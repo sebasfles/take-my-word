@@ -109,6 +109,7 @@ Consolidated 2026-10-20; answers by Sebastian through the om-manager unless mark
 - Dev command (om-reviewer): a debug-only CLI argument reaching the running instance runs the full path from a WAV; a debug-only directory dump writes recorder output. Release builds contain neither: audio is never written to disk in release.
 - Root files (om-reviewer): copied byte-identical from the head of `feat/0001_platform_skeleton`. Desktop-only configuration lives under `apps/desktop` (own `eslint.config.js` extending the root, `tsconfig.json` with DOM, `src-tauri/.gitignore`). 0001 merges first; 0002 rebases on `develop` before its PR opens and regenerates the lockfile.
 - Toolchain: installed first thing, user scope where possible (rustup, Node via a per-user manager, pnpm); only Build Tools raises UAC, and Sebastian is told to accept it. If it stalls, continue with what does not need it and record it.
+- Hook (om-reviewer, 2026-10-20, from the om-developer): a native `WH_KEYBOARD_LL` hook with the `windows` crate behind the `KeyHook` trait replaces `rdev`, which mishandles dead keys and hides `LLKHF_INJECTED`. The Start menu is guarded with the 0xE8 mask key. Only the app's own injections, tagged through `dwExtraInfo`, are ignored, so SendInput tests still drive the hook. Non-Windows builds compile and return unsupported until phase 5. `document-task` amends `docs/modules/desktop/ard.md`.
 - Delivery (om-reviewer): one branch, three review milestones: (1) toolchain, Tauri builds on Windows, tray, hook with the Start-menu guard, recorder with tests; (2) stub client, paste and restore, active window, overlay, first run, settings, hotkey change, dev command; (3) `desktop-ci` with the installer artifact, screenshots, Windows smoke captures, sizes, TRD row.
 
 Constraints:
@@ -130,3 +131,41 @@ Review focus beyond the Pipeline:
 clearance: full: the Windows host through powershell.exe (winget installs, `C:\dev\take-my-word`, running the app, SendInput, screen captures) and GitHub `sebasfles/take-my-word` for the PR and the `desktop-ci` artifact; no AWS.
 
 ## om-developer notes
+
+### Round 1 (milestone 1: toolchain, Windows build, tray, hook, recorder)
+
+Done:
+
+- Windows toolchain: Visual Studio Build Tools 2022 17.14 with the C++ workload and the Windows 11 SDK through `winget` (one UAC prompt); rustup with stable MSVC 1.99.1 per user through `rustup-init`, because the `winget` Rustup package has no user-scope installer; fnm 1.39 per user through `winget`, Node 24.22.0 as default, its alias folder added to the user `Path`; pnpm 10.34.7 through `npm -g`.
+- Root files: copied from `feat/0001_platform_skeleton` at first; 0001 merged during the round, so the branch is rebased on `develop` (`49193e4`), takes `develop`'s root files unchanged and regenerates `pnpm-lock.yaml`.
+- `apps/desktop` as `@take-my-word/desktop` (`pnpm --filter desktop` resolves it): Vite and React UI with one view (a settings placeholder until milestone 2), own `eslint.config.js` extending the root plus react-hooks, `tsconfig.json` with DOM, `.prettierignore` for `src-tauri/target` and `gen`.
+- `src-tauri`: tray with Settings and Quit, no window at startup, exit prevented when the last window closes, settings window destroyed on close; single instance (a second launch opens settings); log plugin; `hotkey` (key model, hotkey validation, chord tracker, `KeyHook` trait, Win32 `WH_KEYBOARD_LL` hook, unsupported stub elsewhere); `audio` (cpal microphone, capture buffer capped at 120 s, rubato FFT resampler, hound WAV); `session` (hold, 0.5 s minimum, cancel on another key, 2 minute cap through `recv_timeout`); `config` (hotkey load); debug-only `--dump-dir`.
+- `apps/desktop/scripts/windows.sh` mirrors the worktree to `C:\dev\take-my-word` and runs a command there through `powershell.exe` with its exit code; `rust:lint`, `rust:test`, `windows:prepare`, `windows:build` scripts; TRD desktop verification row.
+- 30 Rust tests (hotkey, chord, Win32 translation, WAV format, duration, filtering, buffer cap, session) and 2 UI tests.
+
+Decisions the plan did not record (ARD material for `document-task`):
+
+- Microphone pre-armed: building the WASAPI stream takes about 210 ms on this machine (measured), so the first samples arrived 265 ms after key down, the WAV came out about 200 ms shorter than the hold and the first syllable was lost. The input stream is now built at startup and again after each dictation and only `play()`ed on key down; WAVs land within 40 ms of the hold (1990/2024, 680/717, 3500/3530 ms). An armed stream's audio session reports Inactive (`IAudioSessionControl2::GetState`) and Active only during the hold, so the microphone is not in use while idle.
+- Missed key-ups: Win+L, Ctrl+Alt+Del and the secure desktop swallow key-ups, which would leave keys stuck in the tracker and silently disable the hotkey until they were pressed again. Before every key down the session forgets tracked keys the OS no longer reports held (`KeyHook::is_held`, `GetAsyncKeyState` on Windows); only while no chord is active.
+- Chord semantics: the chord fires only when exactly the hotkey keys are down (Ctrl+Shift+Win does not fire Ctrl+Win); Ctrl, Shift and Win match either side; `alt` means Left Alt only, so Right Alt cannot be stored; a hotkey has one to three keys and at least one modifier.
+- Start-menu guard: the 0xE8 mask key is injected when the chord is pressed and the hotkey contains Win, decided from the tracker's physical state rather than `GetAsyncKeyState` to avoid racing the event that just passed the hook.
+- AltGr's synthetic Left Ctrl (scan code 0x21D) is dropped during translation, so it never counts as Ctrl.
+- A dictation is also discarded when the captured audio is under 0.5 s although the hold was longer, matching the API's `minAudioSeconds`.
+- Resampling is rubato's synchronous FFT resampler (band-limited); a test shows a 12 kHz tone at 48 kHz drops under 1% of its level instead of aliasing to 4 kHz.
+- `windows.sh` sets `CARGO_BUILD_JOBS=2`: the first build with 12 parallel rustc processes ran out of memory on the 15.7 GB host shared with WSL. It copies `Cargo.lock` back from Windows, the only place cargo runs.
+- Release profile: LTO, one codegen unit, `opt-level = "s"`, `strip`, `panic = "abort"`. Tauri identifier `dev.fless.takemyword`, NSIS `currentUser` install mode.
+
+Windows smoke (Windows 11 26200; debug exe with `--dump-dir`, then the release exe; input injected from PowerShell with real scan codes):
+
+- Ctrl then Win held 2 s, and Win then Ctrl with Ctrl released first: both recorded 16 kHz mono 16-bit WAVs; Start did not open; no Ctrl or Win left down.
+- 300 ms press discarded; Right arrow during the hold cancelled; release exe records the same way.
+- Without the app, Ctrl+Win press and release does not open Start on this build in either order, so the guard is a safety net here; injecting Win then Ctrl with scan code 0 opened Quick Assist, an artifact of scan-0 injection.
+- Wispr Flow runs on this machine and injects its own Ctrl down and Win up (`dwExtraInfo` 0x5746434B) after Win is released; the tracker tolerates them. Its hotkey is Ctrl+Shift, but the smoke presses also reach it.
+- Installer 1.44 MiB, release exe 4.4 MB; release idle in the tray 18 MB working set, 7 MB private, no WebView2 processes once settings is closed (the 100 MB target with WebView is measured in milestone 3).
+- Recorded WAVs were deleted after measuring.
+
+Pending (milestones 2 and 3): stub server and tray modes, paste and clipboard restore, active window, locale, overlay, first run, settings with hotkey capture (Right Alt rejected at capture), autostart, dev WAV command through the second instance; `desktop-ci`, screenshots, Notepad smoke captures, installer install test, RAM with WebView.
+
+Deferred or open:
+
+- Non-Windows `cargo check` cannot run here (no sudo in WSL for the GTK, WebKit and ALSA headers); I will propose a cheap Ubuntu `cargo check` step in `desktop-ci` in milestone 3 to keep condition 4 verified.

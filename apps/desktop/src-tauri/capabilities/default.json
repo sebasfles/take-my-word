@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Permissions of the app's own windows",
+  "windows": ["settings"],
+  "permissions": ["core:default"]
+}

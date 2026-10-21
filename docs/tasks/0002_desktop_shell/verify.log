@@ -1,0 +1,6 @@
+## 2026-10-21T04:05:01Z by om-developer target desktop on 84c33da1d946871147da3b0218b75618356c3144
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check and clippy -D warnings on C:\dev\take-my-word at 84c33da)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (2 vitest + 30 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+Other targets: untouched; the regenerated pnpm-lock.yaml only adds desktop packages.
