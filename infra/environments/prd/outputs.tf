@@ -47,3 +47,28 @@ output "deploy_role_arn" {
   description = "Role the deploy workflow assumes over OIDC; Terraform writes it into the Actions environment's AWS_ROLE_ARN"
   value       = module.app.deploy_role_arn
 }
+
+output "web_url" {
+  description = "HTTPS URL of the web"
+  value       = module.app.web_url
+}
+
+output "web_function_name" {
+  description = "web Lambda; Terraform writes it into the Actions environment's WEB_FUNCTION_NAME"
+  value       = module.app.web_function_name
+}
+
+output "web_assets_bucket" {
+  description = "Static assets bucket; Terraform writes it into the Actions environment's WEB_ASSETS_BUCKET"
+  value       = module.app.web_assets_bucket
+}
+
+output "web_distribution_id" {
+  description = "Web distribution; Terraform writes it into the Actions environment's WEB_DISTRIBUTION_ID"
+  value       = module.app.web_distribution_id
+}
+
+output "web_secret_id" {
+  description = "Secret holding the web's cookie key, written outside Terraform"
+  value       = module.app.web_secret_id
+}

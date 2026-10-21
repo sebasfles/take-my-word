@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0004_web_landing
 ---
 
 # Auth: product
@@ -23,9 +23,11 @@ There is no public sign-up page.
 ### Sign in on a device
 
 1. The user opens the desktop app, the mobile app or the web, and sees a username and password form.
-2. On success the app goes straight to its main screen: hold-to-talk on desktop and mobile, the read-only account view on the web.
-3. On the first sign-in on any device the user picks a default style; it can be changed later in settings.
-3. The app keeps the user signed in across restarts with no "remember me" choice on desktop and mobile.
+2. With a temporary password the form asks the user to choose their own before going on.
+3. On success the app goes straight to its main screen: hold-to-talk on desktop and mobile, the account page on the web.
+4. On the first sign-in on any device the user picks a default style; it can be changed later in settings.
+5. Desktop and mobile keep the user signed in across restarts with no choice to make.
+   The web offers "remember me": checked, the session survives closing the browser; unchecked, it ends with the browser session.
 
 Errors and empty states: a wrong username or password shows one generic message without saying which field failed; with no network the form says the service is unreachable.
 
@@ -45,17 +47,15 @@ Errors and empty states: a wrong username or password shows one generic message 
 - Accounts exist only by invitation; there is no self-service sign-up and no captcha.
 - Username and password is the only way to sign in in v1.
 - A session lasts until sign-out or revocation, not a fixed number of days; revocation takes effect within about an hour.
-- Each device has its own session, so losing one device is fixed by revoking that device alone.
+- Each device has its own session, so losing one device is fixed by revoking that device alone; on the web, each browser is a device.
 - Every action in the product (dictating, dictionary, styles, app rules, settings, history) requires a signed-in user and only touches that user's data.
 
 ## Out of scope
 
 - Google sign-in: phase 6.
 - Service credentials for third-party integrations: later.
-- "Remember me" on the web: later.
 - Teams, roles or shared accounts.
 
 ## Open questions
 
 - None; a forgotten password is reset by Sebastian by hand in v1.
-- Whether the web session lasts as long as the apps' until "remember me" arrives.

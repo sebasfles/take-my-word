@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0004_web_landing
 ---
 
 # Auth: architecture and debt
@@ -68,3 +68,50 @@ source: 0003_api_features
 - Debt created: none.
 - Revisit when: routes stop being attached by hand in Terraform.
 - Source: 0003_api_features
+
+## 2026-10-21: The web session lives in two sealed host cookies, plus one for the new-password challenge
+
+- Decision: the web keeps access token, `DeviceKey` and the remember flag in `__Host-tmw-session` and the refresh token in `__Host-tmw-refresh`, each sealed with AES-256-GCM under the key in `take-my-word-{env}/web`, with its own cookie name as associated data; the `NEW_PASSWORD_REQUIRED` challenge waits in `__Host-tmw-challenge` for 3 minutes.
+- Alternatives rejected: one cookie with every token, which measured with real tokens leaves almost no margin under 4096 bytes (about 1.8 and 2.6 KB apart); returning the Cognito challenge session to browser JS.
+- Reason: each cookie stays well under the browser limit, a swapped, missing or tampered cookie reads as signed out, and neither the password nor any Cognito secret reaches a script.
+  The two cookies are not bound to each other on purpose: two responses can interleave their `Set-Cookie` headers, and both halves always belong to the same user and device.
+- Debt created: none.
+- Revisit when: Cognito tokens grow enough to push a cookie near 4096 bytes.
+- Source: 0004_web_landing
+
+## 2026-10-21: The browser renews the web session under a Web Lock, never a server render
+
+- Decision: a page that finds the access token in its last minute renders `RenewSession` instead of calling the API; it calls `POST /api/session/refresh` inside `navigator.locks` (`tmw-session-refresh`), shared by every tab of the origin, so a second tab arrives with the renewed cookies and the handler skips Cognito.
+  `refreshSession` in `apps/web/src/lib/auth.ts` is the only refresh path, sign-out included; `NotAuthorizedException` and `RefreshTokenReuseException` sign out, any other error answers 503 and keeps the cookies.
+- Alternatives rejected: refreshing in the server render or a redirect route, which lets two tabs refresh at once; a lock item in DynamoDB holding the renewed tokens for a few seconds, a new data kind for a race the browser can prevent.
+- Reason: Cognito keeps only the refresh token of the renewal that finished last; the other fails later with `RefreshTokenReuseException` (reproduced 4 of 4 in dev), and the browser keeps whichever `Set-Cookie` arrives last, so racing renewals would sign the user out an hour later.
+- Debt created: a browser without the Web Locks API, or two callers outside a browser, can still race and lose the session at the next renewal.
+- Revisit when: a non-browser client uses the web session, or a user is signed out after an hour with two tabs open.
+- Source: 0004_web_landing
+
+## 2026-10-21: Web route handlers accept only requests whose Origin is the configured web origin
+
+- Decision: every web POST (sign-in, new password, refresh, sign-out, language) compares `Origin` with `WEB_ORIGIN`, set by Terraform to `https://{web_hostname}`.
+- Alternatives rejected: comparing with the `Host` header, which behind CloudFront's `AllViewerExceptHostHeader` policy is the Function URL's; a CSRF token, which SameSite=Lax cookies plus the origin check make redundant here.
+- Reason: browsers always send `Origin` on a POST, and the configured value cannot be spoofed through a header the function sees.
+- Debt created: none.
+- Revisit when: the web answers on a second hostname.
+- Source: 0004_web_landing
+
+## 2026-10-21: Web sign-out forgets the device, then revokes the refresh token
+
+- Decision: sign-out runs the refresh path first if the access token is expiring, then `ForgetDevice` (it needs a live access token), then `RevokeToken`, and clears the cookies even when Cognito fails.
+- Alternatives rejected: revoking first, which kills the access token `ForgetDevice` needs; keeping the cookies on a Cognito error, which would leave a user unable to sign out.
+- Reason: the web device and its refresh token disappear together, and the browser is always signed out.
+- Debt created: a browser-session login closed without signing out leaves its refresh token valid and its device listed in Cognito.
+- Revisit when: devices pile up in a user's list, or accounts open beyond invited users.
+- Source: 0004_web_landing
+
+## 2026-10-21: A local cookie key replaces the secret only for screenshots
+
+- Decision: `WEB_COOKIE_KEY` (base64) is read instead of Secrets Manager when it is set; only `pnpm screenshots` sets it, and Terraform never does.
+- Alternatives rejected: reading the dev secret from the screenshot script, which ties mocked screenshots to AWS access.
+- Reason: screenshots run against a local server with a mocked API and a session sealed by the script itself; the deployed function always reads `WEB_SECRET_ID`.
+- Debt created: none.
+- Revisit when: the function's environment is set by anything other than `stacks/app`.
+- Source: 0004_web_landing

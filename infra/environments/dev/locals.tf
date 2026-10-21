@@ -5,6 +5,7 @@ locals {
   aws_account_id = "115891590483"
 
   hosted_zone  = "takemyword.fless.dev"
+  web_hostname = "dev.takemyword.fless.dev"
   api_hostname = "api.dev.takemyword.fless.dev"
 
   github_owner               = "sebasfles"

@@ -5,11 +5,9 @@ import {
   type ApiError,
 } from "@take-my-word/shared";
 import { beforeAll, describe, expect, it } from "vitest";
+import { confirmDevice, forgetDevice, refresh } from "@take-my-word/cognito";
 import {
-  confirmDevice,
   crewE2eConfig,
-  forgetDevice,
-  refresh,
   requiredEnv,
   signInCrewE2e,
   signInCrewE2eSession,
