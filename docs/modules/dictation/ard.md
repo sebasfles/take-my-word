@@ -20,6 +20,7 @@ source: 0001_platform_skeleton
 - Alternatives rejected: Opus from desktop, as the proposal had.
 - Reason: both formats come straight from the recorders (cpal, expo-audio) with no encoder on the client.
 - Debt created: WAV payloads are several times larger than Opus, which costs upload time and caps a desktop dictation at about 2.5 minutes.
+- Resolved by: 2026-10-21 "The audio part is capped at 4 MiB, replacing 5 MB" (0001_platform_skeleton)
 - Revisit when: desktop payload size or upload time shows up in the per-stage latency.
 - Source: setup
 

@@ -59,7 +59,6 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | auth | 2026-10-20 | Three login forms to keep in step; PKCE joins them in phase 6 | Phase 6 starts |
 | auth | 2026-10-21 | A revoked session works until its access token expires, up to 1 h plus the 5 min authorizer cache | Accounts beyond invited users, or immediate revocation needed |
 | auth | 2026-10-21 | Desktop and mobile must confirm their device and send `DeviceKey` on every refresh | Phases 2 and 4 build their logins |
-| dictation | 2026-10-20 | WAV payloads larger than Opus; desktop dictation capped near 2.5 min | Payload size or upload time shows in per-stage latency |
 | dictation | 2026-10-20 | Cold starts of `dictate` paid by the user | MVP works end to end; measure cold vs warm |
 | dictation | 2026-10-21 | Audio part capped at 4 MiB: desktop WAV about 2 min, m4a about 8 | Desktop users hit the cap, or Opus joins |
 | dictation | 2026-10-21 | One daily cap for every user; the per-user override is not built | A task writes `USER`, or a user needs another cap |
