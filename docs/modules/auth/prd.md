@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0004_web_landing
+source: 0007_desktop_integration
 ---
 
 # Auth: product
@@ -25,7 +25,7 @@ There is no public sign-up page.
 1. The user opens the desktop app, the mobile app or the web, and sees a username and password form.
 2. With a temporary password the form asks the user to choose their own before going on.
 3. On success the app goes straight to its main screen: hold-to-talk on desktop and mobile, the account page on the web.
-4. On the first sign-in on any device the user picks a default style; it can be changed later in settings.
+4. The first time a user signs in on a device, the app asks for a default style with the current one preselected; it asks once per user per device, not again when that user signs back in there, and dictation works while the choice is pending.
 5. Desktop and mobile keep the user signed in across restarts with no choice to make.
    The web offers "remember me": checked, the session survives closing the browser; unchecked, it ends with the browser session.
 

@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0002_desktop_shell
+source: 0007_desktop_integration
 ---
 
 # Desktop
@@ -11,7 +11,7 @@ Windows first; macOS and Linux follow.
 
 ## Boundaries
 
-- Owns: the tray, the hotkey hook, recording, the overlay, active window detection, pasting and clipboard restore, the desktop login form and keychain storage, installers and the updater.
+- Owns: the tray, the hotkey hook, recording, the overlay, active window detection, pasting and clipboard restore, the desktop sign-in, session and keychain storage, the first style pick, the dev and prd builds, installers and the updater.
 - Does not own: transcription and cleanup (dictation), styles and app rules data (styles), terms (dictionary), the user pool and token rules (auth).
 - Code: `apps/desktop`.
 
@@ -21,4 +21,4 @@ Windows first; macOS and Linux follow.
 - [trd.md](trd.md): structure and endpoints
 - [ard.md](ard.md): decisions and debt
 - [database.md](database.md): tables and invariants
-- [flows.md](flows.md): hold to talk
+- [flows.md](flows.md): hold to talk with the session

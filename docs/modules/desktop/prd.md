@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0002_desktop_shell
+source: 0007_desktop_integration
 ---
 
 # Desktop: product
@@ -16,11 +16,12 @@ It must feel like typing got faster: no window to open, no copy and paste, the u
 ### First run
 
 1. The user installs the app and it lives in the system tray, starting with Windows unless turned off.
-2. The app explains which keys to hold (Ctrl+Win on Windows, Fn on macOS, Ctrl+Super on Linux) and that the microphone listens only during the hold.
-3. The app shows a username and password form; after sign-in it never asks again until sign-out or revocation (0007).
-4. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
+2. The app asks for username and password; a temporary password must be replaced by the user's own before going on.
+3. The first time a user signs in on this machine, the app asks for a default style, with the current one preselected; dictating already works while the choice is pending.
+4. The app explains which keys to hold (Ctrl+Win on Windows, Fn on macOS, Ctrl+Super on Linux) and that the microphone listens only during the hold.
+5. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
 
-Errors and empty states: if Windows blocks the microphone or none is found, first run says so and links to the privacy setting.
+Errors and empty states: a wrong username or password gets one generic message; an unreachable service says so; if Windows blocks the microphone or none is found, first run says so and links to the privacy setting.
 
 ### Dictate
 
@@ -30,7 +31,7 @@ Errors and empty states: if Windows blocks the microphone or none is found, firs
 4. The clean text is pasted at the cursor and the overlay disappears.
 5. Whatever the user had in the clipboard before is back in the clipboard.
 
-Errors and empty states: a press shorter than half a second does nothing; silence pastes nothing; a network, quota or microphone failure shows a short message in the overlay, which closes after 4 s or on click, and pastes nothing.
+Errors and empty states: a press shorter than half a second does nothing; silence pastes nothing; a network, daily limit, too long, unsupported format or microphone failure shows a short message in the overlay, which closes after 4 s or on click, and pastes nothing; an ended session says "sign in" and opens the sign-in window.
 
 ### Per-app style
 
@@ -46,12 +47,19 @@ Errors and empty states: an app with no rule uses the user's default style and t
 
 Errors and empty states: a rejected combination is explained and the old hotkey stays.
 
+### Sign out
+
+1. The user signs out from the tray or from settings.
+2. The device is forgotten, its session revoked and the keychain cleared, even when the service cannot be reached; the sign-in window opens.
+
 ### Update
 
 1. When a new version is released the app asks before updating (phase 5).
 
 ## Rules
 
+- Signed out, holding the hotkey records nothing; it says "sign in" and opens the sign-in window.
+- Dev and prd are separate apps, "Take My Word Dev" and "Take My Word", with their own sign-in, settings and autostart, so both can sit on one machine.
 - Dictation is hold to talk: recording lasts exactly as long as the key is held, at most two minutes, after which it stops and is sent.
 - Any other key pressed during the hold cancels the dictation.
 - A hotkey is two or three keys with at least one modifier; Right Alt is never accepted, because it is AltGr on Spanish keyboards.
