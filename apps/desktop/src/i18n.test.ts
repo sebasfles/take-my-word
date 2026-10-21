@@ -22,17 +22,18 @@ describe("dictionaries", () => {
 
 describe("language", () => {
   afterEach(() => {
-    setLanguage("es");
+    setLanguage("en");
   });
 
-  it("follows the shell and falls back to Spanish", () => {
+  it("follows the shell and falls back to English", () => {
     expect(languageFromSearch("?view=settings&lang=en")).toBe("en");
     expect(languageFromSearch("?view=settings&lang=es")).toBe("es");
-    expect(languageFromSearch("?view=settings&lang=fr")).toBe("es");
-    expect(languageFromSearch("?view=settings")).toBe("es");
+    expect(languageFromSearch("?view=settings&lang=fr")).toBe("en");
+    expect(languageFromSearch("?view=settings")).toBe("en");
   });
 
   it("fills placeholders in the chosen language", () => {
+    setLanguage("es");
     expect(t("settings.account.signedInAs", { username: "ana" })).toBe("Sesión iniciada como ana");
     setLanguage("en");
     expect(t("settings.account.signedInAs", { username: "ana" })).toBe("Signed in as ana");

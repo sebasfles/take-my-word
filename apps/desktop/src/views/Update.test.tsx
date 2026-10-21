@@ -10,6 +10,8 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   bridge: fakeBridge,
 }));
 
+setLanguage("es");
+
 const available: UpdateView = {
   version: "0.1.1",
   notes: "Pega más rápido en terminales.",

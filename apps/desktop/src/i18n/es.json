@@ -22,8 +22,8 @@
   "choosePassword.rules": "Al menos 12 caracteres, con mayúsculas, minúsculas y números.",
   "choosePassword.mismatch": "Las contraseñas no coinciden.",
   "choosePassword.submit": "Guardar y entrar",
-  "onboarding.title": "Elige tu estilo",
-  "onboarding.intro": "Cada dictado se limpia con este estilo. Puedes cambiarlo después.",
+  "onboarding.title": "Prepara tu dictado",
+  "onboarding.intro": "Elige en qué idiomas hablas y cómo quieres que quede el texto. Puedes cambiarlo después.",
   "onboarding.loading": "Cargando estilos…",
   "style.plain.name": "Neutro",
   "style.casual.name": "Casual",
@@ -167,5 +167,13 @@
   "update.downloading": "Descargando la actualización",
   "update.downloadingPercent": "Descargando la actualización {percent}%",
   "update.installing": "Instalando. Take My Word se reiniciará en unos segundos.",
-  "update.failed": "No se pudo instalar la actualización. Vuelve a intentarlo."
+  "update.failed": "No se pudo instalar la actualización. Vuelve a intentarlo.",
+  "settings.uiLanguage": "Idioma de la app",
+  "settings.uiLanguage.note": "El idioma de los textos de Take My Word.",
+  "settings.uiLanguage.windows": "Idioma de Windows ({language})",
+  "language.en": "English",
+  "language.es": "Español",
+  "dictationLanguages": "Idiomas de dictado",
+  "dictationLanguages.note": "Los idiomas en que hablas. Con los dos, Take My Word reconoce cuál usas en cada dictado.",
+  "dictationLanguages.lastOne": "Elige al menos un idioma."
 }

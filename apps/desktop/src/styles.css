@@ -104,6 +104,7 @@ h2 {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -115,6 +116,7 @@ h2 {
 
 .row-text {
   display: flex;
+  flex: 1 1 180px;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
@@ -792,4 +794,35 @@ kbd {
 
 select.input {
   cursor: pointer;
+}
+
+.row-stacked {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.row-stacked .row-text {
+  flex: none;
+}
+
+.choices-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.choice:has(input:disabled) {
+  cursor: default;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-compact {
+  width: auto;
+  max-width: 100%;
+  flex-shrink: 1;
 }

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, PoisonError, RwLock};
 
 use serde::{Serialize, Serializer};
 
@@ -78,10 +78,21 @@ fn parse(json: &str) -> Dictionary {
 
 static ES: LazyLock<Dictionary> = LazyLock::new(|| parse(include_str!("../../src/i18n/es.json")));
 static EN: LazyLock<Dictionary> = LazyLock::new(|| parse(include_str!("../../src/i18n/en.json")));
-static LANGUAGE: LazyLock<Language> = LazyLock::new(locale::system_language);
+static LANGUAGE: LazyLock<RwLock<Language>> =
+    LazyLock::new(|| RwLock::new(locale::system_language()));
 
 pub fn language() -> Language {
-    *LANGUAGE
+    *LANGUAGE.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+pub fn set_language(language: Language) {
+    *LANGUAGE.write().unwrap_or_else(PoisonError::into_inner) = language;
+}
+
+pub fn choose(choice: Option<Language>) -> Language {
+    let language = choice.unwrap_or_else(locale::system_language);
+    set_language(language);
+    language
 }
 
 pub fn text(message: Message) -> &'static str {
@@ -116,6 +127,15 @@ mod tests {
             assert!(ES.contains_key(message.id()), "es lacks {}", message.id());
             assert!(EN.contains_key(message.id()), "en lacks {}", message.id());
         }
+    }
+
+    #[test]
+    fn a_chosen_language_replaces_windows_until_it_is_cleared() {
+        assert_eq!(choose(Some(Language::Es)), Language::Es);
+        assert_eq!(text(Message::TrayQuit), ES["tray.quit"]);
+        assert_eq!(choose(Some(Language::En)), Language::En);
+        assert_eq!(text(Message::TrayQuit), EN["tray.quit"]);
+        assert_eq!(choose(None), locale::system_language());
     }
 
     #[test]

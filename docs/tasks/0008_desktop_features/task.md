@@ -113,6 +113,28 @@ Review focus beyond the Pipeline: no token, refresh token or dictation text in I
 
 clearance: full: AWS profile `fless-takemyword` on dev (throwaway users created and deleted, Polly speech), the Windows host under the machine rules with mirror `C:\dev\tmw-0008`, GitHub as sebasfles with `GH_TOKEN="$(gh auth token --user sebasfles)"`; no Terraform, no prd.
 
+### Reiteration 1 (2026-10-21): UI language and dictation languages
+
+Scope change decided by Sebastian through the om-manager; details marked (om-reviewer) are mine.
+
+- Scope adjusted, UI language (corrected by Sebastian the same day): the UI follows the Windows display language when it is Spanish or English, and English for any other language (was Spanish). A language selector in General (Windows language, English, Español) overrides it; the choice is saved in `settings.json` and applied at once, without restart, to open windows (an event to every window), the tray items and later notifications; Rust's language becomes mutable state, not a `LazyLock`. Both dictionaries stay.
+- Scope adjusted, dictation languages: `packages/shared` settings gain `dictationLanguages` (one or more of `en`, `es`, unique, default `["en"]`). Onboarding asks for them next to the default style, with the Windows display language (es or en, else en) preselected as the first one, and saves both in one read-then-`PUT`; General edits them. Windows is read only to preselect, never at dictation time.
+- API (om-reviewer details): `GET /me/settings` reads a stored item without `dictationLanguages` as `[language of the stored locale]`, so existing users read `["es"]`. It keeps returning `locale` (derived from the first dictation language) so the web on dev and 0010 keep parsing. A `PUT` without `dictationLanguages` keeps the stored value, so released v0.1.x desktops cannot wipe it.
+- `dictate`: with one language, Whisper gets it; with several, Whisper detects the language. If the detected language is outside the list, or there is none, the audio is transcribed again with the first language. Quota is charged once per request, as today. The silence guard, the refiner's `plain` rules and the saved `DICTATION#` `locale` use the language actually used. Meta `locale` becomes optional, and `dictate` ignores it for the choice; the desktop stops sending it.
+- Rust mirror: `UserSettings` gains `dictationLanguages`, and the contract test must fail first. Without it, onboarding's read-then-`PUT` would drop the field.
+- Acceptance 1 adjusted: the api, shared and web targets join the desktop target in `verify.log`, plus `pnpm e2e` in `apps/api`.
+- Acceptance 5 replaced: with Windows in Spanish every visible string is Spanish, with English English, and with any other language English. Choosing a language in General switches every visible string at once (open windows, tray, notifications), the choice survives restarts, and "Windows language" returns to following Windows. Unit tests cover missing keys and the switch; screenshots in both languages stay.
+- Acceptance 10 added: unit tests in `apps/api` and `packages/shared` cover the selection rule (one language passed, several detected, an outside language re-transcribed with the first, the refiner and `DICTATION#` get the used language, the old `locale` fallback, a `PUT` without the field keeping it). `pnpm e2e` covers `["en"]`, `["es"]` and `["en","es"]` with an English and a Spanish recording. The desktop sends no `locale`, and onboarding and General save `dictationLanguages`.
+- Acceptance 3 extended: the smoke also dictates Spanish into Notepad with `["es"]` and with `["en","es"]`, with the dev API's response as evidence.
+- Delivery adjusted (om-reviewer): milestone 3 is this reiteration (shared, API, e2e, dev deploy, UI language selector, dictation languages in onboarding and General). Milestone 4 is the waveform, the Windows smoke, the measurements, CI and the docs. The dev deploy happens again right before the smoke, and its function code SHA goes in the evidence, since a merge to `develop` (0010) redeploys dev.
+- Docs to reach in `document-task`: `dictation/prd.md` (default English, languages), `dictation/trd.md` and `ard.md` (selection rule), `desktop/prd.md` and `ard.md` (UI language).
+- clearance: full, extended: `lambda update-function-code` plus `wait function-updated-v2` on `take-my-word-dev-{authorizer,dictate,api,dictionary-usage}` with `reusable-deploy`'s build, as 0003 and 0009 did; `pnpm e2e` in `apps/api` with the crew-e2e users. Still no Terraform, no prd.
+- Injected runs (Sebastian through the om-manager, after a run overwrote his clipboard and closed his Notepad):
+  - Snapshot the clipboard in all formats before the first action and restore it at the end; abort if the snapshot fails.
+  - Paste only into a scratch window the run launches itself, under `C:\dev\tmw-0008-smoke`. It must be a top-level window whose handle did not exist before the run. Windows 11 Notepad can open a file as a tab in an existing window, so if the launch lands in a window that already existed, abort and report it; never type into it.
+  - Close only what the run opened.
+  - `computer free` names exactly anything of Sebastian's that changed.
+
 ## om-developer notes
 
 ### Round 1 (milestone 1)
@@ -182,3 +204,35 @@ Did:
 - Finding 3: `.item-actions` stays right-aligned when a row wraps (history, dictionary, app rules at 390 and 768 rechecked).
 
 Pending and deferred: unchanged.
+
+### Round 5 (milestone 3, Reiteration 1)
+
+Did:
+- Shared: `dictationLanguages` (one or both of `en`, `es`, each once) in `settingsSchema`, `settingsUpdateSchema` with `locale` and `dictationLanguages` optional for `PUT`, `localeFor` and `languageOfLocale`; meta `locale` optional.
+- API: `transcribeIn` (`dictation/language-selection.ts`) passes one language to Whisper, lets Whisper detect among several, and transcribes again in the first one when the detected language is neither; quota is still charged once, before transcription; the refiner and `DICTATION#` `locale` get the language used; `dictate` ignores meta `locale`; the done log adds `language` and `transcriptions`.
+  Groq asks for `verbose_json` without a language and maps its `language` name (english, spanish, castilian or the codes) to `en` or `es`, anything else to none.
+- Settings: a stored item without `dictationLanguages` reads as the language of its `locale` (existing users read `["es"]`), with neither it reads `["en"]`; `GET` keeps returning `locale`, the stored one when its language matches the first dictation language, else that language's code; `PUT` without `dictationLanguages` keeps the stored ones and ignores any `locale` sent; new users start on `["en"]`.
+- E2E: `["en"]` with an English recording, `["es"]` with a Spanish one, and `["en","es"]` with both, checked in the text and in the newest history item's `locale`; the feature suite's defaults and the web e2e helper keep the crew and throwaway users on `["es"]`, since they dictate Spanish speech.
+- Dev deploy of 9248c54 with `reusable-deploy`'s build, then `pnpm e2e` (35 passed). Code SHA256 after the update: authorizer `afoz0r1b1mmAWqRFjX1NwhFewDtlC4NbI5ya0fKfwxU=`, dictate `7DZaob3Vri2JUbLjYK+qOO8KSZ7hmyvjq9y8WtCcI2g=`, api `endHjBSsDL3xyTbvV4a/lj8NDdSBH0odCCcjWpkBRro=`, dictionary-usage `OKq0MtF1asNsQr0J1IvEdiE+FzvU6DTIvNRx6PcW2E0=`.
+- Desktop: the contract test failed first (see verify.log), then `UserSettings` gained `dictation_languages` and `DictationMeta.locale` became optional; the desktop sends no `locale`; the stub accepts a meta without it.
+- UI language: Windows' language when it is Spanish or English, English otherwise; `uiLanguage` in `settings.json` overrides it; `set_ui_language` saves it, switches Rust's language (now an `RwLock`), relabels the tray, retitles the first-run window and emits `ui-language` to every window; `LanguageRoot` re-renders the open view in place, so nothing reloads or loses state.
+- General gains "Dictation languages" (saved at once, read then `PUT`, the last checked one cannot be unchecked) and "App language" (Windows language, English, Español); onboarding asks for dictation languages next to the default style, with Windows' language preselected, and `save_onboarding` saves both in one read-then-`PUT` in Rust.
+- Screenshots: 400 files, both languages, General and onboarding with the new rows.
+
+Decisions not in the plan:
+- Groq's detection uses `verbose_json`, and only English and Spanish names count as detected; any other name counts as none, which triggers the second transcription.
+- A `PUT` ignores `locale`; the stored `locale` is always derived, so a released client sending its old locale cannot change the languages.
+- The ordering of dictation languages is the order chosen: onboarding puts Windows' language first; in General a newly checked language goes last.
+- The UI language switch re-renders in place through a root that owns the language, instead of reloading windows.
+- Language names show in their own language (English, Español) in both dictionaries.
+
+Windows run during milestone 4 work, before this reiteration (announced busy, ended early, announced free):
+- Built and measured the base (a97a7ed) and the then head (2ddb28d) dev release builds with 0002's method: 33.3 MB and 33.9 MB private working set, 1.13 and 0.13 CPU seconds over 5 idle minutes. These are redone in milestone 4 on the final commit.
+- UI Automation drove the editors against dev on a throwaway user (`desktop-0008-83ffdd78`, deleted with its items): add, duplicate, alias limit, edit, delete, a custom uppercase style, a `notepad.exe` rule with Shift+Insert; a `--dictate-wav` dictation into a Notepad tab came back uppercase through Shift+Insert, the history copy, delete with confirmation, and the style delete leaving the rule on the default style all worked; a real silent Ctrl+Win hold pasted nothing; the token, password and dictation-text search over the app's config, logs and EBWebView folders (288 files, 69.9 MB, app stopped) found nothing.
+- It found a bug: the history copy failed with "registering the clipboard window failed", since the second clipboard owner registered the same window class again; the fix (register the class once) and its test are on the parked milestone 4 commit with the waveform.
+- What changed of Sebastian's: (1) his clipboard text from before the run was overwritten by a dictation the app left in the clipboard on the first attempt (the debug exe's console took focus, so the paste was refused); clipboard history is off, so it could not be restored, and I cleared the test text at the end; (2) Windows 11 Notepad opened my scratch file as a tab beside two of Sebastian's restored Notepad tabs and one unsaved tab; I read those tabs' text to confirm no dictation landed in them, which the rules now forbid; switching to one of them showed a "file not found" message, and dismissing it made Notepad drop that tab, whose file no longer exists and which was empty; the unsaved tab stayed untouched, and Notepad, which was not running before, closed with no prompt, keeping its session.
+- The new injected-run rules in Reiteration 1 apply from milestone 4 on.
+
+Parked for milestone 4: the waveform and the clipboard fix live on the local branch `wip/0008-milestone-4` (commit 6b27214, before the rebase on 8fe11f1); they come back on their own commit.
+
+Pending (milestone 4): waveform, Windows smoke under the new rules (including Spanish into the scratch window with `["es"]` and `["en","es"]`, and a dev redeploy with its SHAs right before it), measurements on the final commit, `desktop-ci` and `linux-check`, docs.

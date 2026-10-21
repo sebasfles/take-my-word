@@ -175,7 +175,9 @@ describe("Settings", () => {
   });
 
   it("moves an open window to the dictionary with the add field focused", async () => {
-    fakeBridge.apiRequest.mockResolvedValue({ terms: [] });
+    fakeBridge.apiRequest.mockImplementation((route) =>
+      Promise.resolve(route.route === "listTerms" ? { terms: [] } : null),
+    );
     render(<Settings />);
     await screen.findByText("Win");
     act(() => {
@@ -185,7 +187,33 @@ describe("Settings", () => {
     await vi.waitFor(() => {
       expect(document.activeElement).toBe(screen.getByLabelText("Term"));
     });
-    fakeBridge.apiRequest.mockResolvedValue(null);
+    fakeBridge.apiRequest.mockRestore();
+  });
+
+  it("adds a dictation language by reading the settings again and replacing them whole", async () => {
+    render(<Settings />);
+    const english = await screen.findByRole("checkbox", { name: "English" });
+    fireEvent.click(english);
+    await screen.findByText("Saved.");
+    const routes = fakeBridge.apiRequest.mock.calls.map(([route]) => route);
+    expect(routes.at(-2)).toEqual({ route: "getSettings" });
+    expect(routes.at(-1)).toMatchObject({
+      route: "replaceSettings",
+      body: { defaultStyleId: "plain", dictationLanguages: ["es", "en"] },
+    });
+  });
+
+  it("offers Windows' language, English and Spanish for the app and saves the choice", async () => {
+    render(<Settings />);
+    const select = await screen.findByLabelText("App language");
+    await vi.waitFor(() => {
+      expect((select as HTMLSelectElement).disabled).toBe(false);
+    });
+    expect(screen.getByRole("option", { name: "Windows language (Español)" })).toBeTruthy();
+    fireEvent.change(select, { target: { value: "en" } });
+    expect(fakeBridge.setUiLanguage).toHaveBeenCalledWith("en");
+    fireEvent.change(select, { target: { value: "windows" } });
+    expect(fakeBridge.setUiLanguage).toHaveBeenLastCalledWith(null);
   });
 
   it("follows a session that ends elsewhere", async () => {

@@ -6,6 +6,11 @@ describe("dictationMetaSchema", () => {
     expect(dictationMetaSchema.parse({ locale: "es-CO" })).toEqual({ locale: "es-CO" });
   });
 
+  it("accepts no locale, since the server picks the language from settings", () => {
+    expect(dictationMetaSchema.parse({ appId: "notepad.exe" })).toEqual({ appId: "notepad.exe" });
+    expect(dictationMetaSchema.parse({})).toEqual({});
+  });
+
   it("accepts the phase 3 fields so clients can send them early", () => {
     const meta = { locale: "en", styleId: "plain", appId: "com.slack" };
     expect(dictationMetaSchema.parse(meta)).toEqual(meta);
@@ -14,7 +19,6 @@ describe("dictationMetaSchema", () => {
   it.each([
     { locale: "fr" },
     { locale: "es_CO" },
-    {},
     { locale: "es", sttProvider: "aws-transcribe" },
     { locale: "es", refineProvider: "bedrock-claude" },
   ])("rejects %j", (meta) => {

@@ -36,7 +36,7 @@ export const localeSchema = z
   .regex(/^(es|en)(-[A-Z]{2})?$/, "expected es or en, optionally with a region");
 
 export const dictationMetaSchema = z.object({
-  locale: localeSchema,
+  locale: localeSchema.optional(),
   sttProvider: z.enum(transcriberIds).optional(),
   refineProvider: z.enum(refinerIds).optional(),
   styleId: styleIdSchema.optional(),

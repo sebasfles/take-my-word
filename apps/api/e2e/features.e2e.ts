@@ -68,7 +68,7 @@ async function terms(token = tokenA): Promise<DictionaryTerm[]> {
 
 const defaults = (defaultStyleId: string) => ({
   defaultStyleId,
-  locale: "es",
+  dictationLanguages: ["es"],
   providers: { transcriber: "groq-whisper", refiner: "openai" },
 });
 
@@ -334,7 +334,11 @@ describe("styles, app rules and settings in a deployed environment", () => {
       const first = settingsSchema.parse(
         (await call("GET", "/me/settings", { token: tokenB })).json,
       );
-      expect(first).toMatchObject({ defaultStyleId: "plain", locale: "es" });
+      expect(first).toMatchObject({
+        defaultStyleId: "plain",
+        locale: "en",
+        dictationLanguages: ["en"],
+      });
 
       expect((await call("PUT", "/me/settings", { body: defaults("formal") })).status).toBe(200);
       expect(settingsSchema.parse((await call("GET", "/me/settings")).json).defaultStyleId).toBe(

@@ -405,20 +405,47 @@ describe("app rules", () => {
 });
 
 describe("settings", () => {
-  it("creates the user's settings on the first read with plain and es", async () => {
+  it("creates the user's settings on the first read with plain and English", async () => {
     const first = settingsSchema.parse((await world.call("GET", "/me/settings")).json);
     expect(first).toEqual({
       defaultStyleId: "plain",
-      locale: "es",
+      locale: "en",
+      dictationLanguages: ["en"],
       providers: { transcriber: "groq-whisper", refiner: "openai" },
     });
     expect(await world.stores.settings.get("user-a")).toEqual(first);
   });
 
+  it("saves the dictation languages and keeps them when an older client leaves them out", async () => {
+    const providers = { transcriber: "groq-whisper", refiner: "openai" };
+    const chosen = await world.call("PUT", "/me/settings", {
+      body: { defaultStyleId: "plain", dictationLanguages: ["es", "en"], providers },
+    });
+    expect(settingsSchema.parse(chosen.json)).toMatchObject({
+      locale: "es",
+      dictationLanguages: ["es", "en"],
+    });
+    const older = await world.call("PUT", "/me/settings", {
+      body: { defaultStyleId: "casual", locale: "en-US", providers },
+    });
+    expect(older.status).toBe(200);
+    expect(settingsSchema.parse((await world.call("GET", "/me/settings")).json)).toEqual({
+      defaultStyleId: "casual",
+      locale: "es",
+      dictationLanguages: ["es", "en"],
+      providers,
+    });
+    const empty = await world.call("PUT", "/me/settings", {
+      body: { defaultStyleId: "plain", dictationLanguages: [], providers },
+    });
+    expect(empty.status).toBe(400);
+  });
+
   it("changes the default style to an existing one and refuses an unknown one", async () => {
     const body = {
       defaultStyleId: "formal",
-      locale: "en-US",
+      locale: "en",
+      dictationLanguages: ["en"],
       providers: { transcriber: "groq-whisper", refiner: "openai" },
     };
     expect((await world.call("PUT", "/me/settings", { body })).status).toBe(200);

@@ -33,7 +33,6 @@ pub struct Worker<A, P, O, N, K> {
     pub overlay: O,
     pub notifier: N,
     pub keystrokes: K,
-    pub locale: String,
 }
 
 impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A, P, O, N, K> {
@@ -66,7 +65,6 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A
         #[cfg(debug_assertions)]
         crate::dev::dump_recording(&wav);
         let meta = DictationMeta {
-            locale: self.locale.clone(),
             app_id: target.app_id.clone(),
             ..DictationMeta::default()
         };
@@ -247,7 +245,6 @@ mod tests {
             overlay: FakeOverlay(Rc::clone(&world)),
             notifier: FakeNotifier(Rc::clone(&world)),
             keystrokes: Rules,
-            locale: "es-CL".into(),
         };
         worker.handle(Job {
             take,
@@ -288,13 +285,13 @@ mod tests {
     }
 
     #[test]
-    fn text_is_pasted_after_the_overlay_closes_with_locale_and_app() {
+    fn text_is_pasted_after_the_overlay_closes_and_the_api_picks_the_language() {
         let world = run(recorded(), Ok(response("Hola.", None)), PasteResult::Pasted);
         assert_eq!(kinds(&world), vec!["processing", "hidden"]);
         assert_eq!(world.pasted, vec!["Hola."]);
         assert_eq!(world.busy_while_pasting, vec![true]);
         assert_eq!(world.keystrokes, vec![PasteKeystroke::ShiftInsert]);
-        assert_eq!(world.sent[0].locale, "es-CL");
+        assert_eq!(world.sent[0].locale, None);
         assert_eq!(world.sent[0].app_id.as_deref(), Some("notepad.exe"));
         assert_eq!(world.notices, 0);
     }

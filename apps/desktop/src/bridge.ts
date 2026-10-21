@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { Route } from "./api.ts";
-import { isMessageId, type MessageId } from "./i18n.ts";
+import { isMessageId, type Language, type MessageId } from "./i18n.ts";
 
 export type MicStatus = "unknown" | "ready" | "denied" | "missing" | "failing";
 
@@ -38,6 +38,12 @@ export interface StyleOption {
 export interface Onboarding {
   styles: StyleOption[];
   selected: string;
+  dictationLanguages: Language[];
+}
+
+export interface UiLanguage {
+  choice: Language | null;
+  windows: Language;
 }
 
 export function problemOf(reason: unknown): Problem {
@@ -74,7 +80,10 @@ export const bridge = {
     invoke<AccountStep>("sign_in", { username, password }),
   choosePassword: (password: string) => invoke<AccountStep>("choose_password", { password }),
   onboarding: () => invoke<Onboarding>("onboarding"),
-  saveDefaultStyle: (styleId: string) => invoke<undefined>("save_default_style", { styleId }),
+  saveOnboarding: (styleId: string, dictationLanguages: Language[]) =>
+    invoke<undefined>("save_onboarding", { styleId, dictationLanguages }),
+  uiLanguage: () => invoke<UiLanguage>("ui_language"),
+  setUiLanguage: (choice: Language | null) => invoke<UiLanguage>("set_ui_language", { choice }),
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
   apiRequest: (route: Route) => invoke<unknown>("api_request", { route }),
@@ -90,6 +99,10 @@ export const bridge = {
     }),
   onOverlay: (handler: (state: OverlayState) => void): Promise<UnlistenFn> =>
     listen<OverlayState>("overlay", (event) => {
+      handler(event.payload);
+    }),
+  onUiLanguage: (handler: (language: Language) => void): Promise<UnlistenFn> =>
+    listen<Language>("ui-language", (event) => {
       handler(event.payload);
     }),
   onAccountChanged: (handler: (signedIn: boolean) => void): Promise<UnlistenFn> =>

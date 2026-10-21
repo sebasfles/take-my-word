@@ -8,6 +8,8 @@ mod stub;
 
 use serde::{Deserialize, Serialize};
 
+use crate::locale::Language;
+
 pub use authed::AuthedApi;
 pub use http::HttpApi;
 #[cfg(debug_assertions)]
@@ -36,7 +38,8 @@ pub enum RefinerId {
 #[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct DictationMeta {
-    pub locale: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stt_provider: Option<TranscriberId>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -155,6 +158,7 @@ pub struct SettingsProviders {
 pub struct UserSettings {
     pub default_style_id: String,
     pub locale: String,
+    pub dictation_languages: Vec<Language>,
     pub providers: SettingsProviders,
 }
 
@@ -234,13 +238,12 @@ mod tests {
     #[test]
     fn meta_serializes_like_the_shared_schema() {
         let meta = DictationMeta {
-            locale: "es-CL".into(),
             app_id: Some("notepad.exe".into()),
             ..DictationMeta::default()
         };
         assert_eq!(
             serde_json::to_string(&meta).unwrap(),
-            r#"{"locale":"es-CL","appId":"notepad.exe"}"#
+            r#"{"appId":"notepad.exe"}"#
         );
     }
 

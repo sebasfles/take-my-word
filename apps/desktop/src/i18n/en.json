@@ -22,8 +22,8 @@
   "choosePassword.rules": "At least 12 characters, with uppercase, lowercase and numbers.",
   "choosePassword.mismatch": "The passwords do not match.",
   "choosePassword.submit": "Save and sign in",
-  "onboarding.title": "Pick your style",
-  "onboarding.intro": "Every dictation is cleaned up in this style. You can change it later.",
+  "onboarding.title": "Set up your dictation",
+  "onboarding.intro": "Choose the languages you speak and how the text should read. You can change it later.",
   "onboarding.loading": "Loading styles…",
   "style.plain.name": "Plain",
   "style.casual.name": "Casual",
@@ -167,5 +167,13 @@
   "update.downloading": "Downloading the update",
   "update.downloadingPercent": "Downloading the update {percent}%",
   "update.installing": "Installing. Take My Word will restart in a few seconds.",
-  "update.failed": "The update could not be installed. Try again."
+  "update.failed": "The update could not be installed. Try again.",
+  "settings.uiLanguage": "App language",
+  "settings.uiLanguage.note": "The language of Take My Word's own text.",
+  "settings.uiLanguage.windows": "Windows language ({language})",
+  "language.en": "English",
+  "language.es": "Español",
+  "dictationLanguages": "Dictation languages",
+  "dictationLanguages.note": "The languages you speak. With both, Take My Word recognizes which one each dictation is in.",
+  "dictationLanguages.lastOne": "Choose at least one language."
 }

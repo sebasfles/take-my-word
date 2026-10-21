@@ -38,8 +38,12 @@ describe("Account", () => {
     const plain = await screen.findByRole("radio", { name: "Plain" });
     expect((plain as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: "Casual" }));
+    const spanish = screen.getByRole("checkbox", { name: "Español" });
+    expect((spanish as HTMLInputElement).checked).toBe(true);
+    expect((spanish as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "English" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(fakeBridge.saveDefaultStyle).toHaveBeenCalledWith("casual");
+    expect(fakeBridge.saveOnboarding).toHaveBeenCalledWith("casual", ["es", "en"]);
   });
 
   it("shows wrong credentials and stays on sign-in", async () => {
@@ -66,7 +70,7 @@ describe("Account", () => {
     type("Repeat the password", "Chosen password 123");
     fireEvent.click(screen.getByRole("button", { name: "Save and sign in" }));
     expect(fakeBridge.choosePassword).toHaveBeenCalledWith("Chosen password 123");
-    await screen.findByRole("heading", { name: "Pick your style" });
+    await screen.findByRole("heading", { name: "Set up your dictation" });
   });
 
   it("returns to sign-in with the reason when the challenge expired", async () => {

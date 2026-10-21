@@ -1,6 +1,7 @@
 import { type SubmitEvent, useCallback, useEffect, useState } from "react";
 import { type AccountStep, bridge, type Onboarding, problemOf } from "../bridge.ts";
-import { type MessageId, t } from "../i18n.ts";
+import { type Language, type MessageId, t } from "../i18n.ts";
+import { LanguageChoices } from "../LanguageChoices.tsx";
 import { StyleChoices } from "../StyleChoices.tsx";
 import { type AccountScreen, accountScreenFromSearch } from "../view.ts";
 
@@ -198,6 +199,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [onboarding, setOnboarding] = useState<Onboarding | null>(null);
   const [selected, setSelected] = useState("");
+  const [languages, setLanguages] = useState<Language[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<MessageId | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -210,6 +212,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
         if (!current) return;
         setOnboarding(loaded);
         setSelected(loaded.selected);
+        setLanguages(loaded.dictationLanguages);
         setLoad({ kind: "ready" });
       })
       .catch((reason: unknown) => {
@@ -228,7 +231,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
     setBusy(true);
     setError(null);
     bridge
-      .saveDefaultStyle(selected)
+      .saveOnboarding(selected, languages)
       .catch((reason: unknown) => {
         const problem = problemOf(reason);
         if (problem.backToSignIn) onBackToSignIn(problem.message);
@@ -267,7 +270,15 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
       )}
       {load.kind === "ready" && onboarding && (
         <form className="form" onSubmit={save}>
-          <StyleChoices styles={onboarding.styles} selected={selected} onSelect={setSelected} />
+          <section className="form-section">
+            <h2>{t("dictationLanguages")}</h2>
+            <p className="muted">{t("dictationLanguages.note")}</p>
+            <LanguageChoices chosen={languages} onChange={setLanguages} />
+          </section>
+          <section className="form-section">
+            <h2>{t("styles.default")}</h2>
+            <StyleChoices styles={onboarding.styles} selected={selected} onSelect={setSelected} />
+          </section>
           {error && (
             <p className="error" role="alert">
               {t(error)}
@@ -277,7 +288,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
             <button
               type="submit"
               className="button button-primary"
-              disabled={busy || selected === ""}
+              disabled={busy || selected === "" || languages.length === 0}
             >
               {t(busy ? "common.saving" : "common.save")}
             </button>

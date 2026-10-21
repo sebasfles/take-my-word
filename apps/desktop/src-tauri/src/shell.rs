@@ -20,7 +20,6 @@ use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
 use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
-use crate::locale;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, WindowOverlay};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
@@ -102,7 +101,6 @@ impl Shell {
             overlay: overlay.clone(),
             notifier: TrayNotifier(app.clone()),
             keystrokes: Arc::clone(&rules),
-            locale: locale::system_locale(),
         };
         thread::Builder::new()
             .name("dictation".into())

@@ -1,15 +1,16 @@
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::account::Problem;
 use crate::audio::MicStatus;
 use crate::foreground;
-use crate::i18n::Message;
+use crate::i18n::{self, Message};
+use crate::locale::{self, Language};
 use crate::overlay::{Overlay, OverlayState};
 use crate::shell::Shell;
-use crate::windows;
+use crate::{tray, windows};
 
 const MICROPHONE_SETTINGS: &str = "ms-settings:privacy-microphone";
 
@@ -111,4 +112,39 @@ pub fn finish_first_run(app: AppHandle, shell: State<'_, Shell>) {
 #[tauri::command]
 pub fn quit(app: AppHandle) {
     app.exit(0);
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiLanguage {
+    choice: Option<Language>,
+    windows: Language,
+}
+
+#[tauri::command]
+pub fn ui_language(shell: State<'_, Shell>) -> UiLanguage {
+    UiLanguage {
+        choice: shell.settings().ui_language,
+        windows: locale::system_language(),
+    }
+}
+
+#[tauri::command]
+pub fn set_ui_language(
+    app: AppHandle,
+    shell: State<'_, Shell>,
+    choice: Option<Language>,
+) -> UiLanguage {
+    shell.update_settings(|settings| settings.ui_language = choice);
+    let language = i18n::choose(choice);
+    log::info!("ui language: {}", language.code());
+    tray::relabel(&app, shell.account.is_signed_in());
+    windows::retitle(&app);
+    if let Err(error) = app.emit("ui-language", language) {
+        log::warn!("announcing the ui language failed: {error}");
+    }
+    UiLanguage {
+        choice,
+        windows: locale::system_language(),
+    }
 }

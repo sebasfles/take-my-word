@@ -79,6 +79,12 @@ pub fn open_first_run(app: &AppHandle) {
     );
 }
 
+pub fn retitle(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(FIRST_RUN) {
+        let _ = window.set_title(i18n::text(Message::FirstRunTitle));
+    }
+}
+
 pub fn open_account(app: &AppHandle, onboarding: bool) {
     let query = if onboarding { "&step=onboarding" } else { "" };
     let _ = open(app, ACCOUNT, query, &product_name(app), fixed(440.0, 560.0));

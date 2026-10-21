@@ -6,10 +6,10 @@ export type Language = "es" | "en";
 
 export const dictionaries: Record<Language, Record<MessageId, string>> = { es, en };
 
-let current: Language = "es";
+let current: Language = "en";
 
 export function languageFromSearch(search: string): Language {
-  return new URLSearchParams(search).get("lang") === "en" ? "en" : "es";
+  return new URLSearchParams(search).get("lang") === "es" ? "es" : "en";
 }
 
 export function setLanguage(language: Language): void {

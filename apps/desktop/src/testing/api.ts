@@ -38,5 +38,6 @@ export const builtins = [
 export const settings = {
   defaultStyleId: "plain",
   locale: "es-CL",
+  dictationLanguages: ["es"],
   providers: { transcriber: "groq-whisper", refiner: "openai" },
 };

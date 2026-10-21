@@ -128,6 +128,7 @@ function route(request: Record<string, unknown>): Promise<unknown> {
       return Promise.resolve({
         defaultStyleId: "plain",
         locale: "es",
+        dictationLanguages: ["es"],
         providers: { transcriber: "groq-whisper", refiner: "openai" },
       });
     case "replaceSettings":
@@ -186,9 +187,16 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
               { id: "c7d1", name: "Client emails", builtin: false },
             ],
             selected: "plain",
+            dictationLanguages: [params.get("lang") === "es" ? "es" : "en"],
           });
     case "api_request":
       return route(args?.route as Record<string, unknown>) as Promise<T>;
+    case "ui_language":
+    case "set_ui_language":
+      return answer({
+        choice: command === "set_ui_language" ? (args?.choice ?? null) : null,
+        windows: params.get("lang") === "es" ? "es" : "en",
+      });
     case "running_apps":
       return answer(["chrome.exe", "code.exe", "notepad.exe", "slack.exe", "winword.exe"]);
     case "set_autostart":

@@ -6,6 +6,7 @@ import { focusAddFromSearch, type SettingsSection, settingsSectionFromSearch } f
 import { AppRules } from "./settings/AppRules.tsx";
 import { Dictionary } from "./settings/Dictionary.tsx";
 import { History } from "./settings/History.tsx";
+import { DictationLanguagesRow, UiLanguageRow } from "./settings/Languages.tsx";
 import { SectionPage } from "./settings/parts.tsx";
 import { Styles } from "./settings/Styles.tsx";
 
@@ -123,6 +124,10 @@ function General() {
           }}
         />
       </section>
+
+      <DictationLanguagesRow />
+
+      <UiLanguageRow />
 
       <footer className="page-footer">
         <button type="button" className="button button-quiet" onClick={() => void bridge.quit()}>

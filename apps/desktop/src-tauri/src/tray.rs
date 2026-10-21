@@ -10,7 +10,12 @@ const ADD_WORD: &str = "add-word";
 const ACCOUNT: &str = "account";
 const QUIT: &str = "quit";
 
-struct AccountItem(MenuItem<Wry>);
+struct Items {
+    add_word: MenuItem<Wry>,
+    settings: MenuItem<Wry>,
+    account: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
+}
 
 fn account_label(signed_in: bool) -> &'static str {
     text(if signed_in {
@@ -21,10 +26,25 @@ fn account_label(signed_in: bool) -> &'static str {
 }
 
 pub fn show_signed_in(app: &AppHandle, signed_in: bool) {
-    if let Some(item) = app.try_state::<AccountItem>()
-        && let Err(error) = item.0.set_text(account_label(signed_in))
+    if let Some(items) = app.try_state::<Items>()
+        && let Err(error) = items.account.set_text(account_label(signed_in))
     {
         log::warn!("updating the tray failed: {error}");
+    }
+}
+
+pub fn relabel(app: &AppHandle, signed_in: bool) {
+    let Some(items) = app.try_state::<Items>() else {
+        return;
+    };
+    let relabeled = items
+        .add_word
+        .set_text(text(Message::TrayAddWord))
+        .and_then(|()| items.settings.set_text(text(Message::TraySettings)))
+        .and_then(|()| items.account.set_text(account_label(signed_in)))
+        .and_then(|()| items.quit.set_text(text(Message::TrayQuit)));
+    if let Err(error) = relabeled {
+        log::warn!("relabeling the tray failed: {error}");
     }
 }
 
@@ -72,7 +92,12 @@ pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
-    app.manage(AccountItem(account_item));
+    app.manage(Items {
+        add_word,
+        settings,
+        account: account_item,
+        quit,
+    });
     Ok(())
 }
 

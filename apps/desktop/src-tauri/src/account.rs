@@ -6,6 +6,7 @@ use crate::auth::Secret;
 use crate::auth::account::{AccountError, SignInStep, User};
 use crate::commands::blocking;
 use crate::i18n::Message;
+use crate::locale::{self, Language};
 use crate::shell::Shell;
 use crate::{tray, windows};
 
@@ -86,6 +87,7 @@ pub struct StyleOption {
 pub struct Onboarding {
     styles: Vec<StyleOption>,
     selected: String,
+    dictation_languages: Vec<Language>,
 }
 
 #[tauri::command]
@@ -141,16 +143,25 @@ pub async fn onboarding(app: AppHandle) -> Result<Onboarding, Problem> {
                 })
                 .collect(),
             selected,
+            dictation_languages: vec![locale::system_language()],
         })
     })
     .await
 }
 
 #[tauri::command]
-pub async fn save_default_style(app: AppHandle, style_id: String) -> Result<(), Problem> {
+pub async fn save_onboarding(
+    app: AppHandle,
+    style_id: String,
+    dictation_languages: Vec<Language>,
+) -> Result<(), Problem> {
+    if dictation_languages.is_empty() {
+        return Err(Message::Generic.into());
+    }
     blocking(app, move |app, shell| {
         let mut settings = shell.api.settings()?;
         settings.default_style_id = style_id;
+        settings.dictation_languages = dictation_languages;
         shell.api.replace_settings(&settings)?;
         let user = shell.account.user()?;
         shell.update_settings(|settings| {

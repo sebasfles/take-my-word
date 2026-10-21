@@ -19,3 +19,27 @@
 - unit: pass exit 0 (89 vitest including 0005's release scripts + 131 cargo tests, pnpm test && pnpm rust:test)
 - e2e: n/a
 - root and workflows: not run; the rebase had no conflict there and this branch changes no root file or workflow.
+## 2026-10-21T23:26:02Z by om-developer target desktop on round 5 commit (same code as 9248c54; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (92 vitest + 131 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+- contract first red: before the Rust mirror changed, `cargo test contract` failed on dictationMeta.locale (required in Rust, optional in shared) and settings.dictationLanguages (missing in Rust); exit 101, artefact .verify/contract-red.out.
+
+## 2026-10-21T23:26:02Z by om-developer target shared on round 5 commit (same code as 9248c54; run on 62b7490, which differs from it only in apps/desktop/src/LanguageRoot.test.tsx)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (22 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-21T23:26:02Z by om-developer target api on round 5 commit (same code as 9248c54; lint, typecheck and unit ran on 62b7490, which differs from it only in a desktop test)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (191 tests, pnpm test)
+- e2e: pass exit 0 (35 tests, pnpm e2e against dev after deploying 9248c54; the dictation languages cases also ran verbose, 3 passed, artefact .verify/api-e2e-languages.out)
+
+## 2026-10-21T23:26:02Z by om-developer target web on round 5 commit (same code as 9248c54; run on 62b7490, which differs from it only in a desktop test)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: n/a (web e2e not in this round's scope; its helper now saves dictationLanguages ["es"] so Spanish speech stays Spanish)

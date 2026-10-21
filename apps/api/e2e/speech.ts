@@ -17,13 +17,20 @@ function pcmToWav(pcm: Buffer): Buffer {
   return Buffer.concat([header, pcm]);
 }
 
-export async function synthesize(text: string): Promise<Buffer> {
+const voices = {
+  es: { VoiceId: "Lupe", LanguageCode: "es-US" },
+  en: { VoiceId: "Joanna", LanguageCode: "en-US" },
+} as const;
+
+export async function synthesize(
+  text: string,
+  language: keyof typeof voices = "es",
+): Promise<Buffer> {
   const polly = new PollyClient({ region: "us-east-1" });
   const { AudioStream } = await polly.send(
     new SynthesizeSpeechCommand({
       Engine: "neural",
-      VoiceId: "Lupe",
-      LanguageCode: "es-US",
+      ...voices[language],
       OutputFormat: "pcm",
       SampleRate: "16000",
       Text: text,
