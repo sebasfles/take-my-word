@@ -54,3 +54,9 @@ The first unit run exited 1 before cargo started: WSL interop failed to launch p
 - typecheck: n/a
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-21T21:09:13Z by om-developer target desktop on e6abb89
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, plus cargo clippy --release --features prd --locked, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (pnpm check:version reports 0.1.1; 54 vitest + 112 cargo tests, 3 ignored; pnpm check:version && pnpm test && pnpm rust:test, cargo --locked)
+- e2e: n/a

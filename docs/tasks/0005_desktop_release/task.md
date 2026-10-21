@@ -198,3 +198,7 @@ Notes:
 Pending:
 
 - `document-task`, after your go.
+
+### Round 5
+
+- Finding 1: `verify-task` for the desktop target on e6abb89, which includes the 0.1.1 bump: `check:version` reports 0.1.1 in all three files, and lint, clippy (dev and prd release) and cargo tests pass `--locked` on the Windows mirror with `Cargo.lock` unchanged.
