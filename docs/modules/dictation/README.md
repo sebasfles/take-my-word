@@ -1,17 +1,17 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Dictation
 
 Turns a short recording into clean text: transcribe, refine with the user's dictionary and style, return, keep the text 90 days.
 Every surface uses it: desktop pastes the result, mobile copies or shares it, web shows the history.
-Planned; phase 1 builds it.
+`POST /dictations` runs in dev since 0001; history arrives in phase 5.
 
 ## Boundaries
 
-- Owns: `POST /dictations`, `GET /dictations`, the Transcriber and Refiner ports and adapters, the daily quota, the silence guard, `DICTATION#ts` items, the web history screen.
+- Owns: `POST /dictations`, `GET /dictations`, the Transcriber and Refiner ports and adapters, the daily quota, the silence guard, `DICTATION#ts` and `QUOTA#date` items, the web history screen.
 - Does not own: recording and paste (desktop, mobile), terms and ranking (dictionary), style prompts and app rules (styles), the authorizer (auth), Lambdas, table and secrets provisioning (infra).
 - Code: `apps/api`, `packages/shared`, `apps/web`
 

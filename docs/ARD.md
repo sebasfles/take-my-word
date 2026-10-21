@@ -1,5 +1,5 @@
 ---
-updated: 2026-10-20
+updated: 2026-10-21
 source: setup
 ---
 
@@ -57,8 +57,13 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | auth | 2026-10-20 | No Google sign-in until phase 6; password resets by hand until then | Phase 6, or accounts beyond the invited circle |
 | auth | 2026-10-20 | A leaked refresh token stays valid until revoked | Accounts open beyond invited users |
 | auth | 2026-10-20 | Three login forms to keep in step; PKCE joins them in phase 6 | Phase 6 starts |
-| dictation | 2026-10-20 | WAV payloads larger than Opus; desktop dictation capped near 2.5 min | Payload size or upload time shows in per-stage latency |
+| auth | 2026-10-21 | A revoked session works until its access token expires, up to 1 h plus the 5 min authorizer cache | Accounts beyond invited users, or immediate revocation needed |
+| auth | 2026-10-21 | Desktop and mobile must confirm their device and send `DeviceKey` on every refresh | Phases 2 and 4 build their logins |
 | dictation | 2026-10-20 | Cold starts of `dictate` paid by the user | MVP works end to end; measure cold vs warm |
+| dictation | 2026-10-21 | Audio part capped at 4 MiB: desktop WAV about 2 min, m4a about 8 | Desktop users hit the cap, or Opus joins |
+| dictation | 2026-10-21 | One daily cap for every user; the per-user override is not built | A task writes `USER`, or a user needs another cap |
+| dictation | 2026-10-21 | m4a level is not measured, so its ambiguous phrases are always refined | Phase 4, when mobile drops silence with expo-audio metering |
+| dictation | 2026-10-21 | Loud noise can make Whisper loop on mixed hallucinations that get refined | A hallucination loop gets pasted in real use |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |
 | desktop | 2026-10-20 | Rust toolchain in a TypeScript monorepo | Rust layer grows past OS glue |
 | desktop | 2026-10-20 | macOS first run needs the Fn setting changed and Accessibility granted | An OS update breaks the hook, or toggle mode is requested |

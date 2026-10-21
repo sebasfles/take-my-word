@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+workspaceConcurrency: 1
+
+onlyBuiltDependencies:
+  - esbuild

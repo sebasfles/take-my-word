@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Infra: architecture and debt
@@ -67,3 +67,22 @@ source: setup
 - Debt created: cold starts land on the user's first dictation after idle time.
 - Revisit when: the parked latency work starts, with cold and warm numbers per provider.
 - Source: setup
+
+## 2026-10-21: Terraform state in a hand-made S3 bucket, applied through one wrapper
+
+- Decision: every root keeps its state in `takemyword-terraform-state-115891590483` under its own key, locked with the S3 lockfile; the bucket is created by hand outside Terraform; `infra/scripts/tf` passes the GitHub App pem from `.env` and the account profile; a fresh account applies the bucket, `core`, then each env.
+- Alternatives rejected: a DynamoDB lock table; a Terraform-managed state bucket; a tfvars copy of the pem.
+- Reason: the state bucket cannot hold its own state, the S3 lockfile needs no extra resource, and the pem never lands on disk outside `.env`.
+- Debt created: none.
+- Revisit when: someone other than Sebastian applies infrastructure.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: The API answers on `api.` of each environment's host
+
+- Decision: the HTTP API serves `api.dev.takemyword.fless.dev` and `api.takemyword.fless.dev` with a regional ACM certificate and a Route 53 alias; the execute-api endpoint is disabled; the stage throttles at 10 requests per second with a burst of 20; `core` creates the Actions environments and `stacks/app` writes their variables.
+- Alternatives rejected: the default execute-api address.
+- Reason: clients bake in a stable address, and a disabled default endpoint leaves one way in.
+- Debt created: none.
+- Revisit when: the web needs the API under its own origin.
+- Source: 0001_platform_skeleton
+

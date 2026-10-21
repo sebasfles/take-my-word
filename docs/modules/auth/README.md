@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Auth
@@ -13,7 +13,7 @@ A Lambda authorizer validates the token on every API route so every other module
 
 - Owns: the user pool and its app clients, token lifetimes and revocation, the authorizer, the login forms and token storage in every client.
 - Does not own: user settings, quota and provider defaults (dictation), hotkey and recording (desktop, mobile), the HTTP API itself (infra).
-- Code: `infra/modules/aws/cognito`, `infra/stacks/app`, `apps/api`, `apps/desktop`, `apps/mobile`, `apps/web` (planned).
+- Code: `infra/modules/aws/cognito`, `infra/stacks/app`, `apps/api/src/authorizer`, `apps/api/scripts/sign-in.ts`; `apps/desktop`, `apps/mobile`, `apps/web` later.
 
 ## Documents
 

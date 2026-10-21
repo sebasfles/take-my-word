@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Auth: architecture and debt
@@ -40,3 +40,22 @@ source: setup
 - Debt created: three login forms to keep in step; phase 6 adds the PKCE path next to them.
 - Revisit when: phase 6 (Google sign-in) starts.
 - Source: setup
+
+## 2026-10-21: The authorizer checks signatures, not revocation
+
+- Decision: the authorizer verifies the access token's signature, expiry, `token_use` and client id against the cached JWKS, and API Gateway caches its answer for 5 minutes; it never asks Cognito whether the session was revoked.
+- Alternatives rejected: a Cognito call per request to check revocation.
+- Reason: no network call on the dictation path, and access tokens last only 1 h.
+- Debt created: a revoked session keeps working until its access token expires, up to 1 h plus the 5-minute authorizer cache.
+- Revisit when: accounts open beyond invited users, or revocation must be immediate.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: Clients confirm their device and send its key on every refresh
+
+- Decision: with device remembering on, a refresh token only renews with the confirmed `DeviceKey`; clients call `ConfirmDevice` after the first sign-in and pass the key to `GetTokensFromRefreshToken`, and the native client allows `ALLOW_USER_SRP_AUTH` alone because rotation renews outside the `REFRESH_TOKEN_AUTH` flow.
+- Alternatives rejected: turning device remembering off, which would lose per-device revocation; adding `ALLOW_REFRESH_TOKEN_AUTH`, which was not the cause (proven in dev).
+- Reason: refresh without the confirmed key answers `Invalid Refresh Token.`, with it rotation works and an old token is rejected as reuse after the 10 s grace.
+- Debt created: desktop and mobile must each implement device SRP confirmation and keep the device keys next to the refresh token.
+- Revisit when: phase 2 and phase 4 build their logins.
+- Source: 0001_platform_skeleton
+

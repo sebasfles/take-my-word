@@ -1,11 +1,11 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Infra: database
 
-The table is defined in `infra/modules/aws/dynamodb` and instantiated by `infra/stacks/app` (planned); item attributes live in `apps/api` and `packages/shared`.
+The table is defined in `infra/modules/aws/dynamodb` and instantiated by `infra/stacks/app`; item attributes live in `apps/api` and `packages/shared`.
 Infra owns the table as a resource, not the items in it.
 
 ## Tables owned
@@ -30,11 +30,11 @@ Infra owns no item kind.
 ## Invariants kept in code
 
 - One table per env; dev and prd never share a table, a secret or a user pool.
-- TTL stays enabled on the attribute `DICTATION#ts` items use, or history outlives its 90 days.
+- TTL stays enabled on `expiresAt`, which every item kind sets, or history outlives its 90 days.
 - The stream stays enabled with new images, or dictionary ranking stops.
 - prd has no debug bucket; no audio is persisted outside dev.
 - Only `api`, `dictate` and `dictionary-usage` get access to the table, and only `dictate` to the secret.
 
 ## Migrations of note
 
-- None; the table is created in phase 1.
+- None; 0001 created the dev table.

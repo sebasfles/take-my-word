@@ -27,7 +27,8 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 - Stack: Node 24, Hono, zod, AWS SDK v3; bundled with esbuild into two Lambdas, `api` (every CRUD route) and `dictate` (`POST /dictations`, more memory, 60 s timeout), plus `dictionary-usage` on the table stream and the Lambda authorizer.
 - Layout: one folder per module (`auth/`, `dictation/`, `dictionary/`, `styles/`), provider adapters under `dictation/providers/`.
 - Install: `pnpm install --frozen-lockfile` at the root.
-- Workspace files: `.env` with table name, secret id and Cognito ids for local runs.
+- Workspace files: `.env` at the repository root, gitignored, never committed or printed.
+  It holds `GROQ_API_KEY` and `OPENAI_API_KEY` (copied into the providers secret), `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM` (read by `infra/scripts/tf`), and `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD` and `API_URL` (read by `pnpm token` and `pnpm e2e` in `apps/api`).
 - API spec: `none`; the zod contracts in `packages/shared` are the source of truth.
 - Data: one DynamoDB table `take-my-word-{env}`, no ORM, no migrations; item kinds per module in each `database.md`.
 - Delivery: GitHub Actions on `develop` (dev) and `main` (prd) build and run `aws lambda update-function-code`; see [infra](modules/infra/README.md).
@@ -64,16 +65,17 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 ## Verification targets
 
 `verify-task` reads this table literally.
-Phase 1 sets every command; until then they are `unknown`.
+Each app's first task sets its commands; until then they are `unknown`.
 
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
-| api | `apps/api` | unknown | unknown | unknown | unknown |
+| api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
 | web | `apps/web` | unknown | unknown | unknown | unknown |
 | desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
-| shared | `packages/shared` | unknown | unknown | unknown | n/a |
-| infra | `infra` | `terraform fmt -check -recursive` | `terraform validate` per environment | n/a | n/a |
+| shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
+| infra | `infra` | `terraform fmt -check -recursive` | `terraform -chdir=environments/{core,dev,prd} validate`, after `init -backend=false` on a fresh clone | n/a | n/a |
+| workflows | `.` | `pnpm lint:workflows` (actionlint) | n/a | n/a | n/a |
 
 ## Modules
 
