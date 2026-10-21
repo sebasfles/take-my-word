@@ -177,3 +177,43 @@ Decisions the plan did not record:
 
 Pending: milestone 3 (Windows smoke for Acceptance 2 to 8 once the om-manager relays `computer available`, `desktop-ci`, docs).
 Deferred: none new.
+
+### Round 4 (milestone 3: Windows smoke, desktop-ci, verification)
+
+Windows smoke, Windows 11 on Sebastian's machine, dev API and pool, announced to the om-manager (`computer busy` at 14:28, `computer free` after).
+It started after Windows reported more than 2 minutes idle; physical mouse input had kept it from starting earlier.
+A low-level hook watched for physical input the whole time and saw none.
+Input was injected with `SendInput` (Unicode typing for the forms) and UI Automation (buttons, radios); credentials came through `WSLENV`, never written to disk.
+Captures are in `screenshots/windows/` in the workspace; mocked screenshots of every view are in `screenshots/round-3/`.
+
+- Acceptance 2 (release dev installer, `crew-e2e`): after removing the dev app's data and credentials, the silent install opened the sign-in window (`a2-sign-in-after-fresh-install`).
+  Signing in reached the style picker with `plain` preselected (`a2-onboarding`); picking Casual saved it, and `GET /me/settings` returned `defaultStyleId=casual`; first run followed and was dismissed.
+  After a restart only the app's internal windows existed (single-instance and event-loop windows), so neither sign-in nor the picker came back.
+  `crew-e2e`'s `SETTINGS` was restored to `plain` right after.
+- Acceptance 3 (installed build, throwaway user with a temporary password): sign-in led to choose-password (`a3-choose-password`), then to the picker (`a3-onboarding-after-new-password`); after Formal was saved the window closed.
+  The user and its `SETTINGS` item were deleted.
+- Acceptance 4 (debug build, `crew-e2e`, `--dictate-wav` with a Polly es-US sample into a Notepad tab): the real cleaned text was pasted ("Hola, esta es una prueba de dictado desde la aplicación de escritorio. Mañana revisamos el informe con el equipo."), the clipboard hash was unchanged, and the dictation is the newest item of `GET /dictations` (`a4-dictation-notepad`, cropped to the text).
+- Acceptance 5 (throwaway user): after `admin-forget-device` on the app's device and a restart, the renewal at startup failed (`NotAuthorizedException: Invalid Refresh Token.`), the keychain was cleared and the sign-in window opened.
+  The next dictation showed "Sign in to Take My Word to dictate." (`a5-after-forget-overlay`), pasted nothing, and the clipboard was unchanged.
+- Acceptance 6 (throwaway users): with `QUOTA#2026-10-21` seeded at 3600 s the dictation answered 429 `quota_exceeded`, showed "You've reached today's dictation limit." (`a6-quota-overlay`) and pasted nothing.
+  A 2 s near-silent WAV pasted nothing and showed no error ("dictation returned no text" in the log).
+  The seeded item was removed; the users and all their items are gone (0 items left).
+- Acceptance 7 (`crew-e2e`, and again for every throwaway user): Sign out in Settings removed all three Credential Manager entries.
+  A refresh with the old token and device key, read into memory before the sign-out, answered "Invalid Refresh Token."; the device left the user's device list and the sign-in window opened (`a7-settings-signed-in`, `a7-settings-signed-out`).
+- Acceptance 8: the dev app's config folder, log folder and WebView data (`EBWebView`) were searched for the live refresh token, device key and device group key, the passwords used, and anything token-shaped (`eyJ….…`), in UTF-8 and UTF-16.
+  Searches ran signed in with the app stopped (184 files), after the new-password flow (195 files), and at the end (282 files, 72.9 MB, none locked): 0 hits each time.
+  The throwaway users of Acceptance 6 were searched only for token-shaped values, not for their exact passwords.
+- Also: holding Ctrl+Win while signed out (Notepad in front) showed the sign-in message, recorded and sent nothing, and left Start closed (`signed-out-hold-overlay`).
+- Restored: dev app uninstalled (its autostart value went with it), its config, log and WebView folders and credentials removed, no app processes, Notepad closed again with only the tabs its own session restored, clipboard never written, hotkey and microphone settings untouched; `crew-e2e` has no devices.
+
+`desktop-ci` was not pushed (the om-reviewer pushes at publish time).
+Its Windows steps ran locally on the mirror at this code: UI lint, typecheck and tests, `cargo fmt`, clippy on all targets and on release with `--features dev`, `cargo test`, and `pnpm tauri:build:dev` (installer 1.84 MiB).
+The real-clipboard test and the Linux clippy job were not run locally: the first would overwrite Sebastian's clipboard outside a smoke run, and WSL has no Rust toolchain.
+Root `pnpm lint`, `typecheck` and `test` pass, one package at a time.
+
+Incident: Notepad restored Sebastian's earlier tabs when it started, and the first dictation's cleanup keys missed and left an Open dialog up.
+I closed the dialog and my tab without saving through UI Automation, then let Notepad close with the tabs it had restored; his tabs were never edited.
+The dictation script was changed to close only its own tab, and captures now cover only the document area.
+
+Decisions the plan did not record: none.
+Pending: docs, on the clean signal.

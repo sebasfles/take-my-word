@@ -28,3 +28,21 @@ screenshots/tauri-core.ts: Expected the Promise rejection reason to be an Error 
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
 - e2e: n/a
+
+## 2026-10-21T19:43:26Z by om-developer target desktop on 4b4b707
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T19:43:26Z by om-developer target workflows on 4b4b707
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T19:43:26Z by om-developer target root (Acceptance 1) on 6d6eaf5 (same code as 4b4b707)
+- lint: pass exit 0 (pnpm -r --workspace-concurrency=1 lint && pnpm lint:workflows)
+- typecheck: pass exit 0 (pnpm -r --workspace-concurrency=1 typecheck)
+- unit: pass exit 0 (19 + 179 + 25 + 95 vitest tests; pnpm -r --workspace-concurrency=1 test)
+- e2e: n/a
