@@ -44,7 +44,10 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   test.setTimeout(60_000);
-  for (const user of users) await removeUser(user);
+  const failures = (await Promise.allSettled(users.map(removeUser))).flatMap((result) =>
+    result.status === "rejected" ? [result.reason as unknown] : [],
+  );
+  if (failures.length > 0) throw new AggregateError(failures, "throwaway users left behind");
 });
 
 async function signInAs(page: Page, user: ThrowawayUser): Promise<void> {

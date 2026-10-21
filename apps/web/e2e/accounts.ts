@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
@@ -6,7 +7,12 @@ import {
   CognitoIdentityProviderClient,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { BatchWriteCommand, DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchWriteCommand,
+  DynamoDBDocumentClient,
+  QueryCommand,
+  type BatchWriteCommandInput,
+} from "@aws-sdk/lib-dynamodb";
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import {
   appRuleSchema,
@@ -61,6 +67,21 @@ export async function createUser(created: ThrowawayUser[]): Promise<ThrowawayUse
   return user;
 }
 
+const batchAttempts = 6;
+
+async function deleteBatch(requests: BatchWriteCommandInput["RequestItems"]): Promise<void> {
+  let pending = requests;
+  for (let attempt = 0; attempt < batchAttempts; attempt += 1) {
+    if (attempt > 0) await sleep(100 * 2 ** attempt);
+    const { UnprocessedItems } = await table.send(new BatchWriteCommand({ RequestItems: pending }));
+    pending = UnprocessedItems;
+    if (pending === undefined || Object.values(pending).every((items) => items.length === 0)) {
+      return;
+    }
+  }
+  throw new Error(`items left after ${String(batchAttempts)} batch deletes`);
+}
+
 async function deleteItems(sub: string): Promise<void> {
   const tableName = env("TABLE_NAME");
   let start: Record<string, unknown> | undefined;
@@ -76,15 +97,9 @@ async function deleteItems(sub: string): Promise<void> {
     );
     const keys = (page.Items ?? []).map((item) => ({ PK: String(item.PK), SK: String(item.SK) }));
     for (let index = 0; index < keys.length; index += 25) {
-      await table.send(
-        new BatchWriteCommand({
-          RequestItems: {
-            [tableName]: keys
-              .slice(index, index + 25)
-              .map((key) => ({ DeleteRequest: { Key: key } })),
-          },
-        }),
-      );
+      await deleteBatch({
+        [tableName]: keys.slice(index, index + 25).map((key) => ({ DeleteRequest: { Key: key } })),
+      });
     }
     start = page.LastEvaluatedKey;
   } while (start !== undefined);

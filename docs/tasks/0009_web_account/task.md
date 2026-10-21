@@ -144,3 +144,14 @@ External actions (profile `fless-takemyword`, dev only, no Terraform, nothing on
 - Each `pnpm e2e` run of `account.e2e.ts` (three runs) created two throwaway `web-e2e-{hex}` users in the dev pool (one was `web-e2e-ea0696f4`) and deleted them with every `USER#{sub}` item in `afterAll`; `list-users` with the `web-e2e-` prefix returns none afterwards.
 - The first e2e run timed out in the leak check: `response.text()` on a response the page navigated away from never settled; bodies are now read on `requestfinished`.
 - Slip: stopping my local `next start` used `pkill -f next-server` for this user, which would also have stopped another session's Next server had one been running; I kill by PID from now on.
+
+### Round 2
+
+Done:
+
+- Finding 1: `deleteBatch` in `e2e/accounts.ts` resends `UnprocessedItems` up to 6 attempts with exponential backoff (200 ms to 3.2 s) and throws if any remain.
+- Finding 2: `afterAll` removes every user with `Promise.allSettled` and then fails with an `AggregateError` of every rejection.
+
+No app code changed, so dev keeps the round 1 deploy (`3ebed5b`); the web target reran on this commit.
+
+Pending: nothing. Deferred: nothing new.
