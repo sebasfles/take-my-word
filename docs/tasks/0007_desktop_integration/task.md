@@ -136,3 +136,13 @@ Pending: milestone 2 (session, API client, error mapping, views, screenshots) an
 `mod auth` and `mod keychain` carry a temporary `allow(dead_code)` until the session wires them in milestone 2.
 
 Deferred: `--stub-mode` from the command line (debug) changes the mode without updating the tray checkmarks; pre-existing.
+
+### Round 2
+
+Done:
+
+- Finding 1 applied: `CognitoError::ends_session` is now false only for transient failures (network, unexpected answers, HTTP 5xx, `InternalErrorException`, `TooManyRequestsException`); every other rejection ends the session, and `Rejected` carries the HTTP status.
+- Established in dev on a throwaway user (`desktop-probe-*`, deleted afterwards; `.verify/forget-probe.out` in the workspace): after `admin-forget-device` alone, `GetTokensFromRefreshToken` answers `NotAuthorizedException` "Invalid Refresh Token.", still the same 15 s later; after `admin-delete-user` it answers `NotAuthorizedException` "The user has been deleted for the associated refresh token".
+  Both answers, plus reuse and `UserNotFoundException`, are in the fake-Cognito test next to throttling, `InternalErrorException`, a typed 503 and an untyped 500, which keep the session.
+
+Pending and deferred: as in round 1.

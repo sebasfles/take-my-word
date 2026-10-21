@@ -18,8 +18,12 @@ const TARGET_PREFIX: &str = "AWSCognitoIdentityProviderService.";
 pub enum CognitoError {
     #[error("Cognito could not be reached: {0}")]
     Network(String),
-    #[error("Cognito answered {kind}: {message}")]
-    Rejected { kind: String, message: String },
+    #[error("Cognito answered {status} {kind}: {message}")]
+    Rejected {
+        status: u16,
+        kind: String,
+        message: String,
+    },
     #[error("Cognito answered something unexpected: {0}")]
     Unexpected(String),
     #[error(transparent)]
@@ -28,8 +32,9 @@ pub enum CognitoError {
 
 impl CognitoError {
     pub fn ends_session(&self) -> bool {
-        matches!(self, Self::Rejected { kind, .. }
-            if kind == "NotAuthorizedException" || kind == "RefreshTokenReuseException")
+        const TRANSIENT: [&str; 2] = ["InternalErrorException", "TooManyRequestsException"];
+        matches!(self, Self::Rejected { status, kind, .. }
+            if *status < 500 && !TRANSIENT.contains(&kind.as_str()))
     }
 }
 
@@ -304,6 +309,7 @@ fn rejection(status: u16, body: &[u8]) -> CognitoError {
         .find(|message| !message.is_empty())
         .unwrap_or_default();
     CognitoError::Rejected {
+        status,
         kind: kind.to_owned(),
         message: message.to_owned(),
     }
@@ -561,28 +567,42 @@ mod tests {
     }
 
     #[test]
-    fn only_not_authorized_and_reuse_end_the_session() {
-        let (_, cognito) = Fake::start([
+    fn every_rejection_ends_the_session_except_transient_failures() {
+        let ending = [
             rejected("NotAuthorizedException", "Invalid Refresh Token."),
+            rejected(
+                "NotAuthorizedException",
+                "The user has been deleted for the associated refresh token",
+            ),
             rejected("RefreshTokenReuseException", "Refresh token reuse detected"),
+            rejected("UserNotFoundException", "User does not exist."),
+        ];
+        let transient = [
             rejected(
                 "com.amazonaws.cognito#TooManyRequestsException",
                 "Rate exceeded",
             ),
+            (
+                500,
+                json!({ "__type": "InternalErrorException", "message": "" }),
+            ),
+            (
+                503,
+                json!({ "__type": "ServiceUnavailable", "message": "" }),
+            ),
             (500, json!({})),
-        ]);
+        ];
+        let (count_ending, count_transient) = (ending.len(), transient.len());
+        let (_, cognito) = Fake::start(ending.into_iter().chain(transient));
         let refresh = || cognito.refresh(&Secret::new("refresh"), &Secret::new("device"));
-        assert!(refresh().unwrap_err().ends_session());
-        assert!(refresh().unwrap_err().ends_session());
-        let throttled = refresh().unwrap_err();
-        assert!(
-            matches!(&throttled, CognitoError::Rejected { kind, .. } if kind == "TooManyRequestsException")
-        );
-        assert!(!throttled.ends_session());
-        assert!(matches!(
-            refresh().unwrap_err(),
-            CognitoError::Unexpected(_)
-        ));
+        for _ in 0..count_ending {
+            let error = refresh().unwrap_err();
+            assert!(error.ends_session(), "{error}");
+        }
+        for _ in 0..count_transient {
+            let error = refresh().unwrap_err();
+            assert!(!error.ends_session(), "{error}");
+        }
 
         let closed = TcpListener::bind(("127.0.0.1", 0))
             .unwrap()
