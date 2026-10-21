@@ -14,14 +14,8 @@ interface Data {
 }
 
 const loadHistory = async (): Promise<Data> => {
-  const [page, styles] = await Promise.all([
-    api.listDictations(),
-    api.listStyles().then(
-      (list) => list.styles,
-      () => [],
-    ),
-  ]);
-  return { items: page.items, cursor: page.cursor, styles };
+  const [page, styles] = await Promise.all([api.listDictations(), api.listStyles()]);
+  return { items: page.items, cursor: page.cursor, styles: styles.styles };
 };
 
 export function History() {

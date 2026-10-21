@@ -13,3 +13,9 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (58 vitest + 120 cargo tests, pnpm test && pnpm rust:test)
 - e2e: n/a
+## 2026-10-21T21:50:17Z by om-developer target desktop on round 4 commit (same code as 13d7277; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (89 vitest including 0005's release scripts + 131 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+- root and workflows: not run; the rebase had no conflict there and this branch changes no root file or workflow.

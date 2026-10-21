@@ -32,6 +32,9 @@ export function styleDescription(style: Named & { prompt?: string }): string | u
 
 export function styleLabel(styleId: string | undefined, styles: readonly Named[]): string {
   if (styleId === undefined) return t("style.fallback");
+  if ((builtinStyleIds as readonly string[]).includes(styleId)) {
+    return t(builtinCopy[styleId as BuiltinStyleId].name);
+  }
   const style = styles.find((candidate) => candidate.id === styleId);
   return style ? styleName(style) : t("style.deleted");
 }

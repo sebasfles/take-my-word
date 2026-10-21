@@ -22,6 +22,14 @@ struct State {
     keystrokes: HashMap<String, PasteKeystroke>,
     loaded_at: Option<Instant>,
     refreshing: bool,
+    started: u64,
+    applied: u64,
+    cleared: u64,
+}
+
+pub struct Ticket {
+    number: u64,
+    started: Instant,
 }
 
 impl RuleCache {
@@ -30,22 +38,41 @@ impl RuleCache {
     }
 
     pub fn load(&self, source: &impl RuleSource) {
-        let started = Instant::now();
-        let loaded = source.app_rules();
+        let ticket = self.begin();
+        self.finish(ticket, source.app_rules());
+    }
+
+    fn begin(&self) -> Ticket {
+        let mut state = self.state();
+        state.started += 1;
+        Ticket {
+            number: state.started,
+            started: Instant::now(),
+        }
+    }
+
+    fn finish(&self, ticket: Ticket, loaded: Result<AppRuleList, ApiFailure>) {
         let mut state = self.state();
         state.refreshing = false;
-        match loaded {
-            Ok(list) => {
-                state.keystrokes = list
-                    .rules
-                    .into_iter()
-                    .map(|rule| (rule.app_id.to_lowercase(), rule.keystroke))
-                    .collect();
-                state.loaded_at = Some(started);
-                log::info!("loaded {} app rules", state.keystrokes.len());
+        let list = match loaded {
+            Ok(list) => list,
+            Err(failure) => {
+                log::warn!("loading the app rules failed: {failure}");
+                return;
             }
-            Err(failure) => log::warn!("loading the app rules failed: {failure}"),
+        };
+        if ticket.number <= state.applied || ticket.number <= state.cleared {
+            log::info!("dropped app rules older than the ones applied or a sign-out");
+            return;
         }
+        state.keystrokes = list
+            .rules
+            .into_iter()
+            .map(|rule| (rule.app_id.to_lowercase(), rule.keystroke))
+            .collect();
+        state.applied = ticket.number;
+        state.loaded_at = Some(ticket.started);
+        log::info!("loaded {} app rules", state.keystrokes.len());
     }
 
     pub fn claim_refresh(&self, now: Instant) -> bool {
@@ -64,6 +91,7 @@ impl RuleCache {
         let mut state = self.state();
         state.keystrokes.clear();
         state.loaded_at = None;
+        state.cleared = state.started;
     }
 }
 
@@ -162,6 +190,46 @@ mod tests {
         cache.load(&source(vec![]));
         assert!(!cache.claim_refresh(Instant::now() + Duration::from_secs(60)));
         assert!(cache.claim_refresh(Instant::now() + STALE_AFTER));
+    }
+
+    fn list(rules: Vec<(&'static str, PasteKeystroke)>) -> Result<AppRuleList, ApiFailure> {
+        source(rules).app_rules()
+    }
+
+    #[test]
+    fn an_older_load_finishing_after_a_newer_one_is_dropped() {
+        let cache = RuleCache::default();
+        let refresh_at_hold = cache.begin();
+        let reload_after_edit = cache.begin();
+        cache.finish(
+            reload_after_edit,
+            list(vec![("notepad.exe", PasteKeystroke::ShiftInsert)]),
+        );
+        cache.finish(
+            refresh_at_hold,
+            list(vec![("notepad.exe", PasteKeystroke::CtrlV)]),
+        );
+        assert_eq!(
+            cache.for_app(Some("notepad.exe")),
+            PasteKeystroke::ShiftInsert
+        );
+    }
+
+    #[test]
+    fn a_load_finishing_after_sign_out_is_dropped() {
+        let cache = RuleCache::default();
+        let in_flight = cache.begin();
+        cache.clear();
+        cache.finish(
+            in_flight,
+            list(vec![("notepad.exe", PasteKeystroke::ShiftInsert)]),
+        );
+        assert_eq!(cache.for_app(Some("notepad.exe")), PasteKeystroke::CtrlV);
+        cache.load(&source(vec![("notepad.exe", PasteKeystroke::ShiftInsert)]));
+        assert_eq!(
+            cache.for_app(Some("notepad.exe")),
+            PasteKeystroke::ShiftInsert
+        );
     }
 
     #[test]

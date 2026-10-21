@@ -657,6 +657,8 @@ kbd {
 .item-actions {
   display: flex;
   flex: 0 1 auto;
+  justify-content: flex-end;
+  margin-left: auto;
   flex-wrap: wrap;
   max-width: 100%;
   align-items: center;

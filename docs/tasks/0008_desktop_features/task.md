@@ -169,3 +169,16 @@ Decisions not in the plan:
 Pending (milestone 3): waveform, Windows smoke against dev, RAM and CPU measurements of the base and this build, `desktop-ci`, docs.
 
 Deferred: none.
+
+### Round 4
+
+Did:
+- Rebased on `origin/develop` at a97a7ed (0005); the earlier round commits were replayed with new shas, `desktop-v0.1.0` and `desktop-v0.1.1` still point at their commits.
+  Conflicts resolved: `locale.rs` keeps one `Language` and `system_language` (0005's tests plus `code()`), `windows.rs` keeps `open_update` with `view_url`, `main.tsx`, `styles.css`, `testing/bridge.ts`, `dictation.rs` and `shell.rs` (busy tracking plus the keystroke cache), and the screenshot mocks.
+- Update window: its copy moved to `update.*` ids in both dictionaries with `{version}` and `{percent}` placeholders; the language comes from `lang=` like every window, so `UpdateView.language` and `Offers`' language are gone; `Offers` gets `Default`.
+  Its four states are in the screenshots in both languages at the three widths (400 files).
+- Finding 1: `RuleCache` numbers every load; a list applies only when its load started after the list already applied and after the last sign-out; tests for an older load finishing after a newer one and for a load finishing after sign-out.
+- Finding 2: `styleLabel` names built-ins from the dictionaries without the style list; History fails its load with retry when the style list fails instead of calling every style deleted; tests for both.
+- Finding 3: `.item-actions` stays right-aligned when a row wraps (history, dictionary, app rules at 390 and 768 rechecked).
+
+Pending and deferred: unchanged.

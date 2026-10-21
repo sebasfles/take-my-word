@@ -158,5 +158,14 @@
   "history.loadMore": "Cargar más",
   "history.empty": "Aún no tienes dictados.",
   "tray.addWord": "Agregar una palabra",
-  "dictionary.usageOnce": "Usado 1 vez · {date}"
+  "dictionary.usageOnce": "Usado 1 vez · {date}",
+  "update.title": "Hay una nueva versión de Take My Word",
+  "update.version": "Versión {version}",
+  "update.notes": "Novedades",
+  "update.later": "Más tarde",
+  "update.install": "Instalar y reiniciar",
+  "update.downloading": "Descargando la actualización",
+  "update.downloadingPercent": "Descargando la actualización {percent}%",
+  "update.installing": "Instalando. Take My Word se reiniciará en unos segundos.",
+  "update.failed": "No se pudo instalar la actualización. Vuelve a intentarlo."
 }

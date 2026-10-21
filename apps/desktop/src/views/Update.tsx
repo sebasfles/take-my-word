@@ -1,30 +1,6 @@
 import { useEffect, useState } from "react";
 import { bridge, keepListening, type UpdateView } from "../bridge.ts";
-
-const copy = {
-  es: {
-    title: "Hay una nueva versión de Take My Word",
-    version: (version: string) => `Versión ${version}`,
-    notes: "Novedades",
-    later: "Más tarde",
-    install: "Instalar y reiniciar",
-    retry: "Reintentar",
-    downloading: "Descargando la actualización",
-    installing: "Instalando. Take My Word se reiniciará en unos segundos.",
-    failed: "No se pudo instalar la actualización. Vuelve a intentarlo.",
-  },
-  en: {
-    title: "A new version of Take My Word is ready",
-    version: (version: string) => `Version ${version}`,
-    notes: "What's new",
-    later: "Later",
-    install: "Install and restart",
-    retry: "Try again",
-    downloading: "Downloading the update",
-    installing: "Installing. Take My Word will restart in a few seconds.",
-    failed: "The update could not be installed. Try again.",
-  },
-};
+import { t } from "../i18n.ts";
 
 export function Update() {
   const [view, setView] = useState<UpdateView | null>(null);
@@ -38,19 +14,18 @@ export function Update() {
   }, []);
 
   if (!view) return null;
-  const t = copy[view.language];
   const notes = view.notes.trim();
 
   return (
-    <main className="page" lang={view.language}>
+    <main className="page">
       <header className="page-header">
-        <h1>{t.title}</h1>
-        <p className="muted">{t.version(view.version)}</p>
+        <h1>{t("update.title")}</h1>
+        <p className="muted">{t("update.version", { version: view.version })}</p>
       </header>
 
       {notes !== "" && (
         <section className="note">
-          <h2>{t.notes}</h2>
+          <h2>{t("update.notes")}</h2>
           <p className="update-notes">{notes}</p>
         </section>
       )}
@@ -58,24 +33,25 @@ export function Update() {
       {view.phase === "downloading" && (
         <div className="update-progress" role="status">
           <span>
-            {t.downloading}
-            {view.percent === null ? "" : ` ${view.percent}%`}
+            {view.percent === null
+              ? t("update.downloading")
+              : t("update.downloadingPercent", { percent: view.percent })}
           </span>
           <progress
             max={100}
             {...(view.percent === null ? {} : { value: view.percent })}
-            aria-label={t.downloading}
+            aria-label={t("update.downloading")}
           />
         </div>
       )}
       {view.phase === "installing" && (
         <p className="muted" role="status">
-          {t.installing}
+          {t("update.installing")}
         </p>
       )}
       {view.phase === "failed" && (
         <p className="error" role="alert">
-          {t.failed}
+          {t("update.failed")}
         </p>
       )}
 
@@ -86,14 +62,14 @@ export function Update() {
             className="button button-quiet"
             onClick={() => void bridge.postponeUpdate()}
           >
-            {t.later}
+            {t("update.later")}
           </button>
           <button
             type="button"
             className="button button-primary"
             onClick={() => void bridge.installUpdate()}
           >
-            {view.phase === "failed" ? t.retry : t.install}
+            {t(view.phase === "failed" ? "common.tryAgain" : "update.install")}
           </button>
         </footer>
       )}

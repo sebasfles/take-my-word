@@ -117,15 +117,16 @@ pub fn open_update(app: &AppHandle) {
     if app.get_webview_window(UPDATE).is_some() {
         return;
     }
-    let built = WebviewWindowBuilder::new(app, UPDATE, WebviewUrl::App(view_url(UPDATE, "").into()))
-    .title(product_name(app))
-    .inner_size(460.0, 400.0)
-    .resizable(false)
-    .maximizable(false)
-    .minimizable(false)
-    .center()
-    .focused(false)
-    .build();
+    let built =
+        WebviewWindowBuilder::new(app, UPDATE, WebviewUrl::App(view_url(UPDATE, "").into()))
+            .title(product_name(app))
+            .inner_size(460.0, 400.0)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .center()
+            .focused(false)
+            .build();
     match built {
         Ok(window) => {
             let app = app.clone();

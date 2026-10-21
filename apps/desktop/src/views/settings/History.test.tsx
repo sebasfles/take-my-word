@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setLanguage } from "../../i18n.ts";
-import { at, builtins, serve } from "../../testing/api.ts";
+import { at, builtins, failure, serve } from "../../testing/api.ts";
 import { fakeBridge } from "../../testing/bridge.ts";
 import { History } from "./History.tsx";
 
@@ -82,5 +82,23 @@ describe("History", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
     await screen.findByText("You have no dictations yet.");
     expect(seen.at(-1)).toEqual({ route: "deleteDictation", id: "a" });
+  });
+
+  it("never calls a style deleted because the style list failed; it offers a retry", async () => {
+    let stylesFail = true;
+    serve({
+      listStyles: () => {
+        if (stylesFail) throw failure(null, null, "network");
+        return { styles: builtins };
+      },
+      listDictations: () => ({ items: [dictation("a", 20, "First.")] }),
+    });
+    render(<History />);
+    expect((await screen.findByRole("alert")).textContent).toContain("could not reach");
+    expect(screen.queryByText(/Deleted style/)).toBeNull();
+    stylesFail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    const row = (await screen.findByText("First.")).closest("li") as HTMLElement;
+    expect(within(row).getByText(/^Casual · /)).toBeTruthy();
   });
 });

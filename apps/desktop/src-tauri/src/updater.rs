@@ -6,7 +6,6 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::activity::Activity;
-use crate::locale::{self, Language};
 use crate::shell::Shell;
 use crate::windows;
 
@@ -34,7 +33,6 @@ pub enum Phase {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateView {
-    pub language: Language,
     pub version: String,
     pub notes: String,
     #[serde(flatten)]
@@ -50,18 +48,16 @@ struct Offer<U> {
 }
 
 pub struct Offers<U> {
-    language: Language,
     current: Option<Offer<U>>,
 }
 
-impl<U: Clone> Offers<U> {
-    pub fn new(language: Language) -> Self {
-        Self {
-            language,
-            current: None,
-        }
+impl<U> Default for Offers<U> {
+    fn default() -> Self {
+        Self { current: None }
     }
+}
 
+impl<U: Clone> Offers<U> {
     pub fn found(&mut self, update: U, version: String, notes: String) -> bool {
         if self.installing() {
             return false;
@@ -129,7 +125,6 @@ impl<U: Clone> Offers<U> {
 
     pub fn view(&self) -> Option<UpdateView> {
         self.current.as_ref().map(|offer| UpdateView {
-            language: self.language,
             version: offer.version.clone(),
             notes: offer.notes.clone(),
             phase: offer.phase.clone(),
@@ -141,7 +136,7 @@ pub struct Updates(Mutex<Offers<Update>>);
 
 impl Updates {
     pub fn new() -> Self {
-        Self(Mutex::new(Offers::new(locale::system_language())))
+        Self(Mutex::new(Offers::default()))
     }
 
     fn lock(&self) -> MutexGuard<'_, Offers<Update>> {
@@ -316,7 +311,7 @@ mod tests {
     }
 
     fn offers() -> Offers<&'static str> {
-        Offers::new(Language::En)
+        Offers::default()
     }
 
     fn phase(offers: &Offers<&'static str>) -> Option<Phase> {
@@ -330,7 +325,6 @@ mod tests {
         assert_eq!(
             offers.view(),
             Some(UpdateView {
-                language: Language::En,
                 version: "0.1.1".into(),
                 notes: "Faster paste.".into(),
                 phase: Phase::Available,
@@ -396,7 +390,6 @@ mod tests {
     #[test]
     fn the_view_serializes_as_the_ui_reads_it() {
         let view = UpdateView {
-            language: Language::Es,
             version: "0.1.1".into(),
             notes: "Notas".into(),
             phase: Phase::Downloading { percent: Some(40) },
@@ -404,7 +397,6 @@ mod tests {
         assert_eq!(
             serde_json::to_value(view).unwrap(),
             serde_json::json!({
-                "language": "es",
                 "version": "0.1.1",
                 "notes": "Notas",
                 "phase": "downloading",

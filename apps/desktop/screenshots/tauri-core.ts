@@ -198,7 +198,6 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
     case "update_view": {
       const language = params.get("lang") === "en" ? "en" : "es";
       return answer({
-        language,
         version: "0.1.1",
         notes: updateNotes[language],
         ...updatePhases[params.get("update") ?? "available"],

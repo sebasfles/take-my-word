@@ -158,5 +158,14 @@
   "history.loadMore": "Load more",
   "history.empty": "You have no dictations yet.",
   "tray.addWord": "Add a word",
-  "dictionary.usageOnce": "Used once · {date}"
+  "dictionary.usageOnce": "Used once · {date}",
+  "update.title": "A new version of Take My Word is ready",
+  "update.version": "Version {version}",
+  "update.notes": "What's new",
+  "update.later": "Later",
+  "update.install": "Install and restart",
+  "update.downloading": "Downloading the update",
+  "update.downloadingPercent": "Downloading the update {percent}%",
+  "update.installing": "Installing. Take My Word will restart in a few seconds.",
+  "update.failed": "The update could not be installed. Try again."
 }

@@ -55,7 +55,6 @@ export type UpdatePhase =
   | { phase: "failed" };
 
 export type UpdateView = {
-  language: "es" | "en";
   version: string;
   notes: string;
 } & UpdatePhase;
