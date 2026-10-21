@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0002_desktop_shell
+source: 0007_desktop_integration
 ---
 
 # Desktop: database
@@ -10,7 +10,7 @@ The item schema of `take-my-word-{env}` will live in `packages/shared` and `apps
 ## Tables owned
 
 Desktop owns no table and no item kind.
-On the machine it keeps the Cognito tokens in the OS keychain (0007) and its local settings (hotkey, first-run flag) in `settings.json` in the app's config folder.
+On the machine it keeps the refresh token, `DeviceKey` and `DeviceGroupKey` in Windows Credential Manager (persisted per machine, never roaming), the access token only in memory, and its local settings in `settings.json` in the app's config folder.
 
 ## Tables referenced
 
@@ -24,7 +24,9 @@ On the machine it keeps the Cognito tokens in the OS keychain (0007) and its loc
 ## Invariants kept in code
 
 - The `appId` desktop sends is the same identifier it stores in app rules, so the server can resolve the rule.
-- The refresh token in the keychain is overwritten on every renewal, never kept beside the old one.
+- The refresh token in the keychain is overwritten on every renewal, before the new access token is used, never kept beside the old one.
+- The three keychain entries live or die together: a partial set reads as signed out and is removed.
+- Tokens, device keys and passwords never reach `settings.json`, the logs or the WebView.
 - Audio is never written to disk; only debug builds can dump a recording, behind a flag.
 
 ## Migrations of note

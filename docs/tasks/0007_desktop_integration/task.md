@@ -98,3 +98,147 @@ None.
 - clearance: full: AWS profile `fless-takemyword` on dev (crew-e2e sign-in, throwaway users, device forget and global sign-out on them, `QUOTA#` seed and removal, crew-e2e `SETTINGS` restore), prd read-only for pool and client ids, the Windows host under the machine rules above with mirror `C:\dev\tmw-0007`; no Terraform, no prd writes.
 
 ## om-developer notes
+
+### Round 1 (milestone 1: env split, debug-only stub, TLS, contract test, Rust Cognito client, keychain)
+
+Done:
+
+- Environments: Cargo features `dev` and `prd`, selected by `build.features` in `tauri.dev.conf.json` and `tauri.prd.conf.json`; `src-tauri/src/env.rs` holds both sets of public values (prd ids read with `list-user-pools` and `list-user-pool-clients`, read-only).
+  The base `tauri.conf.json` is the dev app, so `cargo test` and debug builds are dev; `compile_error!` stops a release with no environment or with both, and startup refuses a Tauri identifier that does not match the compiled environment.
+  Dev is "Take My Word Dev" (`dev.fless.takemyword.dev`), prd "Take My Word" (`dev.fless.takemyword`); the tray tooltip shows the product name.
+  Scripts `pnpm tauri:build:dev` and `pnpm tauri:build:prd`; `rust:lint`, `windows:build` and `desktop-ci` use dev (release clippy with `--features dev`, the dev NSIS installer).
+  Checked on the mirror: `cargo check --release` with no feature fails with the message, `pnpm windows:build` produces `Take My Word Dev_0.1.0_x64-setup.exe`.
+- Stub: compiled only under `debug_assertions`; a new `Off, real API` mode is the default, and `Stubbed` routes `POST /dictations` to the stub only while another mode is picked.
+  The release worker calls the env's API without a token for now (401 until milestone 2 adds the session).
+  The status mapping and the stub-only constants moved into `stub.rs`, so release builds have no dead code.
+- TLS: reqwest `native-tls` (SChannel on Windows, verifying against the Windows store, no cmake or NASM); `libssl-dev` added explicitly to the Linux clippy job.
+- Contract: `apps/desktop/contract/` generates `src-tauri/src/api/contract.schema.json` with `z.toJSONSchema` (`pnpm contract`; meta with `io: "input"`); a vitest test fails `ci` when the committed file is stale (compared as parsed JSON, the file is prettier-ignored as generated).
+  The Rust test derives schemas with `schemars` (dev-dependency, `cfg_attr(test)`) and compares normalized shapes: field names, required flags, enum and const values, arrays and primitive kinds; string patterns, lengths and integer bounds are not compared.
+  Red on today's mirror before the fix (`.verify/contract-red.out` in the workspace): four missing error codes (`unauthorized`, `forbidden`, `not_found`, `conflict`; the plan said five), `latencyMs.profile`, `styleId`, and no settings or style list mirror.
+  Fixed by completing the mirror and adding `UserSettings`, `SettingsProviders`, `Style`, `StyleList`.
+- Cognito: `src-tauri/src/auth/` with `Secret` (zeroized on drop, redacted `Debug`, no `Serialize`, so every request exposes it explicitly), `srp.rs` mirroring `packages/cognito/src/srp.ts`, and `cognito.rs` with the six operations as unsigned JSON 1.1 POSTs.
+  Fixed vectors in `auth/srp_vectors.json` were produced by `packages/cognito/src/srp.ts` with `randomBytes` patched through `syncBuiltinESMExports` (password claims on two dates, one with a one-digit day, and the device verifier); the Rust port matched them on the first run.
+  Fake-Cognito tests cover the request shapes (no `DEVICE_KEY` on sign-in, `DeviceKey` on every refresh, the new-password step) and the error split.
+  Real dev pass (`auth::dev_pool`, ignored, credentials through `WSLENV`, never on disk): `crew-e2e` signs in, confirms the device, rotates the refresh token, round-trips the real tokens through Credential Manager, forgets the device, revokes, and the next refresh fails as session-ending; `crew-e2e` has no devices left.
+  Measured: access token 1113 bytes, refresh token 1932, device key 46, device group key 36; the password does not appear in any output.
+- Keychain: `src-tauri/src/keychain/` stores refresh token, `DeviceKey` and `DeviceGroupKey` in Windows Credential Manager; tests on the real store cover the round trip, rotation, a partial session read as signed out and removed, and a value over the blob limit failing without echoing it.
+
+Decisions the plan did not record:
+
+- `keyring-core` 1 with `windows-native-keyring-store` 1.1 instead of the `keyring` crate: since v4 `keyring` is a CLI pulling clap and rpassword, and its library split into `keyring-core` plus one store crate per OS.
+  The store is built explicitly (no global default store), so there is no silent mock fallback; non-Windows builds get an unsupported keychain like the other platform modules.
+- Secrets go in as raw UTF-8 bytes (`set_secret`), not passwords: the 1932-byte refresh token fits the 2560-byte blob, while UTF-16 would need 3864, so nothing is split.
+- Credentials persist as `Local` (`CRED_PERSIST_LOCAL_MACHINE`) instead of the store's `Enterprise` default, so device-bound tokens never roam with a domain profile.
+- `CognitoError::ends_session` is true only for `NotAuthorizedException` and `RefreshTokenReuseException`; an empty success body reads as `{}` (`ForgetDevice` and `RevokeToken` answer with none); a refresh answer without `RefreshToken` is an error, as in `packages/cognito`.
+- axum and tokio stay regular dependencies: Cargo cannot scope a dependency to a profile, but with the stub under `debug_assertions` none of their code links into release.
+
+Pending: milestone 2 (session, API client, error mapping, views, screenshots) and milestone 3 (Windows smoke, `desktop-ci`, docs).
+`mod auth` and `mod keychain` carry a temporary `allow(dead_code)` until the session wires them in milestone 2.
+
+Deferred: `--stub-mode` from the command line (debug) changes the mode without updating the tray checkmarks; pre-existing.
+
+### Round 2
+
+Done:
+
+- Finding 1 applied: `CognitoError::ends_session` is now false only for transient failures (network, unexpected answers, HTTP 5xx, `InternalErrorException`, `TooManyRequestsException`); every other rejection ends the session, and `Rejected` carries the HTTP status.
+- Established in dev on a throwaway user (`desktop-probe-*`, deleted afterwards; `.verify/forget-probe.out` in the workspace): after `admin-forget-device` alone, `GetTokensFromRefreshToken` answers `NotAuthorizedException` "Invalid Refresh Token.", still the same 15 s later; after `admin-delete-user` it answers `NotAuthorizedException` "The user has been deleted for the associated refresh token".
+  Both answers, plus reuse and `UserNotFoundException`, are in the fake-Cognito test next to throttling, `InternalErrorException`, a typed 503 and an untyped 500, which keep the session.
+
+Pending and deferred: as in round 1.
+
+### Round 3 (milestone 2: session, API client, error mapping, views, sign-out, screenshots)
+
+Done:
+
+- Session: `auth/account.rs` keeps the refresh token and device keys from the keychain (service = the compiled environment's identifier) and the access token in memory only.
+  Every caller goes through one mutex: an access token with under 5 minutes left renews before use, the rotated refresh token is written to the keychain at once, and callers waiting on a renewal share its result (tested with four threads, one Cognito call).
+  A session-ending answer clears the keychain and signs out; transient failures keep the session.
+  The hotkey reads an atomic flag (never the mutex, so a renewal in flight cannot delay recording) and starts a background renewal at key down.
+  The temporary `allow(dead_code)` on `mod auth` and `mod keychain` is gone.
+- Sign-in: SRP, then `ConfirmDevice` for the new device, then the keychain; the `NEW_PASSWORD_REQUIRED` session waits in Rust, survives an `InvalidPasswordException` for a retry, and an expired one sends the UI back to sign-in.
+  If the keychain refuses the session, the device is forgotten and the token revoked, so nothing dangles.
+  Device name: `{product name} on {COMPUTERNAME}`.
+- Sign-out (tray item that toggles between "Sign in" and "Sign out", and a Settings row): renew if needed, `ForgetDevice`, `RevokeToken`, clear the keychain even when Cognito fails; the sign-in window opens whenever the session ends.
+- API: `api/authed.rs` adds the bearer token to `POST /dictations`, `GET /styles`, `GET` and `PUT /me/settings`; a 401 or 403 without the error envelope renews once and retries once, and a second refusal is reported instead of renewing again.
+- Errors in the overlay: signed out shows "Sign in to Take My Word to dictate." (the sign-in window is already open), quota "You've reached today's dictation limit.", HTTP 413 and 415 short messages by status (the gateway's own 413 has no envelope), network the existing message; nothing is pasted in any of them.
+- Signed out, a hold never opens the microphone: `Sink::may_record` refuses it, shows the sign-in message and opens the sign-in window.
+- Views: one `account` window with sign-in, choose-password (local mismatch check, the web's copy and password rules) and the style picker; onboarding reads `GET /styles` and `GET /me/settings`, preselects the current default, and saves through `GET` then `PUT /me/settings`.
+  The flag is `onboardedUsers` (Cognito `sub`) in `settings.json`; startup reopens the picker while it is pending, then the first-run window if that is not done.
+- Real dev pass (ignored test, credentials through `WSLENV`): the Rust account signs `crew-e2e` in, reads styles and settings from the dev API through the bearer client, signs out and leaves the keychain empty; `crew-e2e` has no devices left.
+- Screenshots of every new and changed state at 390, 768 and 1280 px (plus 1280 light): `screenshots/round-3/` in the workspace, 92 files.
+
+Decisions the plan did not record:
+
+- Tokens are read through `Credentials` (`api/authed.rs`), implemented by the account, so the HTTP client never sees the session and the retry rule is tested against a local gateway.
+- The account window is a single view whose step lives in React; only the onboarding entry comes from the URL, because the choose-password step needs the challenge that only Rust holds.
+- A second 401 or 403 after the forced renewal shows the generic error instead of signing out: Cognito has just confirmed the session.
+- The settings window grew to 560 px high for the account row.
+
+Pending: milestone 3 (Windows smoke for Acceptance 2 to 8 once the om-manager relays `computer available`, `desktop-ci`, docs).
+Deferred: none new.
+
+### Round 4 (milestone 3: Windows smoke, desktop-ci, verification)
+
+Windows smoke, Windows 11 on Sebastian's machine, dev API and pool, announced to the om-manager (`computer busy` at 14:28, `computer free` after).
+It started after Windows reported more than 2 minutes idle; physical mouse input had kept it from starting earlier.
+A low-level hook watched for physical input the whole time and saw none.
+Input was injected with `SendInput` (Unicode typing for the forms) and UI Automation (buttons, radios); credentials came through `WSLENV`, never written to disk.
+Captures are in `screenshots/windows/` in the workspace; mocked screenshots of every view are in `screenshots/round-3/`.
+
+- Acceptance 2 (release dev installer, `crew-e2e`): after removing the dev app's data and credentials, the silent install opened the sign-in window (`a2-sign-in-after-fresh-install`).
+  Signing in reached the style picker with `plain` preselected (`a2-onboarding`); picking Casual saved it, and `GET /me/settings` returned `defaultStyleId=casual`; first run followed and was dismissed.
+  After a restart only the app's internal windows existed (single-instance and event-loop windows), so neither sign-in nor the picker came back.
+  `crew-e2e`'s `SETTINGS` was restored to `plain` right after.
+- Acceptance 3 (installed build, throwaway user with a temporary password): sign-in led to choose-password (`a3-choose-password`), then to the picker (`a3-onboarding-after-new-password`); after Formal was saved the window closed.
+  The user and its `SETTINGS` item were deleted.
+- Acceptance 4 (debug build, `crew-e2e`, `--dictate-wav` with a Polly es-US sample into a Notepad tab): the real cleaned text was pasted ("Hola, esta es una prueba de dictado desde la aplicación de escritorio. Mañana revisamos el informe con el equipo."), the clipboard hash was unchanged, and the dictation is the newest item of `GET /dictations` (`a4-dictation-notepad`, cropped to the text).
+- Acceptance 5 (throwaway user): after `admin-forget-device` on the app's device and a restart, the renewal at startup failed (`NotAuthorizedException: Invalid Refresh Token.`), the keychain was cleared and the sign-in window opened.
+  The next dictation showed "Sign in to Take My Word to dictate." (`a5-after-forget-overlay`), pasted nothing, and the clipboard was unchanged.
+- Acceptance 6 (throwaway users): with `QUOTA#2026-10-21` seeded at 3600 s the dictation answered 429 `quota_exceeded`, showed "You've reached today's dictation limit." (`a6-quota-overlay`) and pasted nothing.
+  A 2 s near-silent WAV pasted nothing and showed no error ("dictation returned no text" in the log).
+  The seeded item was removed; the users and all their items are gone (0 items left).
+- Acceptance 7 (`crew-e2e`, and again for every throwaway user): Sign out in Settings removed all three Credential Manager entries.
+  A refresh with the old token and device key, read into memory before the sign-out, answered "Invalid Refresh Token."; the device left the user's device list and the sign-in window opened (`a7-settings-signed-in`, `a7-settings-signed-out`).
+- Acceptance 8: the dev app's config folder, log folder and WebView data (`EBWebView`) were searched for the live refresh token, device key and device group key, the passwords used, and anything token-shaped (`eyJ….…`), in UTF-8 and UTF-16.
+  Searches ran signed in with the app stopped (184 files), after the new-password flow (195 files), and at the end (282 files, 72.9 MB, none locked): 0 hits each time.
+  The throwaway users of Acceptance 6 were searched only for token-shaped values, not for their exact passwords.
+- Also: holding Ctrl+Win while signed out (Notepad in front) showed the sign-in message, recorded and sent nothing, and left Start closed (`signed-out-hold-overlay`).
+- Restored: dev app uninstalled (its autostart value went with it), its config, log and WebView folders and credentials removed, no app processes, Notepad closed again with only the tabs its own session restored, clipboard never written, hotkey and microphone settings untouched; `crew-e2e` has no devices.
+
+`desktop-ci` was not pushed (the om-reviewer pushes at publish time).
+Its Windows steps ran locally on the mirror at this code: UI lint, typecheck and tests, `cargo fmt`, clippy on all targets and on release with `--features dev`, `cargo test`, and `pnpm tauri:build:dev` (installer 1.84 MiB).
+The real-clipboard test and the Linux clippy job were not run locally: the first would overwrite Sebastian's clipboard outside a smoke run, and WSL has no Rust toolchain.
+Root `pnpm lint`, `typecheck` and `test` pass, one package at a time.
+
+Incident: Notepad restored Sebastian's earlier tabs when it started, and the first dictation's cleanup keys missed and left an Open dialog up.
+I closed the dialog and my tab without saving through UI Automation, then let Notepad close with the tabs it had restored; his tabs were never edited.
+The dictation script was changed to close only its own tab, and captures now cover only the document area.
+
+Decisions the plan did not record: none.
+Pending: docs, on the clean signal.
+
+### Round 5
+
+Done:
+
+- Finding 1 applied: `windows::product_name` reads the configured product name, and the settings and account window titles, the notification title, the tray tooltip and the device name all use it; the first-run title and heading stay "Welcome to Take My Word".
+  No unit test: Tauri's mock runtime is not enabled in this crate, and the titles were checked on Windows instead.
+- Recaptured on Windows (announced, more than 2 minutes idle, watcher saw no physical input) from the rebuilt dev installer: the sign-in, choose-password, style picker, first-run and settings windows (signed in and out, for `crew-e2e` and a throwaway user) now read "Take My Word Dev".
+  `crew-e2e`'s `SETTINGS` is back to `plain` and it has no devices; the throwaway user and its `SETTINGS` were deleted; the dev app is uninstalled and its data and credentials removed.
+- Captures now come from `PrintWindow`, which renders only the target window even when another window covers it.
+  The earlier screen-copy captures were deleted from the workspace and the Windows scratch folder: besides the slivers the om-reviewer saw, some showed the debug console, WhatsApp or a Google Cloud console page in front of the app's window.
+  The Notepad captures cover only the document area and were clean; they are kept.
+- `screenshots/windows/` in the workspace now holds 18 captures: the window captures above, plus the Notepad text and overlays of Acceptance 4 to 6 and the signed-out hold from round 4.
+  The notification title has no capture: no smoke path raises a notification without a failing paste.
+
+Pending: docs, on the clean signal.
+
+### Round 6
+
+Done:
+
+- Finding 1 applied: `StoredSession::device_group_key` carries `expect(dead_code)` only for non-Windows, non-test builds, with its reason; the Windows keychain is still the only reader, as the auth client contract requires keeping the key next to the refresh token, and the `expect` fails as soon as phase 5 reads it.
+- Linux clippy reproduced locally in an `ubuntu:24.04` Docker container with the `desktop-ci` apt packages and stable Rust, on a copy of `src-tauri` plus the built UI: red on `bf716e3` with exactly the reported error, green on this commit with `--all-targets --locked -- -D warnings`.
+  The Windows mirror cannot check the Linux target (the GTK and WebKit `-sys` build scripts need the Linux libraries), so the container replaced it.
+- Other `cfg(windows)` paths of the task checked by reading: the keychain's `unsupported` implementation uses every item of the trait, the second `auth::dev_pool` test is Windows-only with its own imports, and the shell, account and API code is the same on every platform.

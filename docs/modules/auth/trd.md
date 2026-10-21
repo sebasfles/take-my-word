@@ -1,11 +1,11 @@
 ---
 updated: 2026-10-21
-source: 0009_web_account
+source: 0007_desktop_integration
 ---
 
 # Auth: technical
 
-The pool and the authorizer run in dev since 0001 and in prd since 0006, the web login since 0004; phase 2 brings the desktop login, phase 4 the mobile login.
+The pool and the authorizer run in dev since 0001 and in prd since 0006, the web login since 0004, the desktop login since 0007; phase 4 brings the mobile login.
 
 ## Structure
 
@@ -17,7 +17,8 @@ The pool and the authorizer run in dev since 0001 and in prd since 0006, the web
 | `packages/cognito` | Node-only client: SRP sign-in, the new-password challenge, device confirmation, refresh, `ForgetDevice` and `RevokeToken`; used by `apps/web` and by the api scripts and e2e. |
 | `apps/api/scripts/sign-in.ts` | `.env` helpers; `pnpm token` prints a `crew-e2e` access token; the e2e also signs in `crew-e2e-b`. |
 | `apps/web/src/lib` | `session.ts` (sealed cookies), `auth.ts` (sign-in, new password, the one refresh path, sign-out), `handlers.ts` (route handlers), `refresh-lock.ts` (Web Lock around renewal), `server/account.ts` (every account page reads the API through it, or renders the renewal step). |
-| `apps/desktop`, `apps/mobile` | Login forms and token storage (phases 2 and 4). |
+| `apps/desktop/src-tauri/src/auth`, `keychain` | Rust SRP and Cognito client, the session behind one lock, Credential Manager storage; see [desktop](../desktop/trd.md). |
+| `apps/mobile` | Login form and token storage (phase 4). |
 
 ## Endpoints owned
 
@@ -62,4 +63,5 @@ The authorizer answers HTTP API simple responses, cached 5 minutes per `Authoriz
 
 - `apps/api/src/authorizer/authorize.test.ts` signs RS256 tokens locally and runs the real verifier.
 - `pnpm e2e` checks 401 and 403 at the gateway, 401 on every route without a token, that `crew-e2e-b` can neither see nor change `crew-e2e`'s items, and the refresh rotation of a confirmed device.
+- `apps/desktop`: SRP against vectors from `packages/cognito`, the Cognito calls against a local fake, the session rules, and ignored tests that sign in to the dev pool.
 - `apps/web`: unit tests for sealing, cookies, redirect rules, the auth flows and the handlers; `pnpm integration` against the dev pool (refresh past `exp` with `DeviceKey`, a second tab without a second rotation, sign-out, and a throwaway user through the new-password step); `pnpm e2e` with Playwright on dev.

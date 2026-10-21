@@ -1,0 +1,236 @@
+{
+  "dictationMeta": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "locale": {
+        "type": "string",
+        "pattern": "^(es|en)(-[A-Z]{2})?$"
+      },
+      "sttProvider": {
+        "type": "string",
+        "enum": [
+          "groq-whisper"
+        ]
+      },
+      "refineProvider": {
+        "type": "string",
+        "enum": [
+          "openai"
+        ]
+      },
+      "styleId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "appId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "required": [
+      "locale"
+    ]
+  },
+  "dictationResponse": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "raw": {
+        "type": "string"
+      },
+      "text": {
+        "type": "string"
+      },
+      "skipped": {
+        "type": "string",
+        "const": "silence"
+      },
+      "styleId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "providers": {
+        "type": "object",
+        "properties": {
+          "transcriber": {
+            "type": "string"
+          },
+          "refiner": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "latencyMs": {
+        "type": "object",
+        "properties": {
+          "quota": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "profile": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "transcribe": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "refine": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "save": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "raw",
+      "text",
+      "providers",
+      "latencyMs"
+    ],
+    "additionalProperties": false
+  },
+  "apiError": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "bad_request",
+              "unauthorized",
+              "forbidden",
+              "not_found",
+              "conflict",
+              "payload_too_large",
+              "unsupported_media_type",
+              "quota_exceeded",
+              "provider_failed",
+              "internal"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "error"
+    ],
+    "additionalProperties": false
+  },
+  "settings": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "defaultStyleId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "locale": {
+        "type": "string",
+        "pattern": "^(es|en)(-[A-Z]{2})?$"
+      },
+      "providers": {
+        "type": "object",
+        "properties": {
+          "transcriber": {
+            "type": "string",
+            "enum": [
+              "groq-whisper"
+            ]
+          },
+          "refiner": {
+            "type": "string",
+            "enum": [
+              "openai"
+            ]
+          }
+        },
+        "required": [
+          "transcriber",
+          "refiner"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "defaultStyleId",
+      "locale",
+      "providers"
+    ],
+    "additionalProperties": false
+  },
+  "styleList": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "styles": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "name": {
+              "type": "string"
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "builtin": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "prompt",
+            "builtin"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "styles"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0002_desktop_shell
+source: 0007_desktop_integration
 ---
 
 # Desktop: architecture and debt
@@ -76,6 +76,7 @@ source: 0002_desktop_shell
 - Alternatives rejected: calling the API from the WebView with the zod types.
 - Reason: the audio is captured in Rust and the call must work with no window open.
 - Debt created: the mirror can drift from the zod schemas without any check.
+- Resolved by: 0007_desktop_integration, 2026-10-21
 - Revisit when: 0007 adds the contract test fed by JSON Schema from `packages/shared`.
 - Source: 0002_desktop_shell
 
@@ -103,6 +104,7 @@ source: 0002_desktop_shell
 - Alternatives rejected: waiting for the real API, and a stub replacing the client.
 - Reason: 0002 ran in parallel with 0001, and the real client path gets exercised end to end.
 - Debt created: release builds ship the stub and its tray menu until the real API replaces them.
+- Resolved by: 0007_desktop_integration, 2026-10-21
 - Revisit when: 0007 wires sign-in and the real API.
 - Source: 0002_desktop_shell
 
@@ -123,4 +125,67 @@ source: 0002_desktop_shell
 - Debt created: none beyond the WAV entry's.
 - Revisit when: the API limit or the audio format changes.
 - Source: 0002_desktop_shell
+
+## 2026-10-21: SRP and the Cognito calls in Rust
+
+- Decision: the shell signs in with its own SRP port of `packages/cognito/src/srp.ts` and makes the six Cognito calls as unsigned JSON requests over reqwest, with no AWS SDK and no Node sidecar.
+- Alternatives rejected: the shared Node package in a sidecar.
+- Reason: a sidecar adds a Node runtime of tens of MB to a binary of about 10 MB and moves tokens between processes; fixed vectors from `packages/cognito` and a real dev sign-in prove the port.
+- Debt created: two SRP implementations to keep equal.
+- Revisit when: Cognito changes the SRP variant, or a third client needs SRP.
+- Source: 0007_desktop_integration
+
+## 2026-10-21: Dev and prd are separate apps chosen at build time
+
+- Decision: `tauri.dev.conf.json` and `tauri.prd.conf.json` give each environment its product name, identifier and a Cargo feature that selects API URL and pool ids; the identifier also names the keychain service, config folder and autostart entry; a release without an environment fails to compile, and the app refuses an identifier that does not match its environment.
+- Alternatives rejected: an endpoint field at run time, which would be dead UI.
+- Reason: Sebastian runs both side by side, so they must never share a session, settings or a window title.
+- Debt created: none.
+- Revisit when: a third environment appears.
+- Source: 0007_desktop_integration
+
+## 2026-10-21: Tokens never reach the WebView
+
+- Decision: Cognito, `POST /dictations`, `GET /styles` and `GET`/`PUT /me/settings` all run in Rust; the UI gets only what it renders through commands, the new-password challenge stays in Rust, and CSP stays `default-src 'self'`.
+- Alternatives rejected: calling Cognito or the API from React with the zod types.
+- Reason: a script in the WebView can never read a token or the challenge, and the hotkey path works with no window open; this extends the Rust-mirror exception to styles and settings.
+- Debt created: none.
+- Revisit when: the settings window gains editors (0008) that would need many more mirrored contracts.
+- Source: 0007_desktop_integration
+
+## 2026-10-21: The session lives in Credential Manager through keyring-core
+
+- Decision: refresh token, `DeviceKey` and `DeviceGroupKey` go to Windows Credential Manager through `keyring-core` and `windows-native-keyring-store`, as raw UTF-8 bytes, persisted per machine; the access token stays in memory.
+- Alternatives rejected: an encrypted file, weaker than the OS store; the `keyring` crate, a CLI since v4 whose v3 silently falls back to a mock store without a platform feature; splitting tokens over several entries.
+- Reason: the store is built explicitly, so there is no silent mock; the measured refresh token is 1932 bytes, under the 2560-byte blob as UTF-8 but not as UTF-16; device-bound tokens must not roam with a domain profile.
+- Debt created: macOS and Linux have no keychain yet; if a rotated refresh token cannot be written, it lives only in memory and the next start reuses the old one and is signed out.
+- Revisit when: phase 5 builds macOS and Linux, or a user is signed out after a keychain error in the log.
+- Source: 0007_desktop_integration
+
+## 2026-10-21: One lock for the session, and only transient failures keep it
+
+- Decision: every token read goes through one mutex that renews with under 5 minutes left and stores the rotated token at once; the hotkey reads an atomic flag and starts a background renewal; network, unexpected answers, 5xx, `InternalErrorException` and `TooManyRequestsException` keep the session, every other Cognito rejection ends it; a gateway 401 or 403 without the error envelope renews once and retries once.
+- Alternatives rejected: ending the session only on `NotAuthorizedException` and reuse, which would keep a session Cognito answers with any other rejection; renewing on each caller.
+- Reason: Cognito keeps only the last rotation, so concurrent renewals lose the session; in dev a forgotten device and a deleted user both answer `NotAuthorizedException`, and a dead session must return to sign-in instead of failing every dictation.
+- Debt created: none.
+- Revisit when: Cognito adds a transient error kind the client should ride out.
+- Source: 0007_desktop_integration
+
+## 2026-10-21: The API stub is debug-only and off by default
+
+- Decision: the stub compiles only into debug builds, its modes replace only `POST /dictations`, and its default mode is off, so debug builds dictate against the real dev API; sign-in is always real.
+- Alternatives rejected: keeping the stub in every build.
+- Reason: release builds carry no fake server and no stub menu.
+- Debt created: axum and tokio still compile in release builds, unlinked, because Cargo cannot scope a dependency to a profile.
+- Revisit when: release build time matters.
+- Source: 0007_desktop_integration
+
+## 2026-10-21: The Rust mirror is checked against JSON Schema from packages/shared
+
+- Decision: `apps/desktop/contract` writes `z.toJSONSchema` of every mirrored contract to a committed file that vitest keeps current in `ci`, and a Rust test compares it with `schemars` schemas of the serde types: field names, required flags, enum values, arrays and primitive kinds.
+- Alternatives rejected: generating the Rust types from the schema.
+- Reason: hand-written types stay readable, and any field, enum value or required flag added, removed or renamed on either side fails; the test was red on the old mirror before the fix.
+- Debt created: string patterns, lengths and integer bounds are not compared.
+- Revisit when: a client bug comes from a constraint the shapes do not carry.
+- Source: 0007_desktop_integration
 

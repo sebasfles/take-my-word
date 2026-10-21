@@ -1,27 +1,40 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::api::{HttpApi, Stub};
+use crate::api::{AuthedApi, HttpApi};
+#[cfg(debug_assertions)]
+use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
+use crate::auth::account::{Account, CognitoProvider};
+use crate::auth::cognito::Cognito;
 use crate::clipboard;
 use crate::config::{self, Settings};
-use crate::dictation::{Job, Notifier, Worker};
+use crate::dictation::{Job, Notifier, SIGN_IN_TO_DICTATE, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
+use crate::keychain::SystemKeychain;
 use crate::locale;
-use crate::overlay::{GatedOverlay, WindowOverlay};
+use crate::overlay::{GatedOverlay, Overlay, OverlayState, WindowOverlay};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
+use crate::{account, env};
 
-const STUB_DELAY: Duration = Duration::from_millis(700);
+#[cfg(debug_assertions)]
+const STUB_DELAY: std::time::Duration = std::time::Duration::from_millis(700);
+
+pub type AppAccount = Account<CognitoProvider, SystemKeychain>;
+pub type AppApi = AuthedApi<Arc<AppAccount>>;
 
 pub struct Shell {
+    pub account: Arc<AppAccount>,
+    pub api: AppApi,
+    #[cfg(debug_assertions)]
     pub stub: Stub,
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     pub microphone: MicrophoneStatus,
@@ -44,8 +57,23 @@ impl Shell {
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
+        let provider = CognitoProvider {
+            cognito: Cognito::for_environment(env::CURRENT)?,
+            device_name: device_name(app),
+        };
+        let keychain = SystemKeychain::new(env::CURRENT.identifier)?;
+        let listener_app = app.clone();
+        let account = Arc::new(Account::restore(
+            provider,
+            keychain,
+            Box::new(move |signed_in| account::changed(&listener_app, signed_in)),
+        ));
+        let api = AuthedApi::new(HttpApi::new(env::CURRENT.api_url)?, Arc::clone(&account));
+        let dictation_api = api.clone();
+        #[cfg(debug_assertions)]
         let stub = Stub::start(STUB_DELAY)?;
-        let api = HttpApi::new(stub.base_url())?;
+        #[cfg(debug_assertions)]
+        let dictation_api = Stubbed::new(stub.clone(), dictation_api)?;
         let keys = Arc::new(Mutex::new(Keys::new(settings.hotkey.clone())));
         let (session, session_inbox) = mpsc::channel();
         let (jobs, job_inbox) = mpsc::channel();
@@ -62,7 +90,7 @@ impl Shell {
             timing: Timing::default(),
         };
         let mut worker = Worker {
-            api,
+            api: dictation_api,
             paste,
             overlay: overlay.clone(),
             notifier: TrayNotifier(app.clone()),
@@ -72,6 +100,8 @@ impl Shell {
             .name("dictation".into())
             .spawn(move || job_inbox.into_iter().for_each(|job| worker.handle(job)))?;
         let sink = ShellSink {
+            app: app.clone(),
+            account: Arc::clone(&account),
             overlay: overlay.clone(),
             jobs: jobs.clone(),
             target: ForegroundApp::default(),
@@ -81,6 +111,9 @@ impl Shell {
             .spawn(move || Session::new(microphone, sink).run(session_inbox))?;
 
         Ok(Self {
+            account,
+            api,
+            #[cfg(debug_assertions)]
             stub,
             overlay,
             microphone: microphone_status,
@@ -92,6 +125,10 @@ impl Shell {
             settings_path,
             proposed: Mutex::new(None),
         })
+    }
+
+    pub fn settings(&self) -> Settings {
+        lock(&self.settings).clone()
     }
 
     pub fn update_settings(&self, change: impl FnOnce(&mut Settings)) {
@@ -200,13 +237,36 @@ pub fn capture_cancelled(app: &AppHandle) {
     let _ = app.emit_to(windows::SETTINGS, "hotkey-capture-cancelled", ());
 }
 
+fn device_name(app: &AppHandle) -> String {
+    let product = windows::product_name(app);
+    match std::env::var("COMPUTERNAME") {
+        Ok(computer) if !computer.is_empty() => format!("{product} on {computer}"),
+        _ => product,
+    }
+}
+
 struct ShellSink {
+    app: AppHandle,
+    account: Arc<AppAccount>,
     overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
 }
 
 impl Sink for ShellSink {
+    fn may_record(&mut self) -> bool {
+        if self.account.is_signed_in() {
+            self.account.renew_in_background();
+            return true;
+        }
+        self.overlay.set(OverlayState::Error {
+            message: SIGN_IN_TO_DICTATE.into(),
+            action: None,
+        });
+        windows::open_account(&self.app, false);
+        false
+    }
+
     fn listening(&mut self) {
         self.overlay.begin_recording();
         self.target = SystemWindow.foreground();
@@ -264,7 +324,7 @@ impl Notifier for TrayNotifier {
             .0
             .notification()
             .builder()
-            .title("Take My Word")
+            .title(windows::product_name(&self.0))
             .body(message)
             .show();
         if let Err(error) = shown {
