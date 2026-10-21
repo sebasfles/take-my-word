@@ -120,6 +120,18 @@ Constraints:
 
 Review focus beyond the Pipeline: e2e assertions kept, no token leakage, contrast pairs complete, font bytes and the hero animation's cost, the losing directions gone.
 
+Direction (om-manager, 2026-10-21, after round 1): A "Tinta", because the quote-into-bars mark is ownable and reads at 16 px, and Fraunces with terracotta on paper is the warm, editorial, voice-first brief; B's bubble is the category cliché and blurs at 16 px, C's comma and arcs read as the contactless glyph.
+Adjustments: the first screen is composed at 1280x800 and 1440x900 (no empty lower 40%); one full-bleed accent band lower on the landing while the hero stays calm; the demo card's rotation stays crisp at every width or is dropped; optical spacing between "My" and the italic "Word" at nav size; the "Escuchando" overlay pill becomes a brand primitive for 0011.
+B and C leave the branch; their screenshots stay in `screenshots/directions/`.
+
+Language (Sebastian, 2026-10-21, after round 1, corrected the same day; adjusts Scope "Spanish and English", the voice guide and the Lighthouse page): the `tmw-lang` cookie set by the switch wins; without it the page follows `Accept-Language` (the highest-weighted of `es` or `en`, any region), and English for anything else or no header. This replaces 0004's "no `Accept-Language` detection".
+Landing, sign-in and account follow it; both dictionaries stay complete with the same keys.
+The voice and tone guide is written English first, Spanish equally complete.
+The hero demo's primary example is English before and after, with a Spanish one as the multilingual example.
+The OG image is English (crawlers send no Spanish preference); Lighthouse runs with its default `en-US`.
+The e2e covers English with no header or another language, Spanish from an `es` header, and the switch overriding the header across reloads; the behaviors pinned before stay covered.
+Dictation languages (Sebastian): if 0008's `dictationLanguages` setting reaches `develop` before the PR, rebase and show it read-only on the Account page, parsed with the `packages/shared` schema; if it has not landed, nothing is built for it.
+
 clearance: full (dev only: web code and assets deployed to dev from this machine with `reusable-deploy-web`'s steps, throwaway Cognito users, dev table and Polly via `fless-takemyword`; no Terraform, no api deploy, no prd).
 
 ## om-developer notes
@@ -158,3 +170,52 @@ External actions:
 - `pnpm integration` and `pnpm e2e` ran against that deployment with throwaway users; all green.
 
 Verified targets: `brand`, `web` (with integration and e2e) and `workflows`, the ones this diff touches; `api`, `desktop`, `shared`, `cognito` and `infra` are untouched.
+
+### Round 2
+
+Did, per the om-reviewer's round 1 message and the Language block:
+
+- Direction A promoted to the root of `packages/brand`: tokens in `tokens.ts`, `tokens.css` generated at `:root`, fonts, mark, app icon and an outlined wordmark; B, C, their fonts and OFL files, `directions/`, the board, `views.ts` and the `/directions` routes deleted. `screenshots/directions/` left untouched.
+- Adjustment 1: the hero sits under the header without a forced height, so at 1280x800 and 1440x900 the first screen is the hero plus the start of "How it works"; shots in `screenshots/hero/first-screen-*-{1280x800,1440x900,390x844}.png`.
+- Adjustment 2: the dictionary section is a full-bleed accent band; its text is `on-accent` on `accent`, already a contrast pair.
+- Adjustment 3: the demo card's rotation is dropped (rotated text always resamples); a flat offset sheet behind it keeps the paper feel and the text stays crisp.
+- Adjustment 4: the wordmark is now outlined paths generated from Fraunces with the spacing before the italic "Word" set by hand, so it renders the same at nav size, in the OG card and on desktop, and never shifts with font loading.
+- Adjustment 5: `OverlayPill` in `packages/brand/src/ui/overlay-pill.tsx`: listening (level or demo loop), processing, done, error; `role="status"`; reduced motion honored through the waveform; ink-dark in both themes through new `overlay`, `on-overlay`, `overlay-accent` roles. The hero demo uses it.
+- Instruction 8: the version comes from the latest release's `latest.json`, parsed with `desktopReleaseManifestSchema` in `packages/shared`, cached 15 minutes, 2.5 s timeout, streamed in a Suspense boundary so it never blocks; without it the button shows "For Windows 10 and 11".
+- Instruction 9: resting frames show the struck words in `muted` on `surface` (5.9:1 light, 7.9:1 dark); only mid-animation chunks fade.
+- Language: English default; cookie, then `Accept-Language` (highest q of `es` or `en`, any region, `*` ignored, malformed entries skipped), else English; `<html lang>` follows the rendered locale. Copy lives in `src/lib/copy/{en,es}.ts` with a test that both have the same keys. The hero demo leads with the page language and the bilingual block shows the other one. Voice and tone guide in `packages/brand/README.md`, English first.
+- Scope: primitives (button, text input, select, textarea, checkbox, toggle, dialog, toast, tabs, nav item, badge, empty state, skeleton, overlay pill) with keyboard and ARIA tests, shown in `/gallery` behind `TMW_GALLERY=1`; asset generator (`pnpm assets`): SVG masters, favicon `.ico` 16/32/48, favicon SVG, apple-touch, PWA 192/512/maskable, Windows `app.ico` up to 256, 1024 master, English OG card; font subsetter (`pnpm fonts`): Latin plus Spanish, SOFT, WONK and opsz pinned, 78 KB for three faces; landing (hero, how it works, bilingual example, dictionary band, styles, per-app rules, privacy, download, footer), sign-in and choose-password, account shell and the five pages with empty, loading and error states; theme switch (system, light, dark) in a `tmw-theme` cookie rendered as `data-theme` on `<html>`, no inline script; metadata with favicons, manifest, Open Graph and Twitter cards from `WEB_ORIGIN`.
+- Acceptance 6: `src/lib/token-lint.ts` and its test reject literal colors, font families, font sizes, spacing, insets, radii, shadows and durations in `apps/web` CSS and TSX; breakpoints are exempt. A second test fails when a stylesheet references a custom property nobody defines; it caught the generator omitting the `size` group.
+- E2E: the 0004 and 0009 suites now run in English and switch to Spanish where they pinned Spanish; every assertion kept. New: no header or another language gets English, an `es` header gets Spanish, the switch overrides the header across reloads, and the theme choice is remembered and rendered on the server.
+- `dictationLanguages` from 0008 is not on `develop` (checked 2026-10-21 23:05 UTC); nothing built for it.
+
+Evidence, in `.workspaces/0010_brand_web/`:
+
+- `screenshots/{en,es}/{light,dark}/{page}-{390,768,1280}.png` for landing, sign-in, sign-in-error, choose-password, account, dictionary, styles, rules, history, history-open, and each account page `-empty`, `-loading`, `-error`; the script fails on horizontal overflow.
+- `screenshots/hero/`: first screens, listening frames, `reduced-motion-{390,1280}.png`, `loop-{390,1280}.webm`, `favicon-16.png`.
+- `screenshots/gallery/`: primitives and the open dialog, both themes, three widths.
+- `screenshots/social/opengraph-xyz.png`: the dev URL in a public social preview.
+- `lighthouse/landing-run-{1,2,3}.json`: mobile preset, en-US, after a warm-up request; performance 98, 98, 99; accessibility 100; best practices 100; SEO 100; CLS 0.000, 0.002, 0.000.
+
+Decisions not in the plan:
+
+- Fonts reach the web through `next/font/local` over the brand's woff2 files: it serves them from `/_next/static`, preloads them with `Link` headers and sets `--font-face-display` and `--font-face-text`, which the font tokens read first; desktop keeps `index.css` with the brand's `@font-face`. The first deploy without preload measured CLS 0.112 from the swap.
+- The mark has two glyphs: the full one (quote and three bars) and a pixel-aligned one (quote and two bars) for 48 px and below; components and icons switch on their own.
+- Primitives use `tmw-` prefixed classes in plain CSS (`ui/ui.css`) so they never collide with app styles.
+- The release manifest schema lives in `packages/shared`, since the web consumes a contract the desktop release produces.
+- The theme switch is a radio group shown in the header from 480 px and always in the footer, so it is reachable on phones.
+- The hero demo and the landing examples follow the page language; the bilingual block shows the other language.
+- Brand assets are copied into `apps/web/public/static` by `pnpm --filter @take-my-word/web static`; a test fails if the copies differ from the brand's.
+
+Deferred:
+
+- `public/static/icon.svg` from 0004 is deleted from the repo but stays in the dev bucket, since the deploy syncs without `--delete`; harmless.
+- `desktop-ci` does not watch `packages/brand/` yet; 0011 adds it when the desktop consumes the package.
+
+External actions:
+
+- Deployed `aa77dae`, then `5ef1197`, to dev with `reusable-deploy-web`'s steps (`fless-takemyword`, us-east-1): static assets to `take-my-word-dev-web-assets-115891590483`, `take-my-word-dev-web` code updated (final CodeSha256 `RJHAM59hFlsgb4yav2Hsx4FYfH+loKtwyS019wHtrss=`), CloudFront `EMI6CYP83OTMO` invalidated (`I48OA6OK6JMLGT7AIUQ7DX44V`, `I6ISLLONMSH3OIGMLL2SRVJ1ID`).
+- The SDK's SSO token expired mid-run; integration and e2e ran with the profile's still-valid role credentials exported through `aws configure export-credentials`, same account and role.
+- Lighthouse and the opengraph.xyz preview read the public dev URL only.
+
+Verified targets: `brand`, `shared`, `web` (with integration and e2e against `5ef1197` on dev) and `workflows`.

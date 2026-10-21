@@ -13,17 +13,17 @@ const installer =
 
 async function signIn(page: Page, options: { remember: boolean }): Promise<void> {
   await page.goto("/sign-in");
-  await page.getByLabel("Usuario").fill(username);
-  await page.getByLabel("Contraseña", { exact: true }).fill(password);
-  if (options.remember) await page.getByLabel("Recordarme en este navegador").check();
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByLabel("Username").fill(username);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  if (options.remember) await page.getByLabel("Remember me on this browser").check();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByTestId("username")).toHaveText(username);
 }
 
 async function signOut(page: Page): Promise<void> {
   await page.goto("/app");
-  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
 }
 
@@ -46,7 +46,15 @@ async function restart(browser: Browser, context: BrowserContext): Promise<Brows
   return restarted;
 }
 
-test("serves the Spanish landing with the download link and switches to English", async ({
+async function htmlLang(page: Page, acceptLanguage: string | null): Promise<string | undefined> {
+  const response = await page.request.get("/", {
+    headers: acceptLanguage === null ? {} : { "accept-language": acceptLanguage },
+  });
+  expect(response.status()).toBe(200);
+  return /<html[^>]*\blang="([a-z]+)"/.exec(await response.text())?.[1];
+}
+
+test("serves the English landing with the download link and switches to Spanish", async ({
   page,
 }) => {
   const response = await page.goto("/");
@@ -58,22 +66,72 @@ test("serves the Spanish landing with the download link and switches to English"
   expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
   expect(headers["x-cache"]).not.toMatch(/^Hit/);
 
-  await expect(page.locator("html")).toHaveAttribute("lang", "es");
-  await expect(page.getByText("Tu palabra, nuestra orden.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Descargar para Windows" })).toHaveAttribute(
+  const hero = page.locator(".hero");
+  const footer = page.getByRole("contentinfo");
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(footer.getByText("Your Word, Our Command.")).toBeVisible();
+  await expect(hero.getByRole("link", { name: "Download for Windows" })).toHaveAttribute(
     "href",
     installer,
   );
+  await expect(hero.getByTestId("download-version")).toHaveText(
+    /^(Version \d+\.\d+\.\d+ for )?Windows 10 and 11$/i,
+  );
 
-  await page.getByRole("button", { name: "Ver en inglés" }).click();
-  await expect(page.getByText("Your Word, Our Command.")).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.getByRole("link", { name: "Download for Windows" })).toHaveAttribute(
+  await page.getByRole("button", { name: "Ver en español" }).click();
+  await expect(footer.getByText("Tu palabra, nuestra orden.")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+  await expect(hero.getByRole("link", { name: "Descargar para Windows" })).toHaveAttribute(
     "href",
     installer,
   );
   await page.reload();
-  await expect(page.getByText("Your Word, Our Command.")).toBeVisible();
+  await expect(footer.getByText("Tu palabra, nuestra orden.")).toBeVisible();
+});
+
+test("picks Spanish only for a browser that asks for it", async ({ page }) => {
+  expect(await htmlLang(page, null)).toBe("en");
+  expect(await htmlLang(page, "fr-FR,fr;q=0.9,de;q=0.8")).toBe("en");
+  expect(await htmlLang(page, "es-MX,es;q=0.9,en;q=0.8")).toBe("es");
+  expect(await htmlLang(page, "en-US,en;q=0.9,es;q=0.8")).toBe("en");
+});
+
+test("keeps the language chosen with the switch over the browser's", async ({ browser }) => {
+  const context = await browser.newContext({ locale: "es-MX" });
+  try {
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await page.getByRole("button", { name: "Ver en inglés" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    for (const path of ["/", "/sign-in", "/"]) {
+      await page.goto(path);
+      await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    }
+    await expect(page.getByRole("contentinfo").getByText("Your Word, Our Command.")).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("remembers the theme picked by hand and renders it on the server", async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: "light" });
+  try {
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme", /./);
+    await page.locator(".site-header").getByLabel("Dark").check();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect
+      .poll(async () => (await context.cookies()).map((c) => c.name))
+      .toContain("tmw-theme");
+    const response = await page.request.get("/sign-in");
+    expect(await response.text()).toMatch(/<html[^>]*data-theme="dark"/);
+    await page.reload();
+    await expect(page.locator(".site-header").getByLabel("Dark")).toBeChecked();
+  } finally {
+    await context.close();
+  }
 });
 
 test("serves the static assets from the bucket with immutable caching", async ({ page }) => {
@@ -95,17 +153,17 @@ test("serves the static assets from the bucket with immutable caching", async ({
     expect(asset.cacheControl).toBe("public,max-age=31536000,immutable");
     expect(asset.server).toBe("AmazonS3");
   }
-  const icon = await page.request.get("/static/icon.svg");
+  const icon = await page.request.get("/static/favicon.svg");
   expect(icon.status()).toBe(200);
   expect(icon.headers().server).toBe("AmazonS3");
 });
 
 test("refuses a wrong password with one generic message", async ({ page, context }) => {
   await page.goto("/sign-in");
-  await page.getByLabel("Usuario").fill(username);
-  await page.getByLabel("Contraseña", { exact: true }).fill("not-the-password-1A");
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page.locator("#sign-in-error")).toHaveText("Usuario o contraseña incorrectos.");
+  await page.getByLabel("Username").fill(username);
+  await page.getByLabel("Password", { exact: true }).fill("not-the-password-1A");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.locator("#sign-in-error")).toHaveText("Wrong username or password.");
   expect(await context.cookies()).toEqual([]);
 });
 

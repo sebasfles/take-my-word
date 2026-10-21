@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { EmptyState as BrandEmptyState, Waveform } from "@take-my-word/brand";
 import type { Loaded } from "@/lib/api.ts";
 import type { AppData } from "@/lib/gate.ts";
 import type { Dictionary } from "@/lib/i18n.ts";
@@ -30,10 +31,13 @@ export function AccountSection<T>(props: {
   );
 }
 
-export function EmptyState(props: { text: string }) {
+export function EmptyState(props: { title: string; text: string }) {
   return (
-    <p className="card state-card empty-state" data-testid="empty-state">
-      {props.text}
-    </p>
+    <BrandEmptyState
+      testId="empty-state"
+      icon={<Waveform level={0.2} bars={5} />}
+      title={props.title}
+      body={props.text}
+    />
   );
 }

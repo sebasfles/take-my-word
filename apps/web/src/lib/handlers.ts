@@ -4,6 +4,7 @@ import type { AccountApi } from "./api.ts";
 import { completeNewPassword, refreshSession, signIn, signOut, type AuthDeps } from "./auth.ts";
 import { isLocale, localeCookieName, localeMaxAgeSeconds } from "./i18n.ts";
 import { isSameOrigin } from "./origin.ts";
+import { isTheme, themeCookieName } from "./theme.ts";
 import {
   clearedSessionCookies,
   needsRefresh,
@@ -34,6 +35,8 @@ const signInSchema = z.object({
 const newPasswordSchema = z.object({ newPassword: z.string().min(1).max(256) });
 
 const localeSchema = z.object({ locale: z.string().refine(isLocale) });
+
+const themeSchema = z.object({ theme: z.string().refine(isTheme) });
 
 function json(body: unknown, status: number, cookies: CookieToSet[] = []): NextResponse {
   const response = NextResponse.json(body, {
@@ -131,24 +134,35 @@ export function signOutHandler(deps: Deps) {
   };
 }
 
+function preferenceCookie(name: string, value: string): CookieToSet {
+  return {
+    name,
+    value,
+    options: {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: localeMaxAgeSeconds,
+    },
+  };
+}
+
 export function localeHandler(webOrigin: () => string) {
   return async (request: NextRequest): Promise<NextResponse> => {
     if (!isSameOrigin(request, webOrigin())) return forbidden();
     const input = await readBody(request, localeSchema);
     if (input === null) return badRequest();
-    return json({ locale: input.locale }, 200, [
-      {
-        name: localeCookieName,
-        value: input.locale,
-        options: {
-          httpOnly: true,
-          secure: true,
-          sameSite: "lax",
-          path: "/",
-          maxAge: localeMaxAgeSeconds,
-        },
-      },
-    ]);
+    return json({ locale: input.locale }, 200, [preferenceCookie(localeCookieName, input.locale)]);
+  };
+}
+
+export function themeHandler(webOrigin: () => string) {
+  return async (request: NextRequest): Promise<NextResponse> => {
+    if (!isSameOrigin(request, webOrigin())) return forbidden();
+    const input = await readBody(request, themeSchema);
+    if (input === null) return badRequest();
+    return json({ theme: input.theme }, 200, [preferenceCookie(themeCookieName, input.theme)]);
   };
 }
 

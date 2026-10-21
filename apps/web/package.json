@@ -13,7 +13,8 @@
     "test": "vitest run --no-file-parallelism",
     "integration": "vitest run --config vitest.integration.config.ts --no-file-parallelism",
     "e2e": "playwright test --workers=1",
-    "screenshots": "node scripts/screenshots.ts"
+    "screenshots": "node scripts/screenshots.ts",
+    "static": "node scripts/static-assets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "3.1154.0",

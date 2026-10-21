@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { Button } from "@take-my-word/brand";
 import { deleteDictation } from "@/lib/delete-dictation.ts";
 import type { Dictionary } from "@/lib/i18n.ts";
 
@@ -35,7 +36,7 @@ export function DeletableDictation(props: {
   if (phase === "deleted") return null;
 
   return (
-    <li className="card dictation" data-testid="dictation">
+    <li className="dictation" data-testid="dictation">
       {props.children}
       <div className="dictation-footer">
         {props.meta}
@@ -44,24 +45,24 @@ export function DeletableDictation(props: {
             <div className="confirm" role="group" aria-label={t.confirm}>
               <p>{t.confirm}</p>
               <div className="confirm-buttons">
-                <button
-                  type="button"
-                  className="button button-danger"
-                  disabled={phase === "deleting"}
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={phase === "deleting"}
                   onClick={() => void confirmDelete()}
                 >
                   {phase === "deleting" ? t.deleting : t.confirmDelete}
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary"
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={phase === "deleting"}
                   onClick={() => {
                     setPhase("idle");
                   }}
                 >
                   {t.cancel}
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -71,15 +72,15 @@ export function DeletableDictation(props: {
                   {t.deleteFailed}
                 </p>
               )}
-              <button
-                type="button"
-                className="button button-ghost button-small"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setPhase("confirm");
                 }}
               >
                 {t.delete}
-              </button>
+              </Button>
             </>
           )}
         </div>

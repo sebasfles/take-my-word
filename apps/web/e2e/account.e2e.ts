@@ -52,9 +52,9 @@ test.afterAll(async () => {
 
 async function signInAs(page: Page, user: ThrowawayUser): Promise<void> {
   await page.goto("/sign-in");
-  await page.getByLabel("Usuario").fill(user.username);
-  await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
-  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.getByLabel("Username").fill(user.username);
+  await page.getByLabel("Password", { exact: true }).fill(user.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/app$/);
 }
 
@@ -102,26 +102,26 @@ test("shows the seeded account on every page, without a token reaching the brows
 
   await expect(page.getByTestId("account-username")).toHaveText(seeded.username);
   await expect(page.getByTestId("default-style")).toHaveText(styleName);
-  await expect(page.getByTestId("account-language")).toHaveText("Español");
+  await expect(page.getByTestId("account-language")).toHaveText("Spanish");
 
-  await page.getByRole("link", { name: "Diccionario" }).click();
+  await page.getByRole("link", { name: "Dictionary" }).click();
   await expect(page.getByTestId("term")).toHaveCount(3);
   await expect(page.getByTestId("terms")).toContainText("kelvarix");
-  await page.getByRole("link", { name: "Nombre" }).click();
+  await page.getByRole("link", { name: "Name" }).click();
   await expect(page.getByTestId("term").first()).toContainText("Ñandú Labs");
 
-  await page.getByRole("link", { name: "Estilos" }).click();
-  await expect(page.getByTestId("builtin-style")).toHaveText([/Neutro/, /Casual/, /Formal/]);
+  await page.getByRole("link", { name: "Styles" }).click();
+  await expect(page.getByTestId("builtin-style")).toHaveText([/Plain/, /Casual/, /Formal/]);
   await expect(page.getByTestId("custom-style")).toHaveCount(1);
   await expect(page.getByTestId("custom-style")).toContainText(styleName);
-  await expect(page.getByTestId("custom-style")).toContainText("Por defecto");
+  await expect(page.getByTestId("custom-style")).toContainText("Default");
 
-  await page.getByRole("link", { name: "Reglas por app" }).click();
+  await page.getByRole("link", { name: "App rules" }).click();
   await expect(page.getByTestId("rule")).toHaveCount(1);
   await expect(page.getByTestId("rule")).toContainText("slack.exe");
   await expect(page.getByTestId("rule")).toContainText(styleName);
 
-  await page.getByRole("link", { name: "Historial" }).click();
+  await page.getByRole("link", { name: "History" }).click();
   const dictations = page.getByTestId("dictation");
   await expect(dictations).toHaveCount(2);
   const [newest] = seededHistory;
@@ -129,15 +129,17 @@ test("shows the seeded account on every page, without a token reaching the brows
   await expect(dictations.first()).toContainText(newest.text);
   const raw = dictations.first().locator(".dictation-raw p");
   await expect(raw).toBeHidden();
-  await dictations.first().getByText("Transcripción original").click();
+  await dictations.first().getByText("Original transcript").click();
   await expect(raw).toBeVisible();
   await expect(raw).toHaveText(newest.raw);
 
-  await page.getByRole("button", { name: "Ver en inglés" }).click();
-  await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "App rules" })).toBeVisible();
   await page.getByRole("button", { name: "Ver en español" }).click();
   await expect(page.getByRole("heading", { name: "Historial" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Reglas por app" })).toBeVisible();
+  await page.getByRole("link", { name: "Cuenta" }).click();
+  await expect(page.getByTestId("account-language")).toHaveText("Español");
+  await page.getByRole("button", { name: "Ver en inglés" }).click();
+  await expect(page.getByRole("heading", { name: `Hi, ${seeded.username}` })).toBeVisible();
 
   await verifyTraffic();
 });
@@ -150,21 +152,21 @@ test("loads the next page of history and deletes a dictation after confirming", 
   const dictations = page.getByTestId("dictation");
   await expect(dictations).toHaveCount(1);
 
-  await page.getByRole("link", { name: "Cargar más" }).click();
+  await page.getByRole("link", { name: "Load more" }).click();
   await expect(page).toHaveURL(/\/app\/history\?pages=2&limit=1$/);
   await expect(dictations).toHaveCount(2);
-  await expect(page.getByRole("link", { name: "Cargar más" })).toBeHidden();
+  await expect(page.getByRole("link", { name: "Load more" })).toBeHidden();
 
   const [kept, deleted] = seededHistory;
   if (kept === undefined || deleted === undefined) throw new Error("two dictations expected");
   const target = dictations.nth(1);
-  await target.getByRole("button", { name: "Eliminar" }).click();
-  await expect(target.getByText("¿Eliminar este dictado? No se puede deshacer.")).toBeVisible();
-  await target.getByRole("button", { name: "Cancelar" }).click();
+  await target.getByRole("button", { name: "Delete" }).click();
+  await expect(target.getByText("Delete this dictation? This cannot be undone.")).toBeVisible();
+  await target.getByRole("button", { name: "Cancel" }).click();
   await expect(dictations).toHaveCount(2);
 
-  await target.getByRole("button", { name: "Eliminar" }).click();
-  await target.getByRole("button", { name: "Sí, eliminar" }).click();
+  await target.getByRole("button", { name: "Delete" }).click();
+  await target.getByRole("button", { name: "Yes, delete" }).click();
   await expect(dictations).toHaveCount(1);
   await expect(dictations.first()).toContainText(kept.text);
 
@@ -176,14 +178,16 @@ test("loads the next page of history and deletes a dictation after confirming", 
 
 test("shows the empty state of every page to a user without data", async ({ page }) => {
   await signInAs(page, fresh);
-  await expect(page.getByTestId("default-style")).toHaveText("Neutro");
+  await expect(page.getByTestId("default-style")).toHaveText("Plain");
   for (const path of ["/app/dictionary", "/app/rules", "/app/history"]) {
     await page.goto(path);
     await expect(page.getByTestId("empty-state")).toBeVisible();
   }
   await page.goto("/app/styles");
   await expect(page.getByTestId("builtin-style")).toHaveCount(3);
-  await expect(page.getByTestId("empty-state")).toHaveText(
-    "Aún no tienes estilos propios. Créalos desde la app de escritorio.",
-  );
+  await expect(
+    page
+      .getByTestId("empty-state")
+      .getByText("No styles of your own yet. Create them from the desktop app.", { exact: true }),
+  ).toBeVisible();
 });

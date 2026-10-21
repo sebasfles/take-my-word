@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tokensCss } from "./css.ts";
-import { tokens } from "./directions/a/tokens.ts";
+import { tokens } from "./tokens.ts";
 
 const css = tokensCss(tokens, ":root");
 
@@ -16,6 +16,7 @@ describe("tokensCss", () => {
     expect(css).toContain(`  --color-border-strong: ${tokens.light.colors.borderStrong};`);
     expect(css).toContain(`  --accent-500: ${tokens.accent["500"]};`);
     expect(css).toContain(`  --text-2xl: ${tokens.text["2xl"]};`);
+    expect(css).toContain(`  --size-control-large: ${tokens.size.controlLarge};`);
   });
 
   it("keeps the dark values out of the light block", () => {

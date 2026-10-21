@@ -4,19 +4,16 @@ import { describe, expect, it } from "vitest";
 import { contrast } from "./color.ts";
 import { pairs } from "./contrast.ts";
 import { tokensCss } from "./css.ts";
-import { directions } from "./directions/index.ts";
+import { tokens } from "./tokens.ts";
 
-describe.each(directions)("direction $id", (direction) => {
-  it("ships the CSS the generator produces from its tokens", () => {
-    const committed = readFileSync(
-      join(import.meta.dirname, "directions", direction.id, "tokens.css"),
-      "utf8",
-    );
-    expect(committed).toBe(tokensCss(direction.tokens, `[data-direction="${direction.id}"]`));
+describe("tokens", () => {
+  it("ship as the CSS the generator produces", () => {
+    const committed = readFileSync(join(import.meta.dirname, "tokens.css"), "utf8");
+    expect(committed).toBe(tokensCss(tokens, ":root"));
   });
 
-  it.each(["light", "dark"] as const)("meets WCAG AA on every %s text pair", (theme) => {
-    const colors = direction.tokens[theme].colors;
+  it.each(["light", "dark"] as const)("meet WCAG AA on every %s pair", (theme) => {
+    const colors = tokens[theme].colors;
     const failing = pairs
       .map((pair) => ({
         ...pair,

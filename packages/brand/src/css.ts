@@ -31,6 +31,7 @@ export function tokensCss(tokens: Tokens, scope: string): string {
     ...declarations("tracking", tokens.tracking),
     ...declarations("space", tokens.space),
     ...declarations("radius", tokens.radius),
+    ...declarations("size", tokens.size),
     ...declarations("border", tokens.border),
     ...declarations("z", tokens.z),
     ...declarations("duration", tokens.duration),

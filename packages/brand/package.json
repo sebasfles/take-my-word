@@ -9,6 +9,8 @@
   },
   "scripts": {
     "generate": "node scripts/generate.ts",
+    "fonts": "node scripts/fonts.ts",
+    "assets": "node scripts/assets.ts",
     "lint": "eslint . && prettier --check --ignore-path ../../.gitignore --ignore-path ../../.prettierignore .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --no-file-parallelism"
@@ -17,8 +19,17 @@
     "react": "19.3.1"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/fontkit": "2.0.9",
     "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "fontkit": "2.0.4",
+    "happy-dom": "21.0.4",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "subset-font": "2.9.0"
   }
 }

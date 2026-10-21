@@ -16,3 +16,33 @@
 - unit: n/a
 - e2e: n/a
 
+## 2026-10-21T23:19:15Z by om-developer target brand on 5ef1197
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (29 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-21T23:19:15Z by om-developer target shared on 5ef1197
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (24 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-21T23:19:15Z by om-developer target web on 5ef1197
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (178 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration); pass exit 0 (13 tests, pnpm e2e against https://dev.takemyword.fless.dev, deployed sha 5ef1197, Lambda CodeSha256 RJHAM59hFlsgb4yav2Hsx4FYfH+loKtwyS019wHtrss=)
+
+## 2026-10-21T23:19:15Z by om-developer target workflows on 5ef1197
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T23:23:02Z by om-developer target web on 2f3a18e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (178 tests, pnpm test)
+- e2e: n/a (2f3a18e differs from the deployed 5ef1197 only in apps/web/scripts/screenshots.ts and the task folder; integration and e2e above ran on 5ef1197)
+
