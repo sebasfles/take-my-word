@@ -46,3 +46,17 @@
 - unit: pass exit 0 (178 tests, pnpm test)
 - e2e: n/a (2f3a18e differs from the deployed 5ef1197 only in apps/web/scripts/screenshots.ts and the task folder; integration and e2e above ran on 5ef1197)
 
+## 2026-10-21T23:32:14Z by om-developer target brand on 83c5b03
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (30 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-21T23:32:14Z by om-developer target web on 83c5b03
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (188 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration); fail exit 1 (10 passed, 1 failed, 2 not run, pnpm e2e against https://dev.takemyword.fless.dev, deployed sha 83c5b03, Lambda CodeSha256 QJykBgsIm2HkrwGJWfDkmziJzQMW7IsPLVPlXQ3y8tM=); pass exit 0 (2 tests, the two not run, pnpm e2e -g)
+account.e2e.ts:105 expect(getByTestId('account-language')).toHaveText("Spanish") received "English".
+take-my-word-dev-api and -dictate were redeployed at 2026-10-21T23:21Z from code not on develop: GET /me/settings returns dictationLanguages and PUT ignores locale (fresh user: {"locale":"en","dictationLanguages":["en"],...}; after PUT locale "es": still "en").
+

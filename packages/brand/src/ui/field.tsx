@@ -133,6 +133,7 @@ export function Checkbox({
   const generated = useId();
   const controlId = id ?? generated;
   const hintId = hint === undefined ? undefined : `${controlId}-hint`;
+  const described = [rest["aria-describedby"], hintId].filter(Boolean).join(" ");
   return (
     <div className={className === undefined ? "tmw-check" : `tmw-check ${className}`}>
       <input
@@ -141,7 +142,7 @@ export function Checkbox({
         id={controlId}
         type="checkbox"
         className="tmw-check-box"
-        aria-describedby={hintId}
+        aria-describedby={described === "" ? undefined : described}
       />
       <label className="tmw-check-label" htmlFor={controlId}>
         {label}

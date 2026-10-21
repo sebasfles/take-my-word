@@ -219,3 +219,24 @@ External actions:
 - Lighthouse and the opengraph.xyz preview read the public dev URL only.
 
 Verified targets: `brand`, `shared`, `web` (with integration and e2e against `5ef1197` on dev) and `workflows`.
+
+### Round 3
+
+Did, one per finding:
+
+1. Version note: `font-variant-numeric: tabular-nums` on `.download-note` (Instrument Sans ships `tnum`, kept by the subset), so "0.1.1" no longer reads "0.11"; both facts end in a period ("Version 0.1.1 for Windows 10 and 11. macOS and Linux soon." and the Spanish twin), which separates them on one line and when they wrap. The e2e pins the period.
+2. `generateViewport` reads `currentTheme()`; `themeColor()` in `lib/theme.ts` returns the forced theme's `bg` or the media pair for system, from `tokens`. The switch also repaints the `theme-color` meta, so the chrome changes without a reload. Unit test for both cases; the e2e theme test checks the server-rendered meta after forcing dark on a light system.
+3. Token lint: local custom properties now get the color, length (percent allowed) and duration checks, and `var()` fallbacks are checked instead of stripped (nested fallbacks too). Eight new rejects in the table; the accepted sample now includes `--skeleton-width: 40%` and a fallback to another token.
+4. `Checkbox` merges a caller's `aria-describedby` with its hint, like the other fields; test in `controls.test.tsx` covers it and `TextInput`.
+
+Evidence refreshed: all screenshots, `lighthouse/landing-run-{1,2,3}.json` on 83c5b03 (performance 99, 99, 98; the rest 100; CLS 0.000).
+
+Blocked, not by this round's code: the account e2e asserts the seeded user's language is "Spanish", and dev's API now answers "English" for every user.
+`take-my-word-dev-api` and `-dictate` were redeployed at 23:21 UTC from code that is not on `develop` (most likely 0008): `GET /me/settings` returns `dictationLanguages` and `PUT` ignores `locale`.
+The other twelve e2e pass against 83c5b03, the two that the failure skipped included.
+Per the Language decision, `dictationLanguages` is shown only once it reaches `develop`; nothing built for it.
+
+External actions:
+
+- Deployed 83c5b03 to dev the same way (CodeSha256 `QJykBgsIm2HkrwGJWfDkmziJzQMW7IsPLVPlXQ3y8tM=`, invalidation `I154MF8JU30KG0MRYBBJZ7G9T3`).
+- Created and removed one throwaway Cognito user to read dev's `/me/settings` before and after a `PUT`.

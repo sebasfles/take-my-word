@@ -25,8 +25,8 @@ export const es: Dictionary = {
     pitch:
       "Mantén Ctrl + Win, habla y suelta. Take My Word transcribe lo que dijiste, quita las muletillas y pega el texto limpio en la app que tienes delante.",
     download: "Descargar para Windows",
-    version: "Versión {version} para Windows 10 y 11",
-    versionless: "Para Windows 10 y 11",
+    version: "Versión {version} para Windows 10 y 11.",
+    versionless: "Para Windows 10 y 11.",
     soon: "macOS y Linux, pronto.",
     demo: {
       label:

@@ -31,6 +31,14 @@ describe("cssViolations", () => {
     ["box-shadow: 0 1px 2px var(--color-text);", "shadow"],
     ["transition: color 150ms ease;", "duration"],
     ["animation: spin 1s linear infinite;", "duration"],
+    ["--gap: 12px;", "length"],
+    ["--tint: #fff;", "color"],
+    ["--shade: rgb(0 0 0);", "color"],
+    ["--speed: 150ms;", "duration"],
+    ["color: var(--x, #fff);", "color"],
+    ["padding: var(--space-4, 12px);", "length"],
+    ["margin: var(--a, var(--b, 1rem));", "length"],
+    ["font-family: var(--font-text, Georgia);", "font family"],
   ])("rejects %s", (declaration, problem) => {
     expect(cssViolations(`.x { ${declaration} }`)[0]).toMatch(new RegExp(`^${problem}:`));
   });
@@ -49,6 +57,9 @@ describe("cssViolations", () => {
           transition: color var(--duration-fast) var(--ease-standard);
           border-color: currentColor;
           width: 100%;
+          --skeleton-width: 40%;
+          --inner: var(--space-4);
+          gap: var(--inner, var(--space-2));
         }
       }`;
     expect(cssViolations(css)).toEqual([]);

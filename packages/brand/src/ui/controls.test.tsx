@@ -86,6 +86,28 @@ describe("fields", () => {
     expect(select.value).toBe("name");
   });
 
+  it("keep a caller's description next to their own hint", () => {
+    render(
+      <>
+        <p id="form-error">Fix the highlighted fields.</p>
+        <TextInput label="Username" hint="As in your invitation" aria-describedby="form-error" />
+        <Checkbox label="Remember me" hint="Only on this browser" aria-describedby="form-error" />
+      </>,
+    );
+    const describedBy = (name: string) =>
+      (screen.getByLabelText(name).getAttribute("aria-describedby") ?? "")
+        .split(" ")
+        .map((id) => document.getElementById(id)?.textContent);
+    expect(describedBy("Username")).toEqual([
+      "Fix the highlighted fields.",
+      "As in your invitation",
+    ]);
+    expect(describedBy("Remember me")).toEqual([
+      "Fix the highlighted fields.",
+      "Only on this browser",
+    ]);
+  });
+
   it("toggle a checkbox from its label and from the keyboard", async () => {
     render(<Checkbox label="Remember me" />);
     const box = screen.getByRole<HTMLInputElement>("checkbox", { name: "Remember me" });

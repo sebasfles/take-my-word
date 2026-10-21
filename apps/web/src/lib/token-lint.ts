@@ -9,7 +9,25 @@ const spacing =
 const radius = /^border(?:-[a-z]+)*-radius$/;
 const motion = /^(?:transition|animation)(?:-[a-z-]+)?$/;
 
-const withoutVars = (value: string) => value.replace(/var\(--[\w-]+(?:,[^)]*)?\)/g, "");
+const customLength = /(?<![\w-])-?\d*\.?\d+(?:px|rem|em|vh|vw|svh|dvh|lvh|ch|ex|pt)(?![a-z])/;
+const varCall = /var\(\s*--[\w-]+\s*(?:,\s*((?:[^()]|\([^()]*\))*))?\)/g;
+
+function withoutVars(value: string): string {
+  let current = value;
+  for (;;) {
+    const next = current.replace(varCall, (_, fallback?: string) => fallback ?? "");
+    if (next === current) return next;
+    current = next;
+  }
+}
+
+function customPropertyProblem(value: string): string | null {
+  const bare = withoutVars(value);
+  if (colorLiteral.test(bare)) return "color";
+  if (customLength.test(bare)) return "length";
+  if (durationLiteral.test(bare)) return "duration";
+  return null;
+}
 
 export function cssViolations(css: string): string[] {
   const found: string[] = [];
@@ -17,7 +35,11 @@ export function cssViolations(css: string): string[] {
   for (const match of source.matchAll(/([a-z-]+)\s*:\s*([^;{}]+);/g)) {
     const property = match[1] ?? "";
     const value = (match[2] ?? "").trim();
-    if (property.startsWith("--")) continue;
+    if (property.startsWith("--")) {
+      const problem = customPropertyProblem(value);
+      if (problem !== null) found.push(`${problem}: ${property}: ${value}`);
+      continue;
+    }
     const bare = withoutVars(value);
     const problem = colorLiteral.test(bare)
       ? "color"

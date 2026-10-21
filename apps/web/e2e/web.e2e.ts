@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { tokens } from "@take-my-word/brand";
 
 function env(name: string): string {
   const value = process.env[name];
@@ -75,7 +76,7 @@ test("serves the English landing with the download link and switches to Spanish"
     installer,
   );
   await expect(hero.getByTestId("download-version")).toHaveText(
-    /^(Version \d+\.\d+\.\d+ for )?Windows 10 and 11$/i,
+    /^(Version \d+\.\d+\.\d+ for|For) Windows 10 and 11\.$/,
   );
 
   await page.getByRole("button", { name: "Ver en español" }).click();
@@ -129,6 +130,9 @@ test("remembers the theme picked by hand and renders it on the server", async ({
     expect(await response.text()).toMatch(/<html[^>]*data-theme="dark"/);
     await page.reload();
     await expect(page.locator(".site-header").getByLabel("Dark")).toBeChecked();
+    const chrome = page.locator('meta[name="theme-color"]');
+    await expect(chrome).toHaveCount(1);
+    await expect(chrome).toHaveAttribute("content", tokens.dark.colors.bg);
   } finally {
     await context.close();
   }

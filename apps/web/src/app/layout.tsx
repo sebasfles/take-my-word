@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { tokens } from "@take-my-word/brand";
-import { themeAttribute } from "@/lib/theme.ts";
+import { themeAttribute, themeColor } from "@/lib/theme.ts";
 import { webConfig } from "@/lib/server/config.ts";
 import { currentDictionary, currentLocale, currentTheme } from "@/lib/server/request.ts";
 import { displayFace, textFace } from "./fonts.ts";
@@ -43,12 +42,9 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: tokens.light.colors.bg },
-    { media: "(prefers-color-scheme: dark)", color: tokens.dark.colors.bg },
-  ],
-};
+export async function generateViewport(): Promise<Viewport> {
+  return { themeColor: themeColor(await currentTheme()) };
+}
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const t = await currentDictionary();

@@ -74,8 +74,8 @@ export const en = {
     pitch:
       "Hold Ctrl + Win, speak, release. Take My Word transcribes what you said, drops the filler words and pastes clean text into the app in front of you.",
     download: "Download for Windows",
-    version: "Version {version} for Windows 10 and 11",
-    versionless: "For Windows 10 and 11",
+    version: "Version {version} for Windows 10 and 11.",
+    versionless: "For Windows 10 and 11.",
     soon: "macOS and Linux soon.",
     demo: {
       label:
