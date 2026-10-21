@@ -147,7 +147,7 @@ impl<A: DictationApi> DictationApi for Stubbed<A> {
     fn dictate(&self, wav: Vec<u8>, meta: &DictationMeta) -> Result<DictationResponse, ApiFailure> {
         match self.stub.mode() {
             StubMode::Off => self.real.dictate(wav, meta),
-            _ => self.stub_api.dictate(wav, meta),
+            _ => self.stub_api.dictate(None, wav, meta),
         }
     }
 }

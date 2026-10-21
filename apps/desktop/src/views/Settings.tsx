@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { bridge, type Overview, keepListening } from "../bridge.ts";
+import { type AccountView, bridge, type Overview, keepListening } from "../bridge.ts";
 import { Keys } from "../Keys.tsx";
 
 type Capture = { step: "idle" } | { step: "listening" } | { step: "proposed"; keys: string[] };
@@ -64,12 +64,67 @@ export function Settings() {
         />
       </section>
 
+      <AccountRow />
+
       <footer className="page-footer">
         <button type="button" className="button button-quiet" onClick={() => void bridge.quit()}>
           Quit Take My Word
         </button>
       </footer>
     </main>
+  );
+}
+
+function AccountRow() {
+  const [account, setAccount] = useState<AccountView | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const load = () => void bridge.accountStatus().then(setAccount);
+    load();
+    return keepListening(() => bridge.onAccountChanged(load));
+  }, []);
+
+  const signOut = () => {
+    setBusy(true);
+    void bridge
+      .signOut()
+      .then(() => bridge.accountStatus())
+      .then(setAccount)
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  return (
+    <section className="row">
+      <div className="row-text">
+        <h2>Account</h2>
+        <p className="muted">
+          {account === null
+            ? "\u00a0"
+            : account.signedIn
+              ? account.username
+                ? `Signed in as ${account.username}`
+                : "Signed in"
+              : "Signed out. Sign in to dictate."}
+        </p>
+      </div>
+      {account?.signedIn === true && (
+        <button type="button" className="button" disabled={busy} onClick={signOut}>
+          {busy ? "Signing out…" : "Sign out"}
+        </button>
+      )}
+      {account?.signedIn === false && (
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => void bridge.openSignIn()}
+        >
+          Sign in
+        </button>
+      )}
+    </section>
   );
 }
 

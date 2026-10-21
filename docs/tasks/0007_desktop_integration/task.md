@@ -146,3 +146,34 @@ Done:
   Both answers, plus reuse and `UserNotFoundException`, are in the fake-Cognito test next to throttling, `InternalErrorException`, a typed 503 and an untyped 500, which keep the session.
 
 Pending and deferred: as in round 1.
+
+### Round 3 (milestone 2: session, API client, error mapping, views, sign-out, screenshots)
+
+Done:
+
+- Session: `auth/account.rs` keeps the refresh token and device keys from the keychain (service = the compiled environment's identifier) and the access token in memory only.
+  Every caller goes through one mutex: an access token with under 5 minutes left renews before use, the rotated refresh token is written to the keychain at once, and callers waiting on a renewal share its result (tested with four threads, one Cognito call).
+  A session-ending answer clears the keychain and signs out; transient failures keep the session.
+  The hotkey reads an atomic flag (never the mutex, so a renewal in flight cannot delay recording) and starts a background renewal at key down.
+  The temporary `allow(dead_code)` on `mod auth` and `mod keychain` is gone.
+- Sign-in: SRP, then `ConfirmDevice` for the new device, then the keychain; the `NEW_PASSWORD_REQUIRED` session waits in Rust, survives an `InvalidPasswordException` for a retry, and an expired one sends the UI back to sign-in.
+  If the keychain refuses the session, the device is forgotten and the token revoked, so nothing dangles.
+  Device name: `{product name} on {COMPUTERNAME}`.
+- Sign-out (tray item that toggles between "Sign in" and "Sign out", and a Settings row): renew if needed, `ForgetDevice`, `RevokeToken`, clear the keychain even when Cognito fails; the sign-in window opens whenever the session ends.
+- API: `api/authed.rs` adds the bearer token to `POST /dictations`, `GET /styles`, `GET` and `PUT /me/settings`; a 401 or 403 without the error envelope renews once and retries once, and a second refusal is reported instead of renewing again.
+- Errors in the overlay: signed out shows "Sign in to Take My Word to dictate." (the sign-in window is already open), quota "You've reached today's dictation limit.", HTTP 413 and 415 short messages by status (the gateway's own 413 has no envelope), network the existing message; nothing is pasted in any of them.
+- Signed out, a hold never opens the microphone: `Sink::may_record` refuses it, shows the sign-in message and opens the sign-in window.
+- Views: one `account` window with sign-in, choose-password (local mismatch check, the web's copy and password rules) and the style picker; onboarding reads `GET /styles` and `GET /me/settings`, preselects the current default, and saves through `GET` then `PUT /me/settings`.
+  The flag is `onboardedUsers` (Cognito `sub`) in `settings.json`; startup reopens the picker while it is pending, then the first-run window if that is not done.
+- Real dev pass (ignored test, credentials through `WSLENV`): the Rust account signs `crew-e2e` in, reads styles and settings from the dev API through the bearer client, signs out and leaves the keychain empty; `crew-e2e` has no devices left.
+- Screenshots of every new and changed state at 390, 768 and 1280 px (plus 1280 light): `screenshots/round-3/` in the workspace, 92 files.
+
+Decisions the plan did not record:
+
+- Tokens are read through `Credentials` (`api/authed.rs`), implemented by the account, so the HTTP client never sees the session and the retry rule is tested against a local gateway.
+- The account window is a single view whose step lives in React; only the onboarding entry comes from the URL, because the choose-password step needs the challenge that only Rust holds.
+- A second 401 or 403 after the forced renewal shows the generic error instead of signing out: Cognito has just confirmed the session.
+- The settings window grew to 560 px high for the account row.
+
+Pending: milestone 3 (Windows smoke for Acceptance 2 to 8 once the om-manager relays `computer available`, `desktop-ci`, docs).
+Deferred: none new.

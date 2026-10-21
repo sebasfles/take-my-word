@@ -1,3 +1,4 @@
+mod authed;
 #[cfg(test)]
 mod contract;
 mod http;
@@ -6,6 +7,7 @@ mod stub;
 
 use serde::{Deserialize, Serialize};
 
+pub use authed::AuthedApi;
 pub use http::HttpApi;
 #[cfg(debug_assertions)]
 pub use stub::{Stub, StubMode, Stubbed};
@@ -183,6 +185,8 @@ pub enum ApiFailure {
     },
     #[error("the API answered something unexpected: {0}")]
     InvalidResponse(String),
+    #[error("signed out")]
+    SignedOut,
 }
 
 pub trait DictationApi {

@@ -31,6 +31,13 @@ pub enum CognitoError {
 }
 
 impl CognitoError {
+    pub fn kind(&self) -> Option<&str> {
+        match self {
+            Self::Rejected { kind, .. } => Some(kind),
+            _ => None,
+        }
+    }
+
     pub fn ends_session(&self) -> bool {
         const TRANSIENT: [&str; 2] = ["InternalErrorException", "TooManyRequestsException"];
         matches!(self, Self::Rejected { status, kind, .. }
@@ -55,7 +62,7 @@ pub struct NewDevice {
 #[derive(Debug)]
 pub struct NewPasswordChallenge {
     pub username: String,
-    session: Secret,
+    pub(super) session: Secret,
 }
 
 #[derive(Debug)]

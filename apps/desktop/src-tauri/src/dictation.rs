@@ -120,17 +120,18 @@ fn microphone_error(error: &AudioError) -> OverlayState {
     }
 }
 
+pub const SIGN_IN_TO_DICTATE: &str = "Sign in to Take My Word to dictate.";
+
 fn api_error(failure: &ApiFailure) -> OverlayState {
     let message = match failure {
         ApiFailure::Network(_) => "Can't reach Take My Word. Check your connection.",
+        ApiFailure::SignedOut => SIGN_IN_TO_DICTATE,
         ApiFailure::Rejected {
             code: Some(ApiErrorCode::QuotaExceeded),
             ..
-        } => "You've used today's dictation quota.",
-        ApiFailure::Rejected {
-            code: Some(ApiErrorCode::PayloadTooLarge),
-            ..
-        } => "That dictation was too long.",
+        } => "You've reached today's dictation limit.",
+        ApiFailure::Rejected { status: 413, .. } => "That dictation was too long.",
+        ApiFailure::Rejected { status: 415, .. } => "That recording format isn't supported.",
         ApiFailure::Rejected { .. } | ApiFailure::InvalidResponse(_) => GENERIC_FAILURE,
     };
     error_state(message, None)
@@ -276,18 +277,51 @@ mod tests {
     }
 
     #[test]
-    fn api_failures_show_an_error_and_paste_nothing() {
-        let failures: [fn() -> ApiFailure; 3] = [
-            || ApiFailure::Network("refused".into()),
-            || ApiFailure::Rejected {
-                status: 429,
-                code: Some(ApiErrorCode::QuotaExceeded),
-            },
-            || ApiFailure::InvalidResponse("garbage".into()),
+    fn api_failures_show_their_message_and_paste_nothing() {
+        type Failure = fn() -> ApiFailure;
+        let failures: [(Failure, &str); 7] = [
+            (
+                || ApiFailure::Network("refused".into()),
+                "Can't reach Take My Word. Check your connection.",
+            ),
+            (|| ApiFailure::SignedOut, SIGN_IN_TO_DICTATE),
+            (
+                || ApiFailure::Rejected {
+                    status: 429,
+                    code: Some(ApiErrorCode::QuotaExceeded),
+                },
+                "You've reached today's dictation limit.",
+            ),
+            (
+                || ApiFailure::Rejected {
+                    status: 413,
+                    code: None,
+                },
+                "That dictation was too long.",
+            ),
+            (
+                || ApiFailure::Rejected {
+                    status: 415,
+                    code: Some(ApiErrorCode::UnsupportedMediaType),
+                },
+                "That recording format isn't supported.",
+            ),
+            (
+                || ApiFailure::Rejected {
+                    status: 429,
+                    code: None,
+                },
+                GENERIC_FAILURE,
+            ),
+            (
+                || ApiFailure::InvalidResponse("garbage".into()),
+                GENERIC_FAILURE,
+            ),
         ];
-        for failure in failures {
+        for (failure, message) in failures {
             let world = run(recorded(), Err(failure), PasteResult::Pasted);
             assert_eq!(kinds(&world), vec!["processing", "error"]);
+            assert_eq!(world.overlay[1], error_state(message, None));
             assert!(world.pasted.is_empty());
         }
     }

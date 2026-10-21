@@ -13,6 +13,7 @@ pub const FILE_NAME: &str = "settings.json";
 pub struct Settings {
     pub hotkey: Hotkey,
     pub first_run_done: bool,
+    pub onboarded_users: Vec<String>,
 }
 
 pub fn load(path: &Path) -> Settings {
@@ -78,6 +79,7 @@ mod tests {
         let settings = Settings {
             hotkey: Hotkey::new(vec![HotkeyKey::Shift, HotkeyKey::Alt]).unwrap(),
             first_run_done: true,
+            onboarded_users: vec!["2448e4f8-2081-70f1-5c1b-1f2e3d4c5b6a".into()],
         };
         save(&path, &settings).unwrap();
         assert_eq!(load(&path), settings);

@@ -15,3 +15,16 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (17 vitest + 83 cargo tests, 2 ignored; pnpm test && pnpm rust:test)
 - e2e: n/a
+
+## 2026-10-21T19:00:24Z by om-developer target desktop on ac8582b
+- lint: fail exit 1 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+screenshots/tauri-core.ts: Expected the Promise rejection reason to be an Error (@typescript-eslint/prefer-promise-reject-errors), 3 places
+
+## 2026-10-21T19:00:24Z by om-developer target desktop on d772244
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a

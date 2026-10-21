@@ -1,12 +1,6 @@
+mod account;
 mod api;
 mod audio;
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "the session manager wires it in the next milestone"
-    )
-)]
 mod auth;
 mod clipboard;
 mod commands;
@@ -17,14 +11,6 @@ mod dictation;
 mod env;
 mod foreground;
 mod hotkey;
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        unused_imports,
-        reason = "the session manager wires it in the next milestone"
-    )
-)]
 mod keychain;
 mod locale;
 mod overlay;
@@ -62,6 +48,13 @@ pub fn run() {
             commands::open_microphone_settings,
             commands::dismiss_overlay,
             commands::finish_first_run,
+            account::account_status,
+            account::sign_in,
+            account::choose_password,
+            account::onboarding,
+            account::save_default_style,
+            account::open_sign_in,
+            account::sign_out,
             commands::quit,
         ])
         .setup(|app| {
@@ -70,11 +63,13 @@ pub fn run() {
             let settings_path = app.path().app_config_dir()?.join(config::FILE_NAME);
             let settings = config::load(&settings_path);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
+            let signed_in = shell.account.is_signed_in();
             app.manage(shell);
-            tray::build(handle)?;
+            tray::build(handle, signed_in)?;
             if !settings.first_run_done {
-                first_run(handle);
+                turn_on_autostart(handle);
             }
+            account::on_startup(handle);
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -90,13 +85,12 @@ pub fn run() {
     });
 }
 
-fn first_run(app: &AppHandle) {
+fn turn_on_autostart(app: &AppHandle) {
     if !cfg!(debug_assertions)
         && let Err(error) = app.autolaunch().enable()
     {
         log::warn!("turning on autostart failed: {error}");
     }
-    windows::open_first_run(app);
 }
 
 fn on_second_launch(app: &AppHandle, args: &[String]) {

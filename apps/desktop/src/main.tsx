@@ -1,12 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { Account } from "./views/Account.tsx";
 import { FirstRun } from "./views/FirstRun.tsx";
 import { Overlay } from "./views/Overlay.tsx";
 import { Settings } from "./views/Settings.tsx";
 import { viewFromSearch } from "./view.ts";
 import "./styles.css";
 
-const screens = { settings: Settings, "first-run": FirstRun, overlay: Overlay };
+const screens = { settings: Settings, "first-run": FirstRun, account: Account, overlay: Overlay };
 const view = viewFromSearch(window.location.search);
 const Screen = screens[view];
 const root = document.getElementById("root");

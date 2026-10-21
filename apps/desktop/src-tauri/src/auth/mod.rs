@@ -1,3 +1,4 @@
+pub mod account;
 pub mod cognito;
 mod secret;
 mod srp;
@@ -70,5 +71,54 @@ mod dev_pool {
             .refresh(&renewed.refresh_token, &device.key)
             .unwrap_err();
         assert!(revoked.ends_session(), "{revoked}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "signs in to the dev pool and calls the dev API with TMW_DEV_USERNAME and TMW_DEV_PASSWORD"]
+    fn a_real_session_reads_styles_and_settings_from_the_dev_api_and_signs_out() {
+        use std::sync::Arc;
+
+        use super::account::{Account, CognitoProvider, SignInStep};
+        use crate::api::{AuthedApi, HttpApi};
+        use crate::keychain::{Keychain, SystemKeychain};
+
+        let (Ok(username), Ok(password)) = (
+            std::env::var("TMW_DEV_USERNAME"),
+            std::env::var("TMW_DEV_PASSWORD"),
+        ) else {
+            eprintln!("skipped: TMW_DEV_USERNAME and TMW_DEV_PASSWORD are not set");
+            return;
+        };
+        let service = format!("dev.fless.takemyword.test.api.{}", std::process::id());
+        let provider = CognitoProvider {
+            cognito: Cognito::for_environment(&DEV).unwrap(),
+            device_name: "Take My Word cargo test".into(),
+        };
+        let account = Arc::new(Account::restore(
+            provider,
+            SystemKeychain::new(&service).unwrap(),
+            Box::new(|_| {}),
+        ));
+        let step = account.sign_in(&username, Secret::new(password)).unwrap();
+        assert!(matches!(step, SignInStep::SignedIn(_)));
+        let api = AuthedApi::new(HttpApi::new(DEV.api_url).unwrap(), Arc::clone(&account));
+        let styles = api.styles().unwrap().styles;
+        assert!(styles.iter().any(|style| style.id == "casual"));
+        let settings = api.settings().unwrap();
+        assert!(
+            styles
+                .iter()
+                .any(|style| style.id == settings.default_style_id)
+        );
+        account.sign_out();
+        assert!(
+            SystemKeychain::new(&service)
+                .unwrap()
+                .load()
+                .unwrap()
+                .is_none()
+        );
+        assert!(!account.is_signed_in());
     }
 }
