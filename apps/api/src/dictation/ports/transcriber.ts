@@ -6,12 +6,7 @@ export interface TranscribeInput {
   language: Language;
 }
 
-export interface Transcript {
-  text: string;
-  noSpeechProbability?: number;
-}
-
 export interface Transcriber {
   readonly label: string;
-  transcribe(input: TranscribeInput): Promise<Transcript>;
+  transcribe(input: TranscribeInput): Promise<{ text: string }>;
 }

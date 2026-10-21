@@ -197,3 +197,71 @@ Deferred: an integration test of the quota condition against DynamoDB Local; the
 4. The quota store test asserts the Key (`USER#u1`, `QUOTA#2026-10-20`) and resolves the update and condition placeholders to `seconds` 12, cap 3600 and `expiresAt`; the real condition semantics stay with the Acceptance 7 e2e in milestone 2.
 
 Pending and deferred: unchanged from round 1.
+
+### Round 3 (milestone 2: infra, applies, e2e)
+
+Done:
+
+- `infra/modules/aws/{lambda,http_api,cognito,dynamodb,secrets,acm}`, `infra/stacks/app`, `infra/environments/{core,dev,prd}`, and `infra/scripts/tf <env> <args>`, which sets `TF_VAR_github_app_pem` from `.env` and the `fless-takemyword` profile.
+- `apps/api/scripts/srp.ts` and `sign-in.ts` (Cognito SRP on the AWS SDK), `pnpm token` (prints a `crew-e2e` access token), and the e2e suite `apps/api/e2e/dictations.e2e.ts` run by `pnpm e2e`, with Polly speech generated per run.
+- Silence by measured level, per the om-reviewer's approval: the WAV probe reports a sustained level, `dictate` skips WAV under `SILENCE_FLOOR_DBFS` before the quota charge and any provider call, and ambiguous phrases are silence only on WAV under `SPEECH_LEVEL_DBFS`; `noSpeechProbability` and `verbose_json` are gone.
+- `docs/TRD.md`: api e2e row.
+
+External actions (clearance `full`, account 115891590483, profile `fless-takemyword`, us-east-1):
+
+| Command | Target | Env | Result |
+|---|---|---|---|
+| `s3api create-bucket`, `put-public-access-block`, `put-bucket-versioning`, `put-bucket-encryption`, `put-bucket-ownership-controls` | `takemyword-terraform-state-115891590483` | account | created: versioned, AES256, public access blocked, bucket owner enforced |
+| `git push origin origin/develop:refs/heads/main` | `sebasfles/take-my-word` | GitHub | run by the om-reviewer; `main` at 8114686 |
+| `infra/scripts/tf core apply` | OIDC provider, Actions environments `dev` and `prd` with branch policies, rulesets `protect-develop` and `protect-main`, workflow permissions | core | 8 added |
+| `infra/scripts/tf dev apply` | the app stack | dev | 37 added; re-plan afterwards: no changes |
+| `infra/scripts/tf dev apply -var debug_audio=true`, then without it | `dictate` env and policy, debug bucket | dev | 2 changed each way; the one object written was removed with `s3 rm` |
+| `infra/scripts/tf prd plan` | the app stack | prd | 34 to add, 0 to change, 0 to destroy; not applied |
+| `cognito-idp admin-create-user`, `admin-set-user-password --permanent` | `crew-e2e` | dev pool `us-east-1_9g4xiMUfJ` | CONFIRMED |
+| `cognito-idp admin-create-user` | `sebastian`, temporary password | dev pool | FORCE_CHANGE_PASSWORD |
+| `secretsmanager put-secret-value` from `.env` through a 0600 temp file | `take-my-word-dev/providers` | dev | AWSCURRENT holds both keys; the placeholder is AWSPREVIOUS |
+| `lambda update-function-code` plus `wait function-updated-v2` | `take-my-word-dev-dictate`, `take-my-word-dev-authorizer` | dev | updated several times; last at the code of 5d3d955 |
+| `polly synthesize-speech` (Lupe es-US, Mia es-MX) | test audio in `.workspaces/0001_platform_skeleton/e2e/` | account | WAV 7.0 s, m4a 6.7 s; never committed |
+| `dynamodb update-item` | `QUOTA#2026-10-21` of `crew-e2e` | dev | seeded 3595, 3590, then reset to 0 |
+| Direct Groq `audio/transcriptions` calls (6) | near-silent, digital silence and speech samples | Groq | `no_speech_prob` is 0 on turbo for everything and 0.25 to 0.70 on v3; led to the level design |
+
+Secret values were never printed, logged or committed; plan and apply outputs were scanned for key and pem patterns (0 hits), and `.env` gained `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD`, `SEBASTIAN_DEV_USERNAME`, `SEBASTIAN_DEV_TEMP_PASSWORD`, `API_URL`.
+
+Evidence per acceptance criterion (dev, 2026-10-21 UTC):
+
+1. `pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test` at the root: exit 0 (7 and 112 tests); `terraform fmt -check -recursive` and `terraform validate` for core, dev and prd: exit 0 (verify.log).
+2. `core` and `dev` applied from a fresh `init` against the state bucket (8 and 37 added); `prd` plans 34 to add, 0 to change, 0 to destroy.
+3. `curl -X POST https://api.dev.takemyword.fless.dev/dictations` with the WAV sample: no header 401 `{"message":"Unauthorized"}`; `Bearer not.a.jwt` 403; an expired token signed by a foreign key with the pool's issuer and client id 403; `crew-e2e`'s real token with a rewritten `sub` 403 (all `{"message":"Forbidden"}`).
+4. `pnpm token` plus `curl -F 'meta={"locale":"es-CO"}' -F "audio=@sample-es.wav;type=audio/wav"`: 200, `providers` `groq-whisper:whisper-large-v3-turbo` and `openai:gpt-5.4-nano`, `latencyMs` `{ quota 157, transcribe 1304, refine 1111, save 10, total 2587 }`.
+   - WAV raw: "Eh, bueno, este, quería decirte que, mañana nos vemos a las 3 en la oficina, o sea, después del almuerzo."
+   - WAV text: "Quería decirte que mañana nos vemos a las 3 en la oficina, después del almuerzo."
+   - m4a (`audio/mp4`, `es-MX`): 200, same providers, `latencyMs` `{ quota 7, transcribe 383, refine 1765, save 6, total 2162 }`.
+   - m4a raw: "Pues, eh, necesito que me mandes el informe, este, antes del viernes, porque, mmm, lo tengo que revisar con calma."
+   - m4a text: "Necesito que me mandes el informe antes del viernes porque lo tengo que revisar con calma."
+   - The first run kept "o sea"; the `plain` v1 prompt now names the common fillers per language, and the runs above are with it.
+5. Near-silent 2 s WAV: 200 `{"raw":"","text":"","skipped":"silence","providers":{},"latencyMs":{"total":29}}`; log `dictation skipped`, `stage: level`, `sustainedLevelDbfs: -71`, no transcriber or refiner field and no provider metric; 2 s of digital silence the same (`total` 2). Before the level design the same file answered 200 with text "Gracias.", refined.
+6. 4,224,078 B WAV 413 `payload_too_large`; 4,608,078 B WAV 413 from the handler; audio parts of 5, 6, 8 and 10.5 MiB 413 `{"message":"Request Entity Too Large"}` from API Gateway, so above about 4.7 MB of audio (the 6 MiB Lambda payload after base64) the gateway answers before the Lambda; exactly 4,194,304 B 200; `audio/ogg` part 415; raw `audio/wav` body 415; meta not JSON, no audio part, a truncated multipart body, an m4a declared as WAV and an unknown `refineProvider` 400.
+7. `QUOTA#2026-10-21` of `crew-e2e` seeded to 3595 s: the next 7 s WAV 200, the one after 429 `{"error":{"code":"quota_exceeded","message":"Daily limit of 60 minutes of audio reached; it resets at 00:00 UTC."}}`, counter 3601.99, `expiresAt` 2026-10-23T00:00:00Z; the counter key is the UTC date, so the next UTC day starts a new item (unit test "allows the user again after UTC midnight"). Concurrency: seeded 3590, six parallel 7 s requests gave two 200 and four 429, counter 3603.98, so the cap is overshot by at most one recording.
+8. Latest `DICTATION#2026-10-21T03:16:39.717Z#c181390e-...` holds `raw`, `text`, `locale`, `audioSeconds`, `providers`, `latencyMs`, `tokens` (214 in, 25 out), `createdAt`, `expiresAt` 90 days out, and no audio attribute; TTL is enabled on `expiresAt`; the debug bucket held nothing with `debug_audio` off, one `{userId}/{time}-{request}.m4a` with it on, and `DEBUG_BUCKET` is absent from `dictate` when off.
+
+Decisions the plan did not record:
+
+- Apply order: state bucket, core, dev (dev's deploy role federates with core's OIDC provider and writes variables into core's `dev` environment).
+- Actions variables per environment, written by `stacks/app`: `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`; the deploy role trusts exactly `repo:sebasfles/take-my-word:environment:{env}` with `aud` `sts.amazonaws.com`.
+- API: `api.dev.takemyword.fless.dev` and `api.takemyword.fless.dev`, execute-api endpoint disabled, stage throttling 10 requests per second with a burst of 20, JSON access logs without bodies, 30-day retention on every log group.
+- HTTP API integrations time out at 30 s whatever the Lambda's timeout, so the provider timeouts are 10 s (Groq) and 15 s (OpenAI); `dictate` keeps 60 s per Scope.
+- Lambda log format Text, so the raw JSON and EMF lines from stdout stay intact; `NODE_OPTIONS=--enable-source-maps` on both functions.
+- Cognito: Essentials, passwords of 12 or more with upper, lower and number, recovery by admin only, devices always remembered without a device challenge; the client allows `ALLOW_USER_SRP_AUTH` only, because refresh token rotation (accepted at apply) renews through `GetTokensFromRefreshToken`, not `ALLOW_REFRESH_TOKEN_AUTH`; user existence errors hidden, token revocation on.
+- SRP is implemented in `apps/api/scripts/srp.ts` (the 3072-bit group was checked as a safe prime) because `amazon-cognito-identity-js` is deprecated (Amplify v5 maintenance mode) and lint rejects it.
+- Secret placeholder ignores `secret_string` and `version_stages`; recovery window 0 days in dev, 7 in prd; prd has point-in-time recovery and deletion protection on the table and the pool.
+- Silence level: the probe reports the RMS of the fifth-loudest 30 ms frame, the level at least 150 ms of the recording reaches. This deviates from "no frame's RMS reaches the floor" because one full-scale click alone lifts its 30 ms frame to about -27 dBFS; four clicks in near-silence still measure -70 (unit test).
+- Defaults from the dev samples, measured with the shipped probe: near-silent -70.6 dBFS, digital silence -inf, Polly speech -17.9, the same speech 20 dB down -37.9 and 30 dB down -47.9 (the quietest spoken sample, which Groq still transcribed correctly). So `SILENCE_FLOOR_DBFS` defaults to -55 (7 dB under the quietest speech, 15 dB over near-silence) and `SPEECH_LEVEL_DBFS` to -40, below which ambiguous phrases count as silence.
+- Response contract: `providers.transcriber`, `latencyMs.quota` and `latencyMs.transcribe` are optional, because a level skip runs no provider; `dictation done` and transcript skips log `sustainedLevelDbfs` (rounded) for tuning.
+- `.prettierignore` ignores `infra/`, so a root `prettier --write .` never walks provider binaries.
+
+Debt for `document-task`:
+
+- dictation: on m4a the level is not measured, so ambiguous phrases are always refined and only the unambiguous hallucinations drop; revisit in phase 4, when mobile drops silent recordings with expo-audio metering.
+- dictation: loud non-speech noise can make Whisper loop on hallucination phrases mixed with fragments (4 MiB of pink noise gave "¡Suscríbete al canal! ¡Suscríbete al canal! al canal ¡Suscríbete al canal! Gracias por ver el video."), which the whole-transcript guard does not match and the refiner turns into text; revisit if it shows in real use.
+
+Pending for milestone 3: workflows, the rest of the TRD verification table, `.env` under Workspace files.

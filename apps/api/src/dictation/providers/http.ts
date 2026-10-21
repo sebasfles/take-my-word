@@ -7,13 +7,11 @@ export interface HttpOptions {
   timeoutMs?: number;
 }
 
-export const defaultTimeoutMs = 25_000;
-
 export async function postForJson(
   provider: string,
   url: string,
   init: { headers: Record<string, string>; body: NonNullable<RequestInit["body"]> },
-  { fetch: fetchImpl = fetch, timeoutMs = defaultTimeoutMs }: HttpOptions,
+  { fetch: fetchImpl = fetch, timeoutMs }: HttpOptions & { timeoutMs: number },
 ): Promise<unknown> {
   let response: Response;
   try {

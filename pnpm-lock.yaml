@@ -63,6 +63,12 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@aws-sdk/client-cognito-identity-provider':
+        specifier: 3.1154.0
+        version: 3.1154.0
+      '@aws-sdk/client-polly':
+        specifier: 3.1154.0
+        version: 3.1154.0
       '@types/aws-lambda':
         specifier: 8.10.164
         version: 8.10.164
@@ -85,8 +91,16 @@ packages:
     resolution: {integrity: sha512-H8BiG/2DnfwydVxD1uDPLa1s1sfhRnVTbD2OwzfTr3WlJzgbIzICDXxBTlTMjbWNNCe4VS9X55fco+JI34L9kw==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/client-cognito-identity-provider@3.1154.0':
+    resolution: {integrity: sha512-W3BMrm0L5ibG6zBSZOtot4NnOLkJUwjnn/1g5JiKYfIp0pa9QmuoKNYOpZf5sCWdEFHqdn2Io8jGOMIZ8PCvbw==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-dynamodb@3.1154.0':
     resolution: {integrity: sha512-59z5o4r+U0jOC9QEPPCcZkfcF7vAiQPGkMUDe5p6euN0fAFMNDy4rVeyf1eMROEcTs+Lu9xkUJTOVPr5TrbkYg==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-polly@3.1154.0':
+    resolution: {integrity: sha512-TCO7WN83xODdrrCrqEXZVkYNP87lY4N5ggw0H/cLfs692J68FSXFH9DKcBRn6wjURUfExPv3xLTewa4QQyESXg==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-s3@3.1154.0':
@@ -141,6 +155,10 @@ packages:
     resolution: {integrity: sha512-8q1ICxcDjHId3bBryuu/j+1L9y5/3uQnwzLDt5j2ElcjZSoWmFtymdJy7OjLrluSMe0Z4mq5bcH4fxBXvlEHfw==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/eventstream-handler-node@3.972.37':
+    resolution: {integrity: sha512-vU0v4d6anhLqBCpPq7Q7hD2Av3/5qOR5O30Ze8ALLysgB3iMQTPHQ/P2aTgfrY2ZjnVJUCi7NiTSNqa1mDF+5w==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/lib-dynamodb@3.1154.0':
     resolution: {integrity: sha512-4pFhdMzA6BGUsLYW+3JsUnVK5iq/QvzWzAHqnq8E04C/ZLV39TRWPvPe32XPn95K4omsRMgREzgFbWUhirWatQ==}
     engines: {node: '>=20.0.0'}
@@ -149,6 +167,10 @@ packages:
 
   '@aws-sdk/middleware-endpoint-discovery@3.972.33':
     resolution: {integrity: sha512-0ed2hDcj2bAQviyydVAWtu63Bl2R0fsvQgw3SK+X9ei7EpFegUdhpdRW/N7cJZIl4YPJXhMnmaq32wDcvUtacA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-eventstream@3.972.32':
+    resolution: {integrity: sha512-D3ayeW/K2lTQI8+SyzDvAKfM3N4SFJjfgqeHbS3DOZmmQebZyve6WUyJiqOKqeOxmIcFxTzpSdsijnRF035J3g==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-sdk-s3@3.972.80':
@@ -1209,12 +1231,36 @@ snapshots:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
 
+  '@aws-sdk/client-cognito-identity-provider@3.1154.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.4
+      '@aws-sdk/credential-provider-node': 3.972.87
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.1
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
   '@aws-sdk/client-dynamodb@3.1154.0':
     dependencies:
       '@aws-sdk/core': 3.978.4
       '@aws-sdk/credential-provider-node': 3.972.87
       '@aws-sdk/dynamodb-codec': 3.973.49
       '@aws-sdk/middleware-endpoint-discovery': 3.972.33
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.1
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-polly@3.1154.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.4
+      '@aws-sdk/credential-provider-node': 3.972.87
+      '@aws-sdk/eventstream-handler-node': 3.972.37
+      '@aws-sdk/middleware-eventstream': 3.972.32
       '@aws-sdk/types': 3.974.6
       '@smithy/core': 3.36.1
       '@smithy/fetch-http-handler': 5.8.0
@@ -1354,6 +1400,13 @@ snapshots:
       mnemonist: 0.38.3
       tslib: 2.8.1
 
+  '@aws-sdk/eventstream-handler-node@3.972.37':
+    dependencies:
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
   '@aws-sdk/lib-dynamodb@3.1154.0(@aws-sdk/client-dynamodb@3.1154.0)':
     dependencies:
       '@aws-sdk/client-dynamodb': 3.1154.0
@@ -1366,6 +1419,13 @@ snapshots:
   '@aws-sdk/middleware-endpoint-discovery@3.972.33':
     dependencies:
       '@aws-sdk/endpoint-cache': 3.972.11
+      '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/middleware-eventstream@3.972.32':
+    dependencies:
       '@aws-sdk/types': 3.974.6
       '@smithy/core': 3.36.1
       '@smithy/types': 4.19.0

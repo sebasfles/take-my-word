@@ -44,7 +44,7 @@ describe("groq-whisper transcriber", () => {
     expect(captured[0]?.headers.authorization).toBe("Bearer secret-key");
     expect(form.get("model")).toBe("whisper-large-v3");
     expect(form.get("language")).toBe("es");
-    expect(form.get("response_format")).toBe("verbose_json");
+    expect(form.get("response_format")).toBe("json");
     const file = form.get("file") as File;
     expect(file.name).toBe("audio.wav");
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe("RIFF");
@@ -59,20 +59,6 @@ describe("groq-whisper transcriber", () => {
     });
     await expect(failure).rejects.toThrow(ProviderError);
     await expect(failure).rejects.toThrow(/^groq-whisper:whisper-large-v3-turbo answered 429$/);
-  });
-
-  it("reports no speech only when every segment is likely silent", async () => {
-    const transcribe = async (probabilities: number[]) => {
-      const segments = probabilities.map((no_speech_prob) => ({ no_speech_prob, text: "x" }));
-      const { fetch } = fakeFetch(200, { text: "Gracias.", segments });
-      return groqWhisper({ apiKey, fetch }).transcribe({
-        audio: Buffer.alloc(1),
-        container: "wav",
-        language: "es",
-      });
-    };
-    expect(await transcribe([0.9, 0.95])).toEqual({ text: "Gracias.", noSpeechProbability: 0.9 });
-    expect((await transcribe([0.95, 0.02])).noSpeechProbability).toBe(0.02);
   });
 
   it("fails on an unexpected shape", async () => {

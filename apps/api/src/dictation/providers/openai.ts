@@ -5,6 +5,7 @@ import { postForJson, type HttpOptions } from "./http.ts";
 
 export const openaiId = "openai";
 export const defaultOpenaiModel = "gpt-5.4-nano";
+const defaultTimeoutMs = 15_000;
 
 const endpoint = "https://api.openai.com/v1/responses";
 
@@ -43,7 +44,7 @@ export function openaiRefiner({
           },
           body: JSON.stringify({ model, instructions, input: raw, store: false }),
         },
-        http,
+        { timeoutMs: defaultTimeoutMs, ...http },
       );
       const parsed = responseSchema.safeParse(body);
       if (!parsed.success) throw new ProviderError(label, `${label} answered an unexpected shape`);

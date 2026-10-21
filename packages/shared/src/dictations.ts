@@ -49,12 +49,12 @@ export const dictationResponseSchema = z.object({
   text: z.string(),
   skipped: z.literal("silence").optional(),
   providers: z.object({
-    transcriber: z.string(),
+    transcriber: z.string().optional(),
     refiner: z.string().optional(),
   }),
   latencyMs: z.object({
-    quota: milliseconds,
-    transcribe: milliseconds,
+    quota: milliseconds.optional(),
+    transcribe: milliseconds.optional(),
     refine: milliseconds.optional(),
     save: milliseconds.optional(),
     total: milliseconds,

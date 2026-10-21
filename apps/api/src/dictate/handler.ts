@@ -35,7 +35,11 @@ export const handler = createDictateHandler({
   quota: dynamoQuotaStore(dynamo, config.TABLE_NAME),
   dailyQuotaMinutes: config.DAILY_QUOTA_MINUTES,
   dictations: dynamoDictationStore(dynamo, config.TABLE_NAME),
-  isSilence: createSilenceGuard({ noSpeechThreshold: config.SILENCE_NO_SPEECH_THRESHOLD }),
+  isSilence: createSilenceGuard(),
+  silenceLevels: {
+    floorDbfs: config.SILENCE_FLOOR_DBFS,
+    speechLevelDbfs: config.SPEECH_LEVEL_DBFS,
+  },
   ...(config.DEBUG_BUCKET && {
     audioSink: s3DebugAudioSink(new S3Client({}), config.DEBUG_BUCKET),
   }),

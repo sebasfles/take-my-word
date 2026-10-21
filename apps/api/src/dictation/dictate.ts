@@ -8,15 +8,15 @@ import {
 import { HttpError } from "../lib/http-error.ts";
 import type { Logger } from "../lib/log.ts";
 import type { Metrics } from "../lib/metrics.ts";
-import { chargeableSeconds } from "./audio/duration.ts";
+import { probeAudio, type AudioProbe } from "./audio/probe.ts";
 import { AudioTooShortError, InvalidAudioError } from "./audio/invalid-audio.ts";
 import type { AudioSink } from "./audio-sink.ts";
 import type { DictationStore } from "./dictation-store.ts";
 import { ProviderError } from "./ports/provider-error.ts";
-import type { Transcript } from "./ports/transcriber.ts";
 import { plainV1 } from "./prompts/plain.v1.ts";
 import type { ProviderRegistry } from "./providers/registry.ts";
 import { quotaExceededMessage, quotaWindow, type QuotaStore } from "./quota.ts";
+import type { SilenceLevels } from "./silence.ts";
 import type { DictationUpload } from "./upload.ts";
 
 export interface DictateDeps {
@@ -24,7 +24,8 @@ export interface DictateDeps {
   quota: QuotaStore;
   dailyQuotaMinutes: number;
   dictations: DictationStore;
-  isSilence: (transcript: Transcript) => boolean;
+  isSilence: (transcript: { text: string; quiet: boolean }) => boolean;
+  silenceLevels: SilenceLevels;
   audioSink?: AudioSink;
   metrics: Metrics;
   log: Logger;
@@ -82,9 +83,9 @@ export async function dictate(
   const transcriber = deps.providers.transcribers[meta.sttProvider ?? defaultTranscriber];
   const refiner = deps.providers.refiners[meta.refineProvider ?? defaultRefiner];
 
-  let audioSeconds: number;
+  let probe: AudioProbe;
   try {
-    audioSeconds = chargeableSeconds(audio.container, audio.bytes);
+    probe = probeAudio(audio.container, audio.bytes);
   } catch (error) {
     if (error instanceof InvalidAudioError) {
       throw new HttpError(
@@ -102,6 +103,23 @@ export async function dictate(
     }
     throw error;
   }
+  const audioSeconds = probe.seconds;
+  const { sustainedLevelDbfs } = probe;
+
+  if (sustainedLevelDbfs !== undefined && sustainedLevelDbfs < deps.silenceLevels.floorDbfs) {
+    const totalMs = Math.round(deps.elapsed() - startedAt);
+    deps.log.info("dictation skipped", {
+      skipped: "silence",
+      stage: "level",
+      sustainedLevelDbfs: Math.round(sustainedLevelDbfs),
+      audioSeconds,
+      totalMs,
+    });
+    return { raw: "", text: "", skipped: "silence", providers: {}, latencyMs: { total: totalMs } };
+  }
+  const quiet =
+    sustainedLevelDbfs !== undefined && sustainedLevelDbfs < deps.silenceLevels.speechLevelDbfs;
+  const levelDbfs = sustainedLevelDbfs === undefined ? undefined : Math.round(sustainedLevelDbfs);
 
   const window = quotaWindow(createdAt);
   const [allowed, quotaMs] = await timed(deps, () =>
@@ -131,11 +149,13 @@ export async function dictate(
   );
 
   const raw = transcript.text;
-  if (deps.isSilence(transcript)) {
+  if (deps.isSilence({ text: raw, quiet })) {
     const totalMs = Math.round(deps.elapsed() - startedAt);
     deps.log.info("dictation skipped", {
       skipped: "silence",
-      noSpeechProbability: transcript.noSpeechProbability,
+      stage: "transcript",
+      quiet,
+      sustainedLevelDbfs: levelDbfs,
       audioSeconds,
       transcriber: transcriber.label,
       quotaMs,
@@ -177,6 +197,7 @@ export async function dictate(
   const totalMs = Math.round(deps.elapsed() - startedAt);
   deps.log.info("dictation done", {
     audioSeconds,
+    sustainedLevelDbfs: levelDbfs,
     transcriber: providers.transcriber,
     refiner: providers.refiner,
     inputTokens: refined.usage.inputTokens,

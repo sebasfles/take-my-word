@@ -21,3 +21,21 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (107 tests, pnpm test: vitest run --no-file-parallelism)
 - e2e: n/a (unknown in TRD until milestone 2)
+
+## 2026-10-21T03:22:38Z by om-developer target shared on 5d3d955
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (7 tests, pnpm test: vitest run --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-21T03:22:38Z by om-developer target api on 5d3d955
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (112 tests, pnpm test: vitest run --no-file-parallelism)
+- e2e: pass exit 0 (6 tests, pnpm e2e: vitest run --config vitest.e2e.config.ts --no-file-parallelism, against https://api.dev.takemyword.fless.dev)
+
+## 2026-10-21T03:22:38Z by om-developer target infra on 5d3d955
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform validate in environments/core, dev and prd)
+- unit: n/a
+- e2e: n/a

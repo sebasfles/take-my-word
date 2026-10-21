@@ -5,9 +5,18 @@ const extensible = 0xfffe;
 const sampleRate = 16_000;
 const channels = 1;
 const bitsPerSample = 16;
-const byteRate = sampleRate * channels * (bitsPerSample / 8);
+const bytesPerSample = bitsPerSample / 8;
+const byteRate = sampleRate * channels * bytesPerSample;
+const frameSamples = (sampleRate * 30) / 1000;
+const sustainedFrames = 5;
+const fullScale = 32_768;
 
-export function wavSeconds(bytes: Buffer): number {
+export interface WavProbe {
+  seconds: number;
+  sustainedLevelDbfs: number;
+}
+
+function dataStart(bytes: Buffer): number {
   if (bytes.length < 12 || bytes.toString("ascii", 0, 4) !== "RIFF") {
     throw new InvalidAudioError("not a RIFF file");
   }
@@ -39,9 +48,34 @@ export function wavSeconds(bytes: Buffer): number {
       }
     } else if (id === "data") {
       if (format === undefined) throw new InvalidAudioError("data chunk before fmt chunk");
-      return (bytes.length - body) / byteRate;
+      return body;
     }
     offset = body + size + (size % 2);
   }
   throw new InvalidAudioError("no data chunk");
+}
+
+function sustainedLevelDbfs(bytes: Buffer, start: number): number {
+  const samples = Math.floor((bytes.length - start) / bytesPerSample);
+  const levels: number[] = [];
+  for (let frame = 0; frame < samples; frame += frameSamples) {
+    const end = Math.min(frame + frameSamples, samples);
+    let energy = 0;
+    for (let index = frame; index < end; index += 1) {
+      const sample = bytes.readInt16LE(start + index * bytesPerSample);
+      energy += sample * sample;
+    }
+    levels.push(Math.sqrt(energy / (end - frame)));
+  }
+  levels.sort((a, b) => b - a);
+  const level = levels[Math.min(sustainedFrames, levels.length) - 1] ?? 0;
+  return level === 0 ? -Infinity : 20 * Math.log10(level / fullScale);
+}
+
+export function probeWav(bytes: Buffer): WavProbe {
+  const start = dataStart(bytes);
+  return {
+    seconds: (bytes.length - start) / byteRate,
+    sustainedLevelDbfs: sustainedLevelDbfs(bytes, start),
+  };
 }

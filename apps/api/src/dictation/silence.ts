@@ -1,4 +1,3 @@
-import type { Transcript } from "./ports/transcriber.ts";
 import phrases from "./silence-phrases.json" with { type: "json" };
 
 export interface SilencePhrases {
@@ -6,7 +5,12 @@ export interface SilencePhrases {
   ambiguous: readonly string[];
 }
 
-export const defaultNoSpeechThreshold = 0.6;
+export interface SilenceLevels {
+  floorDbfs: number;
+  speechLevelDbfs: number;
+}
+
+export const defaultSilenceLevels: SilenceLevels = { floorDbfs: -55, speechLevelDbfs: -40 };
 
 export function normalizeTranscript(text: string): string {
   return text
@@ -16,21 +20,14 @@ export function normalizeTranscript(text: string): string {
     .trim();
 }
 
-export function createSilenceGuard({
-  noSpeechThreshold = defaultNoSpeechThreshold,
-  known = phrases,
-}: { noSpeechThreshold?: number; known?: SilencePhrases } = {}): (
-  transcript: Transcript,
-) => boolean {
+export function createSilenceGuard(
+  known: SilencePhrases = phrases,
+): (transcript: { text: string; quiet: boolean }) => boolean {
   const hallucinations = new Set(known.hallucinations.map(normalizeTranscript));
   const ambiguous = new Set(known.ambiguous.map(normalizeTranscript));
-  return ({ text, noSpeechProbability }) => {
+  return ({ text, quiet }) => {
     const normalized = normalizeTranscript(text);
     if (normalized === "" || hallucinations.has(normalized)) return true;
-    return (
-      ambiguous.has(normalized) &&
-      noSpeechProbability !== undefined &&
-      noSpeechProbability >= noSpeechThreshold
-    );
+    return quiet && ambiguous.has(normalized);
   };
 }

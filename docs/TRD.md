@@ -68,7 +68,7 @@ Phase 1 sets every command; until then they are `unknown`.
 
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
-| api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | unknown |
+| api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
 | web | `apps/web` | unknown | unknown | unknown | unknown |
 | desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |

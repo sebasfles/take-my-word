@@ -5,6 +5,8 @@ export function wav({
   bitsPerSample = 16,
   extraChunk = false,
   declaredDataSize,
+  toneDbfs,
+  clicks = 0,
 }: {
   seconds: number;
   sampleRate?: number;
@@ -12,6 +14,8 @@ export function wav({
   bitsPerSample?: number;
   extraChunk?: boolean;
   declaredDataSize?: number;
+  toneDbfs?: number;
+  clicks?: number;
 }): Buffer {
   const blockAlign = channels * (bitsPerSample / 8);
   const dataSize = Math.round(seconds * sampleRate) * blockAlign;
@@ -27,11 +31,21 @@ export function wav({
   fmt.writeUInt32LE(sampleRate * blockAlign, 16);
   fmt.writeUInt16LE(blockAlign, 20);
   fmt.writeUInt16LE(bitsPerSample, 22);
-  const data = Buffer.concat([
-    Buffer.from("data"),
-    u32le(declaredDataSize ?? dataSize),
-    Buffer.alloc(dataSize),
-  ]);
+  const samples = Buffer.alloc(dataSize);
+  if (bitsPerSample === 16) {
+    const count = dataSize / 2;
+    if (toneDbfs !== undefined) {
+      const amplitude = Math.SQRT2 * 32_768 * 10 ** (toneDbfs / 20);
+      for (let index = 0; index < count; index += 1) {
+        const value = Math.round(amplitude * Math.sin((2 * Math.PI * 440 * index) / sampleRate));
+        samples.writeInt16LE(Math.max(-32_768, Math.min(32_767, value)), index * 2);
+      }
+    }
+    for (let click = 1; click <= clicks; click += 1) {
+      samples.writeInt16LE(32_767, Math.floor((click * count) / (clicks + 1)) * 2);
+    }
+  }
+  const data = Buffer.concat([Buffer.from("data"), u32le(declaredDataSize ?? dataSize), samples]);
   const body = Buffer.concat([Buffer.from("WAVE"), fmt, list, data]);
   return Buffer.concat([Buffer.from("RIFF"), u32le(body.length), body]);
 }

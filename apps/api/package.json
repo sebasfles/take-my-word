@@ -7,7 +7,9 @@
     "build": "node scripts/build.ts",
     "lint": "eslint . && prettier --check --ignore-path ../../.gitignore --ignore-path ../../.prettierignore .",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --no-file-parallelism"
+    "test": "vitest run --no-file-parallelism",
+    "token": "node scripts/token.ts",
+    "e2e": "vitest run --config vitest.e2e.config.ts --no-file-parallelism"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1154.0",
@@ -20,6 +22,8 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "3.1154.0",
+    "@aws-sdk/client-polly": "3.1154.0",
     "@types/aws-lambda": "8.10.164",
     "@types/busboy": "1.5.5",
     "esbuild": "0.28.2"
