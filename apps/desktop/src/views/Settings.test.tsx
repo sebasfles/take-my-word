@@ -88,6 +88,22 @@ describe("Settings", () => {
     expect(fakeBridge.proposeHotkey).not.toHaveBeenCalled();
   });
 
+  it("ends a capture when the user leaves the section", async () => {
+    await startCapture();
+    chord(ctrl, shift);
+    await screen.findByRole("button", { name: "Save" });
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(fakeBridge.cancelHotkeyCapture).toHaveBeenCalledOnce();
+    expect(fakeBridge.confirmHotkey).not.toHaveBeenCalled();
+  });
+
+  it("leaves Rust alone when the user leaves the section without capturing", async () => {
+    render(<Settings />);
+    await screen.findByText("Win");
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(fakeBridge.cancelHotkeyCapture).not.toHaveBeenCalled();
+  });
+
   it("gives up after fifteen seconds", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await startCapture();

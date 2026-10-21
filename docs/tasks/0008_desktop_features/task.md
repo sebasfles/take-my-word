@@ -136,3 +136,11 @@ Decisions not in the plan:
 Pending (milestones 2 and 3): editors, history, "Add a word", keystroke cache and its app rule mirror, running apps, copy, default-style picker shared with onboarding, waveform, Windows smoke, measurements, docs.
 
 Deferred: none.
+
+### Round 2
+
+Did:
+- Finding 1: `ShortcutRow` cancels the Rust capture on unmount when it is listening or proposed, so switching sections mid-capture never leaves the hotkey dead; tests for leaving mid-capture (one cancel, no confirm) and leaving idle (no cancel).
+- Finding 2: verify.log blocks now name the round commit, stating which code commit they ran on.
+
+Pending and deferred: unchanged from round 1.

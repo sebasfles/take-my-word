@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type AccountView, bridge, type Overview, keepListening, problemOf } from "../bridge.ts";
 import { type MessageId, t } from "../i18n.ts";
 import { Keys } from "../Keys.tsx";
@@ -195,6 +195,18 @@ function ShortcutRow({
   onSaved: (hotkey: string[]) => void;
 }) {
   const [capture, setCapture] = useState<Capture>({ step: "idle" });
+  const capturing = useRef(false);
+
+  useEffect(() => {
+    capturing.current = capture.step !== "idle";
+  }, [capture.step]);
+
+  useEffect(
+    () => () => {
+      if (capturing.current) void bridge.cancelHotkeyCapture();
+    },
+    [],
+  );
   const [error, setError] = useState<MessageId | null>(null);
 
   useEffect(
