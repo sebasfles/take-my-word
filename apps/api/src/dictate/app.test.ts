@@ -7,6 +7,7 @@ import {
 } from "@take-my-word/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DictationRecord } from "../dictation/dictation-store.ts";
+import type { DictationProfile } from "../dictation/profile.ts";
 import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { RefineInput } from "../dictation/ports/refiner.ts";
 import type { TranscribeInput } from "../dictation/ports/transcriber.ts";
@@ -23,6 +24,25 @@ const cleanText = "Quería decir que mañana nos vemos.";
 const whisper = "groq-whisper:whisper-large-v3-turbo";
 const speech = (seconds: number) => wav({ seconds, toneDbfs: -20 });
 
+class Rendezvous {
+  private readonly started = new Set<string>();
+  private readonly waiting: (() => void)[] = [];
+
+  async arrive(party: string): Promise<void> {
+    this.started.add(party);
+    if (this.started.size === 2) {
+      for (const release of this.waiting) release();
+      return;
+    }
+    await new Promise<void>((release, reject) => {
+      this.waiting.push(release);
+      setTimeout(() => {
+        reject(new Error(`${party} ran alone; the other call never started`));
+      }, 500);
+    });
+  }
+}
+
 class World {
   now = new Date("2026-10-20T15:00:00.000Z");
   clock = 0;
@@ -34,6 +54,9 @@ class World {
   used = new Map<string, number>();
   charges: QuotaCharge[] = [];
   lines: string[] = [];
+  profile: DictationProfile = { styles: [], terms: [] };
+  profileLoads: { userId: string; appId: string | undefined }[] = [];
+  rendezvous: Rendezvous | undefined;
 
   handler = createDictateHandler({
     providers: {
@@ -63,13 +86,14 @@ class World {
       },
     },
     quota: {
-      charge: (charge) => {
+      charge: async (charge) => {
+        await this.rendezvous?.arrive("quota");
         this.charges.push(charge);
         const key = `${charge.userId}/${charge.day}`;
         const used = this.used.get(key);
-        if (used !== undefined && used >= charge.capSeconds) return Promise.resolve(false);
+        if (used !== undefined && used >= charge.capSeconds) return false;
         this.used.set(key, (used ?? 0) + charge.seconds);
-        return Promise.resolve(true);
+        return true;
       },
     },
     dailyQuotaMinutes: 60,
@@ -79,6 +103,14 @@ class World {
         return Promise.resolve();
       },
     },
+    profile: {
+      load: async (userId, appId) => {
+        await this.rendezvous?.arrive("profile");
+        this.profileLoads.push({ userId, appId });
+        return this.profile;
+      },
+    },
+    dictionary: { halfLifeDays: 30, promptTokenBudget: 224 },
     isSilence: createSilenceGuard(),
     silenceLevels: defaultSilenceLevels,
     metrics: createMetrics((line) => this.lines.push(line)),
@@ -323,5 +355,81 @@ describe("POST /dictations", () => {
         totalMs: 700,
       }),
     );
+  });
+});
+
+describe("POST /dictations with the user's dictionary, styles and settings", () => {
+  const term = (name: string, aliases: string[], useCount: number, lastUsedAt: string) => ({
+    key: name.toLowerCase(),
+    term: name,
+    aliases,
+    useCount,
+    lastUsedAt,
+    createdAt: "2026-01-01T00:00:00.000Z",
+  });
+  const settings = (defaultStyleId: string) => ({
+    defaultStyleId,
+    locale: "es",
+    providers: { transcriber: "groq-whisper" as const, refiner: "openai" as const },
+  });
+  const post = (meta: Record<string, unknown>) =>
+    world.post(dictationBody({ audio: speech(3), meta: { locale: "es", ...meta } }));
+
+  it("uses plain and sends no prompt for a user with nothing configured", async () => {
+    const { json } = await post({});
+    expect(ok(json).styleId).toBe("plain");
+    expect(world.saved[0]?.styleId).toBe("plain");
+    expect(world.transcribed[0]?.prompt).toBeUndefined();
+  });
+
+  it("steers Whisper with the top terms and gives the refiner every term with its aliases", async () => {
+    world.profile.terms = [
+      term("Kubernetes", ["cubernetes"], 9, "2026-10-19T00:00:00.000Z"),
+      term("Zentrafolk", [], 1, "2026-10-20T00:00:00.000Z"),
+      term("Viejo", [], 50, "2025-01-01T00:00:00.000Z"),
+    ];
+    await post({});
+    expect(world.transcribed[0]?.prompt).toBe("Kubernetes, Zentrafolk, Viejo");
+    expect(world.refined[0]?.instructions).toContain("- Kubernetes (cubernetes)");
+    expect(world.refined[0]?.instructions).toContain("- Viejo");
+  });
+
+  it("resolves the style from the request, then the app rule, then the default", async () => {
+    world.profile = {
+      settings: settings("mine"),
+      rule: { appId: "notepad.exe", styleId: "formal", keystroke: "ctrl+v" },
+      styles: [{ id: "mine", prompt: "Write like a pirate." }],
+      terms: [],
+    };
+    expect(ok((await post({ styleId: "casual", appId: "Notepad.exe" })).json).styleId).toBe(
+      "casual",
+    );
+    expect(ok((await post({ appId: "Notepad.exe" })).json).styleId).toBe("formal");
+    expect(world.profileLoads[1]).toEqual({ userId: "user-1", appId: "notepad.exe" });
+    world.profile = { ...world.profile, rule: { appId: "notepad.exe", keystroke: "ctrl+v" } };
+    expect(ok((await post({ appId: "notepad.exe" })).json).styleId).toBe("mine");
+    expect(world.refined[2]?.instructions).toContain("Write like a pirate.");
+    expect(world.saved.map((record) => record.styleId)).toEqual(["casual", "formal", "mine"]);
+  });
+
+  it("never fails a dictation over a deleted style id", async () => {
+    world.profile = { settings: settings("deleted"), styles: [], terms: [] };
+    const { status, json } = await post({ styleId: "also-deleted" });
+    expect(status).toBe(200);
+    expect(ok(json).styleId).toBe("plain");
+  });
+
+  it("charges the quota and reads the profile concurrently and reports both", async () => {
+    world.rendezvous = new Rendezvous();
+    const { status, json } = await post({});
+    expect(status).toBe(200);
+    expect(world.profileLoads).toHaveLength(1);
+    expect(ok(json).latencyMs).toMatchObject({ quota: 0, profile: 0 });
+    expect(world.saved[0]?.latencyMs).toMatchObject({ profile: 0 });
+  });
+
+  it("reads nothing for a WAV skipped under the level floor", async () => {
+    await world.post(dictationBody({ audio: wav({ seconds: 2, toneDbfs: -70 }) }));
+    expect(world.profileLoads).toHaveLength(0);
   });
 });

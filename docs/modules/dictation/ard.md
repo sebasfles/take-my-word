@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Dictation: architecture and debt
@@ -90,10 +90,10 @@ source: 0001_platform_skeleton
 ## 2026-10-21: The daily quota is one conditional counter per UTC day
 
 - Decision: `QUOTA#YYYY-MM-DD` under the user gets an atomic `ADD seconds` while the stored value is under the cap; the real duration is charged before transcription, never refunded, and the last allowed recording may overshoot the cap.
-- Alternatives rejected: counting dictations; reserving the duration first and refunding failures; a per-user cap stored on `USER`, deferred to the task that first writes `USER`.
+- Alternatives rejected: counting dictations; reserving the duration first and refunding failures; a per-user cap stored on `SETTINGS`, deferred until one user needs it.
 - Reason: providers bill minutes; DynamoDB serializes the condition, so concurrent requests overshoot by at most one recording (six parallel requests at the cap let two through).
 - Debt created: `DAILY_QUOTA_MINUTES` is one cap for every user; the prd's per-user override is not built.
-- Revisit when: a task writes `USER`, or one user needs a different cap.
+- Revisit when: one user needs a different cap.
 - Source: 0001_platform_skeleton
 
 ## 2026-10-21: Silence on WAV is decided by measuring the audio
@@ -123,3 +123,21 @@ source: 0001_platform_skeleton
 - Revisit when: history needs to hide raw from the user.
 - Source: 0001_platform_skeleton
 
+
+## 2026-10-21: Settings are replaced whole and read with per-field defaults
+
+- Decision: `PUT /me/settings` replaces the whole `SETTINGS` item and refuses a default style that does not exist; on read, any stored field that no longer parses (a removed provider, a malformed locale) falls back to that field's default instead of failing.
+- Alternatives rejected: a partial update on `PUT`; failing the read on an invalid field.
+- Reason: clients read the settings before editing them, so a full replace keeps one shape and one validation; per-field defaults keep `dictate` and the settings screen working when a provider is retired.
+- Debt created: none.
+- Revisit when: two clients edit settings at the same time and overwrite each other.
+- Source: 0003_api_features
+
+## 2026-10-21: History hides expired dictations and refills short pages
+
+- Decision: the history Query filters `expiresAt > now`; since DynamoDB applies `Limit` before the filter, the store queries again from `LastEvaluatedKey` for the remaining count until the page is full or the partition ends, and the cursor is the last returned item's sort key; `limit` is 1 to 100, default 20; ids and cursors are unpadded base64url and a malformed one answers 400.
+- Alternatives rejected: trusting TTL, which deletes days after expiry; a single Query that may return a short or empty page with a cursor.
+- Reason: the product promises text for 90 days, not 90 days plus TTL lag, and a client should never get an empty page while older items exist.
+- Debt created: a page over many expired items costs one Query per item batch until TTL catches up.
+- Revisit when: TTL lag leaves more than a page of expired items in a partition.
+- Source: 0003_api_features

@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Infra: architecture and debt
@@ -43,7 +43,7 @@ source: 0001_platform_skeleton
 
 ## 2026-10-20: One DynamoDB table per env, with stream and TTL
 
-- Decision: a single table `take-my-word-{env}` holds every item kind (`USER`, `DICT#term`, `STYLE#id`, `APPRULE#appId`, `DICTATION#ts`); TTL expires dictations after 90 days; its stream feeds the `dictionary-usage` Lambda; no ORM, no migrations.
+- Decision: a single table `take-my-word-{env}` holds every item kind (`SETTINGS`, `QUOTA#date`, `DICT#term`, `STYLE#id`, `APPRULE#appId`, `DICTATION#ts`); TTL expires dictations after 90 days; its stream feeds the `dictionary-usage` Lambda; no ORM, no migrations.
 - Alternatives rejected: one table per item kind; a relational database.
 - Reason: every access is by user, so one partition per user serves every read; on-demand DynamoDB stays inside the free tier at this scale.
 - Debt created: none.

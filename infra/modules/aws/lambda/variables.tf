@@ -38,10 +38,15 @@ variable "environment" {
 }
 
 variable "policy_statements" {
-  description = "Extra IAM statements for the function's role, keyed by statement id"
+  description = "Extra IAM statements for the function's role, keyed by statement id, each with optional conditions"
   type = map(object({
     actions   = list(string)
     resources = list(string)
+    conditions = optional(list(object({
+      test     = string
+      variable = string
+      values   = list(string)
+    })), [])
   }))
   default = {}
 }

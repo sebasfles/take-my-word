@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Dictation: product
@@ -26,8 +26,8 @@ If a provider fails the user sees an error and nothing is pasted.
 
 ### Review history
 
-1. In the web account the user opens history (phase 5).
-2. The user sees past dictations as text, newest first, from the last 90 days.
+1. The user opens history (web in phase 5; the API serves it since 0003).
+2. The user sees past dictations as text, newest first, from the last 90 days, with the raw transcript and the style used, a page at a time.
 
 Errors and empty states: with no dictations, the list is empty.
 
@@ -42,7 +42,8 @@ Errors and empty states: with no dictations, the list is empty.
 - A single recording is at most 4 MB, about 2 minutes from desktop and about 8 from mobile.
 - Audio is never kept; only the text, deleted after 90 days.
 - A user only ever sees their own dictations.
-- The style comes from the user's pick, else the active app's rule on desktop, else the user's default.
+- The style comes from the user's pick, else the active app's rule on desktop, else the user's default, else `plain`; a style that no longer exists never makes a dictation fail.
+- A new user's settings start with the `plain` style and Spanish; the language setting is a client preference, each dictation still says its own language.
 - The transcription and cleanup providers follow the user's settings; a dictation may override them.
 - The result is the cleaned text and nothing else.
 

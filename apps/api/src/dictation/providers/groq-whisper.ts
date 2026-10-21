@@ -24,7 +24,7 @@ export function groqWhisper({
   const label = `${groqWhisperId}:${model}`;
   return {
     label,
-    async transcribe({ audio, container, language }: TranscribeInput) {
+    async transcribe({ audio, container, language, prompt }: TranscribeInput) {
       const form = new FormData();
       form.append(
         "file",
@@ -35,6 +35,7 @@ export function groqWhisper({
       form.append("language", language);
       form.append("response_format", "json");
       form.append("temperature", "0");
+      if (prompt) form.append("prompt", prompt);
       const body = await postForJson(
         label,
         endpoint,

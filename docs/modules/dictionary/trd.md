@@ -1,58 +1,49 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Dictionary: technical
-
-Planned; no code yet, phase 3 builds it.
 
 ## Structure
 
 | Path | What |
 |---|---|
-| `apps/api` | Dictionary CRUD routes in the `api` Lambda (Hono), the ranking and the two projections read by `dictate`. |
-| `apps/api` | The `dictionary-usage` Lambda, consumer of the table's DynamoDB Stream. |
-| `packages/shared` | zod contracts for dictionary terms and aliases. |
-| `apps/web` | Read-only dictionary view. |
-| `apps/desktop` | Dictionary editor in the tray app settings. |
-| `apps/mobile` | Dictionary editor in the app settings. |
-
-Folder names inside each app follow the module name (`dictionary/`).
+| `apps/api/src/dictionary` | Routes in the `api` Lambda, the store port and its DynamoDB adapter, term matching. |
+| `apps/api/src/dictation/dictionary-projection.ts` | Ranking and the two projections `dictate` builds (owned here, called by dictation). |
+| `apps/api/src/dictionary-usage` | The `dictionary-usage` Lambda, consumer of the table stream. |
+| `packages/shared/src/dictionary.ts` | Contracts, limits and `normalizeTerm`, the folding every client and the server share. |
+| `apps/web`, `apps/desktop`, `apps/mobile` | Read-only view and editors (0008, 0009, phase 4). |
 
 ## Endpoints owned
 
 | Method | Route | Purpose | Spec |
 |---|---|---|---|
-| GET | `/dictionary` | List the user's terms with aliases. | none yet |
-| POST | `/dictionary` | Add a term with optional aliases. | none yet |
-| PUT | `/dictionary/{term}` | Edit a term's aliases. | none yet |
-| DELETE | `/dictionary/{term}` | Remove a term. | none yet |
+| GET | `/dictionary` | The user's terms with aliases and usage. | zod in `packages/shared` |
+| POST | `/dictionary` | Add a term; 409 when its folded form exists. | zod in `packages/shared` |
+| PUT | `/dictionary/{id}` | Replace a term's aliases. | zod in `packages/shared` |
+| DELETE | `/dictionary/{id}` | Remove a term. | zod in `packages/shared` |
 
-The exact routes under CRUD `/dictionary` are; the contract in `packages/shared` will be the source.
+`{id}` is the opaque `id` each listed term carries, never the raw term: API Gateway decodes the path once, so `/`, `#` and `%` would not survive.
 
-Jobs: `dictionary-usage` Lambda on the DynamoDB Stream of `take-my-word-{env}`, filtered to new `DICTATION#ts` items, increments `useCount` and sets `lastUsedAt` on every term that appears in the saved text.
-How a term counts as "appearing" (exact term, alias, case and accent folding) is.
+Job: `dictionary-usage` reads inserts of `DICTATION#` from the table stream (filtered at the event source mapping) and adds one use to every term or alias found in the clean text, folded, on Unicode word boundaries.
 
 ## Depends on
 
-- auth: the Lambda authorizer supplies the user id that scopes every term.
-- dictation: its saved `DICTATION#ts` items are the stream events that feed usage.
-- infra: the table, its stream, the `dictionary-usage` Lambda and its event source mapping.
+- auth: the authorizer's `userId` scopes every term.
+- dictation: its saved `DICTATION#` items feed usage through the stream.
+- infra: the table, its stream, the `api` and `dictionary-usage` Lambdas and the mapping.
 
 ## Depended on by
 
-- dictation: `dictate` reads the user's terms and builds two projections.
-  The top terms by score fill Whisper's 224-token `prompt`.
-  The full list with aliases goes to the refiner as a correction table.
+- dictation: `dictate` ranks the terms and sends the top ones as Whisper's `prompt` and every term with aliases to the refiner.
 
 ## Configuration
 
-- Half-life for the score, default 30 days, configurable; env var name.
-- Table name per environment, `take-my-word-{env}`, injected by Terraform.
+- `DICTIONARY_HALF_LIFE_DAYS` (30) and `STT_PROMPT_TOKEN_BUDGET` (224) on `dictate`, set by `infra/stacks/app`.
+- `TABLE_NAME` on `api` and `dictionary-usage`.
 
 ## Testing
 
-- No tests yet.
-- Ranking and projection are pure functions and get unit tests next to them in `apps/api`.
-- Module-specific run: see TRD.
+- Unit tests next to the code: folding, matching, ranking and budget, routes against in-memory stores, the usage consumer.
+- `pnpm e2e` in `apps/api` proves a rare term spelled right only with the dictionary and counted by the stream.

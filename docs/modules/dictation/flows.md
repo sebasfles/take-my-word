@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Dictation: flows
@@ -24,7 +24,11 @@ sequenceDiagram
   alt WAV under the level floor
     D-->>C: empty text, nothing charged
   end
-  D->>T: charge the day's quota, read settings, dictionary, style
+  par
+    D->>T: charge the day's quota
+  and
+    D->>T: read settings, app rule, styles, dictionary
+  end
   alt day already at the cap
     D-->>C: 429
   end
@@ -33,9 +37,9 @@ sequenceDiagram
   alt empty, hallucination, or ambiguous phrase on quiet WAV
     D-->>C: empty text, nothing saved
   end
-  D->>R: raw transcript, style prompt, full dictionary, locale
+  D->>R: raw transcript, editing rules, resolved style, full dictionary, locale
   R-->>D: clean text
-  D->>T: save DICTATION with TTL 90 days
-  D-->>C: raw and clean text
+  D->>T: save DICTATION with styleId and TTL 90 days
+  D-->>C: raw and clean text, styleId
   T-)T: stream to dictionary-usage
 ```

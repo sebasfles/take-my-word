@@ -41,6 +41,8 @@ jobs:
         env:
           DICTATE_FUNCTION_NAME: ${{ vars.DICTATE_FUNCTION_NAME }}
           AUTHORIZER_FUNCTION_NAME: ${{ vars.AUTHORIZER_FUNCTION_NAME }}
+          API_FUNCTION_NAME: ${{ vars.API_FUNCTION_NAME }}
+          DICTIONARY_USAGE_FUNCTION_NAME: ${{ vars.DICTIONARY_USAGE_FUNCTION_NAME }}
         run: |
           deploy() {
             aws lambda update-function-code \
@@ -53,3 +55,5 @@ jobs:
           }
           deploy "$AUTHORIZER_FUNCTION_NAME" authorizer
           deploy "$DICTATE_FUNCTION_NAME" dictate
+          deploy "$API_FUNCTION_NAME" api
+          deploy "$DICTIONARY_USAGE_FUNCTION_NAME" dictionary-usage

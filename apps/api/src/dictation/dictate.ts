@@ -13,10 +13,13 @@ import { AudioTooShortError, InvalidAudioError } from "./audio/invalid-audio.ts"
 import type { AudioSink } from "./audio-sink.ts";
 import type { DictationStore } from "./dictation-store.ts";
 import { ProviderError } from "./ports/provider-error.ts";
-import { plainV1 } from "./prompts/plain.v1.ts";
+import { transcriberPrompt } from "./dictionary-projection.ts";
+import { refinerInstructions } from "./instructions.ts";
+import type { ProfileStore } from "./profile.ts";
 import type { ProviderRegistry } from "./providers/registry.ts";
 import { quotaExceededMessage, quotaWindow, type QuotaStore } from "./quota.ts";
 import type { SilenceLevels } from "./silence.ts";
+import { resolveStyle } from "./style-resolution.ts";
 import type { DictationUpload } from "./upload.ts";
 
 export interface DictateDeps {
@@ -24,6 +27,8 @@ export interface DictateDeps {
   quota: QuotaStore;
   dailyQuotaMinutes: number;
   dictations: DictationStore;
+  profile: ProfileStore;
+  dictionary: { halfLifeDays: number; promptTokenBudget: number };
   isSilence: (transcript: { text: string; quiet: boolean }) => boolean;
   silenceLevels: SilenceLevels;
   audioSink?: AudioSink;
@@ -80,8 +85,6 @@ export async function dictate(
   const createdAt = deps.now();
   const { meta, audio } = upload;
   const language = languageOf(meta.locale);
-  const transcriber = deps.providers.transcribers[meta.sttProvider ?? defaultTranscriber];
-  const refiner = deps.providers.refiners[meta.refineProvider ?? defaultRefiner];
 
   let probe: AudioProbe;
   try {
@@ -122,19 +125,41 @@ export async function dictate(
   const levelDbfs = sustainedLevelDbfs === undefined ? undefined : Math.round(sustainedLevelDbfs);
 
   const window = quotaWindow(createdAt);
-  const [allowed, quotaMs] = await timed(deps, () =>
-    deps.quota.charge({
-      userId,
-      day: window.day,
-      seconds: audioSeconds,
-      capSeconds: deps.dailyQuotaMinutes * 60,
-      expiresAt: window.expiresAt,
-    }),
-  );
+  const [[allowed, quotaMs], [profile, profileMs]] = await Promise.all([
+    timed(deps, () =>
+      deps.quota.charge({
+        userId,
+        day: window.day,
+        seconds: audioSeconds,
+        capSeconds: deps.dailyQuotaMinutes * 60,
+        expiresAt: window.expiresAt,
+      }),
+    ),
+    timed(deps, () => deps.profile.load(userId, meta.appId)),
+  ]);
   if (!allowed) {
     deps.log.info("quota exceeded", { audioSeconds, quotaMs });
     throw new HttpError("quota_exceeded", quotaExceededMessage(deps.dailyQuotaMinutes));
   }
+
+  const { settings } = profile;
+  const transcriber =
+    deps.providers.transcribers[
+      meta.sttProvider ?? settings?.providers.transcriber ?? defaultTranscriber
+    ];
+  const refiner =
+    deps.providers.refiners[meta.refineProvider ?? settings?.providers.refiner ?? defaultRefiner];
+  const style = resolveStyle({
+    requested: meta.styleId,
+    rule: profile.rule?.styleId,
+    defaultStyleId: settings?.defaultStyleId,
+    custom: profile.styles,
+  });
+  const prompt = transcriberPrompt(profile.terms, {
+    now: createdAt,
+    halfLifeDays: deps.dictionary.halfLifeDays,
+    tokenBudget: deps.dictionary.promptTokenBudget,
+  });
 
   if (deps.audioSink) {
     await deps.audioSink.put({ userId, requestId, createdAt, audio }).catch((error: unknown) => {
@@ -145,7 +170,12 @@ export async function dictate(
   }
 
   const [transcript, transcribeMs] = await callProvider(deps, transcriber.label, () =>
-    transcriber.transcribe({ audio: audio.bytes, container: audio.container, language }),
+    transcriber.transcribe({
+      audio: audio.bytes,
+      container: audio.container,
+      language,
+      ...(prompt.prompt !== "" && { prompt: prompt.prompt }),
+    }),
   );
 
   const raw = transcript.text;
@@ -159,6 +189,7 @@ export async function dictate(
       audioSeconds,
       transcriber: transcriber.label,
       quotaMs,
+      profileMs,
       transcribeMs,
       totalMs,
     });
@@ -167,14 +198,19 @@ export async function dictate(
       text: "",
       skipped: "silence",
       providers: { transcriber: transcriber.label },
-      latencyMs: { quota: quotaMs, transcribe: transcribeMs, total: totalMs },
+      latencyMs: { quota: quotaMs, profile: profileMs, transcribe: transcribeMs, total: totalMs },
     };
   }
 
   const [refined, refineMs] = await callProvider(
     deps,
     refiner.label,
-    () => refiner.refine({ raw, language, instructions: plainV1[language] }),
+    () =>
+      refiner.refine({
+        raw,
+        language,
+        instructions: refinerInstructions(language, style.prompt, profile.terms),
+      }),
     (result) => result.usage,
   );
 
@@ -188,8 +224,9 @@ export async function dictate(
       audioSeconds,
       raw,
       text: refined.text,
+      styleId: style.id,
       providers,
-      latencyMs: { quota: quotaMs, transcribe: transcribeMs, refine: refineMs },
+      latencyMs: { quota: quotaMs, profile: profileMs, transcribe: transcribeMs, refine: refineMs },
       tokens: refined.usage,
     }),
   );
@@ -200,9 +237,13 @@ export async function dictate(
     sustainedLevelDbfs: levelDbfs,
     transcriber: providers.transcriber,
     refiner: providers.refiner,
+    styleId: style.id,
+    promptTerms: prompt.terms,
+    dictionaryTerms: profile.terms.length,
     inputTokens: refined.usage.inputTokens,
     outputTokens: refined.usage.outputTokens,
     quotaMs,
+    profileMs,
     transcribeMs,
     refineMs,
     saveMs,
@@ -211,9 +252,11 @@ export async function dictate(
   return {
     raw,
     text: refined.text,
+    styleId: style.id,
     providers,
     latencyMs: {
       quota: quotaMs,
+      profile: profileMs,
       transcribe: transcribeMs,
       refine: refineMs,
       save: saveMs,

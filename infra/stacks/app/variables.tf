@@ -29,6 +29,18 @@ variable "daily_quota_minutes" {
   default     = 60
 }
 
+variable "dictionary_half_life_days" {
+  description = "Days after which a dictionary term's usage weighs half in its ranking"
+  type        = number
+  default     = 30
+}
+
+variable "stt_prompt_token_budget" {
+  description = "Upper bound of tokens for the dictionary terms in the transcriber's prompt (Whisper allows 224)"
+  type        = number
+  default     = 224
+}
+
 variable "log_retention_days" {
   description = "Retention of every log group of the environment"
   type        = number

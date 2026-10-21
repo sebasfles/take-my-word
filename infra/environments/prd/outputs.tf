@@ -33,6 +33,16 @@ output "authorizer_function_name" {
   value       = module.app.authorizer_function_name
 }
 
+output "api_function_name" {
+  description = "api Lambda; Terraform writes it into the Actions environment's API_FUNCTION_NAME"
+  value       = module.app.api_function_name
+}
+
+output "dictionary_usage_function_name" {
+  description = "dictionary-usage Lambda; Terraform writes it into the Actions environment's DICTIONARY_USAGE_FUNCTION_NAME"
+  value       = module.app.dictionary_usage_function_name
+}
+
 output "deploy_role_arn" {
   description = "Role the deploy workflow assumes over OIDC; Terraform writes it into the Actions environment's AWS_ROLE_ARN"
   value       = module.app.deploy_role_arn

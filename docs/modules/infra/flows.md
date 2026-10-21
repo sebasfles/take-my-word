@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Infra: flows
@@ -18,7 +18,7 @@ sequenceDiagram
   participant A as AWS (env account role)
   S->>G: merge PR into develop
   G->>A: assume dev deploy role over OIDC
-  G->>A: aws lambda update-function-code (changed apps only)
+  G->>A: aws lambda update-function-code (authorizer, dictate, api, dictionary-usage)
   G->>G: open promotion PR develop to main
   S->>G: merge promotion PR into main
   G->>A: assume prd deploy role over OIDC

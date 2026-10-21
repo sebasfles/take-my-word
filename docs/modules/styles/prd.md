@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Styles: product
@@ -43,7 +43,9 @@ Whether app rules can also be created from the desktop app (for example "use thi
 - Every style works in Spanish and English; the user does not keep one copy per language.
 - Built-in styles are the same for every user and cannot be edited or deleted.
 - The default style is picked during onboarding and can be changed later in settings.
-- Deleting a custom style that app rules point to makes those rules fall back to the default style.
+- Deleting a custom style that app rules point to makes those rules fall back to the default style; if it was the default style, the default becomes `plain`.
+- A user keeps up to 20 custom styles (name up to 40 characters, directions up to 2000) and up to 100 app rules.
+- A custom style changes tone and register only; the cleanup rules (no fillers, keep the meaning, add nothing) always hold.
 - Custom styles and app rules belong to one user and nobody else sees them.
 - A style shapes tone and format only; the dictionary still corrects terms whatever the style.
 

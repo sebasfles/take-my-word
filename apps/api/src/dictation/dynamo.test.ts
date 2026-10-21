@@ -92,14 +92,20 @@ describe("dynamoDictationStore", () => {
       audioSeconds: 7,
       raw: "eh hola",
       text: "Hola.",
+      styleId: "formal",
       providers: { transcriber: "groq-whisper", refiner: "openai:gpt-5.4-nano" },
-      latencyMs: { quota: 5, transcribe: 300, refine: 400 },
+      latencyMs: { quota: 5, profile: 6, transcribe: 300, refine: 400 },
       tokens: { inputTokens: 90, outputTokens: 4 },
     });
     expect(item.PK).toBe("USER#u1");
     expect(String(item.SK) > "DICTATION#2026-10-20T11:59:59.999Z").toBe(true);
     expect(item.expiresAt).toBe(Date.parse("2027-01-18T12:00:00.000Z") / 1000);
-    expect(item).toMatchObject({ raw: "eh hola", text: "Hola.", tokens: { inputTokens: 90 } });
+    expect(item).toMatchObject({
+      raw: "eh hola",
+      text: "Hola.",
+      styleId: "formal",
+      tokens: { inputTokens: 90 },
+    });
     expect(Object.values(item).some((value) => Buffer.isBuffer(value))).toBe(false);
   });
 });

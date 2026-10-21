@@ -8,8 +8,9 @@ export interface DictationRecord {
   audioSeconds: number;
   raw: string;
   text: string;
+  styleId: string;
   providers: { transcriber: string; refiner: string };
-  latencyMs: { quota: number; transcribe: number; refine: number };
+  latencyMs: { quota: number; profile: number; transcribe: number; refine: number };
   tokens: TokenUsage;
 }
 

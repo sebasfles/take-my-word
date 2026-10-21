@@ -33,6 +33,16 @@ output "authorizer_function_name" {
   value       = module.authorizer.name
 }
 
+output "api_function_name" {
+  description = "api Lambda, updated by the deploy workflow"
+  value       = module.api_function.name
+}
+
+output "dictionary_usage_function_name" {
+  description = "dictionary-usage Lambda, updated by the deploy workflow"
+  value       = module.dictionary_usage.name
+}
+
 output "deploy_role_arn" {
   description = "Role the deploy workflow assumes over OIDC"
   value       = aws_iam_role.deploy.arn

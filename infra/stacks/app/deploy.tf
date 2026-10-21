@@ -1,3 +1,15 @@
+data "github_user" "owner" {
+  username = var.github_owner
+}
+
+data "github_repository" "this" {
+  full_name = "${var.github_owner}/${var.github_repository}"
+}
+
+locals {
+  github_oidc_subject = "repo:${var.github_owner}@${data.github_user.owner.id}/${var.github_repository}@${data.github_repository.this.repo_id}:environment:${var.env}"
+}
+
 data "aws_iam_policy_document" "assume_github" {
   statement {
     effect  = "Allow"
@@ -17,7 +29,7 @@ data "aws_iam_policy_document" "assume_github" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_owner}/${var.github_repository}:environment:${var.env}"]
+      values   = [local.github_oidc_subject]
     }
   }
 }
@@ -36,20 +48,27 @@ resource "aws_iam_role_policy" "deploy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid      = "UpdateFunctions"
-      Effect   = "Allow"
-      Action   = ["lambda:UpdateFunctionCode", "lambda:GetFunction"]
-      Resource = [module.dictate.arn, module.authorizer.arn]
+      Sid    = "UpdateFunctions"
+      Effect = "Allow"
+      Action = ["lambda:UpdateFunctionCode", "lambda:GetFunction"]
+      Resource = [
+        module.dictate.arn,
+        module.authorizer.arn,
+        module.api_function.arn,
+        module.dictionary_usage.arn,
+      ]
     }]
   })
 }
 
 resource "github_actions_environment_variable" "this" {
   for_each = {
-    AWS_ROLE_ARN             = aws_iam_role.deploy.arn
-    AWS_REGION               = data.aws_region.current.region
-    DICTATE_FUNCTION_NAME    = module.dictate.name
-    AUTHORIZER_FUNCTION_NAME = module.authorizer.name
+    AWS_ROLE_ARN                   = aws_iam_role.deploy.arn
+    AWS_REGION                     = data.aws_region.current.region
+    DICTATE_FUNCTION_NAME          = module.dictate.name
+    AUTHORIZER_FUNCTION_NAME       = module.authorizer.name
+    API_FUNCTION_NAME              = module.api_function.name
+    DICTIONARY_USAGE_FUNCTION_NAME = module.dictionary_usage.name
   }
 
   repository    = var.github_repository

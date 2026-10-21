@@ -5,7 +5,7 @@ import { build } from "esbuild";
 
 const root = join(import.meta.dirname, "..");
 const dist = join(root, "dist");
-const functions = ["dictate", "authorizer"] as const;
+const functions = ["dictate", "authorizer", "api", "dictionary-usage"] as const;
 
 rmSync(dist, { recursive: true, force: true });
 

@@ -1,11 +1,11 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Infra: technical
 
-`core` and `dev` are applied and `prd` is written and planned since 0001; `api`, `dictionary-usage` and web hosting come with their phases.
+`core` and `dev` are applied and `prd` is written and planned; `api` and `dictionary-usage` run in dev since 0003, web hosting comes with its phase.
 
 ## Structure
 
@@ -14,7 +14,7 @@ source: 0001_platform_skeleton
 | `infra/environments/core` | Applied once per account: GitHub OIDC provider, GitHub App wiring, Actions environments `dev` and `prd`, branch rulesets. |
 | `infra/environments/dev`, `infra/environments/prd` | One Terraform root per env, each instantiating `stacks/app` with its own variables. |
 | `infra/stacks/app` | Everything one env runs, plus the per-env deploy role scoped to that env's Actions environment. |
-| `infra/modules/aws/*` | Reusable modules: `lambda`, `http_api`, `cognito`, `dynamodb`, `acm`, `secrets`; `s3` and `cloudfront` arrive with the web. |
+| `infra/modules/aws/*` | Reusable modules: `lambda` (IAM statements may carry conditions), `http_api`, `cognito`, `dynamodb`, `acm`, `secrets`; `s3` and `cloudfront` arrive with the web. |
 | `infra/scripts/tf` | `infra/scripts/tf <env> <terraform args>` (`core`, `dev` or `prd`): feeds `GITHUB_APP_PEM` from `.env` as `TF_VAR_github_app_pem` and uses the `fless-takemyword` profile. |
 | `.github/workflows` | `ci` (no path filter), `deploy-dev` and `deploy-prd` (path-filtered to the api, shared, workflows and lockfile) through `reusable-deploy`; desktop and mobile release paths live in their modules. |
 
@@ -23,9 +23,9 @@ source: 0001_platform_skeleton
 | Resource | Purpose |
 |---|---|
 | API Gateway HTTP API | Fronts every route at `api.dev.takemyword.fless.dev` and `api.takemyword.fless.dev` (execute-api endpoint off, 10 requests per second, burst 20); the authorizer is attached; integrations time out at 30 s. |
-| Lambda `api` | Hono, every CRUD route; Node 24, ARM64, bundled with esbuild. |
+| Lambda `api` | Hono, every CRUD route (dictionary, styles, app rules, settings, history); 512 MB, 15 s; Node 24, ARM64, bundled with esbuild. |
 | Lambda `dictate` | `POST /dictations`; 60 s timeout and more memory than `api`. |
-| Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream (dictionary module). |
+| Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream through an event source mapping filtered to inserts of `DICTATION#`, batch 10, retry 2, bisect, batch item failures (dictionary module). |
 | DynamoDB `take-my-word-{env}` | The single table, with TTL and a stream enabled. |
 | Cognito user pool | Configured by the auth module, created here. |
 | Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`. |
@@ -43,7 +43,7 @@ Jobs, listeners or scheduled work: none.
 
 - `develop` deploys dev and the dev deploy opens the promotion PR to `main`; `main` deploys prd.
 - Workflows assume the env's deploy role over GitHub OIDC, build, and run `aws lambda update-function-code`.
-- The deploy role grants `UpdateFunctionCode` and `GetFunction` on that env's functions only and trusts exactly `repo:sebasfles/take-my-word:environment:{env}`.
+- The deploy role grants `UpdateFunctionCode` and `GetFunction` on that env's functions only and trusts exactly the repository's immutable subject, `repo:sebasfles@64487774/take-my-word@1427740478:environment:{env}`, built from the GitHub user and repository ids.
 - The Lambda module ignores `filename`, `source_code_hash` and `publish`, so Terraform never fights CI over code.
 - Terraform is applied only from Sebastian's machine with the `fless-takemyword` profile.
 
@@ -62,7 +62,7 @@ Jobs, listeners or scheduled work: none.
 - AWS profile `fless-takemyword`, login with `aws sso login --sso-session fless`; regions us-east-1 and us-east-2 only.
 - Hosted zone `takemyword.fless.dev` (`Z06585121NIUBTW9PNNB1`).
 - Lambda environment variables are wired by `stacks/app`; `DEBUG_BUCKET` only while the dev variable `debug_audio` is on.
-- `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME` and `AUTHORIZER_FUNCTION_NAME` are written by `stacks/app` into the env's Actions environment, which `core` creates.
+- `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME` and `DICTIONARY_USAGE_FUNCTION_NAME` are written by `stacks/app` into the env's Actions environment, which `core` creates.
 - State: S3 bucket `takemyword-terraform-state-115891590483` (versioned, encrypted, public access blocked, created by hand), one key per root, S3 lockfile.
 - Apply order on a fresh account: state bucket, `core`, then each env.
 

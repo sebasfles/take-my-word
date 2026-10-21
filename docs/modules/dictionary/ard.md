@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Dictionary: architecture and debt
@@ -40,3 +40,21 @@ source: setup
 - Debt created: none.
 - Revisit when: the `aws-transcribe` adapter arrives with the evaluation harness.
 - Source: setup
+
+## 2026-10-21: Folding strips every accent, so ñ and n are one letter
+
+- Decision: `normalizeTerm` lowercases, collapses spaces and removes every combining mark after NFD, and that folded form is the key, the duplicate check and the matching form.
+- Alternatives rejected: keeping ñ (and other letters of the language) apart from their base letter.
+- Reason: the plan asked for case and accent folding, and matching a misheard "Raul" or "kubérnetes" matters more than telling "año" from "ano" apart.
+- Debt created: two terms that differ only by a tilde or umlaut cannot coexist, and a term with ñ also counts uses of its n spelling.
+- Revisit when: a user needs two terms that differ only by ñ or an umlaut.
+- Source: 0003_api_features
+
+## 2026-10-21: The Whisper prompt budget counts UTF-8 bytes
+
+- Decision: terms enter the transcriber prompt greedily by decayed score while the comma-joined prompt stays within `STT_PROMPT_TOKEN_BUDGET` (224) bytes; a term that does not fit is skipped and shorter ones may still enter.
+- Alternatives rejected: a tokenizer in the Lambda; a characters-per-token heuristic.
+- Reason: a byte-level BPE token is at least one byte, so bytes are a strict upper bound; Groq answers 400 past 896 bytes of prompt (measured in dev), which the budget can never reach.
+- Debt created: about a quarter to a half of Whisper's 224 tokens stays unused, roughly 20 to 30 terms reach the transcriber.
+- Revisit when: users keep more top terms than fit and transcription misses them.
+- Source: 0003_api_features
