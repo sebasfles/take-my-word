@@ -13,14 +13,18 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 
 use super::{
-    AUDIO_FIELD, ApiErrorBody, ApiErrorCode, ApiErrorDetail, DictationMeta, DictationResponse,
-    LatencyMs, MAX_AUDIO_BYTES, META_FIELD, MIN_AUDIO_SECONDS, Providers, Skipped,
+    AUDIO_FIELD, ApiErrorBody, ApiErrorCode, ApiErrorDetail, ApiFailure, DictationApi,
+    DictationMeta, DictationResponse, HttpApi, LatencyMs, META_FIELD, Providers, Skipped,
 };
+
+const MAX_AUDIO_BYTES: usize = 4 * 1024 * 1024;
+const MIN_AUDIO_SECONDS: f64 = 0.5;
 
 const WAV_MEDIA_TYPES: [&str; 4] = ["audio/wav", "audio/wave", "audio/x-wav", "audio/vnd.wave"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StubMode {
+    Off,
     Normal,
     Silence,
     QuotaExceeded,
@@ -28,7 +32,8 @@ pub enum StubMode {
 }
 
 impl StubMode {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
+        Self::Off,
         Self::Normal,
         Self::Silence,
         Self::QuotaExceeded,
@@ -37,6 +42,7 @@ impl StubMode {
 
     pub fn label(self) -> &'static str {
         match self {
+            Self::Off => "Off, real API",
             Self::Normal => "Normal",
             Self::Silence => "Silence (empty text)",
             Self::QuotaExceeded => "Quota exceeded (429)",
@@ -46,6 +52,7 @@ impl StubMode {
 
     pub fn id(self) -> &'static str {
         match self {
+            Self::Off => "stub-off",
             Self::Normal => "stub-normal",
             Self::Silence => "stub-silence",
             Self::QuotaExceeded => "stub-quota",
@@ -57,7 +64,7 @@ impl StubMode {
         Self::ALL
             .get(usize::from(index))
             .copied()
-            .unwrap_or(Self::Normal)
+            .unwrap_or(Self::Off)
     }
 
     fn index(self) -> u8 {
@@ -74,6 +81,7 @@ struct Shared {
     delay: Duration,
 }
 
+#[derive(Clone)]
 pub struct Stub {
     mode: Arc<AtomicU8>,
     address: SocketAddr,
@@ -84,7 +92,7 @@ impl Stub {
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         listener.set_nonblocking(true)?;
         let address = listener.local_addr()?;
-        let mode = Arc::new(AtomicU8::new(StubMode::Normal.index()));
+        let mode = Arc::new(AtomicU8::new(StubMode::Off.index()));
         let shared = Shared {
             mode: Arc::clone(&mode),
             delay,
@@ -118,6 +126,32 @@ impl Stub {
     }
 }
 
+pub struct Stubbed<A> {
+    stub: Stub,
+    stub_api: HttpApi,
+    real: A,
+}
+
+impl<A> Stubbed<A> {
+    pub fn new(stub: Stub, real: A) -> Result<Self, ApiFailure> {
+        let stub_api = HttpApi::new(stub.base_url())?;
+        Ok(Self {
+            stub,
+            stub_api,
+            real,
+        })
+    }
+}
+
+impl<A: DictationApi> DictationApi for Stubbed<A> {
+    fn dictate(&self, wav: Vec<u8>, meta: &DictationMeta) -> Result<DictationResponse, ApiFailure> {
+        match self.stub.mode() {
+            StubMode::Off => self.real.dictate(wav, meta),
+            _ => self.stub_api.dictate(wav, meta),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct Upload {
     audio: Option<(String, Bytes)>,
@@ -144,7 +178,9 @@ async fn dictations(
         Err((code, message)) => return api_error(code, message),
     };
     match mode {
-        StubMode::Normal => axum::Json(canned(&meta.locale, shared.delay)).into_response(),
+        StubMode::Off | StubMode::Normal => {
+            axum::Json(canned(&meta.locale, shared.delay)).into_response()
+        }
         StubMode::Silence => axum::Json(silence(shared.delay)).into_response(),
         StubMode::QuotaExceeded => api_error(
             ApiErrorCode::QuotaExceeded,
@@ -243,12 +279,12 @@ fn canned(locale: &str, delay: Duration) -> DictationResponse {
     DictationResponse {
         raw: text.to_lowercase().replace([',', '.'], ""),
         text: text.into(),
-        skipped: None,
         providers: Providers {
             transcriber: Some("stub".into()),
             refiner: Some("stub".into()),
         },
         latency_ms: latency(delay),
+        ..DictationResponse::default()
     }
 }
 
@@ -262,21 +298,34 @@ fn silence(delay: Duration) -> DictationResponse {
             refiner: None,
         },
         latency_ms: latency(delay),
+        ..DictationResponse::default()
     }
 }
 
 fn latency(delay: Duration) -> LatencyMs {
     LatencyMs {
-        quota: None,
-        transcribe: None,
-        refine: None,
-        save: None,
         total: delay.as_millis() as u64,
+        ..LatencyMs::default()
+    }
+}
+
+fn status(code: ApiErrorCode) -> u16 {
+    match code {
+        ApiErrorCode::BadRequest => 400,
+        ApiErrorCode::Unauthorized => 401,
+        ApiErrorCode::Forbidden => 403,
+        ApiErrorCode::NotFound => 404,
+        ApiErrorCode::Conflict => 409,
+        ApiErrorCode::PayloadTooLarge => 413,
+        ApiErrorCode::UnsupportedMediaType => 415,
+        ApiErrorCode::QuotaExceeded => 429,
+        ApiErrorCode::ProviderFailed => 502,
+        ApiErrorCode::Internal => 500,
     }
 }
 
 fn api_error(code: ApiErrorCode, message: &str) -> Response {
-    let status = StatusCode::from_u16(code.status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let status = StatusCode::from_u16(status(code)).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let body = ApiErrorBody {
         error: ApiErrorDetail {
             code,
@@ -296,7 +345,6 @@ fn dropped_connection() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{ApiFailure, DictationApi, HttpApi};
     use crate::audio::{Captured, encode_wav};
 
     fn wav(seconds: f32) -> Vec<u8> {
@@ -391,11 +439,25 @@ mod tests {
         );
     }
 
-    #[test]
-    fn the_http_client_gets_every_stub_mode_over_the_wire() {
-        let stub = Stub::start(Duration::ZERO).unwrap();
-        let api = HttpApi::new(stub.base_url()).unwrap();
+    struct RealApi;
 
+    impl DictationApi for RealApi {
+        fn dictate(&self, _: Vec<u8>, _: &DictationMeta) -> Result<DictationResponse, ApiFailure> {
+            Ok(DictationResponse {
+                text: "real".into(),
+                ..DictationResponse::default()
+            })
+        }
+    }
+
+    #[test]
+    fn stub_modes_replace_the_real_api_over_the_wire_and_off_restores_it() {
+        let stub = Stub::start(Duration::ZERO).unwrap();
+        let api = Stubbed::new(stub.clone(), RealApi).unwrap();
+
+        assert_eq!(api.dictate(wav(1.0), &meta("en-US")).unwrap().text, "real");
+
+        stub.set_mode(StubMode::Normal);
         let normal = api.dictate(wav(1.0), &meta("en-US")).unwrap();
         assert!(normal.has_text());
         assert!(normal.text.starts_with("Hello"));
@@ -426,5 +488,8 @@ mod tests {
                 code: Some(ApiErrorCode::BadRequest)
             })
         ));
+
+        stub.set_mode(StubMode::Off);
+        assert_eq!(api.dictate(wav(1.0), &meta("es")).unwrap().text, "real");
     }
 }

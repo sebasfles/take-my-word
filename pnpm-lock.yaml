@@ -96,6 +96,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@take-my-word/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@tauri-apps/api':
         specifier: 2.12.4
         version: 2.12.4
@@ -105,6 +108,9 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@tauri-apps/cli':
         specifier: 2.12.3

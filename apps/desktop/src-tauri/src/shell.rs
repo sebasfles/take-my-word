@@ -1,16 +1,19 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
-use crate::api::{HttpApi, Stub};
+use crate::api::HttpApi;
+#[cfg(debug_assertions)]
+use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
 use crate::clipboard;
 use crate::config::{self, Settings};
 use crate::dictation::{Job, Notifier, Worker};
+use crate::env;
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
 use crate::locale;
@@ -19,9 +22,11 @@ use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
 
-const STUB_DELAY: Duration = Duration::from_millis(700);
+#[cfg(debug_assertions)]
+const STUB_DELAY: std::time::Duration = std::time::Duration::from_millis(700);
 
 pub struct Shell {
+    #[cfg(debug_assertions)]
     pub stub: Stub,
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     pub microphone: MicrophoneStatus,
@@ -44,8 +49,11 @@ impl Shell {
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
+        let api = HttpApi::new(env::CURRENT.api_url)?;
+        #[cfg(debug_assertions)]
         let stub = Stub::start(STUB_DELAY)?;
-        let api = HttpApi::new(stub.base_url())?;
+        #[cfg(debug_assertions)]
+        let api = Stubbed::new(stub.clone(), api)?;
         let keys = Arc::new(Mutex::new(Keys::new(settings.hotkey.clone())));
         let (session, session_inbox) = mpsc::channel();
         let (jobs, job_inbox) = mpsc::channel();
@@ -81,6 +89,7 @@ impl Shell {
             .spawn(move || Session::new(microphone, sink).run(session_inbox))?;
 
         Ok(Self {
+            #[cfg(debug_assertions)]
             stub,
             overlay,
             microphone: microphone_status,

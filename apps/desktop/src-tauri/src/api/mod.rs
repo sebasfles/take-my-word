@@ -1,17 +1,20 @@
+#[cfg(test)]
+mod contract;
 mod http;
+#[cfg(debug_assertions)]
 mod stub;
 
 use serde::{Deserialize, Serialize};
 
 pub use http::HttpApi;
-pub use stub::{Stub, StubMode};
+#[cfg(debug_assertions)]
+pub use stub::{Stub, StubMode, Stubbed};
 
 pub const AUDIO_FIELD: &str = "audio";
 pub const META_FIELD: &str = "meta";
-pub const MAX_AUDIO_BYTES: usize = 4 * 1024 * 1024;
-pub const MIN_AUDIO_SECONDS: f64 = 0.5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[allow(dead_code, reason = "mirrors transcriberIds in packages/shared")]
 pub enum TranscriberId {
     #[serde(rename = "groq-whisper")]
@@ -19,6 +22,7 @@ pub enum TranscriberId {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[allow(dead_code, reason = "mirrors refinerIds in packages/shared")]
 pub enum RefinerId {
     #[serde(rename = "openai")]
@@ -26,6 +30,7 @@ pub enum RefinerId {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct DictationMeta {
     pub locale: String,
@@ -40,12 +45,14 @@ pub struct DictationMeta {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum Skipped {
     Silence,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[allow(
     dead_code,
     reason = "mirrors dictationResponseSchema in packages/shared"
@@ -57,7 +64,8 @@ pub struct Providers {
     pub refiner: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[allow(
     dead_code,
     reason = "mirrors dictationResponseSchema in packages/shared"
@@ -65,6 +73,8 @@ pub struct Providers {
 pub struct LatencyMs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quota: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transcribe: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,7 +84,8 @@ pub struct LatencyMs {
     pub total: u64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 #[allow(
     dead_code,
@@ -85,6 +96,8 @@ pub struct DictationResponse {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skipped: Option<Skipped>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style_id: Option<String>,
     pub providers: Providers,
     pub latency_ms: LatencyMs,
 }
@@ -96,9 +109,14 @@ impl DictationResponse {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ApiErrorCode {
     BadRequest,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    Conflict,
     PayloadTooLarge,
     UnsupportedMediaType,
     QuotaExceeded,
@@ -106,28 +124,52 @@ pub enum ApiErrorCode {
     Internal,
 }
 
-impl ApiErrorCode {
-    pub fn status(self) -> u16 {
-        match self {
-            Self::BadRequest => 400,
-            Self::PayloadTooLarge => 413,
-            Self::UnsupportedMediaType => 415,
-            Self::QuotaExceeded => 429,
-            Self::ProviderFailed => 502,
-            Self::Internal => 500,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 pub struct ApiErrorDetail {
     pub code: ApiErrorCode,
     pub message: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
 pub struct ApiErrorBody {
     pub error: ApiErrorDetail,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[allow(dead_code, reason = "mirrors settingsSchema in packages/shared")]
+pub struct SettingsProviders {
+    pub transcriber: TranscriberId,
+    pub refiner: RefinerId,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code, reason = "mirrors settingsSchema in packages/shared")]
+pub struct UserSettings {
+    pub default_style_id: String,
+    pub locale: String,
+    pub providers: SettingsProviders,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[allow(dead_code, reason = "mirrors styleSchema in packages/shared")]
+pub struct Style {
+    pub id: String,
+    pub name: String,
+    pub prompt: String,
+    pub builtin: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[allow(dead_code, reason = "mirrors styleListSchema in packages/shared")]
+pub struct StyleList {
+    pub styles: Vec<Style>,
 }
 
 #[derive(Debug, thiserror::Error)]

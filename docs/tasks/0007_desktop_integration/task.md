@@ -98,3 +98,41 @@ None.
 - clearance: full: AWS profile `fless-takemyword` on dev (crew-e2e sign-in, throwaway users, device forget and global sign-out on them, `QUOTA#` seed and removal, crew-e2e `SETTINGS` restore), prd read-only for pool and client ids, the Windows host under the machine rules above with mirror `C:\dev\tmw-0007`; no Terraform, no prd writes.
 
 ## om-developer notes
+
+### Round 1 (milestone 1: env split, debug-only stub, TLS, contract test, Rust Cognito client, keychain)
+
+Done:
+
+- Environments: Cargo features `dev` and `prd`, selected by `build.features` in `tauri.dev.conf.json` and `tauri.prd.conf.json`; `src-tauri/src/env.rs` holds both sets of public values (prd ids read with `list-user-pools` and `list-user-pool-clients`, read-only).
+  The base `tauri.conf.json` is the dev app, so `cargo test` and debug builds are dev; `compile_error!` stops a release with no environment or with both, and startup refuses a Tauri identifier that does not match the compiled environment.
+  Dev is "Take My Word Dev" (`dev.fless.takemyword.dev`), prd "Take My Word" (`dev.fless.takemyword`); the tray tooltip shows the product name.
+  Scripts `pnpm tauri:build:dev` and `pnpm tauri:build:prd`; `rust:lint`, `windows:build` and `desktop-ci` use dev (release clippy with `--features dev`, the dev NSIS installer).
+  Checked on the mirror: `cargo check --release` with no feature fails with the message, `pnpm windows:build` produces `Take My Word Dev_0.1.0_x64-setup.exe`.
+- Stub: compiled only under `debug_assertions`; a new `Off, real API` mode is the default, and `Stubbed` routes `POST /dictations` to the stub only while another mode is picked.
+  The release worker calls the env's API without a token for now (401 until milestone 2 adds the session).
+  The status mapping and the stub-only constants moved into `stub.rs`, so release builds have no dead code.
+- TLS: reqwest `native-tls` (SChannel on Windows, verifying against the Windows store, no cmake or NASM); `libssl-dev` added explicitly to the Linux clippy job.
+- Contract: `apps/desktop/contract/` generates `src-tauri/src/api/contract.schema.json` with `z.toJSONSchema` (`pnpm contract`; meta with `io: "input"`); a vitest test fails `ci` when the committed file is stale (compared as parsed JSON, the file is prettier-ignored as generated).
+  The Rust test derives schemas with `schemars` (dev-dependency, `cfg_attr(test)`) and compares normalized shapes: field names, required flags, enum and const values, arrays and primitive kinds; string patterns, lengths and integer bounds are not compared.
+  Red on today's mirror before the fix (`.verify/contract-red.out` in the workspace): four missing error codes (`unauthorized`, `forbidden`, `not_found`, `conflict`; the plan said five), `latencyMs.profile`, `styleId`, and no settings or style list mirror.
+  Fixed by completing the mirror and adding `UserSettings`, `SettingsProviders`, `Style`, `StyleList`.
+- Cognito: `src-tauri/src/auth/` with `Secret` (zeroized on drop, redacted `Debug`, no `Serialize`, so every request exposes it explicitly), `srp.rs` mirroring `packages/cognito/src/srp.ts`, and `cognito.rs` with the six operations as unsigned JSON 1.1 POSTs.
+  Fixed vectors in `auth/srp_vectors.json` were produced by `packages/cognito/src/srp.ts` with `randomBytes` patched through `syncBuiltinESMExports` (password claims on two dates, one with a one-digit day, and the device verifier); the Rust port matched them on the first run.
+  Fake-Cognito tests cover the request shapes (no `DEVICE_KEY` on sign-in, `DeviceKey` on every refresh, the new-password step) and the error split.
+  Real dev pass (`auth::dev_pool`, ignored, credentials through `WSLENV`, never on disk): `crew-e2e` signs in, confirms the device, rotates the refresh token, round-trips the real tokens through Credential Manager, forgets the device, revokes, and the next refresh fails as session-ending; `crew-e2e` has no devices left.
+  Measured: access token 1113 bytes, refresh token 1932, device key 46, device group key 36; the password does not appear in any output.
+- Keychain: `src-tauri/src/keychain/` stores refresh token, `DeviceKey` and `DeviceGroupKey` in Windows Credential Manager; tests on the real store cover the round trip, rotation, a partial session read as signed out and removed, and a value over the blob limit failing without echoing it.
+
+Decisions the plan did not record:
+
+- `keyring-core` 1 with `windows-native-keyring-store` 1.1 instead of the `keyring` crate: since v4 `keyring` is a CLI pulling clap and rpassword, and its library split into `keyring-core` plus one store crate per OS.
+  The store is built explicitly (no global default store), so there is no silent mock fallback; non-Windows builds get an unsupported keychain like the other platform modules.
+- Secrets go in as raw UTF-8 bytes (`set_secret`), not passwords: the 1932-byte refresh token fits the 2560-byte blob, while UTF-16 would need 3864, so nothing is split.
+- Credentials persist as `Local` (`CRED_PERSIST_LOCAL_MACHINE`) instead of the store's `Enterprise` default, so device-bound tokens never roam with a domain profile.
+- `CognitoError::ends_session` is true only for `NotAuthorizedException` and `RefreshTokenReuseException`; an empty success body reads as `{}` (`ForgetDevice` and `RevokeToken` answer with none); a refresh answer without `RefreshToken` is an error, as in `packages/cognito`.
+- axum and tokio stay regular dependencies: Cargo cannot scope a dependency to a profile, but with the stub under `debug_assertions` none of their code links into release.
+
+Pending: milestone 2 (session, API client, error mapping, views, screenshots) and milestone 3 (Windows smoke, `desktop-ci`, docs).
+`mod auth` and `mod keychain` carry a temporary `allow(dead_code)` until the session wires them in milestone 2.
+
+Deferred: `--stub-mode` from the command line (debug) changes the mode without updating the tray checkmarks; pre-existing.

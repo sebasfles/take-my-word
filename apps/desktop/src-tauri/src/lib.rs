@@ -1,13 +1,31 @@
 mod api;
 mod audio;
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "the session manager wires it in the next milestone"
+    )
+)]
+mod auth;
 mod clipboard;
 mod commands;
 mod config;
 #[cfg(debug_assertions)]
 mod dev;
 mod dictation;
+mod env;
 mod foreground;
 mod hotkey;
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        unused_imports,
+        reason = "the session manager wires it in the next milestone"
+    )
+)]
+mod keychain;
 mod locale;
 mod overlay;
 mod paste;
@@ -48,11 +66,12 @@ pub fn run() {
         ])
         .setup(|app| {
             let handle = app.handle();
+            env::check_identifier(&app.config().identifier)?;
             let settings_path = app.path().app_config_dir()?.join(config::FILE_NAME);
             let settings = config::load(&settings_path);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
-            tray::build(handle, shell.stub.mode())?;
             app.manage(shell);
+            tray::build(handle)?;
             if !settings.first_run_done {
                 first_run(handle);
             }

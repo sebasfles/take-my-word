@@ -143,7 +143,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::api::{DictationResponse, LatencyMs, Providers, Skipped};
+    use crate::api::{DictationResponse, LatencyMs, Skipped};
 
     #[derive(Default)]
     struct World {
@@ -199,17 +199,11 @@ mod tests {
             raw: text.into(),
             text: text.into(),
             skipped,
-            providers: Providers {
-                transcriber: None,
-                refiner: None,
-            },
             latency_ms: LatencyMs {
-                quota: None,
-                transcribe: None,
-                refine: None,
-                save: None,
                 total: 1,
+                ..LatencyMs::default()
             },
+            ..DictationResponse::default()
         }
     }
 
