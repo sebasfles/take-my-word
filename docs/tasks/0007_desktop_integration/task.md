@@ -233,3 +233,12 @@ Done:
   The notification title has no capture: no smoke path raises a notification without a failing paste.
 
 Pending: docs, on the clean signal.
+
+### Round 6
+
+Done:
+
+- Finding 1 applied: `StoredSession::device_group_key` carries `expect(dead_code)` only for non-Windows, non-test builds, with its reason; the Windows keychain is still the only reader, as the auth client contract requires keeping the key next to the refresh token, and the `expect` fails as soon as phase 5 reads it.
+- Linux clippy reproduced locally in an `ubuntu:24.04` Docker container with the `desktop-ci` apt packages and stable Rust, on a copy of `src-tauri` plus the built UI: red on `bf716e3` with exactly the reported error, green on this commit with `--all-targets --locked -- -D warnings`.
+  The Windows mirror cannot check the Linux target (the GTK and WebKit `-sys` build scripts need the Linux libraries), so the container replaced it.
+- Other `cfg(windows)` paths of the task checked by reading: the keychain's `unsupported` implementation uses every item of the trait, the second `auth::dev_pool` test is Windows-only with its own imports, and the shell, account and API code is the same on every platform.

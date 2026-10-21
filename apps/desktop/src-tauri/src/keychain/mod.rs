@@ -14,6 +14,13 @@ use crate::auth::Secret;
 pub struct StoredSession {
     pub refresh_token: Secret,
     pub device_key: Secret,
+    #[cfg_attr(
+        all(not(windows), not(test)),
+        expect(
+            dead_code,
+            reason = "only the Windows keychain stores it until phase 5 adds macOS and Linux"
+        )
+    )]
     pub device_group_key: Secret,
 }
 

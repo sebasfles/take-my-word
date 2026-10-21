@@ -52,3 +52,15 @@ screenshots/tauri-core.ts: Expected the Promise rejection reason to be an Error 
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
 - e2e: n/a
+
+## 2026-10-21T20:18:44Z by om-developer target desktop on 278df71
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T20:18:44Z by om-developer target desktop linux-check on 278df71
+- lint: pass exit 0 (cargo clippy --all-targets --locked -- -D warnings, ubuntu:24.04 container with the desktop-ci apt packages; red on bf716e3 with "field device_group_key is never read")
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
