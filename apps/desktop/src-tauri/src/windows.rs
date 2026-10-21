@@ -59,7 +59,7 @@ pub fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
         WebviewUrl::App("index.html?view=overlay".into()),
     )
     .title("Take My Word overlay")
-    .inner_size(480.0, 64.0)
+    .inner_size(480.0, 96.0)
     .decorations(false)
     .transparent(true)
     .shadow(false)

@@ -233,3 +233,33 @@ Windows smoke (Windows 11 26200; debug build unless noted; input injected from P
 ### Round 5 (round 4 finding)
 
 - Finding 1: an error the gate holds back during a hold now reaches the user as a tray notification ("The previous dictation was not pasted." plus the error's message) through the same `Notifier` the worker uses for paste problems; chosen over showing it after the hold because the newer dictation's overlay would replace it at once and the notification stays in the notification center. Processing and hidden updates are still dropped silently. Test: an error dropped during a hold produces one notification carrying its message while the overlay stays on Listening.
+
+### Round 6 (milestone 3: desktop-ci, screenshots, TRD, sizes)
+
+- `.github/workflows/desktop-ci.yml` on pull requests to `develop` and `main`, path-filtered to `apps/desktop/**`, `packages/shared/**` and itself, pinned action versions, no secrets. `windows` on windows-latest: UI lint, typecheck and vitest, Rust toolchain with a Rust cache, the UI build the shell embeds, `cargo fmt --check`, clippy `-D warnings` on all targets and on release, `cargo test --include-ignored --test-threads=1` (the real-clipboard round trip included), `pnpm tauri build`, and the NSIS installer uploaded as `take-my-word-windows-installer` for 14 days. `linux-check` on ubuntu-latest: GTK, WebKit, ALSA, libxdo and xkbcommon headers, then clippy `-D warnings` on all targets. actionlint passes; the Linux check passed locally in an Ubuntu 24.04 container with the same packages; the Windows steps match `rust:lint` and `rust:test`. The workflow's own green run and artifact can only be seen once the PR is open.
+- Root `ci` with desktop in `pnpm -r` (jsdom included): `pnpm lint` (actionlint included), `pnpm typecheck` and `pnpm test` pass on this commit (desktop 16, shared 19, api 179, web 95 tests).
+- Screenshot tooling committed in `apps/desktop/screenshots`: Vite aliases `@tauri-apps/api/core` and `/event` to URL-driven mocks, and `pnpm screenshots <dir>` drives every state with Playwright (the version `apps/web` already uses). Fixes from reviewing them: the proposal's question mark no longer wraps alone, and the overlay pill wraps to two lines instead of cutting the message (overlay window now 480 by 96).
+- TRD desktop row and its paragraph final (CI, ignored clipboard test, screenshots command).
+- Installer: 1.91 MiB NSIS, release exe about 4.4 MB.
+- RAM, release build idle in the tray, private working set of the app plus WebView2 (Task Manager's figure): 75.5 MB with settings never opened, 100.2 MB with settings open, 83.4 MB after closing it (91.7, 114.6 and 107.8 MB before the overlay memory target).
+
+Screenshots in the workspace, not committed:
+
+- `screenshots/mocked/` (mocked bridge, dark at 390, 768 and 1280 px, light at 1280 px with `-light`): `first-run-ready`, `first-run-microphone-blocked`, `first-run-microphone-missing`, `settings-idle`, `settings-listening`, `settings-proposed`, `settings-error`, `settings-autostart-error`, `overlay-listening`, `overlay-processing`, `overlay-error`, `overlay-error-microphone`.
+- `screenshots/windows/` (real captures on Windows 11 26200): `first-run-ready-debug`, `first-run-ready-release`, `first-run-microphone-blocked`, `settings-proposed`, `overlay-listening`, `overlay-processing`, `overlay-error-quota`, `overlay-error-network`, `overlay-error-microphone-blocked`, `overlay-error-after-two-minute-cap`, `notepad-text-pasted-debug`, `notepad-text-pasted-release` (cropped to the text area, Notepad's tab strip shows other files), `tray-menu`, `taskbar-idle-no-microphone-indicator`, `taskbar-recording-microphone-indicator`.
+
+Left for Sebastian from the PR installer (things injected input could not prove):
+
+- SmartScreen warning on the unsigned installer, install, the first run, and autostart after a real sign-out and sign-in.
+- Physical Ctrl+Win with his own voice in his everyday apps (browser, Slack, a terminal, Word), including that Start never opens and no key stays down.
+- Spanish dead keys (´ ¨) and AltGr characters still type normally while the app runs, and AltGr is refused when pressed in the shortcut capture.
+- Capturing a shortcut with the physical keyboard, Save, and the shortcut surviving a restart.
+- Clipboard back after a paste with his own content (an image, files from Explorer, rich text).
+- Coexistence with Wispr Flow: their hotkeys differ (Ctrl+Shift versus Ctrl+Win), but both watch the keyboard.
+- A paste into an administrator window shows the notification and leaves the text in the clipboard (the code path is unit tested; no elevated window was used here).
+- The overlay above the taskbar on each of his monitors.
+- Whether physical keys reach the hook while one of our own windows is focused (only injected keys were tried; dictating into our own settings window is not a use case).
+
+Deferred:
+
+- Consecutive dictations are joined with no space ("…Word.Hola…"); spacing against the text before the caret belongs with the style work in 0004.

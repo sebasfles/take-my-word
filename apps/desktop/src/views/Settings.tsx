@@ -180,7 +180,10 @@ function ShortcutRow({
         )}
         {capture.step === "proposed" && (
           <p role="status">
-            Use <Keys keys={capture.keys} />?
+            Use{" "}
+            <span className="nowrap">
+              <Keys keys={capture.keys} />?
+            </span>
           </p>
         )}
         {capture.step === "idle" && <p>{hotkey && <Keys keys={hotkey} />}</p>}

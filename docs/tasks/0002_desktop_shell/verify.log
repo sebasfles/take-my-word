@@ -29,3 +29,10 @@ Lockfile regenerated after the rebase on develop 399b242 (the jsdom peer changes
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
 - e2e: n/a
+
+## 2026-10-21T16:46:36Z by om-developer target desktop on 4637edcc4cf5540af712fc547fadae3d37988bcb
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; prettier, eslint, cargo fmt --check, clippy -D warnings on all targets and on release, on C:\dev\take-my-word at 4637edc)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
+- e2e: n/a
+Workflows target: pass exit 0 as part of the root pnpm lint (actionlint over desktop-ci.yml); root pnpm typecheck exit 0 and pnpm test exit 0 on 4637edc's tree.
