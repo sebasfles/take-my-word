@@ -29,3 +29,9 @@ account.e2e.ts: shows the seeded account on every page: Test timeout of 60000ms 
 - unit: pass exit 0 (95 tests, pnpm test)
 - e2e: pass exit 0 (pnpm integration, 4 tests); pass exit 0 (pnpm e2e against dev, 10 tests, web deployed at 3ebed5b, same app code as 93862fa)
 
+## 2026-10-21T14:57:42Z by om-developer target web on 7ee6ec4
+- lint: pass exit 0 (pnpm lint, after deleting .next, next-env.d.ts, .open-next and test-results)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: n/a (not run on the reviewer's call: types only, no behavior change; last green at 93862fa)
+

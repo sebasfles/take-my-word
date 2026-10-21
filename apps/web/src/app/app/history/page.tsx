@@ -15,7 +15,9 @@ import { currentDictionary, currentLocale } from "@/lib/server/request.ts";
 
 export const generateMetadata = () => sectionMetadata((t) => t.history.title);
 
-export default async function HistoryPage(props: PageProps<"/app/history">) {
+export default async function HistoryPage(props: {
+  searchParams: Promise<{ limit?: string | string[]; pages?: string | string[] }>;
+}) {
   const t = await currentDictionary();
   const locale = await currentLocale();
   const view = historyView(await props.searchParams);

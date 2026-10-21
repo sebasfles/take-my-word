@@ -8,7 +8,9 @@ import { currentDictionary, currentLocale } from "@/lib/server/request.ts";
 
 export const generateMetadata = () => sectionMetadata((t) => t.dictionary.title);
 
-export default async function DictionaryPage(props: PageProps<"/app/dictionary">) {
+export default async function DictionaryPage(props: {
+  searchParams: Promise<{ sort?: string | string[] }>;
+}) {
   const t = await currentDictionary();
   const locale = await currentLocale();
   const sort = termSort((await props.searchParams).sort);

@@ -155,3 +155,13 @@ Done:
 No app code changed, so dev keeps the round 1 deploy (`3ebed5b`); the web target reran on this commit.
 
 Pending: nothing. Deferred: nothing new.
+
+### Round 3
+
+Done:
+
+- Finding 1: the dictionary and history pages type their props from what they read (`searchParams` with `sort`, or `limit` and `pages`) instead of the `PageProps` global that `next typegen` writes under `.next/types`, so `pnpm lint` passes on a fresh clone; `next typegen` in `pnpm typecheck` still checks the pages against Next's route types.
+  Chosen over running `next typegen` inside `lint`, which would keep lint tied to a generated file and to the Next CLI.
+- Verified in CI's order after deleting `.next`, `next-env.d.ts`, `.open-next` and `test-results`: lint, then typecheck, then unit.
+
+No app behavior changed: no redeploy, no e2e this round.
