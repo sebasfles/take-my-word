@@ -1,0 +1,100 @@
+---
+id: "0007"
+title: desktop_integration
+type: feature
+crew: pair
+clearance: full
+branch: feat/0007_desktop_integration
+modules: [desktop, auth, dictation]
+repos: ["."]
+phases: 0
+depends_on: ["0002", "0003"]
+ticket:
+created: 2026-10-21
+updated: 2026-10-21
+---
+
+# 0007 Desktop integration with the API
+
+## Goal
+
+The desktop shell from 0002 talks to the real API: the user signs in once with username and password, stays signed in, and every dictation goes through `POST /dictations` in dev or prd depending on the build.
+This is the first usable product end to end.
+
+## Scope
+
+- Sign-in form in the desktop UI (username, password, "choose your password" step for `NEW_PASSWORD_REQUIRED`), SRP against Cognito from the Rust side or through the shared Node SRP package via a sidecar, whichever the om-reviewer finds sound; device confirmation and refresh token rotation as `docs/modules/auth/trd.md` describes; tokens and device key in the OS keychain (`keyring` crate, Windows Credential Manager); silent refresh before expiry; sign out revokes and forgets the device, then clears the keychain.
+- Real API client implementing the trait from 0002 with the `packages/shared` contract (multipart WAV plus `meta` with `locale`, `appId`); the JSON Schema contract test promised in 0002 (schema generated from `packages/shared` with `z.toJSONSchema`, Rust serde types checked against it in CI).
+- Error handling: 401 after a failed refresh returns to sign-in; 429 shows the daily limit message in the overlay; 413 and 415 show a short message; network failure shows the error overlay; in every failure nothing is pasted and the clipboard is restored.
+- Build-time configuration per environment: API base URL, Cognito pool and client ids for dev and prd; `pnpm tauri build` selects the env; the stub stays available in debug builds only.
+- Onboarding: after the first sign-in on a device the app asks the user to pick a default style from `GET /styles` and saves it with `PUT /me/settings` (styles API from 0003).
+- Screenshots at the three widths of sign-in, choose-password, onboarding and the error overlays; Windows smoke captures with the real dev API using `crew-e2e`.
+- Docs: desktop, auth and dictation module docs via `document-task`.
+
+## Out of scope
+
+- Dictionary, styles and app rules editors, history screen: 0008.
+- Updater and release: 0005.
+- Google sign-in.
+
+## Acceptance
+
+1. Root `pnpm lint`, `typecheck`, `test` and the desktop `cargo` checks pass; `ci` and `desktop-ci` green; the contract test runs in CI.
+2. On a fresh install the app shows sign-in; `crew-e2e` signs in and reaches the onboarding style picker; picking `casual` saves it (`GET /me/settings` returns it); the app restarts without asking again.
+3. A user with a temporary password gets the "choose your password" step and lands in onboarding afterwards.
+4. With the cursor in Notepad, holding Ctrl+Win and speaking (the crew uses the dev WAV command with a Spanish sample), the real cleaned text from the dev API is pasted and the clipboard is restored; the dictation appears in `GET /dictations`.
+5. Revoking the refresh token server side makes the next dictation fail and the app return to sign-in, pasting nothing.
+6. Seeding the quota item to the cap makes the next dictation show the daily limit message; a 2 s silent recording pastes nothing.
+7. Sign out clears Credential Manager entries and revokes the token (a later refresh with the old token fails).
+8. Tokens, the device key and the password never appear on disk in plain text, in logs or in screenshots.
+
+## Approach
+
+- Where SRP runs is the om-reviewer's call at analyze time: a Rust SRP implementation avoids a Node sidecar in the binary; the shared Node package avoids a second implementation. The decision and its reason go to `docs/modules/desktop/ard.md`.
+- Keychain through `keyring`; alternative rejected: an encrypted file, weaker than the OS store.
+- Env selection at build time with Tauri's config merging (`tauri.dev.conf.json`, `tauri.prd.conf.json`); alternative rejected: a runtime endpoint field (dead UI).
+
+## Database
+
+None on the client; reads and writes `SETTINGS` and `DICTATION#` through the API.
+
+## Infra
+
+None new; uses dev (and prd for the prd build) as applied. No Terraform change expected.
+
+- Windows machine rules (from 0002): the toolchain (VS Build Tools 2022, rustup, fnm with Node 24, pnpm) is installed; this task keeps its own mirror checkout at `C:\dev\tmw-0007` and its scratch under `C:\dev\tmw-0007-*`, all removed at clean-task. Injected runs (keystrokes, mouse, foreground window, microphone setting) need Sebastian away: start only after 2 minutes of Windows idle, abort and restore on real input, and announce each run to the om-manager with `computer busy: <what, how long>` before and `computer free` after, restoring debug apps, hotkey, autostart, microphone setting and clipboard. Another desktop task may run in parallel: never touch its mirror, and never start an injected run while the om-manager has not relayed the other task's `computer free`.
+
+## Design
+
+None.
+
+## Risks
+
+- SRP and device confirmation in Rust: the Cognito SRP variant has quirks (padding, timestamp format); the e2e scripts from 0001 are the reference implementation.
+- Credential Manager entry size limits (about 2.5 KB per blob): split tokens into several entries if needed.
+
+## Depends on
+
+0002 (PR #8) and 0003 (PR #3), both merged. Runs alongside 0005.
+
+## Context & decisions
+
+- Acceptance 5 adjusted (om-manager for Sebastian): the authorizer checks signatures, not revocation (`docs/modules/auth/ard.md`, 2026-10-21), so it reads: after `admin-forget-device` on the desktop's device the next renewal fails; a restart forces it (the access token lives only in memory), the next dictation fails, pastes nothing and the app returns to sign-in. Fallback if forgetting the device does not stop renewal: `admin-user-global-sign-out` on a throwaway user.
+- Environments (Sebastian via om-manager): dev and prd are separate apps, "Take My Word Dev" and "Take My Word", each with its own identifier, keychain service, config folder and autostart entry, through `tauri.dev.conf.json` and `tauri.prd.conf.json`. Debug builds and `desktop-ci` use dev; a release build with no env selected fails. Pool and client ids are public and committed; prd values are read-only lookups. The updater (0005) belongs to prd only; whichever of 0005 and 0007 merges second reconciles `tauri.conf.json`, `Cargo.toml` and the tray.
+- Language (Sebastian via om-manager): sign-in, choose-password, onboarding and new error messages in English, like the shell; desktop i18n moves to 0008.
+- Onboarding (Sebastian via om-manager): once per user per device, a local flag keyed by the Cognito `sub`, current `defaultStyleId` preselected; not shown again when the same user signs back in on that machine. Dictation works while it is pending. `PUT /me/settings` replaces the whole item, so read `GET /me/settings` first. `document-task` aligns `auth/prd.md`.
+- SRP in Rust (om-reviewer, the task's call): no Node sidecar, which would add a Node runtime of tens of MB to a ~10 MB binary (`desktop/ard.md`, Tauri entry) and move tokens across processes. The SRP port mirrors `packages/cognito/src/srp.ts`; the six Cognito operations are unsigned JSON POSTs over reqwest, no AWS SDK. Cross-checked with fixed vectors produced by `packages/cognito` plus a real dev sign-in. Recorded in `desktop/ard.md`.
+- Sign-in never passes `DEVICE_KEY` (no `DEVICE_SRP_AUTH`; the device password is not kept, as in `packages/cognito`); every sign-in confirms a new device. Client contract in `docs/modules/auth/trd.md` holds: `DeviceKey` on every refresh, store the rotated token at once, never resend an old one.
+- Tokens never reach the WebView (om-reviewer): Cognito, `POST /dictations`, `GET /styles`, `GET`/`PUT /me/settings` all run in Rust; the UI gets only what it renders through commands, CSP stays `default-src 'self'`, the challenge session stays in Rust. This extends the recorded Rust-mirror exception (`desktop/ard.md`, 2026-10-21) to styles and settings.
+- Contract test (om-reviewer): JSON Schema from `packages/shared` via `z.toJSONSchema` for every mirrored contract (meta, response, error, settings, style list); a committed generated file whose staleness fails `ci`, compared in a Rust test so `cargo test` runs alone on the Windows mirror. It fails on any field, enum value or required flag added, removed or renamed on either side; it must be shown red on today's mirror (missing `styleId`, `latencyMs.profile`, five error codes) before the fix.
+- Keychain (om-reviewer): refresh token, `DeviceKey`, `DeviceGroupKey` via `keyring` with the Windows native backend (v3 without a platform feature silently uses a mock store); access token in memory. Measure real dev token sizes against the 2560-byte blob limit (the password API may store UTF-16) before splitting.
+- Session (om-reviewer): lazy renewal with under 5 min left, kicked at hotkey down to overlap the recording; one renewal at a time behind a single lock (`auth/ard.md`, Web Lock entry). The gateway answers 401 without a token and 403 for an invalid one (`auth/trd.md`); a gateway 401/403 without the error envelope forces one renewal and one retry (safe, `dictate` never ran). Only `NotAuthorizedException` and reuse sign out; network and 5xx keep the session. Signed out, the hotkey records nothing, shows "sign in" and opens the sign-in window.
+- Sign-out from the tray and Settings, in the web's order (`auth/ard.md`, 2026-10-21): renew if expiring, `ForgetDevice`, `RevokeToken`, clear the keychain even when Cognito fails.
+- Stub (om-reviewer): compiled only into debug builds (axum out of release); debug defaults to the real dev API; stub modes replace only `POST /dictations`, sign-in is always real. Resolves the desktop debt "Release builds ship the API stub".
+- TLS: reqwest gains a TLS backend verifying against the Windows store that builds on `windows-latest` and the host with no new toolchain (aws-lc-rs needs cmake and NASM).
+- Test users (om-reviewer): Acceptance 3, 5 and 6 on throwaway dev users the crew creates and deletes, as `apps/web/integration` does; crew-e2e for 2, 4 and 7, its `SETTINGS` restored after 2; never leave a seeded `QUOTA#` item behind.
+- Delivery (om-reviewer): one branch, three review milestones, one PR: (1) env split, debug-only stub, TLS, contract test, Rust Cognito client, keychain; (2) session, API client, error mapping, views, screenshots; (3) Windows smoke for 2 to 8, `desktop-ci`, docs.
+- Review will also check: secret types with redacted `Debug`, the password dropped after use and never in an error string; after the smoke the crew searches the log folder, the config folder and the WebView data folder (`EBWebView`) for token, device key and password values and finds none; evidence scripts never write a token to disk (Acceptance 7 and 8).
+- clearance: full: AWS profile `fless-takemyword` on dev (crew-e2e sign-in, throwaway users, device forget and global sign-out on them, `QUOTA#` seed and removal, crew-e2e `SETTINGS` restore), prd read-only for pool and client ids, the Windows host under the machine rules above with mirror `C:\dev\tmw-0007`; no Terraform, no prd writes.
+
+## om-developer notes
