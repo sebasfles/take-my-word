@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setLanguage } from "../i18n.ts";
 import { fakeBridge, overview } from "../testing/bridge.ts";
 import { FirstRun } from "./FirstRun.tsx";
 
@@ -7,6 +8,8 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../bridge.ts")>()),
   bridge: fakeBridge,
 }));
+
+setLanguage("en");
 
 describe("FirstRun", () => {
   afterEach(() => {

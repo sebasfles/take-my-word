@@ -2,6 +2,7 @@ mod authed;
 #[cfg(test)]
 mod contract;
 mod http;
+pub mod routes;
 #[cfg(debug_assertions)]
 mod stub;
 
@@ -183,6 +184,8 @@ pub enum ApiFailure {
         status: u16,
         code: Option<ApiErrorCode>,
     },
+    #[error("the request was refused before sending")]
+    InvalidRequest,
     #[error("the API answered something unexpected: {0}")]
     InvalidResponse(String),
     #[error("signed out")]

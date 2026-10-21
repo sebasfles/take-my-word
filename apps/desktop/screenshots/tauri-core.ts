@@ -26,11 +26,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
       });
     case "propose_hotkey":
       return params.get("propose") === "altgr"
-        ? Promise.reject(
-            new Error(
-              "Right Alt is AltGr on many keyboards, so it cannot be part of the shortcut.",
-            ),
-          )
+        ? problem("hotkey.rightAlt")
         : answer(["Ctrl", "Shift"]);
     case "account_status":
       return answer(
@@ -40,22 +36,22 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
       );
     case "sign_in":
       if (params.get("signin") === "wrong") {
-        return problem("Wrong username or password.");
+        return problem("account.wrongCredentials");
       }
       return answer(params.get("signin") === "new-password" ? "choosePassword" : "onboarding");
     case "choose_password":
       return params.get("password") === "weak"
-        ? problem("The password does not meet the requirements.")
+        ? problem("account.invalidPassword")
         : answer("onboarding");
     case "onboarding":
       return params.get("styles") === "fail"
-        ? problem("We could not reach the service. Try again in a few minutes.")
+        ? problem("account.unreachable")
         : answer({
             styles: [
-              { id: "plain", name: "Plain" },
-              { id: "casual", name: "Casual" },
-              { id: "formal", name: "Formal" },
-              { id: "c7d1", name: "Client emails" },
+              { id: "plain", name: "Plain", builtin: true },
+              { id: "casual", name: "Casual", builtin: true },
+              { id: "formal", name: "Formal", builtin: true },
+              { id: "c7d1", name: "Client emails", builtin: false },
             ],
             selected: "plain",
           });

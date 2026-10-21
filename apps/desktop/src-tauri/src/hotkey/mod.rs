@@ -8,6 +8,8 @@ mod win32;
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::Message;
+
 pub use chord::ChordEvent;
 pub use hook::{KeyEvent, KeyHook, OWN_INJECTION_TAG, install};
 pub use keys::{CAPTURE_TIMEOUT, Keys};
@@ -104,6 +106,17 @@ pub enum HotkeyError {
     NoModifier,
     #[error("Right Alt is AltGr on many keyboards, so it cannot be part of the shortcut.")]
     RightAlt,
+}
+
+impl HotkeyError {
+    pub fn message(&self) -> Message {
+        match self {
+            Self::TooFew => Message::HotkeyTooFew,
+            Self::TooMany => Message::HotkeyTooMany,
+            Self::NoModifier => Message::HotkeyNoModifier,
+            Self::RightAlt => Message::HotkeyRightAlt,
+        }
+    }
 }
 
 pub const MIN_KEYS: usize = 2;

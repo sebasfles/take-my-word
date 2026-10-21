@@ -7,6 +7,15 @@ pub enum Language {
     En,
 }
 
+impl Language {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Es => "es",
+            Self::En => "en",
+        }
+    }
+}
+
 pub fn system_locale() -> String {
     api_locale(sys_locale::get_locale().as_deref())
 }
@@ -64,9 +73,10 @@ mod tests {
     #[test]
     fn the_ui_language_follows_the_dictation_locale() {
         for (tag, expected) in [
-            ("en-GB", Language::En),
+            ("en-US", Language::En),
             ("es-CL", Language::Es),
             ("fr-FR", Language::Es),
+            ("", Language::Es),
         ] {
             assert_eq!(language(&api_locale(Some(tag))), expected);
         }

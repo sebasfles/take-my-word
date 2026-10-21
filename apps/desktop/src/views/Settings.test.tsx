@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setLanguage } from "../i18n.ts";
 import { fakeBridge, listeners } from "../testing/bridge.ts";
 import { Settings } from "./Settings.tsx";
 
@@ -7,6 +8,8 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../bridge.ts")>()),
   bridge: fakeBridge,
 }));
+
+setLanguage("en");
 
 function keys() {
   return Array.from(document.querySelectorAll("kbd"), (key) => key.textContent);
@@ -105,7 +108,10 @@ describe("Settings", () => {
   });
 
   it("explains why a capture could not start", async () => {
-    fakeBridge.captureHotkey.mockRejectedValueOnce("Click Change in the settings window.");
+    fakeBridge.captureHotkey.mockRejectedValueOnce({
+      message: "hotkey.notInSettings",
+      backToSignIn: false,
+    });
     render(<Settings />);
     await screen.findByText("Win");
     fireEvent.click(screen.getByRole("button", { name: "Change" }));
@@ -128,6 +134,7 @@ describe("Settings", () => {
 
   it("signs out and then offers to sign in again", async () => {
     render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
     fakeBridge.accountStatus.mockResolvedValue({ signedIn: false, username: null });
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -138,8 +145,22 @@ describe("Settings", () => {
     fakeBridge.accountStatus.mockResolvedValue({ signedIn: true, username: "sebastian" });
   });
 
+  it("opens on the section the shell asks for and moves between sections", async () => {
+    window.history.replaceState(null, "", "?view=settings&section=account");
+    render(<Settings />);
+    await screen.findByText("Signed in as sebastian");
+    expect(screen.getByRole("button", { name: "Account" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    await screen.findByText("Win");
+    expect(screen.queryByText("Signed in as sebastian")).toBeNull();
+    window.history.replaceState(null, "", "/");
+  });
+
   it("follows a session that ends elsewhere", async () => {
     render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
     fakeBridge.accountStatus.mockResolvedValueOnce({ signedIn: false, username: null });
     act(() => {

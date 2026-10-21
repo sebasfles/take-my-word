@@ -114,3 +114,25 @@ Review focus beyond the Pipeline: no token, refresh token or dictation text in I
 clearance: full: AWS profile `fless-takemyword` on dev (throwaway users created and deleted, Polly speech), the Windows host under the machine rules with mirror `C:\dev\tmw-0008`, GitHub as sebasfles with `GH_TOKEN="$(gh auth token --user sebasfles)"`; no Terraform, no prd.
 
 ## om-developer notes
+
+### Round 1 (milestone 1)
+
+Did:
+- Boundary: `api_request` forwards a closed `Route` enum (`api/routes.rs`, serde `deny_unknown_fields`, no dictation route); ids are one percent-encoded path segment, empty or dot-only ids are refused before sending; the history cursor is encoded into the query; 204 reads as `null`; failures cross as `{kind, status, code}`; the forwarder logs route name, kind and status only, never bodies or network error text.
+  Renewal reuses `AuthedApi::authorized`.
+- `src/api.ts`: one typed client per route, requests validated and normalized with the `packages/shared` input schemas before reaching Rust, responses parsed with the shared schemas, failures as `ApiError`.
+- Localization: `src/i18n/es.json` and `en.json`, flat ids, `{name}` placeholders like the web; Rust embeds them (`i18n.rs`) for the tray, notifications and the first-run title; overlay errors, `Problem` and every command error (hotkey, autostart, microphone settings) cross IPC as ids.
+  `Language` in `locale.rs` copies 0005's shape to ease the merge.
+- Views localized (sign-in, choose password, onboarding, first run, settings, overlay); built-in style names from the dictionaries (`styleNames.ts`), custom names as stored; Shift shows as "Mayús" in Spanish.
+- Settings window: 880x640, resizable, minimum 380x480; left nav (General, Account) that wraps on top under 640 px; `section=` in the URL picks the opening section (for "Add a word" in milestone 2).
+- Screenshots: `pnpm screenshots` renders every state in es and en and fails when a page scrolls sideways; 192 files in the workspace `screenshots/`.
+
+Decisions not in the plan:
+- The language reaches the views as `lang=` in each window URL set by Rust, read once in `main.tsx`, instead of a field in a command response: the first frame is already in the right language and the overlay needs no extra call.
+- Notifications take a sentence of message ids (`Notifier::notify(&[Message])`), so "the previous dictation was not pasted" is composed from two ids instead of English text.
+- Hotkey limits (2 and 3 keys) are written into the dictionary text, not interpolated, since `Problem` carries no values.
+- `api_request` lives in a new `editors.rs`; `blocking` moved to `commands.rs` for reuse.
+
+Pending (milestones 2 and 3): editors, history, "Add a word", keystroke cache and its app rule mirror, running apps, copy, default-style picker shared with onboarding, waveform, Windows smoke, measurements, docs.
+
+Deferred: none.

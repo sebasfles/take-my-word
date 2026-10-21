@@ -7,6 +7,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
 use crate::dictation::Notifier;
+use crate::i18n::Message;
 use crate::windows::OVERLAY;
 
 const ERROR_VISIBLE: Duration = Duration::from_secs(4);
@@ -25,7 +26,7 @@ pub enum OverlayState {
     Listening,
     Processing,
     Error {
-        message: String,
+        message: Message,
         action: Option<OverlayAction>,
     },
 }
@@ -79,8 +80,7 @@ impl<O: Overlay, N: Notifier> Overlay for GatedOverlay<O, N> {
         }
         log::info!("kept the overlay on listening during a hold");
         if let OverlayState::Error { message, .. } = state {
-            self.notifier
-                .notify(&format!("The previous dictation was not pasted. {message}"));
+            self.notifier.notify(&[Message::PreviousNotPasted, message]);
         }
     }
 }
@@ -183,7 +183,7 @@ mod tests {
     #[derive(Default)]
     struct Seen {
         overlay: RefCell<Vec<OverlayState>>,
-        notices: RefCell<Vec<String>>,
+        notices: RefCell<Vec<Vec<Message>>>,
     }
 
     impl Overlay for &Seen {
@@ -193,8 +193,8 @@ mod tests {
     }
 
     impl Notifier for &Seen {
-        fn notify(&self, message: &str) {
-            self.notices.borrow_mut().push(message.into());
+        fn notify(&self, sentence: &[Message]) {
+            self.notices.borrow_mut().push(sentence.to_vec());
         }
     }
 
@@ -221,11 +221,16 @@ mod tests {
         let overlay = GatedOverlay::new(&seen, &seen);
         overlay.begin_recording();
         overlay.set(OverlayState::Error {
-            message: "Can't reach Take My Word. Check your connection.".into(),
+            message: Message::DictationUnreachable,
             action: None,
         });
         assert_eq!(*seen.overlay.borrow(), vec![OverlayState::Listening]);
-        assert_eq!(seen.notices.borrow().len(), 1);
-        assert!(seen.notices.borrow()[0].contains("Can't reach Take My Word"));
+        assert_eq!(
+            *seen.notices.borrow(),
+            vec![vec![
+                Message::PreviousNotPasted,
+                Message::DictationUnreachable
+            ]]
+        );
     }
 }

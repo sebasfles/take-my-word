@@ -5,28 +5,28 @@ const overlayStates: Record<string, unknown> = {
   processing: { state: "processing" },
   error: {
     state: "error",
-    message: "Can't reach Take My Word. Check your connection.",
+    message: "overlay.unreachable",
     action: null,
   },
   "error-quota": {
     state: "error",
-    message: "You've reached today's dictation limit.",
+    message: "overlay.quota",
     action: null,
   },
-  "error-too-long": { state: "error", message: "That dictation was too long.", action: null },
+  "error-too-long": { state: "error", message: "overlay.tooLong", action: null },
   "error-format": {
     state: "error",
-    message: "That recording format isn't supported.",
+    message: "overlay.format",
     action: null,
   },
   "error-sign-in": {
     state: "error",
-    message: "Sign in to Take My Word to dictate.",
+    message: "overlay.signIn",
     action: null,
   },
   "error-microphone": {
     state: "error",
-    message: "Windows blocks the microphone.",
+    message: "overlay.microphoneBlocked",
     action: "microphoneSettings",
   },
 };

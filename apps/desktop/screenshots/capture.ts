@@ -1,7 +1,8 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
 import { createServer } from "vite";
+import type { Language, MessageId } from "../src/i18n.ts";
 
 const out = process.argv[2];
 if (!out) {
@@ -16,30 +17,32 @@ const widths = [
   { width: 1280, height: 800 },
 ];
 
+type Text = (id: MessageId, values?: Record<string, string>) => string;
+
 interface Shot {
   name: string;
   query: string;
-  act?: (page: Page) => Promise<void>;
+  act?: (page: Page, text: Text) => Promise<void>;
 }
 
-const pressShortcut = async (page: Page) => {
-  await page.getByRole("button", { name: "Change" }).click();
-  await page.getByText("Press the new shortcut").waitFor();
+const pressShortcut = async (page: Page, text: Text) => {
+  await page.getByRole("button", { name: text("settings.shortcut.change") }).click();
+  await page.getByText(text("settings.shortcut.listening")).waitFor();
   await page.keyboard.down("Control");
   await page.keyboard.down("Shift");
   await page.keyboard.up("Shift");
   await page.keyboard.up("Control");
 };
 
-const signIn = async (page: Page) => {
-  await page.getByLabel("Username").fill("sebastian");
-  await page.getByLabel("Password").fill("not-a-real-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
+const signIn = async (page: Page, text: Text) => {
+  await page.getByLabel(text("signIn.username")).fill("sebastian");
+  await page.getByLabel(text("signIn.password")).fill("not-a-real-password");
+  await page.getByRole("button", { name: text("signIn.submit") }).click();
 };
 
-const choosePassword = async (page: Page) => {
-  await signIn(page);
-  await page.getByRole("heading", { name: "Choose your password" }).waitFor();
+const choosePassword = async (page: Page, text: Text) => {
+  await signIn(page, text);
+  await page.getByRole("heading", { name: text("choosePassword.title") }).waitFor();
 };
 
 const shots: Shot[] = [
@@ -47,8 +50,8 @@ const shots: Shot[] = [
   {
     name: "account-sign-in-error",
     query: "view=account&signin=wrong",
-    act: async (page) => {
-      await signIn(page);
+    act: async (page, text) => {
+      await signIn(page, text);
       await page.getByRole("alert").waitFor();
     },
   },
@@ -60,19 +63,19 @@ const shots: Shot[] = [
   {
     name: "account-choose-password-error",
     query: "view=account&signin=new-password&password=weak",
-    act: async (page) => {
-      await choosePassword(page);
-      await page.getByLabel("New password").fill("not-a-real-password");
-      await page.getByLabel("Repeat the password").fill("not-a-real-password");
-      await page.getByRole("button", { name: "Save and sign in" }).click();
+    act: async (page, text) => {
+      await choosePassword(page, text);
+      await page.getByLabel(text("choosePassword.new")).fill("not-a-real-password");
+      await page.getByLabel(text("choosePassword.repeat")).fill("not-a-real-password");
+      await page.getByRole("button", { name: text("choosePassword.submit") }).click();
       await page.getByRole("alert").waitFor();
     },
   },
   {
     name: "account-onboarding",
     query: "view=account&step=onboarding",
-    act: async (page) => {
-      await page.getByRole("radio", { name: "Plain" }).waitFor();
+    act: async (page, text) => {
+      await page.getByRole("radio", { name: text("style.plain.name") }).waitFor();
     },
   },
   {
@@ -89,37 +92,46 @@ const shots: Shot[] = [
     name: "settings-idle",
     query: "view=settings",
     act: async (page) => {
-      await page.getByText("Signed in as sebastian").waitFor();
+      await page.locator("kbd", { hasText: "Win" }).waitFor();
+    },
+  },
+  {
+    name: "settings-account",
+    query: "view=settings&section=account",
+    act: async (page, text) => {
+      await page
+        .getByText(text("settings.account.signedInAs", { username: "sebastian" }))
+        .waitFor();
     },
   },
   {
     name: "settings-signed-out",
-    query: "view=settings&account=signed-out",
-    act: async (page) => {
-      await page.getByText("Signed out").waitFor();
+    query: "view=settings&section=account&account=signed-out",
+    act: async (page, text) => {
+      await page.getByText(text("settings.account.signedOut")).waitFor();
     },
   },
   {
     name: "settings-listening",
     query: "view=settings",
-    act: async (page) => {
-      await page.getByRole("button", { name: "Change" }).click();
-      await page.getByText("Press the new shortcut").waitFor();
+    act: async (page, text) => {
+      await page.getByRole("button", { name: text("settings.shortcut.change") }).click();
+      await page.getByText(text("settings.shortcut.listening")).waitFor();
     },
   },
   {
     name: "settings-proposed",
     query: "view=settings",
-    act: async (page) => {
-      await pressShortcut(page);
-      await page.getByRole("button", { name: "Save" }).waitFor();
+    act: async (page, text) => {
+      await pressShortcut(page, text);
+      await page.getByRole("button", { name: text("common.save") }).waitFor();
     },
   },
   {
     name: "settings-error",
     query: "view=settings&propose=altgr",
-    act: async (page) => {
-      await pressShortcut(page);
+    act: async (page, text) => {
+      await pressShortcut(page, text);
       await page.getByRole("alert").waitFor();
     },
   },
@@ -164,27 +176,45 @@ if (!base) throw new Error("the preview server has no local URL");
 
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
+const languages: Language[] = ["es", "en"];
+const dictionary = (language: Language) =>
+  JSON.parse(readFileSync(join(here, "..", "src", "i18n", `${language}.json`), "utf8")) as Record<
+    MessageId,
+    string
+  >;
+
 try {
-  for (const colorScheme of ["dark", "light"] as const) {
-    for (const size of widths) {
-      if (colorScheme === "light" && size.width !== 1280) continue;
-      const context = await browser.newContext({ viewport: size, colorScheme });
-      for (const shot of shots) {
-        const page = await context.newPage();
-        await page.goto(`${base}?${shot.query}`);
-        if (shot.query.includes("view=overlay")) {
-          await page.addStyleTag({ content: "html, body { background: #52525b !important; }" });
-          await page.locator(".pill").waitFor();
-        } else {
-          await page.getByRole("heading").first().waitFor();
+  for (const language of languages) {
+    const messages = dictionary(language);
+    const text: Text = (id, values = {}) =>
+      messages[id].replace(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match);
+    for (const colorScheme of ["dark", "light"] as const) {
+      for (const size of widths) {
+        if (colorScheme === "light" && size.width !== 1280) continue;
+        const context = await browser.newContext({ viewport: size, colorScheme });
+        for (const shot of shots) {
+          const page = await context.newPage();
+          await page.goto(`${base}?${shot.query}&lang=${language}`);
+          if (shot.query.includes("view=overlay")) {
+            await page.addStyleTag({ content: "html, body { background: #52525b !important; }" });
+            await page.locator(".pill").waitFor();
+          } else {
+            await page.getByRole("heading").first().waitFor();
+          }
+          await shot.act?.(page, text);
+          await page.waitForTimeout(200);
+          const overflow = await page.evaluate(
+            () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          );
+          if (overflow)
+            throw new Error(`${shot.name} scrolls sideways at ${String(size.width)} px`);
+          const light = colorScheme === "light" ? "-light" : "";
+          const file = `${shot.name}-${language}-${String(size.width)}${light}.png`;
+          await page.screenshot({ path: join(out, file), fullPage: true });
+          await page.close();
         }
-        await shot.act?.(page);
-        await page.waitForTimeout(200);
-        const file = `${shot.name}-${size.width}${colorScheme === "light" ? "-light" : ""}.png`;
-        await page.screenshot({ path: join(out, file), fullPage: true });
-        await page.close();
+        await context.close();
       }
-      await context.close();
     }
   }
 } finally {

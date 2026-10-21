@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import type { Route } from "../api.ts";
 import type {
   AccountStep,
   AccountView,
@@ -21,9 +22,10 @@ export const signedIn: AccountView = { signedIn: true, username: "sebastian" };
 
 export const onboarding: Onboarding = {
   styles: [
-    { id: "plain", name: "Plain" },
-    { id: "casual", name: "Casual" },
-    { id: "formal", name: "Formal" },
+    { id: "plain", name: "Plain", builtin: true },
+    { id: "casual", name: "Casual", builtin: true },
+    { id: "formal", name: "Formal", builtin: true },
+    { id: "c7d1", name: "Client emails", builtin: false },
   ],
   selected: "plain",
 };
@@ -40,7 +42,7 @@ export const fakeBridge = {
   cancelHotkeyCapture: vi.fn(() => Promise.resolve(undefined)),
   proposeHotkey: vi.fn((codes: string[]) =>
     codes.includes("AltRight")
-      ? Promise.reject(new Error("Right Alt is AltGr on many keyboards"))
+      ? Promise.reject(Object.assign(new Error("hotkey.rightAlt"), { backToSignIn: false }))
       : Promise.resolve(["Ctrl", "Shift"]),
   ),
   confirmHotkey: vi.fn(() => Promise.resolve(["Ctrl", "Shift"])),
@@ -61,6 +63,7 @@ export const fakeBridge = {
   ),
   openSignIn: vi.fn(() => Promise.resolve(undefined)),
   signOut: vi.fn(() => Promise.resolve(undefined)),
+  apiRequest: vi.fn<(route: Route) => Promise<unknown>>(() => Promise.resolve(null)),
   quit: vi.fn(() => Promise.resolve(undefined)),
   updateView: vi.fn(() => Promise.resolve(pendingUpdate.view)),
   installUpdate: vi.fn(() => Promise.resolve(undefined)),

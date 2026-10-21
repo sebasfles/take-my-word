@@ -11,3 +11,11 @@ export type AccountScreen = "sign-in" | "choose-password" | "onboarding";
 export function accountScreenFromSearch(search: string): AccountScreen {
   return new URLSearchParams(search).get("step") === "onboarding" ? "onboarding" : "sign-in";
 }
+
+export const settingsSections = ["general", "account"] as const;
+export type SettingsSection = (typeof settingsSections)[number];
+
+export function settingsSectionFromSearch(search: string): SettingsSection {
+  const requested = new URLSearchParams(search).get("section");
+  return settingsSections.find((section) => section === requested) ?? "general";
+}

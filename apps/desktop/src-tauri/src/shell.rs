@@ -15,9 +15,10 @@ use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
 use crate::clipboard;
 use crate::config::{self, Settings};
-use crate::dictation::{Job, Notifier, SIGN_IN_TO_DICTATE, Worker};
+use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
+use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
 use crate::locale;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, WindowOverlay};
@@ -167,9 +168,9 @@ impl Shell {
         });
     }
 
-    pub fn propose_hotkey(&self, codes: &[String]) -> Result<Vec<String>, String> {
+    pub fn propose_hotkey(&self, codes: &[String]) -> Result<Vec<String>, Message> {
         if !lock(&self.keys).is_capturing(Instant::now()) {
-            return Err("The recording ended. Click Change to try again.".into());
+            return Err(Message::HotkeyCaptureEnded);
         }
         let pressed = codes
             .iter()
@@ -177,7 +178,7 @@ impl Shell {
             .collect::<Option<Vec<_>>>();
         let Some(pressed) = pressed else {
             lock(&self.keys).finish_capture(None);
-            return Err("That key cannot be part of the shortcut.".into());
+            return Err(Message::HotkeyKeyNotAllowed);
         };
         match Hotkey::from_pressed(&pressed) {
             Ok(hotkey) => {
@@ -189,7 +190,7 @@ impl Shell {
             Err(error) => {
                 log::info!("hotkey capture rejected: {error}");
                 lock(&self.keys).finish_capture(None);
-                Err(error.to_string())
+                Err(error.message())
             }
         }
     }
@@ -268,7 +269,7 @@ impl Sink for ShellSink {
             return true;
         }
         self.overlay.set(OverlayState::Error {
-            message: SIGN_IN_TO_DICTATE.into(),
+            message: Message::SignInToDictate,
             action: None,
         });
         windows::open_account(&self.app, false);
@@ -329,13 +330,13 @@ impl Modifiers for HeldModifiers {
 pub struct TrayNotifier(AppHandle);
 
 impl Notifier for TrayNotifier {
-    fn notify(&self, message: &str) {
+    fn notify(&self, sentence: &[Message]) {
         let shown = self
             .0
             .notification()
             .builder()
             .title(windows::product_name(&self.0))
-            .body(message)
+            .body(i18n::sentence(sentence))
             .show();
         if let Err(error) = shown {
             log::warn!("showing a notification failed: {error}");

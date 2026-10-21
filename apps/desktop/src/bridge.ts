@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Route } from "./api.ts";
+import { isMessageId, type MessageId } from "./i18n.ts";
 
 export type MicStatus = "unknown" | "ready" | "denied" | "missing" | "failing";
 
@@ -13,7 +15,7 @@ export type OverlayState =
   | { state: "hidden" }
   | { state: "listening" }
   | { state: "processing" }
-  | { state: "error"; message: string; action: "microphoneSettings" | null };
+  | { state: "error"; message: MessageId; action: "microphoneSettings" | null };
 
 export interface AccountView {
   signedIn: boolean;
@@ -23,13 +25,14 @@ export interface AccountView {
 export type AccountStep = "choosePassword" | "onboarding" | "done";
 
 export interface Problem {
-  message: string;
+  message: MessageId;
   backToSignIn: boolean;
 }
 
 export interface StyleOption {
   id: string;
   name: string;
+  builtin: boolean;
 }
 
 export interface Onboarding {
@@ -39,10 +42,10 @@ export interface Onboarding {
 
 export function problemOf(reason: unknown): Problem {
   if (typeof reason === "object" && reason !== null && "message" in reason) {
-    const { message, backToSignIn } = reason as Partial<Problem>;
-    if (typeof message === "string") return { message, backToSignIn: backToSignIn === true };
+    const { message, backToSignIn } = reason as { message: unknown; backToSignIn?: unknown };
+    if (isMessageId(message)) return { message, backToSignIn: backToSignIn === true };
   }
-  return { message: "Something went wrong. Try again.", backToSignIn: false };
+  return { message: "error.generic", backToSignIn: false };
 }
 
 export type UpdatePhase =
@@ -75,6 +78,7 @@ export const bridge = {
   saveDefaultStyle: (styleId: string) => invoke<undefined>("save_default_style", { styleId }),
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
+  apiRequest: (route: Route) => invoke<unknown>("api_request", { route }),
   quit: () => invoke<undefined>("quit"),
   updateView: () => invoke<UpdateView | null>("update_view"),
   installUpdate: () => invoke<undefined>("install_update"),

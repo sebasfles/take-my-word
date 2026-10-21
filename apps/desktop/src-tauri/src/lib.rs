@@ -9,9 +9,11 @@ mod config;
 #[cfg(debug_assertions)]
 mod dev;
 mod dictation;
+mod editors;
 mod env;
 mod foreground;
 mod hotkey;
+mod i18n;
 mod keychain;
 mod locale;
 mod overlay;
@@ -63,6 +65,7 @@ pub fn run() {
             account::save_default_style,
             account::open_sign_in,
             account::sign_out,
+            editors::api_request,
             commands::quit,
             updater::update_view,
             updater::install_update,

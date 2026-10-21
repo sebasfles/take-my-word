@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::routes::Route;
 use super::{
     ApiFailure, DictationApi, DictationMeta, DictationResponse, HttpApi, StyleList, UserSettings,
 };
@@ -55,6 +56,11 @@ impl<C: Credentials> AuthedApi<C> {
         self.authorized(|token| self.http.put(token, SETTINGS, settings))
     }
 
+    pub fn forward(&self, route: &Route) -> Result<serde_json::Value, ApiFailure> {
+        let request = route.request()?;
+        self.authorized(|token| self.http.forward(token, &request))
+    }
+
     fn authorized<T>(
         &self,
         call: impl Fn(&Secret) -> Result<T, ApiFailure>,
@@ -85,9 +91,11 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::Mutex;
 
-    use axum::Router;
+    use axum::extract::Path;
     use axum::http::{HeaderMap, StatusCode};
-    use axum::routing::get;
+    use axum::routing::{delete, get, post};
+    use axum::{Json, Router};
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::api::ApiErrorCode;
@@ -141,15 +149,18 @@ mod tests {
                 )
             }
         };
+        (serve(Router::new().route("/styles", get(answer))), seen)
+    }
+
+    fn serve(router: Router) -> HttpApi {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         listener.set_nonblocking(true).unwrap();
         let address = listener.local_addr().unwrap();
-        let router = Router::new().route("/styles", get(answer));
         tauri::async_runtime::spawn(async move {
             let listener = tokio::net::TcpListener::from_std(listener).unwrap();
             axum::serve(listener, router).await.unwrap();
         });
-        (HttpApi::new(format!("http://{address}")).unwrap(), seen)
+        HttpApi::new(format!("http://{address}")).unwrap()
     }
 
     fn credentials(current: &str) -> Tokens {
@@ -209,5 +220,49 @@ mod tests {
         );
         assert!(matches!(api.settings(), Err(ApiFailure::SignedOut)));
         assert!(seen.lock().unwrap().is_empty());
+    }
+
+    fn route(value: Value) -> Route {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn forwarded_routes_send_their_body_and_read_an_empty_answer_as_null() {
+        let http = serve(
+            Router::new()
+                .route(
+                    "/dictionary",
+                    post(|headers: HeaderMap, Json(body): Json<Value>| async move {
+                        assert_eq!(headers["authorization"], "Bearer token-0");
+                        (StatusCode::CREATED, Json(json!({"echo": body})))
+                    }),
+                )
+                .route(
+                    "/dictionary/{id}",
+                    delete(|Path(id): Path<String>| async move {
+                        assert_eq!(id, "a b");
+                        StatusCode::NO_CONTENT
+                    }),
+                ),
+        );
+        let api = AuthedApi::new(http, credentials("token-0"));
+        let added = api.forward(&route(
+            json!({"route": "addTerm", "body": {"term": "Kubernetes", "aliases": []}}),
+        ));
+        assert_eq!(
+            added.unwrap(),
+            json!({"echo": {"term": "Kubernetes", "aliases": []}})
+        );
+        let deleted = api.forward(&route(json!({"route": "deleteTerm", "id": "a b"})));
+        assert_eq!(deleted.unwrap(), Value::Null);
+    }
+
+    #[test]
+    fn forwarded_routes_renew_once_like_every_other_call() {
+        let (http, seen) = gateway("token-1", false);
+        let api = AuthedApi::new(http, credentials("stale"));
+        let styles = api.forward(&route(json!({"route": "listStyles"})));
+        assert_eq!(styles.unwrap(), json!({"styles": []}));
+        assert_eq!(*seen.lock().unwrap(), ["Bearer stale", "Bearer token-1"]);
     }
 }

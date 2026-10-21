@@ -4,11 +4,10 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::api::ApiFailure;
 use crate::auth::Secret;
 use crate::auth::account::{AccountError, SignInStep, User};
+use crate::commands::blocking;
+use crate::i18n::Message;
 use crate::shell::Shell;
 use crate::{tray, windows};
-
-const UNREACHABLE: &str = "We could not reach the service. Try again in a few minutes.";
-const SESSION_ENDED: &str = "Your session ended. Sign in again.";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,23 +27,27 @@ pub enum Step {
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Problem {
-    message: &'static str,
+    message: Message,
     back_to_sign_in: bool,
+}
+
+impl From<Message> for Problem {
+    fn from(message: Message) -> Self {
+        Self {
+            message,
+            back_to_sign_in: false,
+        }
+    }
 }
 
 impl From<AccountError> for Problem {
     fn from(error: AccountError) -> Self {
         let (message, back_to_sign_in) = match error {
-            AccountError::InvalidCredentials => ("Wrong username or password.", false),
-            AccountError::InvalidPassword => {
-                ("The password does not meet the requirements.", false)
-            }
-            AccountError::Expired => (
-                "The sign-in expired. Sign in again with your temporary password.",
-                true,
-            ),
-            AccountError::SignedOut => (SESSION_ENDED, true),
-            AccountError::Unavailable(_) => (UNREACHABLE, false),
+            AccountError::InvalidCredentials => (Message::WrongCredentials, false),
+            AccountError::InvalidPassword => (Message::InvalidPassword, false),
+            AccountError::Expired => (Message::SignInExpired, true),
+            AccountError::SignedOut => (Message::SessionEnded, true),
+            AccountError::Unavailable(_) => (Message::Unreachable, false),
         };
         Self {
             message,
@@ -57,11 +60,11 @@ impl From<ApiFailure> for Problem {
     fn from(failure: ApiFailure) -> Self {
         log::warn!("an account request failed: {failure}");
         let (message, back_to_sign_in) = match failure {
-            ApiFailure::SignedOut => (SESSION_ENDED, true),
-            ApiFailure::Network(_) => (UNREACHABLE, false),
-            ApiFailure::Rejected { .. } | ApiFailure::InvalidResponse(_) => {
-                ("Something went wrong. Try again.", false)
-            }
+            ApiFailure::SignedOut => (Message::SessionEnded, true),
+            ApiFailure::Network(_) => (Message::Unreachable, false),
+            ApiFailure::Rejected { .. }
+            | ApiFailure::InvalidRequest
+            | ApiFailure::InvalidResponse(_) => (Message::Generic, false),
         };
         Self {
             message,
@@ -75,6 +78,7 @@ impl From<ApiFailure> for Problem {
 pub struct StyleOption {
     id: String,
     name: String,
+    builtin: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -82,15 +86,6 @@ pub struct StyleOption {
 pub struct Onboarding {
     styles: Vec<StyleOption>,
     selected: String,
-}
-
-async fn blocking<T: Send + 'static>(
-    app: AppHandle,
-    work: impl FnOnce(&AppHandle, &Shell) -> T + Send + 'static,
-) -> T {
-    tauri::async_runtime::spawn_blocking(move || work(&app, app.state::<Shell>().inner()))
-        .await
-        .expect("an account task panicked")
 }
 
 #[tauri::command]
@@ -142,6 +137,7 @@ pub async fn onboarding(app: AppHandle) -> Result<Onboarding, Problem> {
                 .map(|style| StyleOption {
                     id: style.id,
                     name: style.name,
+                    builtin: style.builtin,
                 })
                 .collect(),
             selected,

@@ -2,6 +2,7 @@ use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, Wry};
 
+use crate::i18n::{Message, text};
 use crate::{account, windows};
 
 const SETTINGS: &str = "settings";
@@ -11,7 +12,11 @@ const QUIT: &str = "quit";
 struct AccountItem(MenuItem<Wry>);
 
 fn account_label(signed_in: bool) -> &'static str {
-    if signed_in { "Sign out" } else { "Sign in" }
+    text(if signed_in {
+        Message::TraySignOut
+    } else {
+        Message::TraySignIn
+    })
 }
 
 pub fn show_signed_in(app: &AppHandle, signed_in: bool) {
@@ -23,11 +28,17 @@ pub fn show_signed_in(app: &AppHandle, signed_in: bool) {
 }
 
 pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
-    let settings = MenuItem::with_id(app, SETTINGS, "Settings", true, None::<&str>)?;
+    let settings = MenuItem::with_id(
+        app,
+        SETTINGS,
+        text(Message::TraySettings),
+        true,
+        None::<&str>,
+    )?;
     let account_item =
         MenuItem::with_id(app, ACCOUNT, account_label(signed_in), true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, QUIT, "Quit", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, QUIT, text(Message::TrayQuit), true, None::<&str>)?;
     #[cfg(debug_assertions)]
     let stub = stub::Menu::build(app)?;
     let mut items: Vec<&dyn IsMenuItem<Wry>> = vec![&settings, &account_item];
