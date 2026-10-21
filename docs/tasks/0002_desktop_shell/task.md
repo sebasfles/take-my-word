@@ -263,3 +263,7 @@ Left for Sebastian from the PR installer (things injected input could not prove)
 Deferred:
 
 - Consecutive dictations are joined with no space ("…Word.Hola…"); spacing against the text before the caret belongs with the style work in 0004.
+
+### Round 7 (round 6 finding)
+
+- Finding 1: verify-task ran the `workflows` target (`pnpm lint:workflows`) at the round commit as its own block with its own artefact, and the root `ci` evidence (root `pnpm lint`, `pnpm typecheck`, `pnpm test` with desktop in `pnpm -r`) was run again after that commit. No code or CI change.

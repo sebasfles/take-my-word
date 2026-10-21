@@ -36,3 +36,15 @@ Lockfile regenerated after the rebase on develop 399b242 (the jsdom peer changes
 - unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
 - e2e: n/a
 Workflows target: pass exit 0 as part of the root pnpm lint (actionlint over desktop-ci.yml); root pnpm typecheck exit 0 and pnpm test exit 0 on 4637edc's tree.
+
+## 2026-10-21T16:48:35Z by om-developer target workflows on 03978c8f058e94d1543f9f6a5acc3ee1858d0db0
+- lint: pass exit 0 (pnpm lint:workflows, actionlint over .github/workflows including desktop-ci.yml)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T16:48:35Z by om-developer root ci (pnpm -r with desktop) on 03978c8f058e94d1543f9f6a5acc3ee1858d0db0
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (pnpm test: desktop 16, shared 19, api 179, web 95)
+- e2e: n/a
