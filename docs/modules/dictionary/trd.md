@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Dictionary: technical
@@ -10,10 +10,11 @@ source: 0003_api_features
 | Path | What |
 |---|---|
 | `apps/api/src/dictionary` | Routes in the `api` Lambda, the store port and its DynamoDB adapter, term matching. |
-| `apps/api/src/dictation/dictionary-projection.ts` | Ranking and the two projections `dictate` builds (owned here, called by dictation). |
+| `apps/api/src/dictation/dictionary-projection.ts` | The two projections `dictate` builds (owned here, called by dictation). |
 | `apps/api/src/dictionary-usage` | The `dictionary-usage` Lambda, consumer of the table stream. |
-| `packages/shared/src/dictionary.ts` | Contracts, limits and `normalizeTerm`, the folding every client and the server share. |
-| `apps/web`, `apps/desktop`, `apps/mobile` | Read-only view and editors (0008, 0009, phase 4). |
+| `packages/shared/src/dictionary.ts` | Contracts, limits, `normalizeTerm` and the ranking (`decayedScore`, `rankTerms`, half-life 30), so the web orders terms exactly as `dictate` does. |
+| `apps/web` | Read-only view, by relevance or by name. |
+| `apps/desktop`, `apps/mobile` | Editors (0008, phase 4). |
 
 ## Endpoints owned
 

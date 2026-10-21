@@ -1,0 +1,37 @@
+## 2026-10-21T14:45:06Z by om-developer target shared on 3ebed5b
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (19 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-21T14:45:06Z by om-developer target api on 3ebed5b
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (179 tests, pnpm test)
+- e2e: pass exit 0 (pnpm e2e against dev, api Lambdas deployed at 3ebed5b)
+
+## 2026-10-21T14:45:06Z by om-developer target web on 3ebed5b
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: pass exit 0 (pnpm integration, 4 tests); fail exit 1 (pnpm e2e against dev, web deployed at 3ebed5b)
+account.e2e.ts: shows the seeded account on every page: Test timeout of 60000ms exceeded.
+
+## 2026-10-21T14:48:02Z by om-developer target web on 62e0d3d
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: pass exit 0 (pnpm integration, 4 tests); pass exit 0 (pnpm e2e against dev, 10 tests, web deployed at 3ebed5b, same app code as 62e0d3d)
+
+## 2026-10-21T14:53:03Z by om-developer target web on 93862fa
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: pass exit 0 (pnpm integration, 4 tests); pass exit 0 (pnpm e2e against dev, 10 tests, web deployed at 3ebed5b, same app code as 93862fa)
+
+## 2026-10-21T14:57:42Z by om-developer target web on 7ee6ec4
+- lint: pass exit 0 (pnpm lint, after deleting .next, next-env.d.ts, .open-next and test-results)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: n/a (not run on the reviewer's call: types only, no behavior change; last green at 93862fa)
+

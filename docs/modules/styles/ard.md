@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Styles: architecture and debt
@@ -49,3 +49,12 @@ source: 0003_api_features
 - Debt created: after a failed cleanup, `GET /app-rules` can show a `styleId` that no longer exists until the rule is edited.
 - Revisit when: a client shows a dangling style to a user.
 - Source: 0003_api_features
+
+## 2026-10-21: The web describes built-in styles with its own copy, not their prompts
+
+- Decision: the web names `plain`, `casual` and `formal` by id in the page's language and shows a one-line description from its dictionaries instead of the API's English name and prompt; a custom style shows its own name and prompt, a dangling id "deleted style" and a rule without a style "default style".
+- Alternatives rejected: showing the built-in prompts, which are refiner instructions rather than a description for the user.
+- Reason: the web is in Spanish and English while built-ins carry one English name.
+- Debt created: a change to a built-in prompt does not update its web description.
+- Revisit when: a built-in style's prompt changes its intent, or a fourth built-in arrives.
+- Source: 0009_web_account

@@ -1,15 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import type { AccountApi } from "./api.ts";
 import { completeNewPassword, refreshSession, signIn, signOut, type AuthDeps } from "./auth.ts";
 import { isLocale, localeCookieName, localeMaxAgeSeconds } from "./i18n.ts";
 import { isSameOrigin } from "./origin.ts";
-import { clearedSessionCookies, readChallenge, readSession, type CookieToSet } from "./session.ts";
+import {
+  clearedSessionCookies,
+  needsRefresh,
+  readChallenge,
+  readSession,
+  type CookieToSet,
+} from "./session.ts";
 
 export interface HandlerDeps extends AuthDeps {
   webOrigin: string;
 }
 
 export type Deps = () => Promise<HandlerDeps>;
+
+export interface DictationHandlerDeps {
+  key: Buffer;
+  now: () => number;
+  webOrigin: string;
+  api: (accessToken: string) => Pick<AccountApi, "deleteDictation">;
+}
 
 const signInSchema = z.object({
   username: z.string().trim().min(1).max(128),
@@ -135,5 +149,32 @@ export function localeHandler(webOrigin: () => string) {
         },
       },
     ]);
+  };
+}
+
+const pathIdPattern = /^[\w-]{1,512}$/;
+
+export function deleteDictationHandler(deps: () => Promise<DictationHandlerDeps>) {
+  return async (
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> },
+  ): Promise<NextResponse> => {
+    const d = await deps();
+    if (!isSameOrigin(request, d.webOrigin)) return forbidden();
+    const session = readSession(jar(request), d.key);
+    if (session === null) return json({ error: "signed_out" }, 401);
+    if (needsRefresh(session, d.now())) return json({ error: "renew" }, 401);
+    const { id } = await context.params;
+    if (!pathIdPattern.test(id)) return badRequest();
+    switch (await d.api(session.accessToken).deleteDictation(id)) {
+      case "deleted":
+        return new NextResponse(null, { status: 204, headers: { "cache-control": "no-store" } });
+      case "not-found":
+        return json({ error: "not_found" }, 404);
+      case "unauthorized":
+        return json({ error: "renew" }, 401);
+      case "failed":
+        return json({ error: "unavailable" }, 503);
+    }
   };
 }

@@ -70,7 +70,7 @@ describe("session cookies", () => {
     const [access, refresh] = sessionCookies(session(), key);
     if (access === undefined || refresh === undefined) throw new Error("two cookies expected");
     const flip = (value: string) =>
-      `${value.slice(0, -2)}${value.endsWith("A") ? "B" : "A"}${value.slice(-1)}`;
+      `${value.slice(0, -2)}${value.at(-2) === "A" ? "B" : "A"}${value.slice(-1)}`;
     expect(readSession(jarOf([access]), key)).toBeNull();
     expect(readSession(jarOf([refresh]), key)).toBeNull();
     expect(readSession(jarOf([{ ...access, value: flip(access.value) }, refresh]), key)).toBeNull();

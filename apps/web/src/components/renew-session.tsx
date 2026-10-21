@@ -3,18 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { Dictionary } from "@/lib/i18n.ts";
-import { withRefreshLock } from "@/lib/refresh-lock.ts";
-import { signedFetch } from "@/lib/signed-fetch.ts";
-
-function renew(): Promise<number> {
-  return withRefreshLock(async () => {
-    try {
-      return (await signedFetch("/api/session/refresh", { method: "POST" })).status;
-    } catch {
-      return 0;
-    }
-  });
-}
+import { renewSession } from "@/lib/renew.ts";
 
 export function RenewSession({ t }: { t: Dictionary["renew"] }) {
   const router = useRouter();
@@ -31,7 +20,7 @@ export function RenewSession({ t }: { t: Dictionary["renew"] }) {
 
   useEffect(() => {
     let active = true;
-    void renew().then((status) => {
+    void renewSession().then((status) => {
       if (active) settle(status);
     });
     return () => {
@@ -41,7 +30,7 @@ export function RenewSession({ t }: { t: Dictionary["renew"] }) {
 
   function retry() {
     setFailed(false);
-    void renew().then(settle);
+    void renewSession().then(settle);
   }
 
   return (

@@ -8,7 +8,7 @@ import {
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DeleteCommand, DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { afterEach, describe, expect, it } from "vitest";
-import { fetchSettings } from "../src/lib/api.ts";
+import { accountApi } from "../src/lib/api.ts";
 import {
   apiUrl,
   choosePassword,
@@ -61,7 +61,7 @@ describe("first sign-in with a temporary password against the dev pool", () => {
       const session = sessionOf(cookiesOf(chosen));
       expect(await deviceKeys(username)).toEqual([session.deviceKey]);
 
-      const settings = await fetchSettings(apiUrl, session.accessToken);
+      const settings = await accountApi(apiUrl, session.accessToken).settings();
       expect(settings.kind).toBe("ok");
 
       expect((await signOut(cookiesOf(chosen))).status).toBe(200);

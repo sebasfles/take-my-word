@@ -1,13 +1,16 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { cognitoError, fakeDeps } from "../testing/fake-cognito.ts";
-import { fakeAccessToken } from "../testing/tokens.ts";
+import { fakeAccessToken, testKey } from "../testing/tokens.ts";
+import type { Deleted } from "./api.ts";
 import {
+  deleteDictationHandler,
   localeHandler,
   newPasswordHandler,
   refreshHandler,
   signInHandler,
   signOutHandler,
+  type DictationHandlerDeps,
   type HandlerDeps,
 } from "./handlers.ts";
 import { localeCookieName, localeFrom } from "./i18n.ts";
@@ -269,5 +272,99 @@ describe("POST /api/locale", () => {
       (await handler(post("/api/locale", { locale: "en" }, { origin: "https://evil.example" })))
         .status,
     ).toBe(403);
+  });
+});
+
+describe("DELETE /api/dictations/[id]", () => {
+  const now = Date.UTC(2026, 9, 21, 12);
+
+  function setupDelete(outcome: Deleted = "deleted") {
+    const calls: string[] = [];
+    const deps: DictationHandlerDeps = {
+      key: testKey(),
+      now: () => now,
+      webOrigin: origin,
+      api: (accessToken) => ({
+        deleteDictation: (id) => {
+          calls.push(`${accessToken}:${id}`);
+          return Promise.resolve(outcome);
+        },
+      }),
+    };
+    return { handler: deleteDictationHandler(() => Promise.resolve(deps)), deps, calls };
+  }
+
+  function cookiesFor(deps: DictationHandlerDeps, expSeconds: number, username = "ana"): string {
+    return sessionCookies(
+      {
+        accessToken: fakeAccessToken({ username, exp: expSeconds }),
+        refreshToken: "refresh-0",
+        deviceKey: "us-east-1_device",
+        remember: false,
+      },
+      deps.key,
+    )
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
+  }
+
+  function del(id: string, headers: Record<string, string>) {
+    return [
+      new NextRequest(new URL(`/api/dictations/${id}`, origin), { method: "DELETE", headers }),
+      { params: Promise.resolve({ id }) },
+    ] as const;
+  }
+
+  it("deletes through the API with the session's access token and answers 204", async () => {
+    const { handler, deps, calls } = setupDelete();
+    const cookie = cookiesFor(deps, now / 1000 + 3600);
+    const response = await handler(...del("MjAyNi0x", { origin, cookie }));
+    expect(response.status).toBe(204);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/^eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+:MjAyNi0x$/);
+  });
+
+  it("refuses a foreign or missing Origin before reading the session", async () => {
+    const { handler, deps, calls } = setupDelete();
+    const cookie = cookiesFor(deps, now / 1000 + 3600);
+    expect((await handler(...del("eA", { origin: "https://evil.example", cookie }))).status).toBe(
+      403,
+    );
+    expect((await handler(...del("eA", { cookie }))).status).toBe(403);
+    expect(calls).toEqual([]);
+  });
+
+  it("answers 401 without calling the API when there is no session or it needs renewing", async () => {
+    const { handler, deps, calls } = setupDelete();
+    const signedOut = await handler(...del("eA", { origin }));
+    expect(signedOut.status).toBe(401);
+    expect(await signedOut.json()).toEqual({ error: "signed_out" });
+    const expiring = await handler(
+      ...del("eA", { origin, cookie: cookiesFor(deps, now / 1000 + 30) }),
+    );
+    expect(expiring.status).toBe(401);
+    expect(await expiring.json()).toEqual({ error: "renew" });
+    expect(expiring.headers.getSetCookie()).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses an id that is not an opaque path id", async () => {
+    const { handler, deps, calls } = setupDelete();
+    const cookie = cookiesFor(deps, now / 1000 + 3600);
+    expect((await handler(...del("a%2Fb", { origin, cookie }))).status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("maps the API's answers", async () => {
+    const cases: [Deleted, number][] = [
+      ["not-found", 404],
+      ["unauthorized", 401],
+      ["failed", 503],
+    ];
+    for (const [outcome, status] of cases) {
+      const { handler, deps } = setupDelete(outcome);
+      const cookie = cookiesFor(deps, now / 1000 + 3600);
+      expect((await handler(...del("eA", { origin, cookie }))).status).toBe(status);
+    }
   });
 });
