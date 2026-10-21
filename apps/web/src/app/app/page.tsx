@@ -1,50 +1,65 @@
-import type { Metadata } from "next";
-import { RenewSession } from "@/components/renew-session.tsx";
-import { fetchSettings } from "@/lib/api.ts";
+import { AccountSection } from "@/components/account-section.tsx";
+import {
+  bothLoaded,
+  languageName,
+  refinerNames,
+  styleLabel,
+  transcriberNames,
+} from "@/lib/account.ts";
 import { format } from "@/lib/i18n.ts";
-import { accessClaims } from "@/lib/session.ts";
-import { webConfig } from "@/lib/server/config.ts";
-import { currentDictionary, requireAppSession } from "@/lib/server/request.ts";
+import { loadAccount } from "@/lib/server/account.ts";
+import { sectionMetadata } from "@/lib/server/metadata.ts";
+import { currentDictionary, currentLocale, currentUsername } from "@/lib/server/request.ts";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await currentDictionary();
-  return { title: `${t.app.title} · ${t.meta.title}` };
-}
+export const generateMetadata = () => sectionMetadata((t) => t.app.title);
 
-export default async function AppPage() {
-  const access = await requireAppSession();
+export default async function AccountPage() {
   const t = await currentDictionary();
-  const username = accessClaims(access.session.accessToken)?.username ?? "";
-  const settings =
-    access.kind === "allow"
-      ? await fetchSettings(webConfig().apiUrl, access.session.accessToken)
-      : null;
+  const locale = await currentLocale();
+  const username = await currentUsername();
+  const data = await loadAccount(async (api) =>
+    bothLoaded(await Promise.all([api.settings(), api.styles()])),
+  );
 
   return (
-    <main className="container account">
-      <h1>{format(t.app.greeting, { username })}</h1>
-      {settings === null ? (
-        <RenewSession t={t.renew} />
-      ) : (
-        <>
-          <section className="card account-card">
-            <h2>{t.app.defaultStyle}</h2>
-            {settings.kind === "ok" ? (
-              <p className="account-value">
-                <code data-testid="default-style">{settings.settings.defaultStyleId}</code>
-              </p>
-            ) : (
-              <p role="alert" className="form-error">
-                {t.app.settingsUnavailable}
-              </p>
-            )}
-          </section>
-          <section className="card account-card account-soon">
-            <h2>{t.app.comingSoonTitle}</h2>
-            <p>{t.app.comingSoon}</p>
-          </section>
-        </>
-      )}
-    </main>
+    <AccountSection
+      t={t}
+      title={format(t.account.greeting, { username })}
+      intro={t.app.readOnly}
+      data={data}
+    >
+      {([settings, styles]) => {
+        const style = styleLabel(settings.defaultStyleId, styles, t.styles);
+        const rows = [
+          { label: t.account.username, value: username, testId: "account-username" },
+          { label: t.account.defaultStyle, value: style.name, testId: "default-style" },
+          {
+            label: t.account.language,
+            value: languageName(settings.locale, locale),
+            testId: "account-language",
+          },
+          {
+            label: t.account.transcriber,
+            value: transcriberNames[settings.providers.transcriber],
+            testId: "account-transcriber",
+          },
+          {
+            label: t.account.refiner,
+            value: refinerNames[settings.providers.refiner],
+            testId: "account-refiner",
+          },
+        ];
+        return (
+          <dl className="card details">
+            {rows.map((row) => (
+              <div key={row.testId} className="details-row">
+                <dt>{row.label}</dt>
+                <dd data-testid={row.testId}>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        );
+      }}
+    </AccountSection>
   );
 }

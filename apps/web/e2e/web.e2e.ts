@@ -120,7 +120,7 @@ test("signs in to /app with the API's default style, and signs out for good", as
 }) => {
   try {
     await signIn(page, { remember: false });
-    await expect(page.getByTestId("default-style")).toHaveText(/^[\w-]+$/);
+    await expect(page.getByTestId("default-style")).not.toBeEmpty();
 
     const cookies = await context.cookies();
     const session = cookies.filter((cookie) => cookie.name.startsWith("__Host-tmw-"));

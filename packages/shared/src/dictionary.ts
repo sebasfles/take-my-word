@@ -34,3 +34,39 @@ export type DictionaryTerm = z.infer<typeof dictionaryTermSchema>;
 
 export const dictionaryListSchema = z.object({ terms: z.array(dictionaryTermSchema) });
 export type DictionaryList = z.infer<typeof dictionaryListSchema>;
+
+export const dictionaryHalfLifeDays = 30;
+
+export interface RankableTerm {
+  term: string;
+  useCount: number;
+  lastUsedAt: string;
+}
+
+const dayMs = 86_400_000;
+
+export function decayedScore(
+  term: RankableTerm,
+  now: Date,
+  halfLifeDays: number = dictionaryHalfLifeDays,
+): number {
+  const days = Math.max(0, (now.getTime() - Date.parse(term.lastUsedAt)) / dayMs);
+  const score = term.useCount * 0.5 ** (days / halfLifeDays);
+  return Number.isFinite(score) ? score : 0;
+}
+
+export function rankTerms<T extends RankableTerm>(
+  terms: readonly T[],
+  now: Date,
+  halfLifeDays: number = dictionaryHalfLifeDays,
+): T[] {
+  return terms
+    .map((term) => ({ term, score: decayedScore(term, now, halfLifeDays) }))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.term.lastUsedAt.localeCompare(a.term.lastUsedAt) ||
+        a.term.term.localeCompare(b.term.term),
+    )
+    .map(({ term }) => term);
+}

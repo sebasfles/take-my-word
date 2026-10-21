@@ -100,6 +100,47 @@ Constraints:
 
 Review focus beyond the Pipeline: token leakage into client components, the renew branch on every page, the delete handler's origin and 401 paths, cleanup of the e2e's throwaway users and their items, and score ordering against the api's tie-breaks.
 
+Pre-merge deploy (om-reviewer, during round 1): e2e runs against dev, so each round's commit is deployed to dev from this machine with the deploy jobs' own steps (web and api), as 0004 did. The deployed sha is logged next to each e2e line, and every external action goes in om-developer notes. A local `next start` was rejected because it leaves DELETE through CloudFront OAC unproven.
+
 clearance: full (dev Cognito pool, dev table and Polly through the `fless-takemyword` profile, dev API and web; no Terraform, no prd).
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+
+- `decayedScore`, `rankTerms` and `dictionaryHalfLifeDays` (30) live in `packages/shared/src/dictionary.ts`; the api's projection and `DICTIONARY_HALF_LIFE_DAYS` default import them, behavior unchanged; their tests moved to shared, plus one on the tie-breaks.
+- `apps/web/src/lib/api.ts` is one `accountApi(apiUrl, accessToken)` client over the shared contracts (settings, styles, app rules, dictionary, history, delete); `fetchSettings` is gone and the integration tests use the client.
+- Pages load through `loadAccount` (`src/lib/server/account.ts`), which calls `whenFresh` in `gate.ts`: an expiring session renders `RenewSession` and never builds the client, so no page touches the session object and no client component receives anything but strings and ids.
+- `/app` (Account), `/app/dictionary` (relevance or `?sort=name`), `/app/styles`, `/app/rules`, `/app/history` with a left navigation (pills under 768 px); `loading.tsx` and `error.tsx` keep the shell, and an API failure renders the same `ErrorState` with a retry.
+- History renders `limit * pages` items server side (`?limit=` within `historyQuerySchema`, `?pages=`); "load more" links to `pages + 1`; the raw transcript sits in a collapsed `<details>`.
+- `DELETE /api/dictations/[id]` checks `Origin`, answers 401 `renew` for an expiring session or an API 401/403, 404 for a dictation already gone, 503 otherwise; the browser calls it through `signedFetch`, renews under the Web Lock on 401 and retries once, and treats 404 as deleted.
+- `es` and `en` cover every new string under `sections`, `state`, `account`, `dictionary`, `styles`, `rules`, `history`; the unused "coming soon" copy is gone.
+- `pnpm screenshots` mocks every route for a user with data and one without; 90 shots (five pages, five empty states, history with a transcript open and a delete confirmation, landing and sign-in) in `.workspaces/0009_web_account/screenshots/`, and the script fails if any page scrolls horizontally.
+- `e2e/account.e2e.ts` creates two throwaway users per run (`e2e/accounts.ts`), seeds one through the API (3 terms, 1 custom style set as default, 1 rule, 2 Polly dictations), and deletes both users and every `USER#{sub}` item in `afterAll`; a user is registered for cleanup the moment Cognito creates it.
+- Fixed the flaky `session.test.ts` tamper case: `flip` checked the last character but replaced the second to last, so about 1 run in 30 the "tampered" cookie was unchanged.
+
+Decisions the plan did not record:
+
+- History re-fetches every shown item on each render, asking for one more than it shows to know whether "load more" applies (the API returns a cursor even on an exact last page), in requests of at most 100; shown items are capped at 1000 (at most 11 requests), and past the cap the link disappears.
+- Dates render in the viewer's time zone: `LocalTime` formats in UTC on the server and in the browser's zone after hydration (`useSyncExternalStore`), since the server cannot know the zone.
+- Built-in styles show a localized one-line description instead of their prompt, and the Styles page marks the default style; the Account page shows the settings language through `Intl.DisplayNames` and providers by product name.
+- Rules are sorted by app id; the table stacks into cards under 1024 px.
+- Delete asks for confirmation inline in the card rather than with `window.confirm`.
+
+Pending: nothing in code.
+
+Deferred:
+
+- `e2e/accounts.ts` repeats the Polly WAV helper of `apps/api/e2e/speech.ts`; a shared test-support package would hold both.
+- A `GET /me/usage` follow-up for the quota (om-manager).
+
+External actions (profile `fless-takemyword`, dev only, no Terraform, nothing on prd):
+
+- Deployed the api Lambdas from `3ebed5b` with `reusable-deploy`'s steps (`pnpm --filter @take-my-word/api build`, `update-function-code` and `wait function-updated-v2`): `take-my-word-dev-authorizer`, `take-my-word-dev-dictate`, `take-my-word-dev-api`, `take-my-word-dev-dictionary-usage`.
+- Deployed the web from `3ebed5b` with `reusable-deploy-web`'s steps: OpenNext bundle, server zip with `zip -qry`, `s3 sync` of `_next/static/*` (immutable) to `take-my-word-dev-web-assets-115891590483`, `update-function-code` on `take-my-word-dev-web`, `s3 sync` of the rest (max-age 300), invalidation `/*` on distribution `EMI6CYP83OTMO` (`I2K5XQ54MN3ZFG6DXLXZ4FMA9`, completed).
+  The final commit differs from `3ebed5b` only in `apps/web/e2e/account.e2e.ts` and the task folder, so no redeploy.
+- Each `pnpm e2e` run of `account.e2e.ts` (three runs) created two throwaway `web-e2e-{hex}` users in the dev pool (one was `web-e2e-ea0696f4`) and deleted them with every `USER#{sub}` item in `afterAll`; `list-users` with the `web-e2e-` prefix returns none afterwards.
+- The first e2e run timed out in the leak check: `response.text()` on a response the page navigated away from never settled; bodies are now read on `requestfinished`.
+- Slip: stopping my local `next start` used `pkill -f next-server` for this user, which would also have stopped another session's Next server had one been running; I kill by PID from now on.
