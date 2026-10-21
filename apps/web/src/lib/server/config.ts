@@ -9,6 +9,7 @@ import {
 } from "@take-my-word/cognito";
 import { z } from "zod";
 import type { AuthDeps, CognitoPort } from "../auth.ts";
+import { logError } from "../log.ts";
 import { parseCookieKey } from "../seal.ts";
 
 export interface WebConfig {
@@ -75,11 +76,6 @@ export function cognitoPort(config: Pick<WebConfig, "userPoolId" | "clientId">):
       forgetDevice({ userPoolId, accessToken, deviceKey }),
     revokeToken: async (refreshToken) => revokeToken({ userPoolId, clientId, refreshToken }),
   };
-}
-
-export function logError(message: string, error: unknown): void {
-  const name = error instanceof Error ? error.name : "unknown";
-  console.error(JSON.stringify({ level: "error", message, error: name }));
 }
 
 export async function liveAuthDeps(): Promise<AuthDeps> {

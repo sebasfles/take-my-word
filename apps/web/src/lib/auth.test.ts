@@ -57,13 +57,10 @@ describe("signIn", () => {
     }
   });
 
-  it("tells an unreachable service apart and logs it without the password", async () => {
-    const { deps, cognito, logged } = fakeDeps();
+  it("tells an unreachable service apart", async () => {
+    const { deps, cognito } = fakeDeps();
     cognito.signInResult = cognitoError("TimeoutError");
     expect(await signIn(deps, credentials)).toEqual({ kind: "unavailable" });
-    expect(JSON.stringify(logged.map((entry) => entry.message))).not.toContain(
-      credentials.password,
-    );
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dictionary, format, localeFrom } from "./i18n.ts";
+import { format, localeFrom } from "./i18n.ts";
 
 describe("localeFrom", () => {
   it("defaults to Spanish and switches to English only from the cookie", () => {
@@ -8,10 +8,6 @@ describe("localeFrom", () => {
     expect(localeFrom("es")).toBe("es");
     expect(localeFrom("fr")).toBe("es");
     expect(localeFrom("EN")).toBe("es");
-  });
-
-  it("serves different copy per language", () => {
-    expect(dictionary("es").landing.download).not.toBe(dictionary("en").landing.download);
   });
 });
 

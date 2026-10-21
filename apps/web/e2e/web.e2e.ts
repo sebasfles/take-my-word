@@ -26,6 +26,18 @@ async function signOut(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/sign-in$/);
 }
 
+const emptyBodyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+async function signOutFromPage(page: Page): Promise<void> {
+  if (!page.url().startsWith("https://")) await page.goto("/");
+  await page.evaluate(async (hash) => {
+    await fetch("/api/session/sign-out", {
+      method: "POST",
+      headers: { "x-amz-content-sha256": hash },
+    });
+  }, emptyBodyHash);
+}
+
 async function restart(browser: Browser, context: BrowserContext): Promise<BrowserContext> {
   const survivors = (await context.cookies()).filter((cookie) => cookie.expires !== -1);
   const restarted = await browser.newContext();
@@ -106,43 +118,57 @@ test("signs in to /app with the API's default style, and signs out for good", as
   context,
   browser,
 }) => {
-  await signIn(page, { remember: false });
-  await expect(page.getByTestId("default-style")).toHaveText(/^[\w-]+$/);
+  try {
+    await signIn(page, { remember: false });
+    await expect(page.getByTestId("default-style")).toHaveText(/^[\w-]+$/);
 
-  const cookies = await context.cookies();
-  const session = cookies.filter((cookie) => cookie.name.startsWith("__Host-tmw-"));
-  expect(session).toHaveLength(2);
-  for (const cookie of session) {
-    expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Lax", expires: -1 });
+    const cookies = await context.cookies();
+    const session = cookies.filter((cookie) => cookie.name.startsWith("__Host-tmw-"));
+    expect(session).toHaveLength(2);
+    for (const cookie of session) {
+      expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Lax", expires: -1 });
+    }
+
+    const restarted = await restart(browser, context);
+    try {
+      const restartedPage = await restarted.newPage();
+      await restartedPage.goto("/app");
+      await expect(restartedPage).toHaveURL(/\/sign-in$/);
+    } finally {
+      await restarted.close();
+    }
+
+    await signOut(page);
+    await page.goto("/app");
+    await expect(page).toHaveURL(/\/sign-in$/);
+    expect((await context.cookies()).filter((cookie) => cookie.name.startsWith("__Host-"))).toEqual(
+      [],
+    );
+  } finally {
+    await signOutFromPage(page);
   }
-
-  const restarted = await restart(browser, context);
-  const restartedPage = await restarted.newPage();
-  await restartedPage.goto("/app");
-  await expect(restartedPage).toHaveURL(/\/sign-in$/);
-  await restarted.close();
-
-  await signOut(page);
-  await page.goto("/app");
-  await expect(page).toHaveURL(/\/sign-in$/);
-  expect((await context.cookies()).filter((cookie) => cookie.name.startsWith("__Host-"))).toEqual(
-    [],
-  );
 });
 
 test("keeps a remembered session across a browser restart", async ({ page, context, browser }) => {
-  await signIn(page, { remember: true });
-  const session = (await context.cookies()).filter((cookie) =>
-    cookie.name.startsWith("__Host-tmw-"),
-  );
-  for (const cookie of session) {
-    expect(cookie.expires * 1000 - Date.now()).toBeGreaterThan(399 * 24 * 60 * 60 * 1000);
-  }
+  try {
+    await signIn(page, { remember: true });
+    const session = (await context.cookies()).filter((cookie) =>
+      cookie.name.startsWith("__Host-tmw-"),
+    );
+    for (const cookie of session) {
+      expect(cookie.expires * 1000 - Date.now()).toBeGreaterThan(399 * 24 * 60 * 60 * 1000);
+    }
 
-  const restarted = await restart(browser, context);
-  const restartedPage = await restarted.newPage();
-  await restartedPage.goto("/app");
-  await expect(restartedPage.getByTestId("username")).toHaveText(username);
-  await signOut(restartedPage);
-  await restarted.close();
+    const restarted = await restart(browser, context);
+    try {
+      const restartedPage = await restarted.newPage();
+      await restartedPage.goto("/app");
+      await expect(restartedPage.getByTestId("username")).toHaveText(username);
+      await signOut(restartedPage);
+    } finally {
+      await restarted.close();
+    }
+  } finally {
+    await signOutFromPage(page);
+  }
 });

@@ -110,8 +110,23 @@ try {
       );
       await page.getByRole("button", { name: locale === "es" ? "Entrar" : "Sign in" }).click();
       await page.locator("#sign-in-error").waitFor();
+      await page.mouse.move(0, 0);
       await page.screenshot({
         path: join(out, `sign-in-error-${locale}-${String(width)}.png`),
+        fullPage: true,
+      });
+      await page.unroute("**/api/session");
+      await page.route("**/api/session", (route) =>
+        route.fulfill({ status: 200, json: { step: "new-password" } }),
+      );
+      await page.goto(`${webOrigin}/sign-in`);
+      await page.getByRole("textbox").first().fill("sebastian");
+      await page.locator("input[type=password]").fill("temporary-password");
+      await page.getByRole("button", { name: locale === "es" ? "Entrar" : "Sign in" }).click();
+      await page.locator("#new-password").waitFor();
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: join(out, `sign-in-new-password-${locale}-${String(width)}.png`),
         fullPage: true,
       });
       await signedIn(context);

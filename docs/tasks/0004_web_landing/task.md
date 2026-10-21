@@ -168,3 +168,19 @@ External actions (clearance full, profile `fless-takemyword`, us-east-1, dev):
 - `secretsmanager put-secret-value` on `take-my-word-dev/web` with a random 32-byte `COOKIE_KEY`.
 - `aws s3 sync` to `take-my-word-dev-web-assets-115891590483` (two passes), `lambda update-function-code` on `take-my-word-dev-web` (twice, the second with `zip -y`), `cloudfront create-invalidation` on `EMI6CYP83OTMO`.
 - `cognito-idp admin-forget-device` on five `crew-e2e` devices left by my refresh-race experiment and one failed integration run; the pool now holds none.
+
+### Round 2
+
+Applied all five findings:
+
+1. `integration/new-password.int.ts` creates a throwaway `web-e2e-{hex}` user with `AdminCreateUser` (temporary password, message suppressed), signs in through the handlers to the `new-password` step, chooses a password, checks the user's only device is the session's `DeviceKey` and that `GET /me/settings` answers, signs out, checks no device remains, and in a `finally` deletes the user and its `SETTINGS` item.
+   The shared setup moved to `integration/harness.ts`, which tracks the latest session cookies.
+2. `pnpm screenshots` adds `sign-in-new-password-{es,en}-{390,768,1280}.png` by routing `/api/session` to `{ step: "new-password" }`, and moves the mouse off the button before the error and new-password shots so no hover color shows.
+3. The hollow assertion is gone; `logError` moved to `src/lib/log.ts` and `log.test.ts` checks the exact line written to `console.error` for an error whose message and properties carry a password and a token.
+4. The dictionary test is removed.
+5. Every integration test signs out in an `afterEach` with the latest tracked cookies; each signed-in e2e test signs out in a `finally` through an in-page `fetch` (the browser sets `Origin`, the test sets the empty-body hash), and closes its restarted context in a `finally`.
+
+Also: TRD web row says `pnpm integration` needs the `fless-takemyword` profile; web devDependencies gain `@aws-sdk/client-cognito-identity-provider`, `@aws-sdk/client-dynamodb` and `@aws-sdk/lib-dynamodb` for that test; dev redeployed from this round's code.
+
+External actions (dev, profile `fless-takemyword`): throwaway users created and deleted by each integration run, with their `SETTINGS` items; web code and assets pushed again and the distribution invalidated.
+After the verify run, `crew-e2e` holds no device and no `web-e2e-` user exists.
