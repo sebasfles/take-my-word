@@ -175,3 +175,26 @@ Done:
 Pending:
 
 - Your hand-off for `desktop-v0.1.0` (hand-made annotated tag) and `pnpm release:desktop 0.1.1`, then Acceptance 3 on Windows.
+
+### Round 4 (releases and Windows acceptance)
+
+Evidence is in the workspace `evidence/`: release records, the Acceptance 3 journal and screenshots.
+
+- Acceptance 2: `desktop-v0.1.0` is a hand-made annotated tag on 3eecb79. Run 39672092058 published Take My Word 0.1.0 with `latest.json`, the NSIS installer, its `.sig` and the fixed-name copy. release-check confirmed the installer's signature with the committed key, signed for 0.1.0 (sha256 `debc70ae...0fd3c3`). `desktop-v0.1.1` came from `pnpm release:desktop 0.1.1` (bump 6e73803). Run 39673851693 published it the same way, signed for 0.1.1 (sha256 `e50f33b5...239839`). Both runs show the signing secrets only as `***`.
+- Acceptance 4: anonymously, `releases/latest/download/take-my-word-windows-x64-setup.exe` returned 200 and the same bytes as the signed 0.1.0 installer. `latest.json` then announced 0.1.0 and now announces 0.1.1. The landing links to that fixed path.
+- Acceptance 3, Windows 11 with an es-MX UI, injected runs announced to the om-manager:
+  - Installed 0.1.0 silently; its updater logged `no update available`.
+  - After 0.1.1 was published, I started 0.1.0 with a standalone window in the foreground. 0007's sign-in window takes focus at every signed-out start, so I refocused the target once. The update dialog appeared 0.7 s later with the target in the foreground, and nothing changed the foreground over the next 5 s. The dialog was in Spanish with the 0.1.1 notes.
+  - "Más tarde" closed it and 0.1.0 kept running.
+  - On restart, "Instalar y reiniciar" downloaded, installed and relaunched the app as 0.1.1 within 7 s, and the relaunched app logged `no update available`.
+  - Afterwards I uninstalled the prd app, which matches the machine before the run. Config folders were restored from a backup; no autostart entry, credential or process is left.
+- Buttons were pressed through UI Automation and windows focused through Win32, so no keyboard or mouse input was injected. Any change in Windows' last-input time would have aborted the run.
+
+Notes:
+
+- Windows 11 Notepad reopens its previous session's tabs, so I used a standalone WinForms window as the focus target, to leave Notepad untouched.
+- Signed out, 0007's sign-in window takes focus at every prd start. That is 0007's behavior, not the updater's.
+
+Pending:
+
+- `document-task`, after your go.
