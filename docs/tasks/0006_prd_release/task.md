@@ -108,3 +108,29 @@ Notes:
 clearance: full; account `takemyword` 115891590483, us-east-1, profile `fless-takemyword`: apply `prd` (and `dev` only for in-place fixes), prd secrets, prd Cognito user `sebastian`, prd functions and assets, the `prd` Actions environment through Terraform.
 
 ## om-developer notes
+
+### Round 1 (2026-10-21)
+
+Done: prd applied from a fresh init with no Terraform change; secrets, user and first code push done; Acceptance 1 to 4 verified.
+Pending: Acceptance 5 after the promotion merge, then `document-task` and `publish-task`.
+
+| Command | Target | Environment | Result |
+|---|---|---|---|
+| `infra/scripts/tf prd init`, `plan -out`, `apply` of the read plan | `environments/prd` | prd | 107 added, 0 changed, 0 destroyed |
+| `secretsmanager put-secret-value` from stdin | `take-my-word-prd/providers` | prd | `GROQ_API_KEY` and `OPENAI_API_KEY` from `.env`, non-empty, never printed |
+| `secretsmanager put-secret-value` from stdin | `take-my-word-prd/web` | prd | new random 32-byte `COOKIE_KEY`, never printed |
+| `cognito-idp admin-create-user` (SUPPRESS, `email`, `email_verified`) through a 0600 temp file, deleted after | `sebastian` in `us-east-1_uekLYxWNc` | prd | FORCE_CHANGE_PASSWORD; `SEBASTIAN_PRD_TEMP_PASSWORD` in workspace and root `.env`, never printed |
+| `lambda update-function-code` and `wait function-updated-v2`, built from `be53ebc` (code of `24cbc0a`) with Node 24 | authorizer, dictate, api, dictionary-usage, web | prd | updated; web zipped with `zip -qry` |
+| `s3 sync` `_next/static` (immutable), then the rest (5 min), no `--delete` | `take-my-word-prd-web-assets-115891590483` | prd | 15 then 2 objects |
+| `cloudfront create-invalidation /*` | `E3OQ3ZCL4AAMGV` | prd | created |
+| `terraform plan -detailed-exitcode` | `prd`, then `dev` | prd, dev | No changes, both |
+
+Checks:
+
+- Acceptance 2: `/`, `/sign-in`, a `_next/static` chunk and `/static/icon.svg` answer 200 over HTTPS with HSTS, `X-Frame-Options: DENY` and the CSP; the page carries build id `7kDenRoZGWxKxa3gtv--m`; `GET https://api.takemyword.fless.dev/dictations` answers 401 `Unauthorized`.
+- Acceptance 3: headless Chromium on `https://takemyword.fless.dev/sign-in` with `sebastian` and the temporary password reaches "Elige tu contraseña", not submitted; user still FORCE_CHANGE_PASSWORD; screenshot `screenshots/prd-new-password-1280.png` in the workspace.
+- Acceptance 4: the nine Actions variables are in prd state and refreshed by a clean plan; the deploy role trusts exactly `repo:sebasfles@64487774/take-my-word@1427740478:environment:prd`, which matches the repo's immutable OIDC subject prefix.
+- The first `admin-create-user` attempt fed `--cli-input-json` from stdin and was rejected as invalid JSON before any user existed; the password lines it had already written were reused.
+- Acceptance 5: PR #2 merged into `main` as `ce96a1d`; `deploy-prd` run 39552600810 on `ce96a1d` succeeded (changes, api, web); the `CodeSha256` its jobs printed for the five prd functions equal `lambda get-function`; the page now carries the CI build `HmpAQSAeAwKfZ-bP4EDG8` instead of the local `7kDenRoZGWxKxa3gtv--m`, its chunks answer 200, the API still 401.
+- Docs: infra `trd.md` (prd applied and how a new env gets its first code) and `database.md` (prd table), auth `trd.md` (prd pool); no ARD entry, every decision is in Approach or Context & decisions; `docs/TRD.md` environments section still holds, but its intro "Nothing is built yet" is stale and belongs to the om-manager.
+- No round commit: the round changed no code or Terraform, only this task's notes and the docs commit.

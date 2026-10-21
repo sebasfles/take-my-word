@@ -1,11 +1,11 @@
 ---
 updated: 2026-10-21
-source: 0004_web_landing
+source: 0006_prd_release
 ---
 
 # Auth: technical
 
-The pool and the authorizer run in dev since 0001, the web login since 0004; phase 2 brings the desktop login, phase 4 the mobile login.
+The pool and the authorizer run in dev since 0001 and in prd since 0006, the web login since 0004; phase 2 brings the desktop login, phase 4 the mobile login.
 
 ## Structure
 

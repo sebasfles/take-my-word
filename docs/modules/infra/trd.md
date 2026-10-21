@@ -1,11 +1,11 @@
 ---
 updated: 2026-10-21
-source: 0004_web_landing
+source: 0006_prd_release
 ---
 
 # Infra: technical
 
-`core` and `dev` are applied and `prd` is written and planned; `api` and `dictionary-usage` run in dev since 0003, web hosting since 0004.
+`core`, `dev` and `prd` are applied; prd serves `takemyword.fless.dev` and `api.takemyword.fless.dev` since 0006, and `main` deploys it.
 
 ## Structure
 
@@ -66,6 +66,7 @@ Jobs, listeners or scheduled work: none.
 - `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME`, `DICTIONARY_USAGE_FUNCTION_NAME`, `WEB_FUNCTION_NAME`, `WEB_ASSETS_BUCKET` and `WEB_DISTRIBUTION_ID` are written by `stacks/app` into the env's Actions environment, which `core` creates.
 - State: S3 bucket `takemyword-terraform-state-115891590483` (versioned, encrypted, public access blocked, created by hand), one key per root, S3 lockfile.
 - Apply order on a fresh account: state bucket, `core`, then each env.
+- A newly applied env answers `not deployed` (503) until code reaches it: write its two secrets from `.env` and a fresh `COOKIE_KEY` (stdin, never arguments), then push the code once by hand in `reusable-deploy` order, or let the next deploy run do it.
 
 ## Testing
 
