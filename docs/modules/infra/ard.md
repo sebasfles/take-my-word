@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0004_web_landing
 ---
 
 # Infra: architecture and debt
@@ -86,3 +86,29 @@ source: 0003_api_features
 - Revisit when: the web needs the API under its own origin.
 - Source: 0001_platform_skeleton
 
+## 2026-10-21: Each deploy job runs only for the side of the monorepo the push touched
+
+- Decision: `deploy-dev` and `deploy-prd` first run `reusable-changes`, which diffs the push against its previous head; the api job runs for `apps/api`, the web job for `apps/web` and `packages/cognito`, and both for `packages/shared`, the workflows, `package.json`, `pnpm-lock.yaml` and `pnpm-workspace.yaml`; a push with no previous head deploys both; the promotion PR waits for both jobs and opens unless one failed.
+- Alternatives rejected: workflow-level `paths`, which cannot tell the jobs apart; a third-party paths-filter action.
+- Reason: an api-only merge must not redeploy the web and the reverse, with no action outside GitHub's own.
+- Debt created: none.
+- Revisit when: a third deployable joins the workflows.
+- Source: 0004_web_landing
+
+## 2026-10-21: The web deploy keeps pnpm's symlinks and never deletes assets
+
+- Decision: the server function is zipped with `zip -y`; `/_next/static/*` is synced before the code swap and the rest after it, with no `--delete`.
+- Alternatives rejected: `zip -r`, which follows the links (seen on dev: `Cannot find module '@swc/helpers/...'` at init); syncing everything after the swap; `--delete`, which removes chunks an open page still loads.
+- Reason: OpenNext's output keeps pnpm's symlinked `node_modules`, which resolve only as links; new HTML must never reference a chunk that is not in the bucket yet.
+- Debt created: chunks of old builds stay in the web bucket forever.
+- Revisit when: the bucket's size shows on the bill, then add a lifecycle rule on `_next/static/` older than a few weeks.
+- Source: 0004_web_landing
+
+## 2026-10-21: CloudFront sets the web's security headers, with a framing-only CSP
+
+- Decision: one response headers policy on every behavior sets HSTS (2 years, subdomains), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` and a CSP limited to `frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`.
+- Alternatives rejected: headers from Next.js, which the bucket behaviors would not carry; a full `script-src` policy, which Next's inline scripts would need nonces for.
+- Reason: one place covers server and bucket responses, and the default behavior's caching stays disabled so no per-user or per-language page is ever cached.
+- Debt created: no `script-src` restriction.
+- Revisit when: the web renders content a user did not write, or adds third-party scripts.
+- Source: 0004_web_landing

@@ -1,11 +1,11 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0004_web_landing
 ---
 
 # Infra: technical
 
-`core` and `dev` are applied and `prd` is written and planned; `api` and `dictionary-usage` run in dev since 0003, web hosting comes with its phase.
+`core` and `dev` are applied and `prd` is written and planned; `api` and `dictionary-usage` run in dev since 0003, web hosting since 0004.
 
 ## Structure
 
@@ -14,9 +14,9 @@ source: 0003_api_features
 | `infra/environments/core` | Applied once per account: GitHub OIDC provider, GitHub App wiring, Actions environments `dev` and `prd`, branch rulesets. |
 | `infra/environments/dev`, `infra/environments/prd` | One Terraform root per env, each instantiating `stacks/app` with its own variables. |
 | `infra/stacks/app` | Everything one env runs, plus the per-env deploy role scoped to that env's Actions environment. |
-| `infra/modules/aws/*` | Reusable modules: `lambda` (IAM statements may carry conditions), `http_api`, `cognito`, `dynamodb`, `acm`, `secrets`; `s3` and `cloudfront` arrive with the web. |
+| `infra/modules/aws/*` | Reusable modules: `lambda` (IAM statements may carry conditions, optional `AWS_IAM` Function URL), `http_api`, `cognito`, `dynamodb`, `acm`, `secrets`, `s3` (private bucket), `cloudfront` (distribution with OAC to a bucket and a Function URL, security headers policy, alias records). |
 | `infra/scripts/tf` | `infra/scripts/tf <env> <terraform args>` (`core`, `dev` or `prd`): feeds `GITHUB_APP_PEM` from `.env` as `TF_VAR_github_app_pem` and uses the `fless-takemyword` profile. |
-| `.github/workflows` | `ci` (no path filter), `deploy-dev` and `deploy-prd` (path-filtered to the api, shared, workflows and lockfile) through `reusable-deploy`; desktop and mobile release paths live in their modules. |
+| `.github/workflows` | `ci` (no path filter, also runs the OpenNext build); `deploy-dev` and `deploy-prd` run `reusable-changes`, then `reusable-deploy` (api) and `reusable-deploy-web` only for the side the push touched; desktop and mobile release paths live in their modules. |
 
 ## Resources per env
 
@@ -28,10 +28,10 @@ source: 0003_api_features
 | Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream through an event source mapping filtered to inserts of `DICTATION#`, batch 10, retry 2, bisect, batch item failures (dictionary module). |
 | DynamoDB `take-my-word-{env}` | The single table, with TTL and a stream enabled. |
 | Cognito user pool | Configured by the auth module, created here. |
-| Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`. |
+| Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`; `take-my-word-{env}/web` holds the web's `COOKIE_KEY`. |
 | S3 debug bucket | Dev only, optional raw audio for debugging, one-day lifecycle. |
-| Web hosting | `apps/web` through OpenNext on Lambda behind CloudFront. |
-| Route 53 records | `takemyword.fless.dev` for prd, `dev.takemyword.fless.dev` for dev, and an `api.` alias in front of each with its ACM certificate. |
+| Web hosting | Lambda `web` (OpenNext server, 512 MB, 30 s) behind an `AWS_IAM` Function URL, the private bucket `take-my-word-{env}-web-assets-{account}` for `/_next/static/*` and `/static/*`, and one CloudFront distribution with OAC to both, caching disabled for the server and a headers policy (HSTS, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`); its us-east-1 certificate validates in the hosted zone. |
+| Route 53 records | `takemyword.fless.dev` for prd and `dev.takemyword.fless.dev` for dev (A and AAAA to CloudFront), and an `api.` alias in front of each, each with its ACM certificate. |
 | CloudWatch | Structured logs and EMF metrics per provider; every log group keeps 30 days. |
 
 ## Endpoints owned
@@ -43,7 +43,8 @@ Jobs, listeners or scheduled work: none.
 
 - `develop` deploys dev and the dev deploy opens the promotion PR to `main`; `main` deploys prd.
 - Workflows assume the env's deploy role over GitHub OIDC, build, and run `aws lambda update-function-code`.
-- The deploy role grants `UpdateFunctionCode` and `GetFunction` on that env's functions only and trusts exactly the repository's immutable subject, `repo:sebasfles@64487774/take-my-word@1427740478:environment:{env}`, built from the GitHub user and repository ids.
+- The web job uploads `/_next/static/*` (immutable, one year) before swapping the function code, then the rest of the assets (5 minutes), then invalidates the distribution; the server zip keeps pnpm's symlinks (`zip -y`).
+- The deploy role grants `UpdateFunctionCode` and `GetFunction` on that env's functions only, `s3:ListBucket` and `s3:PutObject` on the web bucket and `cloudfront:CreateInvalidation` on the web distribution, and trusts exactly the repository's immutable subject, `repo:sebasfles@64487774/take-my-word@1427740478:environment:{env}`, built from the GitHub user and repository ids.
 - The Lambda module ignores `filename`, `source_code_hash` and `publish`, so Terraform never fights CI over code.
 - Terraform is applied only from Sebastian's machine with the `fless-takemyword` profile.
 
@@ -62,11 +63,11 @@ Jobs, listeners or scheduled work: none.
 - AWS profile `fless-takemyword`, login with `aws sso login --sso-session fless`; regions us-east-1 and us-east-2 only.
 - Hosted zone `takemyword.fless.dev` (`Z06585121NIUBTW9PNNB1`).
 - Lambda environment variables are wired by `stacks/app`; `DEBUG_BUCKET` only while the dev variable `debug_audio` is on.
-- `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME` and `DICTIONARY_USAGE_FUNCTION_NAME` are written by `stacks/app` into the env's Actions environment, which `core` creates.
+- `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME`, `DICTIONARY_USAGE_FUNCTION_NAME`, `WEB_FUNCTION_NAME`, `WEB_ASSETS_BUCKET` and `WEB_DISTRIBUTION_ID` are written by `stacks/app` into the env's Actions environment, which `core` creates.
 - State: S3 bucket `takemyword-terraform-state-115891590483` (versioned, encrypted, public access blocked, created by hand), one key per root, S3 lockfile.
 - Apply order on a fresh account: state bucket, `core`, then each env.
 
 ## Testing
 
 - `terraform fmt -check -recursive` and `terraform validate` per environment root, in `ci` and in `verify-task`.
-- `pnpm e2e` in `apps/api` exercises the deployed dev stack.
+- `pnpm e2e` in `apps/api` and in `apps/web` exercise the deployed dev stack.

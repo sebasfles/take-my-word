@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0004_web_landing
 ---
 
 # Auth: flows
@@ -44,3 +44,32 @@ sequenceDiagram
   G-->>C: new access and new refresh
   C->>K: overwrite refresh token
 ```
+
+## Web session renewal
+
+Runs when a page of `/app` finds the access token in its last minute.
+Cognito keeps only the refresh token of the renewal that finished last, so tabs renew one at a time.
+
+```mermaid
+sequenceDiagram
+  participant P as Page (server render)
+  participant T as Tab (RenewSession)
+  participant L as Web Lock tmw-session-refresh
+  participant R as POST /api/session/refresh
+  participant G as Cognito
+  P-->>T: render "renewing", no API call
+  T->>L: request lock
+  L-->>T: granted (other tabs wait)
+  T->>R: sealed cookies
+  alt cookie already renewed by another tab
+    R-->>T: 200, no Set-Cookie
+  else expiring
+    R->>G: GetTokensFromRefreshToken with DeviceKey
+    G-->>R: new access and rotated refresh
+    R-->>T: 200 with resealed cookies
+  end
+  T->>L: release
+  T->>P: router.refresh()
+```
+
+A rejected or reused refresh token answers 401 and the tab goes to sign-in; Cognito unreachable answers 503 and keeps the cookies.
