@@ -6,7 +6,15 @@ import {
   type ApiError,
 } from "@take-my-word/shared";
 import { beforeAll, describe, expect, it } from "vitest";
-import { requiredEnv, signInCrewE2e } from "../scripts/sign-in.ts";
+import {
+  confirmDevice,
+  crewE2eConfig,
+  forgetDevice,
+  refresh,
+  requiredEnv,
+  signInCrewE2e,
+  signInCrewE2eSession,
+} from "../scripts/sign-in.ts";
 import { wav } from "../src/testing/audio.ts";
 
 const fillers = /\b(eh|este|mmm)\b/i;
@@ -131,4 +139,37 @@ describe("POST /dictations in a deployed environment", () => {
     const unknown = await post({ meta: { locale: "es", refineProvider: "nope" }, audio: speech });
     expect(unknown.status).toBe(400);
   });
+
+  it("refreshes a confirmed device's session with rotation and rejects the old refresh token after the grace period", async () => {
+    const { userPoolId, clientId } = crewE2eConfig();
+    const first = await signInCrewE2eSession();
+    const deviceKey = await confirmDevice({ userPoolId, session: first, deviceName: "crew-e2e" });
+    try {
+      const second = await refresh({
+        userPoolId,
+        clientId,
+        refreshToken: first.refreshToken,
+        deviceKey,
+      });
+      expect(second.accessToken).not.toBe(first.accessToken);
+      expect(second.refreshToken).not.toBe(first.refreshToken);
+
+      const { status } = await post({ meta: { locale: "es" }, audio: speech }, second.accessToken);
+      expect(status).toBe(200);
+
+      await new Promise((resolve) => setTimeout(resolve, 12_000));
+      await expect(
+        refresh({ userPoolId, clientId, refreshToken: first.refreshToken, deviceKey }),
+      ).rejects.toThrow(/reuse detected/i);
+      const third = await refresh({
+        userPoolId,
+        clientId,
+        refreshToken: second.refreshToken,
+        deviceKey,
+      });
+      expect(third.refreshToken).not.toBe(second.refreshToken);
+    } finally {
+      await forgetDevice({ userPoolId, accessToken: first.accessToken, deviceKey });
+    }
+  }, 60_000);
 });

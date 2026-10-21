@@ -265,3 +265,34 @@ Debt for `document-task`:
 - dictation: loud non-speech noise can make Whisper loop on hallucination phrases mixed with fragments (4 MiB of pink noise gave "¡Suscríbete al canal! ¡Suscríbete al canal! al canal ¡Suscríbete al canal! Gracias por ver el video."), which the whole-transcript guard does not match and the refiner turns into text; revisit if it shows in real use.
 
 Pending for milestone 3: workflows, the rest of the TRD verification table, `.env` under Workspace files.
+
+### Round 4 (round 3 finding applied, milestone 3)
+
+Finding 1, refresh with rotation, proven in dev for `crew-e2e` (statuses only, no token recorded):
+
+- First attempt, with the client as applied: `GetTokensFromRefreshToken` without `DeviceKey` answered `NotAuthorizedException: Invalid Refresh Token.`, and the same with the unconfirmed `DeviceKey` that sign-in returns in `NewDeviceMetadata`.
+- Cause: device remembering binds the refresh token to a confirmed device, not a missing auth flow; after `ConfirmDevice` (device SRP verifier in `apps/api/scripts/srp.ts`), refresh with that `DeviceKey` succeeds, so `ALLOW_USER_SRP_AUTH` alone stays and nothing was re-applied.
+- (a) Refresh with the confirmed `DeviceKey` returns a new access token and a new refresh token (both differ from the originals).
+- (b) The refreshed access token answers 200 on `POST /dictations` with the Polly WAV.
+- (c) After 12 s the old refresh token answers `NotAuthorizedException: Refresh token reuse detected`, and the rotated token keeps refreshing (a third pair is issued).
+- All three run in `pnpm e2e` ("refreshes a confirmed device's session with rotation..."), which forgets the device at the end; `crew-e2e` holds 0 devices after the run.
+- Other observations for phase 2: inside the 10 s grace the old refresh token still refreshes, and doing so revokes the access token issued by the previous rotation.
+- Device key on refresh: yes. With device remembering on, every client must call `ConfirmDevice` after its first sign-in, store `DeviceKey` (and `DeviceGroupKey`) with the refresh token, and pass `DeviceKey` on every refresh. Once confirmed, a refresh without it answers `Invalid Refresh Token.`, and an unconfirmed key is rejected too.
+
+Milestone 3:
+
+- `.github/workflows/ci.yml`: job `ci`, no path filter, on pull requests to `develop` and `main` and on push to `develop`; install, `pnpm lint` (which now ends with `pnpm lint:workflows`, actionlint), `pnpm typecheck`, `pnpm test`, `terraform fmt -check -recursive infra`, and `init -backend=false` plus `validate` for every environment.
+- `reusable-deploy.yml`: environment from the caller, OIDC through `aws-actions/configure-aws-credentials` with `vars.AWS_ROLE_ARN` and `vars.AWS_REGION`, `pnpm --filter @take-my-word/api build`, then `update-function-code` and `wait function-updated-v2` for the authorizer and then `dictate`.
+- `deploy-dev.yml` on `develop` and `deploy-prd.yml` on `main`, path-filtered to `apps/api/**`, `packages/shared/**`, `.github/workflows/**`, `package.json` and `pnpm-lock.yaml`; the dev deploy then opens the promotion pull request `develop -> main` when `develop` is ahead and none is open.
+- `iam simulate-principal-policy` on `take-my-word-dev-deploy`: `UpdateFunctionCode` and `GetFunction` allowed on both dev functions; `UpdateFunctionConfiguration` and `DeleteFunction` denied on them, and every action denied on a prd function; trust is `StringEquals` on `sub` `repo:sebasfles/take-my-word:environment:dev` and `aud` `sts.amazonaws.com`.
+- `docs/TRD.md`: the infra commands exact, a `workflows` row, `.env` keys under the api's Workspace files; web, desktop and mobile stay `unknown` until their first task.
+
+Decisions the plan did not record:
+
+- Clients must confirm their device and send `DeviceKey` on refresh (above); `scripts/sign-in.ts` now returns the refresh token and the device keys, and has `confirmDevice`, `refresh` and `forgetDevice`.
+- The deploy path filter also covers `package.json` and `pnpm-lock.yaml`, because a dependency bump changes the bundle.
+- Action majors: `actions/checkout@v7`, `actions/setup-node@v7`, `pnpm/action-setup@v6` (reads `packageManager`), `aws-actions/configure-aws-credentials@v6`, `hashicorp/setup-terraform@v4`.
+- `github-actionlint` 1.7.12 at the root, run by `pnpm lint`.
+- `deploy-prd` fails until `prd` is applied, since the `prd` environment has no variables yet; the promotion pull request is not merged before then, per Context & decisions.
+
+Pending: Acceptance 9 after merge (the om-manager checks the first `deploy-dev` run and the promotion pull request).

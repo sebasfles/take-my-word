@@ -91,3 +91,20 @@ export function passwordVerifier(input: {
     .digest("base64");
   return { signature, timestamp };
 }
+
+export function deviceVerifier(input: { deviceGroupKey: string; deviceKey: string }): {
+  password: string;
+  passwordVerifier: string;
+  salt: string;
+} {
+  const password = randomBytes(40).toString("base64");
+  const salt = BigInt(`0x${randomBytes(16).toString("hex")}`);
+  const identity = sha256Hex(`${input.deviceGroupKey}${input.deviceKey}:${password}`);
+  const x = BigInt(`0x${hexHash(`${padHex(salt)}${identity}`)}`);
+  const verifier = modPow(g, x, N);
+  return {
+    password,
+    passwordVerifier: Buffer.from(padHex(verifier), "hex").toString("base64"),
+    salt: Buffer.from(padHex(salt), "hex").toString("base64"),
+  };
+}
