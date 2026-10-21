@@ -82,7 +82,7 @@ pub fn open_update(app: &AppHandle) {
         UPDATE,
         WebviewUrl::App("index.html?view=update".into()),
     )
-    .title("Take My Word")
+    .title(product_name(app))
     .inner_size(460.0, 400.0)
     .resizable(false)
     .maximizable(false)

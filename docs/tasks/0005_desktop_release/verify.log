@@ -35,3 +35,22 @@ The step needs the fless-takemyword AWS profile; this task's clearance excludes 
 - typecheck: n/a
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-21T20:37:12Z by om-developer target desktop on 48947ff
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, plus cargo clippy --release --features prd, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (54 vitest + 112 cargo tests, 3 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+The first unit run exited 1 before cargo started: WSL interop failed to launch powershell.exe (UtilAcceptVsock accept4 failed 110); vitest had passed 54/54. The rerun above is the artefact.
+
+## 2026-10-21T20:37:12Z by om-developer target web on 48947ff
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: n/a (needs the fless-takemyword AWS profile, outside this task's clearance; accepted by the om-reviewer)
+
+## 2026-10-21T20:37:12Z by om-developer target workflows on 48947ff
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

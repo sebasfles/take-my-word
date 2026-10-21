@@ -108,14 +108,16 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
 
-      - name: Upload the installer under its fixed name
+      - name: Upload the prd installer under its fixed name
         env:
           RELEASE_ID: ${{ steps.draft.outputs.id }}
+          VERSION: ${{ steps.tag.outputs.version }}
         run: |
           shopt -s nullglob
           installers=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
-          if [[ ${#installers[@]} -ne 1 ]]; then
-            echo "::error::expected one NSIS installer, found ${#installers[@]}"
+          prd="apps/desktop/src-tauri/target/release/bundle/nsis/Take My Word_${VERSION}_x64-setup.exe"
+          if [[ ${#installers[@]} -ne 1 || "${installers[0]}" != "$prd" ]]; then
+            echo "::error::expected only the prd installer $prd, found: ${installers[*]}"
             exit 1
           fi
           release="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"

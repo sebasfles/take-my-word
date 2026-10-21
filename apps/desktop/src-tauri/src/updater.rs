@@ -15,7 +15,11 @@ const IDLE_POLL: Duration = Duration::from_millis(250);
 const CONFIG_KEY: &str = "updater";
 
 pub fn enabled(config: &tauri::Config) -> bool {
-    !cfg!(debug_assertions) && config.plugins.0.contains_key(CONFIG_KEY)
+    !cfg!(debug_assertions) && configured(config)
+}
+
+fn configured(config: &tauri::Config) -> bool {
+    config.plugins.0.contains_key(CONFIG_KEY)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -254,7 +258,62 @@ pub fn postpone_update(app: AppHandle) {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
+
     use super::*;
+
+    fn merge(base: &mut Value, overlay: Value) {
+        match (base, overlay) {
+            (Value::Object(base), Value::Object(overlay)) => {
+                for (key, value) in overlay {
+                    merge(base.entry(key).or_insert(Value::Null), value);
+                }
+            }
+            (base, overlay) => *base = overlay,
+        }
+    }
+
+    fn build_config(overlay: Option<&str>) -> tauri::Config {
+        let mut config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        if let Some(overlay) = overlay {
+            merge(&mut config, serde_json::from_str(overlay).unwrap());
+        }
+        serde_json::from_value(config).unwrap()
+    }
+
+    #[test]
+    fn only_the_prd_build_carries_the_updater() {
+        let debug = build_config(None);
+        let dev = build_config(Some(include_str!("../tauri.dev.conf.json")));
+        let prd = build_config(Some(include_str!("../tauri.prd.conf.json")));
+        assert!(!configured(&debug));
+        assert!(!configured(&dev));
+        assert!(configured(&prd));
+        assert!(!enabled(&debug) && !enabled(&dev));
+        assert_eq!(enabled(&prd), !cfg!(debug_assertions));
+        assert_eq!(prd.identifier, crate::env::PRD.identifier);
+    }
+
+    #[test]
+    fn the_prd_updater_config_is_what_the_plugin_reads() {
+        let prd = build_config(Some(include_str!("../tauri.prd.conf.json")));
+        let config: tauri_plugin_updater::Config =
+            serde_json::from_value(prd.plugins.0[CONFIG_KEY].clone()).unwrap();
+        assert_eq!(
+            config
+                .endpoints
+                .iter()
+                .map(|url| url.as_str())
+                .collect::<Vec<_>>(),
+            ["https://github.com/sebasfles/take-my-word/releases/latest/download/latest.json"]
+        );
+        assert!(config.require_signed_version);
+        assert!(!config.pubkey.is_empty());
+        assert!(matches!(
+            prd.bundle.create_updater_artifacts,
+            tauri::utils::config::Updater::Bool(true)
+        ));
+    }
 
     fn offers() -> Offers<&'static str> {
         Offers::new(Language::En)

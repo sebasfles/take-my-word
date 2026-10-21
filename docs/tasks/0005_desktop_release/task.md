@@ -161,3 +161,17 @@ Decisions not recorded in the plan:
 Pending:
 
 - Acceptance 3 and the real releases wait for 0007 and your hand-off of the release tags.
+
+### Round 3
+
+Done:
+
+- Rebased on `develop` at ebb0532 (0007). Conflicts resolved by keeping both sides: `tauri.conf.json` is 0007's dev base without `version`, so Tauri reads `Cargo.toml`. 0007's prd identity (`productName`, `identifier`, `build.features: ["prd"]`) now sits in `tauri.prd.conf.json` next to `bundle.createUpdaterArtifacts` and `plugins.updater`. `lib.rs`, `shell.rs`, the bridge, the views and the styles carry both the account and the update additions. `Cargo.lock` was regenerated on the mirror.
+- Updater gating is proven against the real overlays. `updater::configured` looks for `plugins.updater`. In `updater.rs`, `only_the_prd_build_carries_the_updater` merges `tauri.conf.json` with no overlay (debug), with `tauri.dev.conf.json` (what `pnpm tauri:build:dev` and `desktop-ci` build) and with `tauri.prd.conf.json`. Only prd carries it; `enabled` is false for debug and dev. `the_prd_updater_config_is_what_the_plugin_reads` parses the prd block as the plugin's own `Config`, so a malformed block cannot fail plugin setup.
+- `desktop-release` builds with the same `--config src-tauri/tauri.prd.conf.json` overlay as `pnpm tauri:build:prd`. The fixed-name copy fails unless the only NSIS installer is `Take My Word_<version>_x64-setup.exe`, the prd product name.
+- The update window title uses `windows::product_name`, like 0007's windows.
+- Screenshots refreshed.
+
+Pending:
+
+- Your hand-off for `desktop-v0.1.0` (hand-made annotated tag) and `pnpm release:desktop 0.1.1`, then Acceptance 3 on Windows.
