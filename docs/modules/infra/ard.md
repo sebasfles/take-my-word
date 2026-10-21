@@ -25,7 +25,7 @@ source: 0004_web_landing
 
 ## 2026-10-20: Terraform owns infrastructure, CI only swaps Lambda code
 
-- Decision: Terraform is applied only from Sebastian's machine; `environments/core` creates the GitHub OIDC provider, GitHub App wiring, Actions environments and branch rulesets; `stacks/app` creates one deploy role per env, scoped to that env's Actions environment, allowed only `UpdateFunctionCode` on its functions; workflows run `aws lambda update-function-code`; the Lambda module ignores `filename`, `source_code_hash` and `publish`.
+- Decision: Terraform is applied only from Sebastian's machine; `environments/core` creates the GitHub OIDC provider, GitHub App wiring, Actions environments and branch rulesets; `stacks/app` creates one deploy role per env, scoped to that env's Actions environment, allowed only to swap code: `UpdateFunctionCode` on its functions, plus the web assets sync and the distribution invalidation; workflows run `aws lambda update-function-code`; the Lambda module ignores `filename`, `source_code_hash` and `publish`.
 - Alternatives rejected: Terraform apply in CI; long-lived AWS keys in GitHub secrets.
 - Reason: CI can never change or destroy infrastructure, and Terraform and CI never fight over the deployed code; the pattern is already proven on Sebastian's other platforms.
 - Debt created: infrastructure changes wait for Sebastian's machine, and nothing flags drift between the Terraform code and the account.

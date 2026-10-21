@@ -190,5 +190,6 @@ After the verify run, `crew-e2e` holds no device and no `web-e2e-` user exists.
 - auth: README, prd (first sign-in password step, web remember me, the "later" and the open question removed), trd (`packages/cognito`, web route handlers, cookies, configuration, testing), flows (web renewal under the Web Lock), ard (five entries).
 - infra: trd, flows, ard (three entries); README and database.md unchanged, since boundaries and the table did not move.
 - dictation: nothing changed; the web only reads `GET /me/settings` through the shared contract.
+- auth `database.md`: nothing changed; the web session lives in sealed cookies, devices and refresh tokens stay in the pool it already lists, and no item kind was added.
 - `docs/TRD.md` web section rewritten because Scope names it; Debt index of `docs/ARD.md` gains four rows.
-- For the reviewer: the deploy role now also syncs the web bucket and invalidates the distribution, beyond the "only `UpdateFunctionCode`" wording of infra's 2026-10-20 entry and the global ARD; still no infrastructure change from CI, so I left those entries as they are.
+- infra's 2026-10-20 entry on the deploy role corrected in place (docs findings): the role swaps code, syncs the web assets and invalidates the distribution.

@@ -42,7 +42,7 @@ Jobs, listeners or scheduled work: none.
 ## Delivery
 
 - `develop` deploys dev and the dev deploy opens the promotion PR to `main`; `main` deploys prd.
-- Workflows assume the env's deploy role over GitHub OIDC, build, and run `aws lambda update-function-code`.
+- Workflows assume the env's deploy role over GitHub OIDC, build, and run `aws lambda update-function-code`; the web job also syncs the assets bucket and invalidates the CloudFront distribution.
 - The web job uploads `/_next/static/*` (immutable, one year) before swapping the function code, then the rest of the assets (5 minutes), then invalidates the distribution; the server zip keeps pnpm's symlinks (`zip -y`).
 - The deploy role grants `UpdateFunctionCode` and `GetFunction` on that env's functions only, `s3:ListBucket` and `s3:PutObject` on the web bucket and `cloudfront:CreateInvalidation` on the web distribution, and trusts exactly the repository's immutable subject, `repo:sebasfles@64487774/take-my-word@1427740478:environment:{env}`, built from the GitHub user and repository ids.
 - The Lambda module ignores `filename`, `source_code_hash` and `publish`, so Terraform never fights CI over code.
