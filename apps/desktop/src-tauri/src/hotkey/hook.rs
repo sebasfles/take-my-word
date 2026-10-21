@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use super::Key;
 #[cfg(not(windows))]
 use super::unsupported as platform;
@@ -14,7 +12,7 @@ pub struct KeyEvent {
     pub down: bool,
 }
 
-pub trait KeyHook: Send + Sync {
+pub trait KeyHook {
     fn guard_start_menu(&self);
     fn is_held(&self, key: Key) -> bool;
 }
@@ -23,8 +21,8 @@ pub trait KeyHook: Send + Sync {
 #[error("the keyboard hook is unavailable: {0}")]
 pub struct HookError(pub String);
 
-pub type KeySink = Box<dyn Fn(KeyEvent) + Send>;
+pub type KeySink = Box<dyn FnMut(KeyEvent, &dyn KeyHook) + Send>;
 
-pub fn install(sink: KeySink) -> Result<Arc<dyn KeyHook>, HookError> {
+pub fn install(sink: KeySink) -> Result<(), HookError> {
     platform::install(sink)
 }

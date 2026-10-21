@@ -1,4 +1,4 @@
-use super::{Hotkey, Key, KeyEvent};
+use super::{Hotkey, Key, KeyEvent, KeyHook};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChordEvent {
@@ -7,69 +7,82 @@ pub enum ChordEvent {
     Cancelled,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ChordTracker {
+    hotkey: Hotkey,
     down: Vec<Key>,
     active: bool,
 }
 
 impl ChordTracker {
-    pub fn on_key(&mut self, hotkey: &Hotkey, event: KeyEvent) -> Option<ChordEvent> {
-        if event.down {
-            self.on_down(hotkey, event.key)
+    pub fn new(hotkey: Hotkey) -> Self {
+        Self {
+            hotkey,
+            down: Vec::new(),
+            active: false,
+        }
+    }
+
+    pub fn on_key(&mut self, event: KeyEvent, keyboard: &dyn KeyHook) -> Option<ChordEvent> {
+        let chord = if event.down {
+            if !self.active {
+                self.down
+                    .retain(|key| *key == event.key || keyboard.is_held(*key));
+            }
+            self.on_down(event.key)
         } else {
-            self.on_up(hotkey, event.key)
+            self.on_up(event.key)
+        };
+        if chord == Some(ChordEvent::Pressed) && self.hotkey.uses_meta() {
+            keyboard.guard_start_menu();
         }
+        chord
     }
 
-    pub fn forget_released(&mut self, still_held: impl Fn(Key) -> bool) {
-        if !self.active {
-            self.down.retain(|key| still_held(*key));
-        }
-    }
-
-    fn on_down(&mut self, hotkey: &Hotkey, key: Key) -> Option<ChordEvent> {
+    fn on_down(&mut self, key: Key) -> Option<ChordEvent> {
         if self.down.contains(&key) {
             return None;
         }
         self.down.push(key);
         if self.active {
-            if hotkey.contains(key) {
+            if self.hotkey.contains(key) {
                 return None;
             }
             self.active = false;
             return Some(ChordEvent::Cancelled);
         }
-        if self.matches_exactly(hotkey) {
+        if self.matches_exactly() {
             self.active = true;
             return Some(ChordEvent::Pressed);
         }
         None
     }
 
-    fn on_up(&mut self, hotkey: &Hotkey, key: Key) -> Option<ChordEvent> {
+    fn on_up(&mut self, key: Key) -> Option<ChordEvent> {
         self.down.retain(|held| *held != key);
-        if self.active && !self.holds_every_key(hotkey) {
+        if self.active && !self.holds_every_key() {
             self.active = false;
             return Some(ChordEvent::Released);
         }
         None
     }
 
-    fn holds_every_key(&self, hotkey: &Hotkey) -> bool {
-        hotkey
+    fn holds_every_key(&self) -> bool {
+        self.hotkey
             .keys()
             .iter()
             .all(|wanted| self.down.iter().any(|held| wanted.matches(*held)))
     }
 
-    fn matches_exactly(&self, hotkey: &Hotkey) -> bool {
-        self.holds_every_key(hotkey) && self.down.iter().all(|held| hotkey.contains(*held))
+    fn matches_exactly(&self) -> bool {
+        self.holds_every_key() && self.down.iter().all(|held| self.hotkey.contains(*held))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::cell::{Cell, RefCell};
+
     use super::*;
     use crate::hotkey::{HotkeyKey, Side};
 
@@ -79,6 +92,22 @@ mod tests {
     const SHIFT: Key = Key::Shift(Side::Left);
     const LEFT_ARROW: Key = Key::Other(0x25);
 
+    #[derive(Default)]
+    struct FakeKeyboard {
+        released_unseen: RefCell<Vec<Key>>,
+        guards: Cell<usize>,
+    }
+
+    impl KeyHook for FakeKeyboard {
+        fn guard_start_menu(&self) {
+            self.guards.set(self.guards.get() + 1);
+        }
+
+        fn is_held(&self, key: Key) -> bool {
+            !self.released_unseen.borrow().contains(&key)
+        }
+    }
+
     fn down(key: Key) -> KeyEvent {
         KeyEvent { key, down: true }
     }
@@ -87,38 +116,54 @@ mod tests {
         KeyEvent { key, down: false }
     }
 
-    fn feed(tracker: &mut ChordTracker, events: &[KeyEvent]) -> Vec<ChordEvent> {
-        let hotkey = Hotkey::default();
+    fn feed(
+        tracker: &mut ChordTracker,
+        keyboard: &FakeKeyboard,
+        events: &[KeyEvent],
+    ) -> Vec<ChordEvent> {
         events
             .iter()
-            .filter_map(|event| tracker.on_key(&hotkey, *event))
+            .filter_map(|event| tracker.on_key(*event, keyboard))
             .collect()
     }
 
+    fn ctrl_win() -> (ChordTracker, FakeKeyboard) {
+        (
+            ChordTracker::new(Hotkey::default()),
+            FakeKeyboard::default(),
+        )
+    }
+
     #[test]
-    fn ctrl_then_win_presses_and_releasing_either_releases() {
-        let mut tracker = ChordTracker::default();
+    fn ctrl_then_win_presses_once_guards_the_start_menu_and_releasing_either_releases() {
+        let (mut tracker, keyboard) = ctrl_win();
         assert_eq!(
             feed(
                 &mut tracker,
+                &keyboard,
                 &[down(LCTRL), down(LWIN), up(LWIN), up(LCTRL)]
+            ),
+            vec![ChordEvent::Pressed, ChordEvent::Released]
+        );
+        assert_eq!(keyboard.guards.get(), 1);
+    }
+
+    #[test]
+    fn win_then_right_ctrl_presses_too() {
+        let (mut tracker, keyboard) = ctrl_win();
+        assert_eq!(
+            feed(
+                &mut tracker,
+                &keyboard,
+                &[down(LWIN), down(RCTRL), up(RCTRL)]
             ),
             vec![ChordEvent::Pressed, ChordEvent::Released]
         );
     }
 
     #[test]
-    fn win_then_right_ctrl_presses_too() {
-        let mut tracker = ChordTracker::default();
-        assert_eq!(
-            feed(&mut tracker, &[down(LWIN), down(RCTRL), up(RCTRL)]),
-            vec![ChordEvent::Pressed, ChordEvent::Released]
-        );
-    }
-
-    #[test]
     fn autorepeat_while_holding_does_not_press_again() {
-        let mut tracker = ChordTracker::default();
+        let (mut tracker, keyboard) = ctrl_win();
         let events = [
             down(LCTRL),
             down(LWIN),
@@ -128,20 +173,28 @@ mod tests {
             up(LCTRL),
         ];
         assert_eq!(
-            feed(&mut tracker, &events),
+            feed(&mut tracker, &keyboard, &events),
             vec![ChordEvent::Pressed, ChordEvent::Released]
         );
+        assert_eq!(keyboard.guards.get(), 1);
     }
 
     #[test]
     fn extra_modifier_held_before_the_chord_does_not_press() {
-        let mut tracker = ChordTracker::default();
-        assert!(feed(&mut tracker, &[down(SHIFT), down(LCTRL), down(LWIN)]).is_empty());
+        let (mut tracker, keyboard) = ctrl_win();
+        assert!(
+            feed(
+                &mut tracker,
+                &keyboard,
+                &[down(SHIFT), down(LCTRL), down(LWIN)]
+            )
+            .is_empty()
+        );
     }
 
     #[test]
     fn another_key_during_the_hold_cancels_and_does_not_restart_on_its_release() {
-        let mut tracker = ChordTracker::default();
+        let (mut tracker, keyboard) = ctrl_win();
         let events = [
             down(LCTRL),
             down(LWIN),
@@ -151,41 +204,44 @@ mod tests {
             up(LCTRL),
         ];
         assert_eq!(
-            feed(&mut tracker, &events),
+            feed(&mut tracker, &keyboard, &events),
             vec![ChordEvent::Pressed, ChordEvent::Cancelled]
         );
         assert_eq!(
-            feed(&mut tracker, &[down(LCTRL), down(LWIN), up(LCTRL)]),
+            feed(
+                &mut tracker,
+                &keyboard,
+                &[down(LCTRL), down(LWIN), up(LCTRL)]
+            ),
             vec![ChordEvent::Pressed, ChordEvent::Released]
         );
     }
 
     #[test]
     fn keys_whose_release_was_missed_are_forgotten_before_the_next_press() {
-        let hotkey = Hotkey::default();
-        let mut tracker = ChordTracker::default();
+        let (mut tracker, keyboard) = ctrl_win();
         let lock_screen = Key::Other(0x4C);
-        feed(&mut tracker, &[down(LWIN), down(lock_screen)]);
-        tracker.forget_released(|key| key == LWIN);
-        assert_eq!(tracker.on_key(&hotkey, down(LWIN)), None);
+        feed(&mut tracker, &keyboard, &[down(LWIN), down(lock_screen)]);
+        *keyboard.released_unseen.borrow_mut() = vec![lock_screen];
         assert_eq!(
-            tracker.on_key(&hotkey, down(LCTRL)),
-            Some(ChordEvent::Pressed)
+            feed(&mut tracker, &keyboard, &[down(LWIN), down(LCTRL)]),
+            vec![ChordEvent::Pressed]
         );
     }
 
     #[test]
-    fn custom_hotkey_with_a_regular_key() {
+    fn custom_hotkey_without_win_never_guards_the_start_menu() {
         let hotkey = Hotkey::new(vec![HotkeyKey::Shift, HotkeyKey::Code(0x7C)]).unwrap();
-        let mut tracker = ChordTracker::default();
-        assert_eq!(tracker.on_key(&hotkey, down(SHIFT)), None);
+        let mut tracker = ChordTracker::new(hotkey);
+        let keyboard = FakeKeyboard::default();
         assert_eq!(
-            tracker.on_key(&hotkey, down(Key::Other(0x7C))),
-            Some(ChordEvent::Pressed)
+            feed(
+                &mut tracker,
+                &keyboard,
+                &[down(SHIFT), down(Key::Other(0x7C)), up(Key::Other(0x7C))]
+            ),
+            vec![ChordEvent::Pressed, ChordEvent::Released]
         );
-        assert_eq!(
-            tracker.on_key(&hotkey, up(Key::Other(0x7C))),
-            Some(ChordEvent::Released)
-        );
+        assert_eq!(keyboard.guards.get(), 0);
     }
 }

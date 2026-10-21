@@ -169,3 +169,10 @@ Pending (milestones 2 and 3): stub server and tray modes, paste and clipboard re
 Deferred or open:
 
 - Non-Windows `cargo check` cannot run here (no sudo in WSL for the GTK, WebKit and ALSA headers); I will propose a cheap Ubuntu `cargo check` step in `desktop-ci` in milestone 3 to keep condition 4 verified.
+
+### Round 2 (round 1 findings)
+
+- Finding 1: chord detection moved to the key-events thread, milliseconds behind the hook. The hook hands each event to the sink together with the live keyboard (`KeyHook::is_held`, `guard_start_menu`), so missed-key-up pruning and the Start-menu guard are judged at event time, and the guard can only fire while Win is physically down. The session now receives `Pressed`, `Released` and `Cancelled` stamped with the instant they were detected, and measures the hold from those stamps instead of from when it gets to them. Encoding and everything after a take run on a separate `dictation` worker, so the session only opens and stops the microphone. Test: a press, release, press, release queued at once behind a microphone whose stop takes 300 ms still yields two recordings with 1000 and 1050 ms holds.
+- Finding 2: a hotkey has two or three keys with at least one modifier; a single key, modifier or not, is rejected, and a config holding one falls back to Ctrl+Win (tests for both).
+- `ChordTracker` owns its hotkey; changing the hotkey without restart (milestone 2) replaces the tracker's hotkey on the key-events thread.
+- Windows smoke repeated on the debug build: two 2 s holds (both key orders) recorded 1990 and 1980 ms WAVs, 300 ms discarded, arrow cancelled, Start closed, no keys left down. WAVs deleted.

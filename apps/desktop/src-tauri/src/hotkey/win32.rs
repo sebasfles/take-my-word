@@ -1,4 +1,4 @@
-use std::sync::{Arc, OnceLock, mpsc};
+use std::sync::{OnceLock, mpsc};
 use std::thread;
 
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
@@ -49,7 +49,7 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
-pub fn install(sink: KeySink) -> Result<Arc<dyn KeyHook>, HookError> {
+pub fn install(mut sink: KeySink) -> Result<(), HookError> {
     let (raw_sender, raw_keys) = mpsc::channel();
     RAW_KEYS
         .set(raw_sender)
@@ -69,13 +69,13 @@ pub fn install(sink: KeySink) -> Result<Arc<dyn KeyHook>, HookError> {
         .spawn(move || {
             for raw in raw_keys {
                 if let Some(event) = translate(raw) {
-                    sink(event);
+                    sink(event, &WindowsHook);
                 }
             }
         })
         .map_err(|error| HookError(error.to_string()))?;
 
-    Ok(Arc::new(WindowsHook))
+    Ok(())
 }
 
 fn pump_messages(ready: mpsc::Sender<Result<(), HookError>>) {

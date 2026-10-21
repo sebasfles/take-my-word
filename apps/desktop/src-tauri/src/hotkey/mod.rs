@@ -54,14 +54,15 @@ impl HotkeyKey {
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum HotkeyError {
-    #[error("the hotkey needs at least one key")]
-    Empty,
+    #[error("the hotkey needs at least {MIN_KEYS} keys")]
+    TooFew,
     #[error("the hotkey takes at most {MAX_KEYS} keys")]
     TooMany,
     #[error("the hotkey needs a modifier (Ctrl, Shift, Alt or Win)")]
     NoModifier,
 }
 
+pub const MIN_KEYS: usize = 2;
 pub const MAX_KEYS: usize = 3;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,8 +75,8 @@ impl Hotkey {
     pub fn new(mut keys: Vec<HotkeyKey>) -> Result<Self, HotkeyError> {
         keys.sort();
         keys.dedup();
-        if keys.is_empty() {
-            return Err(HotkeyError::Empty);
+        if keys.len() < MIN_KEYS {
+            return Err(HotkeyError::TooFew);
         }
         if keys.len() > MAX_KEYS {
             return Err(HotkeyError::TooMany);
@@ -142,8 +143,25 @@ mod tests {
     }
 
     #[test]
+    fn a_single_key_is_never_a_hotkey() {
+        for key in [
+            HotkeyKey::Ctrl,
+            HotkeyKey::Shift,
+            HotkeyKey::Alt,
+            HotkeyKey::Meta,
+            HotkeyKey::Code(0x7C),
+        ] {
+            assert_eq!(Hotkey::new(vec![key]), Err(HotkeyError::TooFew));
+        }
+        assert_eq!(
+            Hotkey::new(vec![HotkeyKey::Ctrl, HotkeyKey::Ctrl]),
+            Err(HotkeyError::TooFew)
+        );
+    }
+
+    #[test]
     fn validation_rejects_empty_oversized_and_modifierless_hotkeys() {
-        assert_eq!(Hotkey::new(vec![]), Err(HotkeyError::Empty));
+        assert_eq!(Hotkey::new(vec![]), Err(HotkeyError::TooFew));
         assert_eq!(
             Hotkey::new(vec![
                 HotkeyKey::Ctrl,
@@ -154,7 +172,7 @@ mod tests {
             Err(HotkeyError::TooMany)
         );
         assert_eq!(
-            Hotkey::new(vec![HotkeyKey::Code(0x41)]),
+            Hotkey::new(vec![HotkeyKey::Code(0x41), HotkeyKey::Code(0x42)]),
             Err(HotkeyError::NoModifier)
         );
         assert_eq!(

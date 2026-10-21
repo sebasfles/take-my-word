@@ -52,6 +52,13 @@ mod tests {
             load(&scratch("empty-hotkey", Some(r#"{"hotkey":[]}"#))),
             Settings::default()
         );
+        for single in ["ctrl", "shift", "alt", "meta"] {
+            let json = format!(r#"{{"hotkey":["{single}"]}}"#);
+            assert_eq!(
+                load(&scratch(&format!("single-{single}"), Some(&json))).hotkey,
+                Hotkey::default()
+            );
+        }
     }
 
     #[test]
