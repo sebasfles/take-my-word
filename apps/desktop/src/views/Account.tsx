@@ -1,7 +1,7 @@
 import { type SubmitEvent, useCallback, useEffect, useState } from "react";
 import { type AccountStep, bridge, type Onboarding, problemOf } from "../bridge.ts";
 import { type MessageId, t } from "../i18n.ts";
-import { styleName } from "../styleNames.ts";
+import { StyleChoices } from "../StyleChoices.tsx";
 import { type AccountScreen, accountScreenFromSearch } from "../view.ts";
 
 export function Account() {
@@ -267,23 +267,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
       )}
       {load.kind === "ready" && onboarding && (
         <form className="form" onSubmit={save}>
-          <fieldset className="choices">
-            <legend className="visually-hidden">{t("onboarding.legend")}</legend>
-            {onboarding.styles.map((style) => (
-              <label key={style.id} className="choice">
-                <input
-                  type="radio"
-                  name="style"
-                  value={style.id}
-                  checked={selected === style.id}
-                  onChange={() => {
-                    setSelected(style.id);
-                  }}
-                />
-                <span>{styleName(style)}</span>
-              </label>
-            ))}
-          </fieldset>
+          <StyleChoices styles={onboarding.styles} selected={selected} onSelect={setSelected} />
           {error && (
             <p className="error" role="alert">
               {t(error)}

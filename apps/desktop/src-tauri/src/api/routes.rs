@@ -69,6 +69,13 @@ impl Route {
         }
     }
 
+    pub fn changes_app_rules(&self) -> bool {
+        matches!(
+            self,
+            Self::CreateAppRule { .. } | Self::UpdateAppRule { .. } | Self::DeleteAppRule { .. }
+        )
+    }
+
     pub fn request(&self) -> Result<Request<'_>, ApiFailure> {
         use Method::{Delete, Get, Post, Put};
         let request = |method, path: String, body| Request { method, path, body };

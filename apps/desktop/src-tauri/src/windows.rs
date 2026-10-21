@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 use crate::i18n::{self, Message};
 use crate::shell::Shell;
@@ -36,8 +36,23 @@ const SETTINGS_SIZE: Size = Size {
     min: Some((380.0, 480.0)),
 };
 
+const ADD_WORD: &str = "&section=dictionary&focus=add";
+
+pub fn add_word(app: &AppHandle) {
+    if app.get_webview_window(SETTINGS).is_some()
+        && let Err(error) = app.emit_to(SETTINGS, "settings-navigate", ADD_WORD)
+    {
+        log::warn!("moving settings to the dictionary failed: {error}");
+    }
+    open_settings_with(app, ADD_WORD);
+}
+
 pub fn open_settings(app: &AppHandle) {
-    let Some(window) = open(app, SETTINGS, "", &product_name(app), SETTINGS_SIZE) else {
+    open_settings_with(app, "");
+}
+
+fn open_settings_with(app: &AppHandle, query: &str) {
+    let Some(window) = open(app, SETTINGS, query, &product_name(app), SETTINGS_SIZE) else {
         return;
     };
     let app = app.clone();
@@ -78,6 +93,7 @@ fn open(
 ) -> Option<tauri::WebviewWindow> {
     if let Some(window) = app.get_webview_window(label) {
         let _ = window.unminimize();
+        let _ = window.show();
         let _ = window.set_focus();
         return None;
     }

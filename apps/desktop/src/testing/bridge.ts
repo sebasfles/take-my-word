@@ -11,6 +11,7 @@ import type {
 
 export const listeners: {
   overlay?: (state: OverlayState) => void;
+  settingsNavigate?: (query: string) => void;
   captureCancelled?: () => void;
   accountChanged?: (signedIn: boolean) => void;
   update?: (view: UpdateView) => void;
@@ -64,6 +65,8 @@ export const fakeBridge = {
   openSignIn: vi.fn(() => Promise.resolve(undefined)),
   signOut: vi.fn(() => Promise.resolve(undefined)),
   apiRequest: vi.fn<(route: Route) => Promise<unknown>>(() => Promise.resolve(null)),
+  runningApps: vi.fn(() => Promise.resolve(["notepad.exe", "outlook.exe"])),
+  copyText: vi.fn<(text: string) => Promise<undefined>>(() => Promise.resolve(undefined)),
   quit: vi.fn(() => Promise.resolve(undefined)),
   updateView: vi.fn(() => Promise.resolve(pendingUpdate.view)),
   installUpdate: vi.fn(() => Promise.resolve(undefined)),
@@ -78,6 +81,10 @@ export const fakeBridge = {
   }),
   onAccountChanged: vi.fn((handler: (signedIn: boolean) => void) => {
     listeners.accountChanged = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onSettingsNavigate: vi.fn((handler: (query: string) => void) => {
+    listeners.settingsNavigate = handler;
     return Promise.resolve(() => undefined);
   }),
   onHotkeyCaptureCancelled: vi.fn((handler: () => void) => {

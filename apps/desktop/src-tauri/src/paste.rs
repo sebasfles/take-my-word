@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use enigo::{Direction, Enigo, Keyboard, Settings};
 
+use crate::api::PasteKeystroke;
 use crate::clipboard::Clipboard;
 use crate::foreground::ActiveWindow;
 use crate::hotkey::OWN_INJECTION_TAG;
@@ -24,7 +25,7 @@ pub enum Undelivered {
 }
 
 pub trait Keystroke {
-    fn paste(&mut self) -> Result<(), String>;
+    fn paste(&mut self, keystroke: PasteKeystroke) -> Result<(), String>;
 }
 
 pub trait Modifiers {
@@ -61,7 +62,12 @@ pub struct Paster<C, K, W, M> {
 }
 
 impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, M> {
-    pub fn paste(&mut self, text: &str, target: Option<isize>) -> PasteResult {
+    pub fn paste(
+        &mut self,
+        text: &str,
+        target: Option<isize>,
+        keystroke: PasteKeystroke,
+    ) -> PasteResult {
         if !self.wait_for_release() {
             return self.leave(text, Undelivered::KeysHeld);
         }
@@ -77,7 +83,7 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
             return PasteResult::Failed;
         }
         let sent = Instant::now();
-        if let Err(error) = self.keystroke.paste() {
+        if let Err(error) = self.keystroke.paste(keystroke) {
             log::warn!("the paste keystroke failed: {error}");
             return self.keep();
         }
@@ -130,31 +136,56 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
 impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> crate::dictation::Paste
     for Paster<C, K, W, M>
 {
-    fn paste(&mut self, text: &str, target: Option<isize>) -> PasteResult {
-        Paster::paste(self, text, target)
+    fn paste(
+        &mut self,
+        text: &str,
+        target: Option<isize>,
+        keystroke: PasteKeystroke,
+    ) -> PasteResult {
+        Paster::paste(self, text, target, keystroke)
     }
 }
 
 pub struct EnigoKeystroke;
 
 impl Keystroke for EnigoKeystroke {
-    fn paste(&mut self) -> Result<(), String> {
+    fn paste(&mut self, keystroke: PasteKeystroke) -> Result<(), String> {
         let settings = Settings {
             windows_dw_extra_info: Some(OWN_INJECTION_TAG),
             ..Settings::default()
         };
         let mut enigo = Enigo::new(&settings).map_err(|error| error.to_string())?;
-        let modifier = if cfg!(target_os = "macos") {
-            enigo::Key::Meta
-        } else {
-            enigo::Key::Control
-        };
-        enigo
-            .key(modifier, Direction::Press)
-            .map_err(|error| error.to_string())?;
-        let pressed = enigo.key(enigo::Key::Unicode('v'), Direction::Click);
-        let released = enigo.key(modifier, Direction::Release);
-        pressed.and(released).map_err(|error| error.to_string())
+        let (modifiers, key) = keys(keystroke);
+        let mut pressed = Vec::new();
+        let mut outcome = Ok(());
+        for modifier in modifiers {
+            outcome = enigo.key(*modifier, Direction::Press);
+            if outcome.is_err() {
+                break;
+            }
+            pressed.push(*modifier);
+        }
+        if outcome.is_ok() {
+            outcome = enigo.key(key, Direction::Click);
+        }
+        for modifier in pressed.into_iter().rev() {
+            let released = enigo.key(modifier, Direction::Release);
+            outcome = outcome.and(released);
+        }
+        outcome.map_err(|error| error.to_string())
+    }
+}
+
+fn keys(keystroke: PasteKeystroke) -> (&'static [enigo::Key], enigo::Key) {
+    use enigo::Key::{Control, Meta, Shift, Unicode};
+    match keystroke {
+        PasteKeystroke::CmdV if cfg!(target_os = "macos") => (&[Meta], Unicode('v')),
+        PasteKeystroke::CtrlV | PasteKeystroke::CmdV => (&[Control], Unicode('v')),
+        PasteKeystroke::CtrlShiftV => (&[Control, Shift], Unicode('v')),
+        #[cfg(not(target_os = "macos"))]
+        PasteKeystroke::ShiftInsert => (&[Shift], enigo::Key::Insert),
+        #[cfg(target_os = "macos")]
+        PasteKeystroke::ShiftInsert => (&[Meta], Unicode('v')),
     }
 }
 
@@ -218,9 +249,10 @@ mod tests {
     struct FakeKeystroke(Shared);
 
     impl Keystroke for FakeKeystroke {
-        fn paste(&mut self) -> Result<(), String> {
+        fn paste(&mut self, keystroke: PasteKeystroke) -> Result<(), String> {
             let mut world = self.0.borrow_mut();
-            world.log.push("ctrl+v".into());
+            let name = serde_json::to_value(keystroke).unwrap();
+            world.log.push(name.as_str().unwrap().into());
             if world.keystroke_fails {
                 return Err("blocked".into());
             }
@@ -288,8 +320,29 @@ mod tests {
     #[test]
     fn the_clipboard_is_restored_only_after_the_target_read_the_text() {
         let world = world(will_be_read);
-        assert_eq!(paster(&world).paste("hola", Some(1)), PasteResult::Pasted);
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::Pasted
+        );
         assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
+    }
+
+    #[test]
+    fn the_paste_sends_the_keystroke_it_is_given() {
+        let world = world(will_be_read);
+        let pasted = paster(&world).paste("hola", Some(1), PasteKeystroke::ShiftInsert);
+        assert_eq!(pasted, PasteResult::Pasted);
+        assert_eq!(
+            world.borrow().log,
+            vec!["offer hola", "shift+insert", "restore"]
+        );
+    }
+
+    #[test]
+    fn cmd_v_reads_as_ctrl_v_outside_macos() {
+        if !cfg!(target_os = "macos") {
+            assert_eq!(keys(PasteKeystroke::CmdV), keys(PasteKeystroke::CtrlV));
+        }
     }
 
     #[test]
@@ -298,7 +351,10 @@ mod tests {
             will_be_read(world);
             world.held_polls.set(3);
         });
-        assert_eq!(paster(&world).paste("hola", Some(1)), PasteResult::Pasted);
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::Pasted
+        );
         assert_eq!(
             world.borrow().log,
             vec!["held", "held", "held", "offer hola", "ctrl+v", "restore"]
@@ -308,7 +364,10 @@ mod tests {
     #[test]
     fn a_read_before_the_keystroke_still_restores_after_a_safety_wait() {
         let world = world(|world| world.read_at = Some(Instant::now() - Duration::from_secs(1)));
-        assert_eq!(paster(&world).paste("hola", Some(1)), PasteResult::Pasted);
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::Pasted
+        );
         assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
     }
 
@@ -316,7 +375,7 @@ mod tests {
     fn text_nobody_reads_stays_in_the_clipboard() {
         let world = world(|_| {});
         assert_eq!(
-            paster(&world).paste("hola", Some(1)),
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::LeftInClipboard(Undelivered::NotRead)
         );
         assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "keep"]);
@@ -326,7 +385,7 @@ mod tests {
     fn a_failed_keystroke_leaves_the_text_in_the_clipboard() {
         let world = world(|world| world.keystroke_fails = true);
         assert_eq!(
-            paster(&world).paste("hola", Some(1)),
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::LeftInClipboard(Undelivered::NotRead)
         );
         assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "keep"]);
@@ -336,7 +395,7 @@ mod tests {
     fn an_elevated_window_gets_no_keystroke_and_the_text_stays_in_the_clipboard() {
         let world = world(|world| world.elevated = true);
         assert_eq!(
-            paster(&world).paste("hola", Some(1)),
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::LeftInClipboard(Undelivered::Elevated)
         );
         assert_eq!(world.borrow().log, vec!["put hola"]);
@@ -349,7 +408,7 @@ mod tests {
             world.focus_moved = true;
         });
         assert_eq!(
-            paster(&world).paste("hola", Some(1)),
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::LeftInClipboard(Undelivered::FocusChanged)
         );
         assert_eq!(world.borrow().log, vec!["put hola"]);
@@ -362,7 +421,7 @@ mod tests {
             world.restore_fails = true;
         });
         assert_eq!(
-            paster(&world).paste("hola", Some(1)),
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::PastedClipboardLost
         );
         assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
@@ -371,7 +430,10 @@ mod tests {
     #[test]
     fn a_busy_clipboard_fails_without_typing_anything() {
         let world = world(|world| world.offer_fails = true);
-        assert_eq!(paster(&world).paste("hola", Some(1)), PasteResult::Failed);
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::Failed
+        );
         assert!(world.borrow().log.is_empty());
     }
 }

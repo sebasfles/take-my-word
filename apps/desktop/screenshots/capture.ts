@@ -143,8 +143,200 @@ const shots: Shot[] = [
       await page.getByRole("alert").waitFor();
     },
   },
+  {
+    name: "settings-dictionary",
+    query: "view=settings&section=dictionary",
+    act: async (page) => {
+      await page.getByText("Kubernetes", { exact: true }).waitFor();
+    },
+  },
+  {
+    name: "settings-dictionary-empty",
+    query: "view=settings&section=dictionary&data=empty",
+    act: async (page, text) => {
+      await page.getByText(text("dictionary.empty")).waitFor();
+    },
+  },
+  {
+    name: "settings-dictionary-add-word",
+    query: "view=settings&section=dictionary&focus=add",
+    act: async (page, text) => {
+      await page.getByText("Kubernetes", { exact: true }).waitFor();
+      await page.getByLabel(text("dictionary.term")).fill("Ñuñoa");
+    },
+  },
+  {
+    name: "settings-dictionary-error",
+    query: "view=settings&section=dictionary",
+    act: async (page, text) => {
+      await page.getByText("Kubernetes", { exact: true }).waitFor();
+      await page.getByRole("button", { name: text("dictionary.add") }).click();
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "settings-dictionary-duplicate",
+    query: "view=settings&section=dictionary",
+    act: async (page, text) => {
+      await page.getByText("Kubernetes", { exact: true }).waitFor();
+      await page.getByLabel(text("dictionary.term")).fill("kubernetes");
+      await page.getByRole("button", { name: text("dictionary.add") }).click();
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "settings-dictionary-edit",
+    query: "view=settings&section=dictionary",
+    act: async (page, text) => {
+      await page
+        .getByRole("button", { name: text("common.edit") })
+        .first()
+        .click();
+    },
+  },
+  {
+    name: "settings-dictionary-delete",
+    query: "view=settings&section=dictionary",
+    act: async (page, text) => {
+      await page
+        .getByRole("button", { name: text("common.delete") })
+        .first()
+        .click();
+      await page.getByText(text("common.confirmDelete")).waitFor();
+    },
+  },
+  {
+    name: "settings-dictionary-failed",
+    query: "view=settings&section=dictionary&fail=listTerms",
+    act: async (page) => {
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "settings-styles",
+    query: "view=settings&section=styles",
+    act: async (page) => {
+      await page.getByText("Correos a clientes").first().waitFor();
+    },
+  },
+  {
+    name: "settings-styles-empty",
+    query: "view=settings&section=styles&data=empty",
+    act: async (page, text) => {
+      await page.getByText(text("styles.customEmpty")).waitFor();
+    },
+  },
+  {
+    name: "settings-styles-saved",
+    query: "view=settings&section=styles",
+    act: async (page, text) => {
+      await page.getByRole("radio", { name: text("style.casual.name") }).check();
+      await page.getByRole("button", { name: text("common.save") }).click();
+      await page.getByText(text("common.saved")).waitFor();
+    },
+  },
+  {
+    name: "settings-styles-error",
+    query: "view=settings&section=styles",
+    act: async (page, text) => {
+      await page.getByLabel(text("styles.name")).fill("Notas rápidas");
+      await page.getByRole("button", { name: text("styles.create") }).click();
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "settings-styles-edit",
+    query: "view=settings&section=styles",
+    act: async (page, text) => {
+      await page
+        .getByRole("button", { name: text("common.edit") })
+        .first()
+        .click();
+    },
+  },
+  {
+    name: "settings-styles-delete",
+    query: "view=settings&section=styles",
+    act: async (page, text) => {
+      await page
+        .getByRole("button", { name: text("common.delete") })
+        .first()
+        .click();
+      await page.getByText(text("styles.confirmDelete")).waitFor();
+    },
+  },
+  {
+    name: "settings-app-rules",
+    query: "view=settings&section=appRules",
+    act: async (page) => {
+      await page.getByText("windowsterminal.exe", { exact: true }).waitFor();
+    },
+  },
+  {
+    name: "settings-app-rules-empty",
+    query: "view=settings&section=appRules&data=empty",
+    act: async (page, text) => {
+      await page.getByText(text("appRules.empty")).waitFor();
+    },
+  },
+  {
+    name: "settings-app-rules-duplicate",
+    query: "view=settings&section=appRules",
+    act: async (page, text) => {
+      await page.getByText("windowsterminal.exe", { exact: true }).waitFor();
+      await page.getByLabel(text("appRules.app")).fill("Notepad.exe");
+      await page.getByRole("button", { name: text("appRules.add") }).click();
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "settings-app-rules-edit",
+    query: "view=settings&section=appRules",
+    act: async (page, text) => {
+      await page
+        .getByRole("button", { name: text("common.edit") })
+        .first()
+        .click();
+    },
+  },
+  {
+    name: "settings-history",
+    query: "view=settings&section=history",
+    act: async (page) => {
+      await page.getByText("Compra pan y leche.").waitFor();
+    },
+  },
+  {
+    name: "settings-history-empty",
+    query: "view=settings&section=history&data=empty",
+    act: async (page, text) => {
+      await page.getByText(text("history.empty")).waitFor();
+    },
+  },
+  {
+    name: "settings-history-raw",
+    query: "view=settings&section=history",
+    act: async (page, text) => {
+      await page.getByText(text("history.raw")).first().click();
+      await page
+        .getByRole("button", { name: text("history.copy") })
+        .first()
+        .click();
+      await page.getByText(text("history.copied")).waitFor();
+    },
+  },
+  {
+    name: "settings-history-delete",
+    query: "view=settings&section=history",
+    act: async (page, text) => {
+      await page
+        .getByRole("button", { name: text("common.delete") })
+        .first()
+        .click();
+      await page.getByText(text("common.confirmDelete")).waitFor();
+    },
+  },
   { name: "update-available", query: "view=update&update=available" },
-  { name: "update-available-en", query: "view=update&update=available&lang=en" },
   { name: "update-downloading", query: "view=update&update=downloading" },
   { name: "update-installing", query: "view=update&update=installing" },
   { name: "update-failed", query: "view=update&update=failed" },

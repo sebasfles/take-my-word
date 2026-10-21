@@ -1,5 +1,6 @@
 import {
   apiErrorSchema,
+  appRuleListSchema,
   dictationMetaSchema,
   dictationResponseSchema,
   settingsSchema,
@@ -17,5 +18,6 @@ export function contractSchemas(): Record<string, unknown> {
     apiError: z.toJSONSchema(apiErrorSchema),
     settings: z.toJSONSchema(settingsSchema),
     styleList: z.toJSONSchema(styleListSchema),
+    appRuleList: z.toJSONSchema(appRuleListSchema),
   };
 }

@@ -175,6 +175,37 @@ pub struct StyleList {
     pub styles: Vec<Style>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+pub enum PasteKeystroke {
+    #[default]
+    #[serde(rename = "ctrl+v")]
+    CtrlV,
+    #[serde(rename = "ctrl+shift+v")]
+    CtrlShiftV,
+    #[serde(rename = "shift+insert")]
+    ShiftInsert,
+    #[serde(rename = "cmd+v")]
+    CmdV,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct AppRule {
+    pub id: String,
+    pub app_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style_id: Option<String>,
+    pub keystroke: PasteKeystroke,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+pub struct AppRuleList {
+    pub rules: Vec<AppRule>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ApiFailure {
     #[error("the API could not be reached: {0}")]

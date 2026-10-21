@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError, mpsc};
 use std::thread;
 use std::time::Instant;
 
@@ -7,13 +7,13 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::activity::{Activity, Busy};
-use crate::api::{AuthedApi, HttpApi};
+use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi};
 #[cfg(debug_assertions)]
 use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
 use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
-use crate::clipboard;
+use crate::clipboard::{self, Clipboard, ClipboardError};
 use crate::config::{self, Settings};
 use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
@@ -23,6 +23,7 @@ use crate::keychain::SystemKeychain;
 use crate::locale;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, WindowOverlay};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
+use crate::rules::{RuleCache, RuleSource};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
 use crate::{account, env};
@@ -36,6 +37,7 @@ pub type AppApi = AuthedApi<Arc<AppAccount>>;
 pub struct Shell {
     pub account: Arc<AppAccount>,
     pub api: AppApi,
+    pub rules: Arc<RuleCache>,
     #[cfg(debug_assertions)]
     pub stub: Stub,
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
@@ -48,6 +50,7 @@ pub struct Shell {
     settings: Mutex<Settings>,
     settings_path: PathBuf,
     proposed: Mutex<Option<Hotkey>>,
+    copies: OnceLock<Mutex<Box<dyn Clipboard + Send>>>,
 }
 
 impl Shell {
@@ -72,6 +75,7 @@ impl Shell {
             Box::new(move |signed_in| account::changed(&listener_app, signed_in)),
         ));
         let api = AuthedApi::new(HttpApi::new(env::CURRENT.api_url)?, Arc::clone(&account));
+        let rules = Arc::new(RuleCache::default());
         let dictation_api = api.clone();
         #[cfg(debug_assertions)]
         let stub = Stub::start(STUB_DELAY)?;
@@ -97,6 +101,7 @@ impl Shell {
             paste,
             overlay: overlay.clone(),
             notifier: TrayNotifier(app.clone()),
+            keystrokes: Arc::clone(&rules),
             locale: locale::system_locale(),
         };
         thread::Builder::new()
@@ -106,6 +111,8 @@ impl Shell {
         let sink = ShellSink {
             app: app.clone(),
             account: Arc::clone(&account),
+            api: api.clone(),
+            rules: Arc::clone(&rules),
             overlay: overlay.clone(),
             jobs: jobs.clone(),
             target: ForegroundApp::default(),
@@ -119,6 +126,7 @@ impl Shell {
         Ok(Self {
             account,
             api,
+            rules,
             #[cfg(debug_assertions)]
             stub,
             overlay,
@@ -131,6 +139,7 @@ impl Shell {
             settings: Mutex::new(settings),
             settings_path,
             proposed: Mutex::new(None),
+            copies: OnceLock::new(),
         })
     }
 
@@ -144,6 +153,15 @@ impl Shell {
         if let Err(error) = config::save(&self.settings_path, &settings) {
             log::error!("saving settings failed: {error}");
         }
+    }
+
+    pub fn copy(&self, text: &str) -> Result<(), ClipboardError> {
+        let copies = self.copies.get_or_init(|| Mutex::new(clipboard::system()));
+        lock(copies).put_text(text)
+    }
+
+    pub fn reload_rules(&self) {
+        self.rules.load(&self.api);
     }
 
     pub fn hotkey(&self) -> Hotkey {
@@ -252,9 +270,17 @@ fn device_name(app: &AppHandle) -> String {
     }
 }
 
+impl RuleSource for AppApi {
+    fn app_rules(&self) -> Result<AppRuleList, ApiFailure> {
+        AuthedApi::app_rules(self)
+    }
+}
+
 struct ShellSink {
     app: AppHandle,
     account: Arc<AppAccount>,
+    api: AppApi,
+    rules: Arc<RuleCache>,
     overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
@@ -266,6 +292,10 @@ impl Sink for ShellSink {
     fn may_record(&mut self) -> bool {
         if self.account.is_signed_in() {
             self.account.renew_in_background();
+            if self.rules.claim_refresh(Instant::now()) {
+                let (api, rules) = (self.api.clone(), Arc::clone(&self.rules));
+                thread::spawn(move || rules.load(&api));
+            }
             return true;
         }
         self.overlay.set(OverlayState::Error {

@@ -174,6 +174,20 @@ describe("Settings", () => {
     window.history.replaceState(null, "", "/");
   });
 
+  it("moves an open window to the dictionary with the add field focused", async () => {
+    fakeBridge.apiRequest.mockResolvedValue({ terms: [] });
+    render(<Settings />);
+    await screen.findByText("Win");
+    act(() => {
+      listeners.settingsNavigate?.("&section=dictionary&focus=add");
+    });
+    await screen.findByRole("heading", { name: "Dictionary" });
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText("Term"));
+    });
+    fakeBridge.apiRequest.mockResolvedValue(null);
+  });
+
   it("follows a session that ends elsewhere", async () => {
     render(<Settings />);
     fireEvent.click(screen.getByRole("button", { name: "Account" }));

@@ -18,6 +18,7 @@ mod keychain;
 mod locale;
 mod overlay;
 mod paste;
+mod rules;
 mod session;
 mod shell;
 mod tray;
@@ -66,6 +67,8 @@ pub fn run() {
             account::open_sign_in,
             account::sign_out,
             editors::api_request,
+            editors::running_apps,
+            editors::copy_text,
             commands::quit,
             updater::update_view,
             updater::install_update,

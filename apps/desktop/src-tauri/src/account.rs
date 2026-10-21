@@ -194,6 +194,14 @@ fn finish(app: &AppHandle, shell: &Shell) {
 
 pub fn changed(app: &AppHandle, signed_in: bool) {
     log::info!("account: signed {}", if signed_in { "in" } else { "out" });
+    if let Some(shell) = app.try_state::<Shell>() {
+        if signed_in {
+            let app = app.clone();
+            std::thread::spawn(move || app.state::<Shell>().reload_rules());
+        } else {
+            shell.rules.clear();
+        }
+    }
     tray::show_signed_in(app, signed_in);
     let _ = app.emit("account-changed", signed_in);
     if !signed_in {
@@ -216,6 +224,7 @@ pub fn on_startup(app: &AppHandle) {
             _ if !shell.settings().first_run_done => windows::open_first_run(&app),
             _ => {}
         }
+        shell.reload_rules();
     });
 }
 

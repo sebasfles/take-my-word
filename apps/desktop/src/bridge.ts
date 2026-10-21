@@ -79,6 +79,8 @@ export const bridge = {
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
   apiRequest: (route: Route) => invoke<unknown>("api_request", { route }),
+  runningApps: () => invoke<string[]>("running_apps"),
+  copyText: (text: string) => invoke<undefined>("copy_text", { text }),
   quit: () => invoke<undefined>("quit"),
   updateView: () => invoke<UpdateView | null>("update_view"),
   installUpdate: () => invoke<undefined>("install_update"),
@@ -93,6 +95,10 @@ export const bridge = {
     }),
   onAccountChanged: (handler: (signedIn: boolean) => void): Promise<UnlistenFn> =>
     listen<boolean>("account-changed", (event) => {
+      handler(event.payload);
+    }),
+  onSettingsNavigate: (handler: (query: string) => void): Promise<UnlistenFn> =>
+    listen<string>("settings-navigate", (event) => {
       handler(event.payload);
     }),
   onHotkeyCaptureCancelled: (handler: () => void): Promise<UnlistenFn> =>

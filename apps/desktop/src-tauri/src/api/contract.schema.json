@@ -232,5 +232,49 @@
       "styles"
     ],
     "additionalProperties": false
+  },
+  "appRuleList": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "appId": {
+              "type": "string"
+            },
+            "styleId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "keystroke": {
+              "type": "string",
+              "enum": [
+                "ctrl+v",
+                "ctrl+shift+v",
+                "shift+insert",
+                "cmd+v"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "appId",
+            "keystroke"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "rules"
+    ],
+    "additionalProperties": false
   }
 }

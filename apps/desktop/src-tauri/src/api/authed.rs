@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use super::routes::Route;
 use super::{
-    ApiFailure, DictationApi, DictationMeta, DictationResponse, HttpApi, StyleList, UserSettings,
+    ApiFailure, AppRuleList, DictationApi, DictationMeta, DictationResponse, HttpApi, StyleList,
+    UserSettings,
 };
 use crate::auth::Secret;
 use crate::auth::account::{Account, AccountError, IdentityProvider};
@@ -10,6 +11,7 @@ use crate::keychain::Keychain;
 
 const STYLES: &str = "/styles";
 const SETTINGS: &str = "/me/settings";
+const APP_RULES: &str = "/app-rules";
 
 pub trait Credentials {
     fn token(&self) -> Result<Secret, ApiFailure>;
@@ -50,6 +52,10 @@ impl<C: Credentials> AuthedApi<C> {
 
     pub fn settings(&self) -> Result<UserSettings, ApiFailure> {
         self.authorized(|token| self.http.get(token, SETTINGS))
+    }
+
+    pub fn app_rules(&self) -> Result<AppRuleList, ApiFailure> {
+        self.authorized(|token| self.http.get(token, APP_RULES))
     }
 
     pub fn replace_settings(&self, settings: &UserSettings) -> Result<UserSettings, ApiFailure> {

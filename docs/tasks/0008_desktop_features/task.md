@@ -144,3 +144,28 @@ Did:
 - Finding 2: verify.log blocks now name the round commit, stating which code commit they ran on.
 
 Pending and deferred: unchanged from round 1.
+
+### Round 3 (milestone 2)
+
+Did:
+- Settings sections General, Dictionary, Styles, App rules, History, Account (`src/views/settings/`), all through `api.ts` and the route forwarder.
+  Each pre-checks the shared limits; a create's 400 and the 409 map to localized inline messages; loads that fail show a retry, or sign-in when the session ended.
+- Dictionary: list with aliases, use count and last use; add, edit aliases, delete with confirmation.
+- Styles: default-style picker (reads settings again, then `PUT` whole), built-ins with the web's copy, custom styles created, edited and deleted with name and prompt checks; deleting the default style moves the picker back to Plain, as the API does.
+  `StyleChoices` is the picker shared with onboarding.
+- App rules: list with style label ("default style", "deleted style") and keystroke; add from a `datalist` of running apps or typed executable, lowercased; edit style and keystroke, delete; `cmd+v` shows and edits as Ctrl+V.
+- History: newest first, raw transcript in a collapsed `details`, style, date, audio seconds, "load more" with the cursor, copy and delete with confirmation.
+- Rust: `AppRuleList` and `PasteKeystroke` mirrored and added to the contract test; `RuleCache` (`rules.rs`) loaded at startup and sign-in, reloaded after every rule route, refreshed in the background at hotkey down when older than 5 min (one refresh at a time, never awaited), cleared on sign-out; the worker pastes with the cached keystroke of the target's `appId` (Ctrl+V otherwise, `cmd+v` as Ctrl+V on Windows, Shift+Insert through enigo's `Insert`).
+- `running_apps`: visible titled top-level windows, same executable and `ApplicationFrameHost` mapping as the foreground (now one shared `app_id_of`), lowercased, deduplicated, without this app.
+- `copy_text`: a second clipboard owner, created on the first copy, puts the text with the paste's exclusion flags; no restore; the text is never logged.
+- Tray "Add a word" opens settings on the dictionary with the term field focused, or moves an open window there through the `settings-navigate` event.
+- Screenshots: every new state in both languages (368 files); dark danger button text made readable.
+
+Decisions not in the plan:
+- Deletes in every editor ask for confirmation inline (not only history), since a term, style or rule cannot be recovered either.
+- The running-apps picker is a `datalist` on the app field, so choosing and typing are one control.
+- History copy uses its own lazily spawned clipboard thread instead of the paste worker's, so a copy never waits behind a dictation or disturbs its restore.
+
+Pending (milestone 3): waveform, Windows smoke against dev, RAM and CPU measurements of the base and this build, `desktop-ci`, docs.
+
+Deferred: none.

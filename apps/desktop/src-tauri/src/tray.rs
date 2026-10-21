@@ -6,6 +6,7 @@ use crate::i18n::{Message, text};
 use crate::{account, windows};
 
 const SETTINGS: &str = "settings";
+const ADD_WORD: &str = "add-word";
 const ACCOUNT: &str = "account";
 const QUIT: &str = "quit";
 
@@ -35,13 +36,20 @@ pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
+    let add_word = MenuItem::with_id(
+        app,
+        ADD_WORD,
+        text(Message::TrayAddWord),
+        true,
+        None::<&str>,
+    )?;
     let account_item =
         MenuItem::with_id(app, ACCOUNT, account_label(signed_in), true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, QUIT, text(Message::TrayQuit), true, None::<&str>)?;
     #[cfg(debug_assertions)]
     let stub = stub::Menu::build(app)?;
-    let mut items: Vec<&dyn IsMenuItem<Wry>> = vec![&settings, &account_item];
+    let mut items: Vec<&dyn IsMenuItem<Wry>> = vec![&add_word, &settings, &account_item];
     #[cfg(debug_assertions)]
     items.push(&stub.submenu);
     items.extend([&separator as &dyn IsMenuItem<Wry>, &quit]);
@@ -52,6 +60,7 @@ pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             SETTINGS => windows::open_settings(app),
+            ADD_WORD => windows::add_word(app),
             ACCOUNT => account::toggle_from_tray(app),
             QUIT => app.exit(0),
             #[cfg(debug_assertions)]

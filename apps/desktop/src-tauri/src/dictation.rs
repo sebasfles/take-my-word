@@ -1,10 +1,11 @@
 use crate::activity::Busy;
-use crate::api::{ApiErrorCode, ApiFailure, DictationApi, DictationMeta};
+use crate::api::{ApiErrorCode, ApiFailure, DictationApi, DictationMeta, PasteKeystroke};
 use crate::audio::{self, AudioError, Captured};
 use crate::foreground::ForegroundApp;
 use crate::i18n::Message;
 use crate::overlay::{Overlay, OverlayAction, OverlayState};
 use crate::paste::{PasteResult, Undelivered};
+use crate::rules::Keystrokes;
 use crate::session::Take;
 
 pub struct Job {
@@ -14,22 +15,28 @@ pub struct Job {
 }
 
 pub trait Paste {
-    fn paste(&mut self, text: &str, target: Option<isize>) -> PasteResult;
+    fn paste(
+        &mut self,
+        text: &str,
+        target: Option<isize>,
+        keystroke: PasteKeystroke,
+    ) -> PasteResult;
 }
 
 pub trait Notifier {
     fn notify(&self, sentence: &[Message]);
 }
 
-pub struct Worker<A, P, O, N> {
+pub struct Worker<A, P, O, N, K> {
     pub api: A,
     pub paste: P,
     pub overlay: O,
     pub notifier: N,
+    pub keystrokes: K,
     pub locale: String,
 }
 
-impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
+impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A, P, O, N, K> {
     pub fn handle(&mut self, job: Job) {
         let Job { take, target, busy } = job;
         match take {
@@ -60,7 +67,7 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
         crate::dev::dump_recording(&wav);
         let meta = DictationMeta {
             locale: self.locale.clone(),
-            app_id: target.app_id,
+            app_id: target.app_id.clone(),
             ..DictationMeta::default()
         };
         let response = match self.api.dictate(wav, &meta) {
@@ -76,7 +83,8 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
             log::info!("dictation returned no text");
             return;
         }
-        match self.paste.paste(&response.text, target.window) {
+        let keystroke = self.keystrokes.for_app(target.app_id.as_deref());
+        match self.paste.paste(&response.text, target.window, keystroke) {
             PasteResult::Pasted => log::info!("pasted a dictation"),
             PasteResult::PastedClipboardLost => {
                 log::info!("pasted a dictation but could not restore the clipboard");
@@ -147,6 +155,7 @@ mod tests {
         busy_while_pasting: Vec<bool>,
         overlay: Vec<OverlayState>,
         pasted: Vec<String>,
+        keystrokes: Vec<PasteKeystroke>,
         notices: usize,
         sent: Vec<DictationMeta>,
     }
@@ -170,11 +179,17 @@ mod tests {
     struct FakePaste(Shared, PasteResult);
 
     impl Paste for FakePaste {
-        fn paste(&mut self, text: &str, _target: Option<isize>) -> PasteResult {
+        fn paste(
+            &mut self,
+            text: &str,
+            _target: Option<isize>,
+            keystroke: PasteKeystroke,
+        ) -> PasteResult {
             let mut world = self.0.borrow_mut();
             let busy = !world.activity.is_idle();
             world.busy_while_pasting.push(busy);
             world.pasted.push(text.into());
+            world.keystrokes.push(keystroke);
             self.1
         }
     }
@@ -184,6 +199,17 @@ mod tests {
     impl Overlay for FakeOverlay {
         fn set(&self, state: OverlayState) {
             self.0.borrow_mut().overlay.push(state);
+        }
+    }
+
+    struct Rules;
+
+    impl Keystrokes for Rules {
+        fn for_app(&self, app_id: Option<&str>) -> PasteKeystroke {
+            match app_id {
+                Some("notepad.exe") => PasteKeystroke::ShiftInsert,
+                _ => PasteKeystroke::CtrlV,
+            }
         }
     }
 
@@ -220,6 +246,7 @@ mod tests {
             paste: FakePaste(Rc::clone(&world), pasting),
             overlay: FakeOverlay(Rc::clone(&world)),
             notifier: FakeNotifier(Rc::clone(&world)),
+            keystrokes: Rules,
             locale: "es-CL".into(),
         };
         worker.handle(Job {
@@ -266,6 +293,7 @@ mod tests {
         assert_eq!(kinds(&world), vec!["processing", "hidden"]);
         assert_eq!(world.pasted, vec!["Hola."]);
         assert_eq!(world.busy_while_pasting, vec![true]);
+        assert_eq!(world.keystrokes, vec![PasteKeystroke::ShiftInsert]);
         assert_eq!(world.sent[0].locale, "es-CL");
         assert_eq!(world.sent[0].app_id.as_deref(), Some("notepad.exe"));
         assert_eq!(world.notices, 0);

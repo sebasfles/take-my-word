@@ -1,8 +1,13 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type AccountView, bridge, type Overview, keepListening, problemOf } from "../bridge.ts";
 import { type MessageId, t } from "../i18n.ts";
 import { Keys } from "../Keys.tsx";
-import { type SettingsSection, settingsSectionFromSearch } from "../view.ts";
+import { focusAddFromSearch, type SettingsSection, settingsSectionFromSearch } from "../view.ts";
+import { AppRules } from "./settings/AppRules.tsx";
+import { Dictionary } from "./settings/Dictionary.tsx";
+import { History } from "./settings/History.tsx";
+import { SectionPage } from "./settings/parts.tsx";
+import { Styles } from "./settings/Styles.tsx";
 
 type Capture = { step: "idle" } | { step: "listening" } | { step: "proposed"; keys: string[] };
 
@@ -10,12 +15,30 @@ const CAPTURE_TIMEOUT_MS = 15_000;
 
 const sections: { id: SettingsSection; label: MessageId }[] = [
   { id: "general", label: "settings.general" },
+  { id: "dictionary", label: "settings.dictionary" },
+  { id: "styles", label: "settings.styles" },
+  { id: "appRules", label: "settings.appRules" },
+  { id: "history", label: "settings.history" },
   { id: "account", label: "settings.account" },
 ];
 
 export function Settings() {
   const [section, setSection] = useState<SettingsSection>(() =>
     settingsSectionFromSearch(window.location.search),
+  );
+  const [focusAdd, setFocusAdd] = useState(() =>
+    focusAddFromSearch(window.location.search) ? 1 : 0,
+  );
+
+  useEffect(
+    () =>
+      keepListening(() =>
+        bridge.onSettingsNavigate((query) => {
+          setSection(settingsSectionFromSearch(query));
+          if (focusAddFromSearch(query)) setFocusAdd((count) => count + 1);
+        }),
+      ),
+    [],
   );
 
   return (
@@ -39,28 +62,12 @@ export function Settings() {
         </ul>
       </nav>
       {section === "general" && <General />}
+      {section === "dictionary" && <Dictionary focusAdd={focusAdd} />}
+      {section === "styles" && <Styles />}
+      {section === "appRules" && <AppRules />}
+      {section === "history" && <History />}
       {section === "account" && <Account />}
     </div>
-  );
-}
-
-function SectionPage({
-  title,
-  intro,
-  children,
-}: {
-  title: MessageId;
-  intro: MessageId;
-  children: ReactNode;
-}) {
-  return (
-    <main className="page settings-page">
-      <header className="page-header">
-        <h1>{t(title)}</h1>
-        <p className="muted">{t(intro)}</p>
-      </header>
-      {children}
-    </main>
   );
 }
 

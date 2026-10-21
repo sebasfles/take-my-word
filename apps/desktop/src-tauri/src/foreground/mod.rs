@@ -15,6 +15,13 @@ pub struct ForegroundApp {
     pub elevated: bool,
 }
 
+pub fn running_apps() -> Vec<String> {
+    let mut apps = platform::running_apps();
+    apps.sort();
+    apps.dedup();
+    apps
+}
+
 pub fn foreground_is_this_process() -> bool {
     platform::foreground_is_this_process()
 }
