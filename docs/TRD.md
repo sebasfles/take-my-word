@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0004_web_landing
+source: 0009_web_account
 ---
 
 # Technical Requirements Document
@@ -39,7 +39,7 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 - Stack: Next.js 16 App Router, React 19, TypeScript, plain CSS; built with OpenNext 4 (incremental and tag caches off, images unoptimized), served by a Lambda Function URL behind CloudFront; Next.js and OpenNext pinned.
 - Layout: `src/app` (landing, `sign-in`, `app` for the account, `api` for the route handlers), `src/lib` (session, auth flows, handlers, `es` and `en` dictionaries, API client), `src/components`; `public/static/` is the only public folder; `integration/` and `e2e/` run against dev.
 - Install: root `pnpm install --frozen-lockfile`; `pnpm exec playwright install chromium` for e2e and screenshots.
-- Workspace files: the root `.env` (`USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `API_URL`, `CREW_E2E_*`, `TABLE_NAME`) for `pnpm integration` and `pnpm e2e`; `pnpm screenshots` needs none.
+- Workspace files: the root `.env` (`USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `API_URL`, `CREW_E2E_*`, `TABLE_NAME`) and the `fless-takemyword` profile for `pnpm integration` and `pnpm e2e`, which create, seed (Polly speech) and delete throwaway users; `pnpm screenshots` mocks the API and needs none.
 - Delivery: `reusable-deploy-web` on the same pushes as api, gated per job; static assets to S3, code to the Lambda, CloudFront invalidation; see [infra](modules/infra/trd.md).
 
 ### desktop
@@ -71,7 +71,7 @@ Each app's first task sets its commands; until then they are `unknown`.
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
 | api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
-| web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the `fless-takemyword` profile for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, `--workers=1`) |
+| web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the `fless-takemyword` profile for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, with the `fless-takemyword` profile and `TABLE_NAME` for throwaway users, `--workers=1`) |
 | desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
 | cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |

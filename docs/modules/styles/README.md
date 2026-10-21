@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Styles
@@ -11,9 +11,9 @@ Mobile offers the same styles through a manual picker.
 
 ## Boundaries
 
-- Owns: styles (built-in and custom), app rules, their settings screens on web, and the desktop logic that resolves the focused app to a rule.
+- Owns: styles (built-in and custom), app rules, their read-only web views, and the desktop logic that resolves the focused app to a rule.
 - Does not own: the refiner call and the pipeline (dictation), terms and aliases (dictionary), active window capture and the paste itself (desktop), the default style setting (dictation, through `/me/settings`).
-- Code: `apps/api`, `packages/shared` (in dev since 0003); `apps/web` and `apps/desktop` come with 0009 and 0008.
+- Code: `apps/api`, `packages/shared`, `apps/web`; `apps/desktop` comes with 0008.
 
 ## Documents
 
