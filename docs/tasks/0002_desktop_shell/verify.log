@@ -1,0 +1,62 @@
+## 2026-10-21T04:05:01Z by om-developer target desktop on 84c33da1d946871147da3b0218b75618356c3144
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check and clippy -D warnings on C:\dev\take-my-word at 84c33da)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (2 vitest + 30 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+Other targets: untouched; the regenerated pnpm-lock.yaml only adds desktop packages.
+
+## 2026-10-21T04:57:11Z by om-developer target desktop on d498907c24cb5ba4db5961e67bb3f26641c84db6
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check and clippy -D warnings on C:\dev\take-my-word at d498907, clean rebuild)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (2 vitest + 30 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T16:25:54Z by om-developer target desktop on 4ba374497a695494c0e30adbd3fe3d3ae6bb7813
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check, clippy -D warnings on all targets and on the release profile, on C:\dev\take-my-word at 4ba3744)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 65 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+Lockfile regenerated after the rebase on develop 399b242 (the jsdom peer changes vitest's resolved key): unit tests of shared (19, exit 0), api (179, exit 0) and web (95, exit 0) also pass on this commit.
+
+## 2026-10-21T16:32:54Z by om-developer target desktop on cbd85cbe69ad51461d476fc7075654edb741e847
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check, clippy -D warnings on all targets and on the release profile, on C:\dev\take-my-word at cbd85cb)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 67 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T16:35:50Z by om-developer target desktop on 91d95a0e07e39acf7252d8f2ff0f82ce2ad1d64c
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check, clippy -D warnings on all targets and on the release profile, on C:\dev\take-my-word at 91d95a0)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T16:46:36Z by om-developer target desktop on 4637edcc4cf5540af712fc547fadae3d37988bcb
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; prettier, eslint, cargo fmt --check, clippy -D warnings on all targets and on release, on C:\dev\take-my-word at 4637edc)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
+- e2e: n/a
+Workflows target: pass exit 0 as part of the root pnpm lint (actionlint over desktop-ci.yml); root pnpm typecheck exit 0 and pnpm test exit 0 on 4637edc's tree.
+
+## 2026-10-21T16:48:35Z by om-developer target workflows on 03978c8f058e94d1543f9f6a5acc3ee1858d0db0
+- lint: pass exit 0 (pnpm lint:workflows, actionlint over .github/workflows including desktop-ci.yml)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T16:48:35Z by om-developer root ci (pnpm -r with desktop) on 03978c8f058e94d1543f9f6a5acc3ee1858d0db0
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (pnpm test: desktop 16, shared 19, api 179, web 95)
+- e2e: n/a
+
+## 2026-10-21T16:57:13Z by om-developer target desktop on 758a7463d1cd2b8d938382c17fedebfb6e379eb8
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; prettier, eslint, cargo fmt --check, clippy -D warnings on all targets and on release, on C:\dev\take-my-word at 758a746)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T16:57:13Z by om-developer target workflows on 758a7463d1cd2b8d938382c17fedebfb6e379eb8
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

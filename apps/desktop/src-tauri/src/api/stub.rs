@@ -1,0 +1,430 @@
+use std::io::Cursor;
+use std::net::{SocketAddr, TcpListener};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::time::Duration;
+
+use axum::Router;
+use axum::body::{Body, Bytes};
+use axum::extract::multipart::{Multipart, MultipartRejection};
+use axum::extract::{DefaultBodyLimit, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::routing::post;
+
+use super::{
+    AUDIO_FIELD, ApiErrorBody, ApiErrorCode, ApiErrorDetail, DictationMeta, DictationResponse,
+    LatencyMs, MAX_AUDIO_BYTES, META_FIELD, MIN_AUDIO_SECONDS, Providers, Skipped,
+};
+
+const WAV_MEDIA_TYPES: [&str; 4] = ["audio/wav", "audio/wave", "audio/x-wav", "audio/vnd.wave"];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StubMode {
+    Normal,
+    Silence,
+    QuotaExceeded,
+    NetworkError,
+}
+
+impl StubMode {
+    pub const ALL: [Self; 4] = [
+        Self::Normal,
+        Self::Silence,
+        Self::QuotaExceeded,
+        Self::NetworkError,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Normal => "Normal",
+            Self::Silence => "Silence (empty text)",
+            Self::QuotaExceeded => "Quota exceeded (429)",
+            Self::NetworkError => "Network error",
+        }
+    }
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Normal => "stub-normal",
+            Self::Silence => "stub-silence",
+            Self::QuotaExceeded => "stub-quota",
+            Self::NetworkError => "stub-network",
+        }
+    }
+
+    fn from_index(index: u8) -> Self {
+        Self::ALL
+            .get(usize::from(index))
+            .copied()
+            .unwrap_or(Self::Normal)
+    }
+
+    fn index(self) -> u8 {
+        Self::ALL
+            .iter()
+            .position(|mode| *mode == self)
+            .unwrap_or_default() as u8
+    }
+}
+
+#[derive(Clone)]
+struct Shared {
+    mode: Arc<AtomicU8>,
+    delay: Duration,
+}
+
+pub struct Stub {
+    mode: Arc<AtomicU8>,
+    address: SocketAddr,
+}
+
+impl Stub {
+    pub fn start(delay: Duration) -> std::io::Result<Self> {
+        let listener = TcpListener::bind(("127.0.0.1", 0))?;
+        listener.set_nonblocking(true)?;
+        let address = listener.local_addr()?;
+        let mode = Arc::new(AtomicU8::new(StubMode::Normal.index()));
+        let shared = Shared {
+            mode: Arc::clone(&mode),
+            delay,
+        };
+        let router = Router::new()
+            .route("/dictations", post(dictations))
+            .layer(DefaultBodyLimit::max(MAX_AUDIO_BYTES + 1024 * 1024))
+            .with_state(shared);
+        tauri::async_runtime::spawn(async move {
+            let served = match tokio::net::TcpListener::from_std(listener) {
+                Ok(listener) => axum::serve(listener, router).await,
+                Err(error) => Err(error),
+            };
+            if let Err(error) = served {
+                log::error!("the API stub stopped: {error}");
+            }
+        });
+        Ok(Self { mode, address })
+    }
+
+    pub fn base_url(&self) -> String {
+        format!("http://{}", self.address)
+    }
+
+    pub fn mode(&self) -> StubMode {
+        StubMode::from_index(self.mode.load(Ordering::SeqCst))
+    }
+
+    pub fn set_mode(&self, mode: StubMode) {
+        self.mode.store(mode.index(), Ordering::SeqCst);
+    }
+}
+
+#[derive(Debug, Default)]
+struct Upload {
+    audio: Option<(String, Bytes)>,
+    meta: Option<String>,
+}
+
+type Rejection = (ApiErrorCode, &'static str);
+
+async fn dictations(
+    State(shared): State<Shared>,
+    multipart: Result<Multipart, MultipartRejection>,
+) -> Response {
+    let mode = StubMode::from_index(shared.mode.load(Ordering::SeqCst));
+    tokio::time::sleep(shared.delay).await;
+    let upload = match multipart {
+        Ok(multipart) => read(multipart).await,
+        Err(_) => Err((
+            ApiErrorCode::UnsupportedMediaType,
+            "Send multipart/form-data with audio and meta parts.",
+        )),
+    };
+    let meta = match upload.and_then(|upload| validate(&upload)) {
+        Ok(meta) => meta,
+        Err((code, message)) => return api_error(code, message),
+    };
+    match mode {
+        StubMode::Normal => axum::Json(canned(&meta.locale, shared.delay)).into_response(),
+        StubMode::Silence => axum::Json(silence(shared.delay)).into_response(),
+        StubMode::QuotaExceeded => api_error(
+            ApiErrorCode::QuotaExceeded,
+            "The daily dictation quota is used up.",
+        ),
+        StubMode::NetworkError => dropped_connection(),
+    }
+}
+
+async fn read(mut multipart: Multipart) -> Result<Upload, Rejection> {
+    const MALFORMED: Rejection = (ApiErrorCode::BadRequest, "Malformed multipart body.");
+    let mut upload = Upload::default();
+    while let Some(field) = multipart.next_field().await.map_err(|_| MALFORMED)? {
+        match field.name() {
+            Some(AUDIO_FIELD) => {
+                let content_type = field.content_type().unwrap_or_default().to_owned();
+                let bytes = field.bytes().await.map_err(|_| MALFORMED)?;
+                upload.audio = Some((content_type, bytes));
+            }
+            Some(META_FIELD) => upload.meta = Some(field.text().await.map_err(|_| MALFORMED)?),
+            _ => {}
+        }
+    }
+    Ok(upload)
+}
+
+fn validate(upload: &Upload) -> Result<DictationMeta, Rejection> {
+    let Some((content_type, bytes)) = &upload.audio else {
+        return Err((ApiErrorCode::BadRequest, "The audio part is missing."));
+    };
+    let media_type = content_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    if !WAV_MEDIA_TYPES.contains(&media_type.as_str()) {
+        return Err((
+            ApiErrorCode::UnsupportedMediaType,
+            "The desktop app sends WAV (audio/wav).",
+        ));
+    }
+    if bytes.len() > MAX_AUDIO_BYTES {
+        return Err((ApiErrorCode::PayloadTooLarge, "The audio is over 4 MB."));
+    }
+    let reader = hound::WavReader::new(Cursor::new(bytes.as_ref()))
+        .map_err(|_| (ApiErrorCode::BadRequest, "The audio is not a WAV file."))?;
+    let spec = reader.spec();
+    if spec.sample_rate != 16_000
+        || spec.channels != 1
+        || spec.bits_per_sample != 16
+        || spec.sample_format != hound::SampleFormat::Int
+    {
+        return Err((
+            ApiErrorCode::BadRequest,
+            "The audio must be 16 kHz mono 16-bit WAV.",
+        ));
+    }
+    if f64::from(reader.duration()) / f64::from(spec.sample_rate) < MIN_AUDIO_SECONDS {
+        return Err((
+            ApiErrorCode::BadRequest,
+            "The audio is shorter than half a second.",
+        ));
+    }
+    let Some(meta) = &upload.meta else {
+        return Err((ApiErrorCode::BadRequest, "The meta part is missing."));
+    };
+    let meta: DictationMeta = serde_json::from_str(meta)
+        .map_err(|_| (ApiErrorCode::BadRequest, "The meta part is not valid JSON."))?;
+    if !valid_locale(&meta.locale) {
+        return Err((
+            ApiErrorCode::BadRequest,
+            "Invalid locale: expected es or en, optionally with a region.",
+        ));
+    }
+    Ok(meta)
+}
+
+fn valid_locale(locale: &str) -> bool {
+    let (language, region) = match locale.split_once('-') {
+        Some((language, region)) => (language, Some(region)),
+        None => (locale, None),
+    };
+    (language == "es" || language == "en")
+        && region.is_none_or(|region| {
+            region.len() == 2 && region.chars().all(|c| c.is_ascii_uppercase())
+        })
+}
+
+fn canned(locale: &str, delay: Duration) -> DictationResponse {
+    let text = if locale.starts_with("en") {
+        "Hello, this is a Take My Word test dictation."
+    } else {
+        "Hola, este es un dictado de prueba de Take My Word."
+    };
+    DictationResponse {
+        raw: text.to_lowercase().replace([',', '.'], ""),
+        text: text.into(),
+        skipped: None,
+        providers: Providers {
+            transcriber: Some("stub".into()),
+            refiner: Some("stub".into()),
+        },
+        latency_ms: latency(delay),
+    }
+}
+
+fn silence(delay: Duration) -> DictationResponse {
+    DictationResponse {
+        raw: String::new(),
+        text: String::new(),
+        skipped: Some(Skipped::Silence),
+        providers: Providers {
+            transcriber: Some("stub".into()),
+            refiner: None,
+        },
+        latency_ms: latency(delay),
+    }
+}
+
+fn latency(delay: Duration) -> LatencyMs {
+    LatencyMs {
+        quota: None,
+        transcribe: None,
+        refine: None,
+        save: None,
+        total: delay.as_millis() as u64,
+    }
+}
+
+fn api_error(code: ApiErrorCode, message: &str) -> Response {
+    let status = StatusCode::from_u16(code.status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let body = ApiErrorBody {
+        error: ApiErrorDetail {
+            code,
+            message: message.into(),
+        },
+    };
+    (status, axum::Json(body)).into_response()
+}
+
+fn dropped_connection() -> Response {
+    let broken = futures_util::stream::once(async {
+        Err::<Bytes, std::io::Error>(std::io::Error::other("the stub dropped the connection"))
+    });
+    Response::new(Body::from_stream(broken))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::{ApiFailure, DictationApi, HttpApi};
+    use crate::audio::{Captured, encode_wav};
+
+    fn wav(seconds: f32) -> Vec<u8> {
+        let captured = Captured {
+            samples: vec![0.1; (seconds * 16_000.0) as usize],
+            channels: 1,
+            sample_rate: 16_000,
+        };
+        encode_wav(&captured).unwrap()
+    }
+
+    fn upload(content_type: &str, audio: Vec<u8>, meta: &str) -> Upload {
+        Upload {
+            audio: Some((content_type.into(), Bytes::from(audio))),
+            meta: Some(meta.into()),
+        }
+    }
+
+    fn meta(locale: &str) -> DictationMeta {
+        DictationMeta {
+            locale: locale.into(),
+            app_id: Some("notepad.exe".into()),
+            ..DictationMeta::default()
+        }
+    }
+
+    #[test]
+    fn the_stub_accepts_what_the_desktop_sends() {
+        let accepted = validate(&upload(
+            "audio/wav",
+            wav(1.0),
+            r#"{"locale":"es-CL","appId":"notepad.exe"}"#,
+        ))
+        .unwrap();
+        assert_eq!(accepted, meta("es-CL"));
+    }
+
+    #[test]
+    fn the_stub_rejects_what_the_api_rejects() {
+        let cases = [
+            (
+                upload("audio/mpeg", wav(1.0), r#"{"locale":"es"}"#),
+                ApiErrorCode::UnsupportedMediaType,
+            ),
+            (
+                upload("audio/wav", vec![0; 64], r#"{"locale":"es"}"#),
+                ApiErrorCode::BadRequest,
+            ),
+            (
+                upload("audio/wav", wav(0.3), r#"{"locale":"es"}"#),
+                ApiErrorCode::BadRequest,
+            ),
+            (
+                upload("audio/wav", wav(1.0), r#"{"locale":"fr-FR"}"#),
+                ApiErrorCode::BadRequest,
+            ),
+            (
+                upload("audio/wav", wav(1.0), r#"{"locale":"es-cl"}"#),
+                ApiErrorCode::BadRequest,
+            ),
+            (
+                upload("audio/wav", wav(1.0), r#"{}"#),
+                ApiErrorCode::BadRequest,
+            ),
+            (
+                upload(
+                    "audio/wav",
+                    vec![0; MAX_AUDIO_BYTES + 1],
+                    r#"{"locale":"es"}"#,
+                ),
+                ApiErrorCode::PayloadTooLarge,
+            ),
+        ];
+        for (upload, code) in cases {
+            assert_eq!(validate(&upload).map_err(|(code, _)| code), Err(code));
+        }
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 16_000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut stereo = Vec::new();
+        let mut writer = hound::WavWriter::new(Cursor::new(&mut stereo), spec).unwrap();
+        for _ in 0..32_000 {
+            writer.write_sample(100_i16).unwrap();
+        }
+        writer.finalize().unwrap();
+        assert_eq!(
+            validate(&upload("audio/wav", stereo, r#"{"locale":"es"}"#)).map_err(|(code, _)| code),
+            Err(ApiErrorCode::BadRequest)
+        );
+    }
+
+    #[test]
+    fn the_http_client_gets_every_stub_mode_over_the_wire() {
+        let stub = Stub::start(Duration::ZERO).unwrap();
+        let api = HttpApi::new(stub.base_url()).unwrap();
+
+        let normal = api.dictate(wav(1.0), &meta("en-US")).unwrap();
+        assert!(normal.has_text());
+        assert!(normal.text.starts_with("Hello"));
+
+        stub.set_mode(StubMode::Silence);
+        assert!(!api.dictate(wav(1.0), &meta("es")).unwrap().has_text());
+
+        stub.set_mode(StubMode::QuotaExceeded);
+        assert!(matches!(
+            api.dictate(wav(1.0), &meta("es")),
+            Err(ApiFailure::Rejected {
+                status: 429,
+                code: Some(ApiErrorCode::QuotaExceeded)
+            })
+        ));
+
+        stub.set_mode(StubMode::NetworkError);
+        assert!(matches!(
+            api.dictate(wav(1.0), &meta("es")),
+            Err(ApiFailure::Network(_))
+        ));
+
+        stub.set_mode(StubMode::Normal);
+        assert!(matches!(
+            api.dictate(wav(1.0), &DictationMeta::default()),
+            Err(ApiFailure::Rejected {
+                status: 400,
+                code: Some(ApiErrorCode::BadRequest)
+            })
+        ));
+    }
+}

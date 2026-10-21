@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0002_desktop_shell
 ---
 
 # Desktop: product
@@ -15,12 +15,12 @@ It must feel like typing got faster: no window to open, no copy and paste, the u
 
 ### First run
 
-1. The user installs the app and it lives in the system tray.
-2. The app shows a username and password form; after sign-in it never asks again until sign-out or revocation.
-3. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
-4. The app tells the user which key to hold: Ctrl+Win on Windows, Fn on macOS, Ctrl+Super on Linux.
+1. The user installs the app and it lives in the system tray, starting with Windows unless turned off.
+2. The app explains which keys to hold (Ctrl+Win on Windows, Fn on macOS, Ctrl+Super on Linux) and that the microphone listens only during the hold.
+3. The app shows a username and password form; after sign-in it never asks again until sign-out or revocation (0007).
+4. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
 
-Errors and empty states: if a permission is denied the app explains that dictation cannot paste or hear the key, and links to the system setting.
+Errors and empty states: if Windows blocks the microphone or none is found, first run says so and links to the privacy setting.
 
 ### Dictate
 
@@ -30,7 +30,7 @@ Errors and empty states: if a permission is denied the app explains that dictati
 4. The clean text is pasted at the cursor and the overlay disappears.
 5. Whatever the user had in the clipboard before is back in the clipboard.
 
-Errors and empty states: a press shorter than half a second does nothing; silence pastes nothing; a network or quota failure shows a short message in the overlay and pastes nothing.
+Errors and empty states: a press shorter than half a second does nothing; silence pastes nothing; a network, quota or microphone failure shows a short message in the overlay, which closes after 4 s or on click, and pastes nothing.
 
 ### Per-app style
 
@@ -41,8 +41,10 @@ Errors and empty states: an app with no rule uses the user's default style and t
 
 ### Change the hotkey
 
-1. The user opens settings from the tray and records a new key or combination.
-2. The new hotkey works immediately.
+1. The user opens settings from the tray, clicks Change and presses the new combination.
+2. The app proposes it; Save applies it at once and keeps it across restarts.
+
+Errors and empty states: a rejected combination is explained and the old hotkey stays.
 
 ### Update
 
@@ -50,16 +52,16 @@ Errors and empty states: an app with no rule uses the user's default style and t
 
 ## Rules
 
-- Reaching the maximum recording length while the key is still held stops the recording and sends it.
-- History, dictionary, styles and app rules are all editable from the app settings.
-
-- Dictation is hold to talk: recording lasts exactly as long as the key is held.
-- Right Alt is never offered as a hotkey, because it is AltGr on Spanish keyboards.
-- One recording lasts at most about two and a half minutes.
+- Dictation is hold to talk: recording lasts exactly as long as the key is held, at most two minutes, after which it stops and is sent.
+- Any other key pressed during the hold cancels the dictation.
+- A hotkey is two or three keys with at least one modifier; Right Alt is never accepted, because it is AltGr on Spanish keyboards.
+- Holding the hotkey while the previous dictation is processing starts a new recording; the earlier text is pasted once the new hold ends, and its failure, if any, arrives as a notification.
+- The paste goes only to the window that had focus when the hold began.
+- When the paste cannot land (an administrator window, the window changed, the target never read it), the text stays in the clipboard and a notification says so; when the earlier clipboard cannot be put back, a notification says that too.
 - Audio leaves the machine only to be transcribed and is never stored.
-- The clipboard is always restored after pasting.
+- The dictated text stays out of Windows clipboard history and the cloud clipboard.
+- History, dictionary, styles and app rules are all editable from the app settings.
 - Windows comes first; macOS and Linux follow in phase 5.
-- Apps running as administrator on Windows do not accept the paste; this is a known limitation, as in other dictation tools.
 
 ## Out of scope
 
@@ -68,7 +70,5 @@ Errors and empty states: an app with no rule uses the user's default style and t
 - Choosing the style by hand per dictation; app rules and the default style, picked during onboarding, decide.
 
 ## Open questions
-
-- What the user can do with the text when paste fails (administrator windows, network drop after transcription): keep it in the clipboard or offer it from the tray.
 
 - Whether the hotkey setting follows the user across machines or stays per machine.

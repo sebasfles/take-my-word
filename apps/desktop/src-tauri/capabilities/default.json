@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Permissions of the app's own windows",
+  "windows": ["settings", "first-run", "overlay"],
+  "permissions": ["core:default"]
+}
