@@ -85,6 +85,7 @@ Consolidated 2026-10-21; answers by Sebastian through the om-manager unless mark
 - Release timing: build and review everything now; dry-run `desktop-release` on a draft release to prove signing and `latest.json`.
   No public release of the stub shell: once 0007 is on `develop`, rebase, build the release with 0007's prd config, then cut `desktop-v0.1.0` and `desktop-v0.1.1` on this branch and run Acceptance 3. The PR waits for that.
 - Releases are prd builds; dev and prd landings link the same installer. The release job uses no Actions environment (prd's deployment policy allows only `main`).
+- 0007 coordination (decided, om-manager, 2026-10-21): 0007 adds `tauri.dev.conf.json` and `tauri.prd.conf.json` (own identifier, product name, keychain, config folder, autostart); a release build with no env fails. So `desktop-release` builds with the prd config, and the updater config (pubkey, endpoint, `createUpdaterArtifacts`) lives in the prd config only; a dev build never checks for updates and tolerates the missing config. Until 0007 lands, this branch creates `tauri.prd.conf.json` with the updater part only (om-reviewer); the second to merge reconciles `tauri.conf.json`, `Cargo.toml` and the tray. `desktop-ci`'s artifact becomes the dev build (0007).
 - Tagged commits stay untouched: PRs merge with merge commits, so the tagged commits reach `develop`; after a tag is pushed, never rebase or force-push at or below it.
 - Scope adjusted, `pnpm release:desktop X.Y.Z` (root): refuses `develop` and `main` and a dirty tree; bumps `apps/desktop/package.json`, `Cargo.toml` and the package's entry in `Cargo.lock`; commits; creates the annotated tag `desktop-vX.Y.Z` carrying the notes; pushes branch and tag. Reason: `protect-develop` requires PRs (`infra/environments/core/github.tf`).
 - Updater key: generated outside the repo, password never in argv; both secrets set with `gh secret set` from stdin; both values appended to the root `.env` and the workspace `.env`; temp files deleted. Sebastian copies them to his password manager (om-manager tells him).
@@ -94,6 +95,7 @@ Consolidated 2026-10-21; answers by Sebastian through the om-manager unless mark
 - Updater (om-reviewer): check and install run in Rust; React only renders the `update` view and answers through commands, so the WebView gets no updater permission. Updater off in debug builds. Tauri 2's plugin has no built-in dialog, so "dialog off" is moot.
 - Update window (om-reviewer): opens without taking focus, never during a hold or before a pending paste lands; install only when idle; release notes rendered as plain text. Copy in es or en from the Windows language, mapped as `src-tauri/src/locale.rs` (es fallback); the rest of the UI stays English (tracked for 0008).
 - Acceptance 3: the 0.1.1 bump alone is the dummy change.
+- Dry run (om-reviewer, 2026-10-21, from the om-developer): `desktop-release` always creates a draft, verifies `latest.json`'s signature and version against the pubkey in `tauri.prd.conf.json`, and only then publishes with `--latest`; a prerelease version (`X.Y.Z-dryrun.N`) stays a draft. The dry run is a throwaway commit off the branch tagged `desktop-v0.1.0-dryrun.1`; the om-developer pushes only that tag, then deletes the tag and the draft. Real release tags are pushed by the om-developer only when the om-reviewer hands them over explicitly, after 0007 is on `develop`.
 - gh (om-reviewer): every gh call runs as sebasfles with `GH_TOKEN="$(gh auth token --user sebasfles)"`; the active account (sflores-designli, no push) is never switched.
 
 Constraints:
@@ -110,3 +112,34 @@ Review focus beyond the Pipeline:
 clearance: full: GitHub `sebasfles/take-my-word` as sebasfles (Actions secrets, tags, releases, PR), the Windows host through powershell.exe under `C:\dev\tmw-0005*`; no AWS.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+
+- Updater key generated with a password through a pty (never in argv), both Actions secrets set from stdin as sebasfles, both values appended to the root and workspace `.env`, temp files shredded; key id `0D621D8A094B5116`, public key in `tauri.prd.conf.json`.
+- `tauri.conf.json` drops `version`; `tauri.prd.conf.json` holds only the updater part (`createUpdaterArtifacts`, pubkey, endpoint, `requireSignedVersion`, passive install).
+- Rust: `tauri-plugin-updater` registered only when the build config has `plugins.updater` and the build is not debug, so `cargo test`, `desktop-ci` and debug builds never check. `updater.rs` checks at startup and every 6 hours, holds the offer, downloads, waits for idle, installs; the WebView only gets `update_view`, `install_update`, `postpone_update` and the `update` event, no updater permission. "Later" or closing the window drops the offer until the next check.
+- Idle means no hold and no dictation job in flight: `activity.rs` gives each hold a `Busy` guard that travels inside the `Job` and drops after the worker pasted; the update window opens only when idle, with `focused(false)`, and the install waits for idle after the download.
+- UI: `Update` view in es or en from `locale::system_language()` (same mapping as the dictation locale, es fallback), notes as plain text, progress, failure with retry; screenshots in the workspace `screenshots/update-*` at 390, 768, 1280 (dark) and 1280 light.
+- Scripts in `apps/desktop/scripts`: `version.ts` (equality of `package.json`, `Cargo.toml`, `Cargo.lock`, optional tag; run by `ci` as `check:version`), `release.ts` behind root `pnpm release:desktop X.Y.Z [--notes file]`, `release-check.ts` plus `minisign.ts` (Ed25519 and BLAKE2b in `node:crypto`, trusted comment version), tested against fixtures signed by the Tauri CLI with throwaway keys (private keys not kept).
+- `desktop-release.yml`: tag must be annotated with a message and match the app version; `tauri-action@v1.0.0` builds with the prd config into a draft; fixed-name installer uploaded; assets downloaded and checked against the committed key; non-prerelease versions published as latest and the public links smoke-tested. No Rust cache in the signing job.
+- Landing and its e2e point to `releases/latest/download/take-my-word-windows-x64-setup.exe`.
+
+Decisions not recorded in the plan:
+
+- Updater TLS is `native-tls` (SChannel), not the plugin's default `rustls-tls`: `rustls-tls` switches the shared `reqwest` to `rustls-no-provider`, which panicked the existing stub client (and would have crashed release builds at startup before the updater ever ran); native TLS also keeps rustls and ring out of the binary.
+- `requireSignedVersion: true`: Tauri CLI 2.12.3 writes the version into the signature's trusted comment, so a manifest cannot pair a new version number with an older signed installer.
+- The workflow verifies the release itself before publishing (`release-check.ts`), so the "signature verifies with the committed key" evidence is in every run's log.
+- Dry runs are prerelease versions (`X.Y.Z-dryrun.N`) on throwaway commits off the branch; they stay drafts.
+- Update window 460x400, not resizable, unfocused on open.
+
+Pending:
+
+- Dry run blocked. Runs 39647373542 (`0.1.0-dryrun.1`, commit adds the workflows) and the `0.1.0-dryrun.2` run (commit only bumps the version) both built and signed the installer (2.01 MiB NSIS plus `.sig`, about 8 min). Both then failed when `tauri-action` created the release: `Resource not accessible by integration`, although the job token shows `Contents: write` and immutable releases are off. Not yet proven: the tag commits are off `develop` (the default branch) and carry workflow files `develop` lacks, which GitHub may refuse to `GITHUB_TOKEN`. Both tags are deleted and no release or draft exists.
+- web e2e (`pnpm integration && pnpm e2e`) needs the `fless-takemyword` AWS profile, outside this task's clearance; logged as fail in `verify.log`. Its landing assertion also needs the new link deployed to dev.
+- Acceptance 3 (0.1.0 then 0.1.1 on Windows) waits for 0007 and your hand-off of the release tags.
+
+Deferred:
+
+- None.

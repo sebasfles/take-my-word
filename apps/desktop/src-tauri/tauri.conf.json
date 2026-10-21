@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Take My Word Dev",
-  "version": "0.1.0",
   "identifier": "dev.fless.takemyword.dev",
   "build": {
     "beforeDevCommand": "pnpm dev",

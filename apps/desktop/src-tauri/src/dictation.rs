@@ -1,3 +1,4 @@
+use crate::activity::Busy;
 use crate::api::{ApiErrorCode, ApiFailure, DictationApi, DictationMeta};
 use crate::audio::{self, AudioError, Captured};
 use crate::foreground::ForegroundApp;
@@ -8,6 +9,7 @@ use crate::session::Take;
 pub struct Job {
     pub take: Take,
     pub target: ForegroundApp,
+    pub busy: Busy,
 }
 
 pub trait Paste {
@@ -28,7 +30,8 @@ pub struct Worker<A, P, O, N> {
 
 impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
     pub fn handle(&mut self, job: Job) {
-        match job.take {
+        let Job { take, target, busy } = job;
+        match take {
             Take::TooShort | Take::Cancelled => self.overlay.set(OverlayState::Hidden),
             Take::Failed(error) => {
                 log::warn!("dictation failed: {error}");
@@ -36,9 +39,10 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
             }
             Take::Recorded { captured, held } => {
                 log::info!("dictating a {} ms hold", held.as_millis());
-                self.dictate(&captured, job.target);
+                self.dictate(&captured, target);
             }
         }
+        drop(busy);
     }
 
     fn dictate(&mut self, captured: &Captured, target: ForegroundApp) {
@@ -144,10 +148,13 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+    use crate::activity::Activity;
     use crate::api::{DictationResponse, LatencyMs, Skipped};
 
     #[derive(Default)]
     struct World {
+        activity: Activity,
+        busy_while_pasting: Vec<bool>,
         overlay: Vec<OverlayState>,
         pasted: Vec<String>,
         notices: usize,
@@ -174,7 +181,10 @@ mod tests {
 
     impl Paste for FakePaste {
         fn paste(&mut self, text: &str, _target: Option<isize>) -> PasteResult {
-            self.0.borrow_mut().pasted.push(text.into());
+            let mut world = self.0.borrow_mut();
+            let busy = !world.activity.is_idle();
+            world.busy_while_pasting.push(busy);
+            world.pasted.push(text.into());
             self.1
         }
     }
@@ -214,6 +224,7 @@ mod tests {
         pasting: PasteResult,
     ) -> World {
         let world = Rc::new(RefCell::new(World::default()));
+        let busy = world.borrow().activity.start();
         let mut worker = Worker {
             api: FakeApi(Rc::clone(&world), answer),
             paste: FakePaste(Rc::clone(&world), pasting),
@@ -228,7 +239,9 @@ mod tests {
                 app_id: Some("notepad.exe".into()),
                 elevated: false,
             },
+            busy,
         });
+        assert!(world.borrow().activity.is_idle());
         drop(worker);
         Rc::try_unwrap(world).ok().unwrap().into_inner()
     }
@@ -262,6 +275,7 @@ mod tests {
         let world = run(recorded(), Ok(response("Hola.", None)), PasteResult::Pasted);
         assert_eq!(kinds(&world), vec!["processing", "hidden"]);
         assert_eq!(world.pasted, vec!["Hola."]);
+        assert_eq!(world.busy_while_pasting, vec![true]);
         assert_eq!(world.sent[0].locale, "es-CL");
         assert_eq!(world.sent[0].app_id.as_deref(), Some("notepad.exe"));
         assert_eq!(world.notices, 0);

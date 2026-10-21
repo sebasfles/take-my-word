@@ -17,7 +17,8 @@
     "screenshots": "node screenshots/capture.ts",
     "contract": "node contract/write.ts",
     "tauri:build:dev": "tauri build --config src-tauri/tauri.dev.conf.json",
-    "tauri:build:prd": "tauri build --config src-tauri/tauri.prd.conf.json"
+    "tauri:build:prd": "tauri build --config src-tauri/tauri.prd.conf.json",
+    "check:version": "node scripts/version.ts"
   },
   "dependencies": {
     "@take-my-word/shared": "workspace:*",

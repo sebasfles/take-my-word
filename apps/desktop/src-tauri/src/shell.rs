@@ -6,6 +6,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::activity::{Activity, Busy};
 use crate::api::{AuthedApi, HttpApi};
 #[cfg(debug_assertions)]
 use crate::api::{Stub, Stubbed};
@@ -38,6 +39,7 @@ pub struct Shell {
     pub stub: Stub,
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     pub microphone: MicrophoneStatus,
+    pub activity: Activity,
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
     keys: Arc<Mutex<Keys>>,
@@ -99,12 +101,15 @@ impl Shell {
         thread::Builder::new()
             .name("dictation".into())
             .spawn(move || job_inbox.into_iter().for_each(|job| worker.handle(job)))?;
+        let activity = Activity::default();
         let sink = ShellSink {
             app: app.clone(),
             account: Arc::clone(&account),
             overlay: overlay.clone(),
             jobs: jobs.clone(),
             target: ForegroundApp::default(),
+            activity: activity.clone(),
+            busy: None,
         };
         thread::Builder::new()
             .name("session".into())
@@ -117,6 +122,7 @@ impl Shell {
             stub,
             overlay,
             microphone: microphone_status,
+            activity,
             #[cfg(debug_assertions)]
             jobs,
             keys,
@@ -251,6 +257,8 @@ struct ShellSink {
     overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
+    activity: Activity,
+    busy: Option<Busy>,
 }
 
 impl Sink for ShellSink {
@@ -268,6 +276,7 @@ impl Sink for ShellSink {
     }
 
     fn listening(&mut self) {
+        self.busy = Some(self.activity.start());
         self.overlay.begin_recording();
         self.target = SystemWindow.foreground();
     }
@@ -277,6 +286,7 @@ impl Sink for ShellSink {
         let _ = self.jobs.send(Job {
             take,
             target: std::mem::take(&mut self.target),
+            busy: self.busy.take().unwrap_or_else(|| self.activity.start()),
         });
     }
 }

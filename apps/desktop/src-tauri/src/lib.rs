@@ -1,4 +1,5 @@
 mod account;
+mod activity;
 mod api;
 mod audio;
 mod auth;
@@ -18,6 +19,7 @@ mod paste;
 mod session;
 mod shell;
 mod tray;
+mod updater;
 mod windows;
 
 use tauri::{AppHandle, Manager, RunEvent};
@@ -26,7 +28,13 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::shell::Shell;
 
 pub fn run() {
-    let app = tauri::Builder::default()
+    let context = tauri::generate_context!();
+    let updates = updater::enabled(context.config());
+    let mut builder = tauri::Builder::default();
+    if updates {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+    let app = builder
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             on_second_launch(app, &args);
         }))
@@ -56,14 +64,21 @@ pub fn run() {
             account::open_sign_in,
             account::sign_out,
             commands::quit,
+            updater::update_view,
+            updater::install_update,
+            updater::postpone_update,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle();
             env::check_identifier(&app.config().identifier)?;
             let settings_path = app.path().app_config_dir()?.join(config::FILE_NAME);
             let settings = config::load(&settings_path);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
             let signed_in = shell.account.is_signed_in();
+            app.manage(updater::Updates::new());
+            if updates {
+                updater::start(handle, shell.activity.clone());
+            }
             app.manage(shell);
             tray::build(handle, signed_in)?;
             if !settings.first_run_done {
@@ -72,7 +87,7 @@ pub fn run() {
             account::on_startup(handle);
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("the Tauri application failed to build");
 
     app.run(|_app, event| {
