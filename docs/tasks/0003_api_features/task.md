@@ -180,3 +180,16 @@ Deferred: none.
    From here every round commits first and verifies the committed tree.
 
 Pending and deferred: unchanged from round 1.
+
+### Round 3 (round 2 findings, 3 of 3 applied)
+
+1. History hides expired dictations: the Query filters `expiresAt > now` (epoch seconds from the route's `now`), and because DynamoDB applies `Limit` before the filter, the store re-queries from `LastEvaluatedKey` with the remaining count until the page is full or the partition ends; the cursor is the last returned entry's SK.
+   `history/dynamo.test.ts` runs the store against a fake that evaluates `Limit` before the filter: an expired newest item, and a page that must skip two expired items and continue after its last entry.
+   Checked by mutation: without the filter two tests fail, returning the `LastEvaluatedKey` after one query fails the paging test.
+2. The e2e scoping test dictates for `crew-e2e` itself, asserts that dictation is A's newest, pages all of `crew-e2e-b`'s history to show its id is absent, asserts B's `DELETE` answers 404 and that A still has it; no conditional assertion is left.
+3. The concurrency test uses a rendezvous: the quota fake and the profile fake each wait for the other to start, and either fails after 500 ms if it ran alone, so a serial `dictate` in either order answers 500.
+   Checked by mutation: awaiting the quota before the profile read fails the test.
+
+External actions: `lambda update-function-code` plus `wait function-updated-v2` for the four dev functions at the code of 1cba069. No Terraform apply.
+
+Pending and deferred: unchanged from round 1.

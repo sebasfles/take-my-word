@@ -49,3 +49,29 @@ The amended round commit differs from 268d578 only in docs/tasks/0003_api_featur
 - e2e: n/a
 
 Run on a clean worktree at db3701b; every artefact in .verify/ is newer than its commit time (2026-10-20T23:22:40-05:00).
+
+## 2026-10-21T04:33:37Z by om-developer target api on 1cba069
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (182 tests, pnpm test, --no-file-parallelism)
+- e2e: pass exit 0 (32 tests, pnpm e2e against dev at the code of 1cba069, --no-file-parallelism)
+
+## 2026-10-21T04:33:37Z by om-developer target shared on 1cba069
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (15 tests, pnpm test, --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-21T04:33:37Z by om-developer target infra on 1cba069
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T04:33:37Z by om-developer target workflows on 1cba069
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+Run on a clean worktree at 1cba069; every artefact in .verify/ is newer than its commit time (2026-10-20T23:30:36-05:00).
