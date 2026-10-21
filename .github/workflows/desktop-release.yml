@@ -133,7 +133,7 @@ jobs:
           dir="$RUNNER_TEMP/release-assets"
           mkdir -p "$dir"
           gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" > "$RUNNER_TEMP/assets.json"
-          node -e 'for (const a of JSON.parse(require("node:fs").readFileSync(0, "utf8"))) if (/(\.exe|^latest\.json)$/.test(a.name)) console.log(`${a.id}\t${a.name}`)' \
+          node -e 'for (const a of JSON.parse(require("node:fs").readFileSync(0, "utf8"))) if (/(\.exe|^latest\.json)$/.test(a.name)) console.log(a.id + "\t" + a.name)' \
             < "$RUNNER_TEMP/assets.json" |
             while IFS=$'\t' read -r asset name; do
               gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > "$dir/$name"

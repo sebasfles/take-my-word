@@ -60,3 +60,12 @@ The first unit run exited 1 before cargo started: WSL interop failed to launch p
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (pnpm check:version reports 0.1.1; 54 vitest + 112 cargo tests, 3 ignored; pnpm check:version && pnpm test && pnpm rust:test, cargo --locked)
 - e2e: n/a
+
+## 2026-10-21T21:30:12Z by om-developer target workflows on e1f38a4
+- lint: pass exit 0 (command -v shellcheck && shellcheck --version && pnpm lint:workflows -verbose; shellcheck 0.11.0 at ~/.local/bin, so a missing shellcheck fails the step)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+Negative control: actionlint on desktop-release.yml from b2182f8 exits 1 with SC2016, so the shellcheck rule is active.
+Earlier workflows blocks in this log (b25d8fb, a63507c, 48947ff) ran without shellcheck installed, so actionlint skipped every run: script; their pass was a false negative.
+Also ran ci's Lint step, pnpm lint at the root: exit 0.

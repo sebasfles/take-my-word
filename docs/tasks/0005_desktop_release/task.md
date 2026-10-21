@@ -202,3 +202,8 @@ Pending:
 ### Round 5
 
 - Finding 1: `verify-task` for the desktop target on e6abb89, which includes the 0.1.1 bump: `check:version` reports 0.1.1 in all three files, and lint, clippy (dev and prd release) and cargo tests pass `--locked` on the Windows mirror with `Cargo.lock` unchanged.
+
+### Round 6
+
+- Finding 1: the asset listing in `desktop-release` builds its line by string concatenation instead of a template literal in single quotes (SC2016). Its output on a sample asset list is identical to the old one, so what the step lists and downloads is unchanged.
+- Finding 2: shellcheck 0.11.0 installed in `~/.local/bin`; workflows lint now requires it and passes. A control run on the pre-fix file fails with SC2016. The earlier workflows-lint passes ran without shellcheck and are marked as false negatives in `verify.log`.
