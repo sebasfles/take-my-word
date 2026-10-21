@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0002_desktop_shell
 ---
 
 # Desktop: flows
@@ -10,7 +10,7 @@ Only flows that deserve a diagram. A CRUD does not.
 ## Hold to talk
 
 Runs every time the user holds the hotkey.
-How the error state is dismissed (timeout or click) is not decided.
+An error closes after 4 s or on click; a failure that lands while the next hold is open arrives as a notification instead.
 
 ```mermaid
 stateDiagram-v2
@@ -20,9 +20,9 @@ stateDiagram-v2
   Listening --> Processing: hotkey up
   Processing --> Pasting: text returned
   Processing --> Idle: empty text, nothing pasted
-  Processing --> Error: network or quota failure
+  Processing --> Error: network, quota or microphone failure
   Pasting --> Idle: clipboard restored
-  Error --> Idle: overlay dismissed
+  Error --> Idle: 4 s or click
 ```
 
 ```mermaid
@@ -39,8 +39,9 @@ sequenceDiagram
   D->>O: show processing
   D->>A: WAV, appId, styleId, access token
   A-->>D: clean text
-  D->>D: save clipboard, put text
+  D->>D: save clipboard, offer text (delayed rendering)
   D->>F: paste keystroke from app rule
+  F-->>D: reads the text
   D->>D: restore clipboard
   D->>O: hide
 ```
