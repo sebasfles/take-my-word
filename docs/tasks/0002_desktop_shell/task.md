@@ -267,3 +267,7 @@ Deferred:
 ### Round 7 (round 6 finding)
 
 - Finding 1: verify-task ran the `workflows` target (`pnpm lint:workflows`) at the round commit as its own block with its own artefact, and the root `ci` evidence (root `pnpm lint`, `pnpm typecheck`, `pnpm test` with desktop in `pnpm -r`) was run again after that commit. No code or CI change.
+
+### Round 8 (PR #8 desktop-ci finding)
+
+- Finding 1: the repository had no line-ending policy, so the windows-latest checkout (`core.autocrlf true`) turned every file to CRLF and `prettier --check` failed in `apps/desktop`. A root `.gitattributes` sets `* text=auto eol=lf` with the icons and WAVs marked binary; prettier keeps `endOfLine: lf`. `git add --renormalize .` changed no content. A clone made with `core.autocrlf=true` checks out LF and passes the desktop UI lint.

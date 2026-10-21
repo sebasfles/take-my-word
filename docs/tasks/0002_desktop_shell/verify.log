@@ -48,3 +48,15 @@ Workflows target: pass exit 0 as part of the root pnpm lint (actionlint over des
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (pnpm test: desktop 16, shared 19, api 179, web 95)
 - e2e: n/a
+
+## 2026-10-21T16:57:13Z by om-developer target desktop on 758a7463d1cd2b8d938382c17fedebfb6e379eb8
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; prettier, eslint, cargo fmt --check, clippy -D warnings on all targets and on release, on C:\dev\take-my-word at 758a746)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 68 cargo tests, 1 ignored real-clipboard test; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T16:57:13Z by om-developer target workflows on 758a7463d1cd2b8d938382c17fedebfb6e379eb8
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
