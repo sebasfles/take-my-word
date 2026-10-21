@@ -73,6 +73,10 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
         }
         match self.paste.paste(&response.text, target.window) {
             PasteResult::Pasted => log::info!("pasted a dictation"),
+            PasteResult::PastedClipboardLost => {
+                log::info!("pasted a dictation but could not restore the clipboard");
+                self.notifier.notify(CLIPBOARD_LOST);
+            }
             PasteResult::LeftInClipboard(reason) => {
                 log::info!("left a dictation in the clipboard: {reason:?}");
                 self.notifier.notify(match reason {
@@ -89,6 +93,7 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
 const GENERIC_FAILURE: &str = "Something went wrong. Try again.";
 const PASTE_FAILURE: &str = "Couldn't paste. Try again.";
 const NOT_PASTED: &str = "Couldn't paste into that window. The text is on your clipboard.";
+const CLIPBOARD_LOST: &str = "The text was pasted, but another app held the clipboard, so what you had copied before could not be put back.";
 const NOT_PASTED_FOCUS_CHANGED: &str = "The window changed while you were dictating, so nothing was pasted. The text is on your clipboard.";
 const NOT_PASTED_ELEVATED: &str =
     "That window runs as administrator, so the text couldn't be pasted. It is on your clipboard.";
@@ -307,6 +312,17 @@ mod tests {
             );
             assert_eq!(world.notices, 1);
         }
+    }
+
+    #[test]
+    fn a_clipboard_that_could_not_be_restored_is_announced() {
+        let world = run(
+            recorded(),
+            Ok(response("Hola.", None)),
+            PasteResult::PastedClipboardLost,
+        );
+        assert_eq!(world.pasted, vec!["Hola."]);
+        assert_eq!(world.notices, 1);
     }
 
     #[test]

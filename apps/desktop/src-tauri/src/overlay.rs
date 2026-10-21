@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Duration;
 
@@ -31,6 +31,51 @@ pub enum OverlayState {
 
 pub trait Overlay {
     fn set(&self, state: OverlayState);
+}
+
+#[derive(Clone)]
+pub struct GatedOverlay<O> {
+    inner: O,
+    recording: Arc<Mutex<bool>>,
+}
+
+impl<O: Overlay> GatedOverlay<O> {
+    pub fn new(inner: O) -> Self {
+        Self {
+            inner,
+            recording: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn begin_recording(&self) {
+        let mut recording = self
+            .recording
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *recording = true;
+        self.inner.set(OverlayState::Listening);
+    }
+
+    pub fn end_recording(&self) {
+        *self
+            .recording
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = false;
+    }
+}
+
+impl<O: Overlay> Overlay for GatedOverlay<O> {
+    fn set(&self, state: OverlayState) {
+        let recording = self
+            .recording
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if *recording && state != OverlayState::Listening {
+            log::info!("kept the overlay on listening during a hold");
+            return;
+        }
+        self.inner.set(state);
+    }
 }
 
 #[derive(Clone)]
@@ -120,4 +165,39 @@ pub fn set_memory_target(window: &tauri::WebviewWindow, target: MemoryTarget) {
     });
     #[cfg(not(windows))]
     let _ = (window, target);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use super::*;
+
+    #[derive(Default)]
+    struct Shown(RefCell<Vec<OverlayState>>);
+
+    impl Overlay for &Shown {
+        fn set(&self, state: OverlayState) {
+            self.0.borrow_mut().push(state);
+        }
+    }
+
+    #[test]
+    fn a_dictation_finishing_during_the_next_hold_leaves_the_overlay_on_listening() {
+        let shown = Shown::default();
+        let overlay = GatedOverlay::new(&shown);
+        overlay.begin_recording();
+        overlay.set(OverlayState::Hidden);
+        overlay.set(OverlayState::Error {
+            message: "Can't reach Take My Word.".into(),
+            action: None,
+        });
+        assert_eq!(*shown.0.borrow(), vec![OverlayState::Listening]);
+        overlay.end_recording();
+        overlay.set(OverlayState::Processing);
+        assert_eq!(
+            *shown.0.borrow(),
+            vec![OverlayState::Listening, OverlayState::Processing]
+        );
+    }
 }

@@ -24,7 +24,8 @@ use super::{Clipboard, ClipboardError};
 
 const WM_COMMANDS: u32 = WM_APP + 1;
 const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
-const OPEN_ATTEMPTS: u32 = 20;
+const OPEN_PATIENCE: Duration = Duration::from_millis(200);
+const RESTORE_PATIENCE: Duration = Duration::from_secs(3);
 const OPEN_RETRY: Duration = Duration::from_millis(10);
 const GDI_HANDLE_FORMATS: [u32; 8] = [2, 3, 9, 14, 0x80, 0x82, 0x83, 0x8E];
 const PRIVATE_HANDLE_FORMATS: std::ops::RangeInclusive<u32> = 0x200..=0x3FF;
@@ -258,7 +259,7 @@ fn execute(command: Command) {
 }
 
 fn offer(window: HWND, text: Vec<u8>) -> Result<(), ClipboardError> {
-    let saved = with_open_clipboard(window, || {
+    let saved = with_open_clipboard(window, OPEN_PATIENCE, || {
         let saved = snapshot();
         unsafe { EmptyClipboard() }.map_err(win_error)?;
         delay_rendering(u32::from(CF_UNICODETEXT.0))?;
@@ -273,12 +274,8 @@ fn offer(window: HWND, text: Vec<u8>) -> Result<(), ClipboardError> {
 }
 
 fn restore(window: HWND) -> Result<(), ClipboardError> {
-    let saved = with_state(|state| {
-        state.pending = None;
-        std::mem::take(&mut state.saved)
-    })
-    .unwrap_or_default();
-    with_open_clipboard(window, || {
+    let saved = with_state(|state| std::mem::take(&mut state.saved)).unwrap_or_default();
+    let restored = with_open_clipboard(window, RESTORE_PATIENCE, || {
         unsafe { EmptyClipboard() }.map_err(win_error)?;
         for (format, bytes) in &saved {
             if let Err(error) = set_data(*format, bytes) {
@@ -291,7 +288,12 @@ fn restore(window: HWND) -> Result<(), ClipboardError> {
             set_data(format, &[0])?;
         }
         Ok(())
-    })
+    });
+    with_state(|state| match &restored {
+        Ok(()) => state.pending = None,
+        Err(_) => state.saved = saved,
+    });
+    restored
 }
 
 fn keep_text(window: HWND) -> Result<(), ClipboardError> {
@@ -302,7 +304,7 @@ fn keep_text(window: HWND) -> Result<(), ClipboardError> {
     .flatten() else {
         return Ok(());
     };
-    with_open_clipboard(window, || {
+    with_open_clipboard(window, OPEN_PATIENCE, || {
         if unsafe { GetClipboardOwner() }.is_ok_and(|owner| owner == window) {
             set_data(u32::from(CF_UNICODETEXT.0), &text)?;
         }
@@ -315,7 +317,7 @@ fn put_text(window: HWND, text: &[u8]) -> Result<(), ClipboardError> {
         state.saved.clear();
         state.pending = None;
     });
-    with_open_clipboard(window, || {
+    with_open_clipboard(window, OPEN_PATIENCE, || {
         unsafe { EmptyClipboard() }.map_err(win_error)?;
         set_data(u32::from(CF_UNICODETEXT.0), text)?;
         mark_private()
@@ -324,12 +326,12 @@ fn put_text(window: HWND, text: &[u8]) -> Result<(), ClipboardError> {
 
 fn with_open_clipboard<T>(
     window: HWND,
+    patience: Duration,
     work: impl FnOnce() -> Result<T, ClipboardError>,
 ) -> Result<T, ClipboardError> {
-    let mut attempt = 0;
+    let deadline = Instant::now() + patience;
     while let Err(error) = unsafe { OpenClipboard(Some(window)) } {
-        attempt += 1;
-        if attempt >= OPEN_ATTEMPTS {
+        if Instant::now() >= deadline {
             return Err(win_error(error));
         }
         thread::sleep(OPEN_RETRY);
@@ -458,6 +460,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
     fn offered_text_renders_on_first_read_and_the_previous_clipboard_comes_back() {
         let mut clipboard = SystemClipboard::spawn().unwrap();
         let before = read_text();

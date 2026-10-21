@@ -14,7 +14,7 @@ use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
 use crate::locale;
-use crate::overlay::{Overlay, OverlayState, WindowOverlay};
+use crate::overlay::{GatedOverlay, WindowOverlay};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
@@ -23,7 +23,7 @@ const STUB_DELAY: Duration = Duration::from_millis(700);
 
 pub struct Shell {
     pub stub: Stub,
-    pub overlay: WindowOverlay,
+    pub overlay: GatedOverlay<WindowOverlay>,
     pub microphone: MicrophoneStatus,
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
@@ -41,7 +41,7 @@ impl Shell {
         settings: Settings,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         windows::create_overlay(app)?;
-        let overlay = WindowOverlay::new(app.clone());
+        let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
         let stub = Stub::start(STUB_DELAY)?;
@@ -201,18 +201,19 @@ pub fn capture_cancelled(app: &AppHandle) {
 }
 
 struct ShellSink {
-    overlay: WindowOverlay,
+    overlay: GatedOverlay<WindowOverlay>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
 }
 
 impl Sink for ShellSink {
     fn listening(&mut self) {
-        self.overlay.set(OverlayState::Listening);
+        self.overlay.begin_recording();
         self.target = SystemWindow.foreground();
     }
 
     fn finished(&mut self, take: Take) {
+        self.overlay.end_recording();
         let _ = self.jobs.send(Job {
             take,
             target: std::mem::take(&mut self.target),

@@ -10,6 +10,7 @@ use crate::hotkey::OWN_INJECTION_TAG;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PasteResult {
     Pasted,
+    PastedClipboardLost,
     LeftInClipboard(Undelivered),
     Failed,
 }
@@ -89,7 +90,7 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
             Ok(()) => PasteResult::Pasted,
             Err(error) => {
                 log::warn!("restoring the clipboard failed: {error}");
-                PasteResult::Pasted
+                PasteResult::PastedClipboardLost
             }
         }
     }
@@ -172,6 +173,7 @@ mod tests {
         read_at: Option<Instant>,
         keystroke_fails: bool,
         offer_fails: bool,
+        restore_fails: bool,
         elevated: bool,
         focus_moved: bool,
         held_polls: Cell<u32>,
@@ -196,6 +198,9 @@ mod tests {
 
         fn restore(&mut self) -> Result<(), ClipboardError> {
             self.0.borrow_mut().log.push("restore".into());
+            if self.0.borrow().restore_fails {
+                return Err(ClipboardError("held by another app".into()));
+            }
             Ok(())
         }
 
@@ -348,6 +353,19 @@ mod tests {
             PasteResult::LeftInClipboard(Undelivered::FocusChanged)
         );
         assert_eq!(world.borrow().log, vec!["put hola"]);
+    }
+
+    #[test]
+    fn a_clipboard_that_cannot_be_restored_is_reported_not_hidden() {
+        let world = world(|world| {
+            will_be_read(world);
+            world.restore_fails = true;
+        });
+        assert_eq!(
+            paster(&world).paste("hola", Some(1)),
+            PasteResult::PastedClipboardLost
+        );
+        assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
     }
 
     #[test]
