@@ -238,14 +238,10 @@ pub fn capture_cancelled(app: &AppHandle) {
 }
 
 fn device_name(app: &AppHandle) -> String {
-    let product = app
-        .config()
-        .product_name
-        .as_deref()
-        .unwrap_or("Take My Word");
+    let product = windows::product_name(app);
     match std::env::var("COMPUTERNAME") {
         Ok(computer) if !computer.is_empty() => format!("{product} on {computer}"),
-        _ => product.to_owned(),
+        _ => product,
     }
 }
 
@@ -328,7 +324,7 @@ impl Notifier for TrayNotifier {
             .0
             .notification()
             .builder()
-            .title("Take My Word")
+            .title(windows::product_name(&self.0))
             .body(message)
             .show();
         if let Err(error) = shown {

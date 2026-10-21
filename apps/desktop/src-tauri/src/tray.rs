@@ -36,12 +36,7 @@ pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
     items.extend([&separator as &dyn IsMenuItem<Wry>, &quit]);
     let menu = Menu::with_items(app, &items)?;
     let mut tray = TrayIconBuilder::with_id("main")
-        .tooltip(
-            app.config()
-                .product_name
-                .as_deref()
-                .unwrap_or("Take My Word"),
-        )
+        .tooltip(windows::product_name(app))
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {

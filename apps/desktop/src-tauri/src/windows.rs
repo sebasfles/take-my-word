@@ -7,8 +7,15 @@ pub const FIRST_RUN: &str = "first-run";
 pub const ACCOUNT: &str = "account";
 pub const OVERLAY: &str = "overlay";
 
+pub fn product_name(app: &AppHandle) -> String {
+    app.config()
+        .product_name
+        .clone()
+        .unwrap_or_else(|| "Take My Word".into())
+}
+
 pub fn open_settings(app: &AppHandle) {
-    let Some(window) = open(app, SETTINGS, "", "Take My Word", (480.0, 560.0)) else {
+    let Some(window) = open(app, SETTINGS, "", &product_name(app), (480.0, 560.0)) else {
         return;
     };
     let app = app.clone();
@@ -37,7 +44,7 @@ pub fn open_first_run(app: &AppHandle) {
 
 pub fn open_account(app: &AppHandle, onboarding: bool) {
     let query = if onboarding { "&step=onboarding" } else { "" };
-    let _ = open(app, ACCOUNT, query, "Take My Word", (440.0, 560.0));
+    let _ = open(app, ACCOUNT, query, &product_name(app), (440.0, 560.0));
 }
 
 fn open(

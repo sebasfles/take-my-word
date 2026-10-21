@@ -217,3 +217,19 @@ The dictation script was changed to close only its own tab, and captures now cov
 
 Decisions the plan did not record: none.
 Pending: docs, on the clean signal.
+
+### Round 5
+
+Done:
+
+- Finding 1 applied: `windows::product_name` reads the configured product name, and the settings and account window titles, the notification title, the tray tooltip and the device name all use it; the first-run title and heading stay "Welcome to Take My Word".
+  No unit test: Tauri's mock runtime is not enabled in this crate, and the titles were checked on Windows instead.
+- Recaptured on Windows (announced, more than 2 minutes idle, watcher saw no physical input) from the rebuilt dev installer: the sign-in, choose-password, style picker, first-run and settings windows (signed in and out, for `crew-e2e` and a throwaway user) now read "Take My Word Dev".
+  `crew-e2e`'s `SETTINGS` is back to `plain` and it has no devices; the throwaway user and its `SETTINGS` were deleted; the dev app is uninstalled and its data and credentials removed.
+- Captures now come from `PrintWindow`, which renders only the target window even when another window covers it.
+  The earlier screen-copy captures were deleted from the workspace and the Windows scratch folder: besides the slivers the om-reviewer saw, some showed the debug console, WhatsApp or a Google Cloud console page in front of the app's window.
+  The Notepad captures cover only the document area and were clean; they are kept.
+- `screenshots/windows/` in the workspace now holds 18 captures: the window captures above, plus the Notepad text and overlays of Acceptance 4 to 6 and the signed-out hold from round 4.
+  The notification title has no capture: no smoke path raises a notification without a failing paste.
+
+Pending: docs, on the clean signal.
