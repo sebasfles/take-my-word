@@ -44,6 +44,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Build the web with OpenNext
+        run: pnpm --filter @take-my-word/web bundle
+
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false

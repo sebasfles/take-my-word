@@ -8,6 +8,11 @@ variable "api_hostname" {
   type        = string
 }
 
+variable "web_hostname" {
+  description = "Hostname the web answers on through CloudFront"
+  type        = string
+}
+
 variable "hosted_zone" {
   description = "Route 53 zone that answers for the API hostname; read, never owned"
   type        = string

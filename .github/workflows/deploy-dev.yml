@@ -6,10 +6,13 @@ on:
       - develop
     paths:
       - apps/api/**
+      - apps/web/**
       - packages/shared/**
+      - packages/cognito/**
       - .github/workflows/**
       - package.json
       - pnpm-lock.yaml
+      - pnpm-workspace.yaml
 
 permissions:
   contents: read
@@ -19,7 +22,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  changes:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-changes.yml
+
+  api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
     permissions:
       contents: read
       id-token: write
@@ -27,8 +37,19 @@ jobs:
     with:
       environment: dev
 
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/reusable-deploy-web.yml
+    with:
+      environment: dev
+
   promotion-pr:
-    needs: deploy
+    needs: [api, web]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

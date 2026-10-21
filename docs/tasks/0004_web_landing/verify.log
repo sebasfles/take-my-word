@@ -1,0 +1,29 @@
+## 2026-10-21T05:26:18Z by om-developer target cognito on 41bd22c
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T05:26:18Z by om-developer target api on 41bd22c
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (182 tests, pnpm test --no-file-parallelism)
+- e2e: pass exit 0 (32 tests, AWS_PROFILE=fless-takemyword pnpm e2e --no-file-parallelism)
+
+## 2026-10-21T05:26:18Z by om-developer target web on 41bd22c
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (60 tests, pnpm test --no-file-parallelism)
+- e2e: pass exit 0 (3 tests, pnpm integration --no-file-parallelism; then 6 tests, pnpm e2e --workers=1 against https://dev.takemyword.fless.dev)
+
+## 2026-10-21T05:26:18Z by om-developer target infra on 41bd22c
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T05:26:18Z by om-developer target workflows on 41bd22c
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

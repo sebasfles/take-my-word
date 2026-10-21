@@ -47,17 +47,38 @@ resource "aws_iam_role_policy" "deploy" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "UpdateFunctions"
-      Effect = "Allow"
-      Action = ["lambda:UpdateFunctionCode", "lambda:GetFunction"]
-      Resource = [
-        module.dictate.arn,
-        module.authorizer.arn,
-        module.api_function.arn,
-        module.dictionary_usage.arn,
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "UpdateFunctions"
+        Effect = "Allow"
+        Action = ["lambda:UpdateFunctionCode", "lambda:GetFunction"]
+        Resource = [
+          module.dictate.arn,
+          module.authorizer.arn,
+          module.api_function.arn,
+          module.dictionary_usage.arn,
+          module.web_function.arn,
+        ]
+      },
+      {
+        Sid      = "ListWebAssets"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = module.web_assets.arn
+      },
+      {
+        Sid      = "SyncWebAssets"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "${module.web_assets.arn}/*"
+      },
+      {
+        Sid      = "InvalidateWeb"
+        Effect   = "Allow"
+        Action   = ["cloudfront:CreateInvalidation"]
+        Resource = module.web_cdn.distribution_arn
+      },
+    ]
   })
 }
 
@@ -69,6 +90,9 @@ resource "github_actions_environment_variable" "this" {
     AUTHORIZER_FUNCTION_NAME       = module.authorizer.name
     API_FUNCTION_NAME              = module.api_function.name
     DICTIONARY_USAGE_FUNCTION_NAME = module.dictionary_usage.name
+    WEB_FUNCTION_NAME              = module.web_function.name
+    WEB_ASSETS_BUCKET              = module.web_assets.id
+    WEB_DISTRIBUTION_ID            = module.web_cdn.distribution_id
   }
 
   repository    = var.github_repository

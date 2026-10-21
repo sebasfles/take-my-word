@@ -52,3 +52,28 @@ output "debug_bucket" {
   description = "Debug audio bucket, null where the environment has none"
   value       = var.debug_bucket ? aws_s3_bucket.debug[0].id : null
 }
+
+output "web_url" {
+  description = "HTTPS URL of the web"
+  value       = module.web_cdn.url
+}
+
+output "web_function_name" {
+  description = "web Lambda, updated by the deploy workflow"
+  value       = module.web_function.name
+}
+
+output "web_assets_bucket" {
+  description = "Bucket the deploy workflow syncs the web's static assets into"
+  value       = module.web_assets.id
+}
+
+output "web_distribution_id" {
+  description = "CloudFront distribution of the web, invalidated by the deploy workflow"
+  value       = module.web_cdn.distribution_id
+}
+
+output "web_secret_id" {
+  description = "Secret holding the web's COOKIE_KEY, written outside Terraform"
+  value       = module.web_secret.arn
+}

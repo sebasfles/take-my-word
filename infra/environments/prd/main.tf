@@ -3,6 +3,7 @@ module "app" {
 
   env          = local.env
   api_hostname = local.api_hostname
+  web_hostname = local.web_hostname
   hosted_zone  = local.hosted_zone
 
   github_owner      = local.github_owner

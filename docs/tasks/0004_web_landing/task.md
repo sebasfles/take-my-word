@@ -120,3 +120,51 @@ Review focus beyond the Pipeline:
 clearance: full: AWS profile `fless-takemyword` (apply dev, plan prd, push dev web code and assets, write the dev web secret), `crew-e2e` in the dev pool including forgetting its devices, GitHub `sebasfles/take-my-word`.
 
 ## om-developer notes
+
+### Round 1
+
+Did:
+
+- `packages/cognito` (`@take-my-word/cognito`, Node only): `srp.ts` moved from `apps/api/scripts` with `git mv`, plus `signIn` (now returns `signed-in` or `new-password-required`), `completeNewPassword`, `confirmDevice`, `forgetDevice`, `refresh`, `revokeToken`; one Cognito client per region.
+  `apps/api/scripts/sign-in.ts` keeps only the `.env` helpers and imports the package; the api e2e imports it directly.
+- `apps/web`: Next.js 16.3.8, React 19.3.1, `@opennextjs/aws` 4.1.10, all pinned; landing, `/sign-in` (credentials step and choose-password step), `/app` shell with username, sign-out and `GET /me/settings` parsed with `settingsSchema`; `es` default and `en` through the `tmw-lang` cookie on all three pages and `<html lang>`.
+- Session: two cookies, `__Host-tmw-session` (access token, `DeviceKey`, remember flag) and `__Host-tmw-refresh` (refresh token), each AES-256-GCM sealed with its cookie name as associated data, HttpOnly, Secure, SameSite=Lax, Path=/; Max-Age 400 days only when remember me was checked, renewed on every refresh.
+  Measured with real `crew-e2e` tokens: 1767 and 2610 bytes per `Set-Cookie` header.
+  The `NEW_PASSWORD_REQUIRED` challenge lives in a third sealed cookie, `__Host-tmw-challenge`, for 3 minutes; the password and the Cognito session never reach browser JS.
+- Route handlers: `POST /api/session`, `/api/session/password`, `/api/session/refresh`, `/api/session/sign-out`, `/api/locale`; every one checks `Origin` against `WEB_ORIGIN` and every browser call goes through `signedFetch`; no Server Action, no form post, no middleware.
+- Infra: modules `s3` and `cloudfront` (security headers policy: HSTS 2 years, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`), `function_url` option in `lambda`, `stacks/app/web.tf` (certificate, secret `take-my-word-{env}/web` with `COOKIE_KEY`, web Lambda 512 MB 30 s, assets bucket, distribution, both Lambda permissions), deploy role and Actions variables `WEB_FUNCTION_NAME`, `WEB_ASSETS_BUCKET`, `WEB_DISTRIBUTION_ID`.
+  Applied to dev (27 added, 1 changed); prd planned only (107 to add); dev `COOKIE_KEY` written, never printed.
+- Workflows: `reusable-changes` diffs the push against its previous head and gives `api` and `web` booleans; `deploy-dev` and `deploy-prd` run `reusable-deploy` (api) and the new `reusable-deploy-web` per job; the promotion PR waits for both and runs unless one failed; `ci` also runs the OpenNext build.
+- Dev deployed from this machine with the web job's commands; integration (3) and e2e (6) green on `https://dev.takemyword.fless.dev`; api e2e green after the move.
+- Screenshots: `.workspaces/0004_web_landing/screenshots/` holds landing, sign-in, sign-in with the error and `/app`, in `es` and `en`, at 390, 768 and 1280, from `pnpm screenshots` (mocked API, local cookie key, sealed fake session).
+- TRD verification rows for `web` and `cognito` set, since `verify-task` reads them; the rest of the TRD web section waits for `document-task`.
+
+Decisions not in the plan:
+
+- Cognito keeps only the refresh token issued by the call that finished last: two refreshes of one token both succeed inside the grace period, then renewing the earlier one fails with `RefreshTokenReuseException` (reproduced 4 of 4 against the dev pool).
+  The browser keeps whichever `Set-Cookie` arrives last, so two server-side refreshes racing would sometimes leave a dead token and sign the user out an hour later.
+  So refresh is never triggered by a server render: a page that finds the access token in its last minute renders `RenewSession`, which calls `POST /api/session/refresh` inside a Web Lock (`navigator.locks`, name `tmw-session-refresh`) shared by every tab of the origin; the second tab then carries the renewed cookies and the handler returns without calling Cognito.
+  `refreshSession` in `src/lib/auth.ts` is the one code path, also used by sign-out; `RefreshTokenReuseException` and `NotAuthorizedException` sign out, anything else answers 503 and keeps the cookies.
+  A browser without Web Locks still renews, unserialized; two concurrent requests from outside a browser can still race, which is debt for `document-task`.
+- `WEB_ORIGIN` joins the function's environment: the `Origin` check needs the public origin, and the `Host` the function sees is the Function URL's (`AllViewerExceptHostHeader`).
+- `WEB_COOKIE_KEY` (base64) replaces `WEB_SECRET_ID` when set, only for `pnpm screenshots`; Terraform never sets it, so the deployed function always reads Secrets Manager.
+- Sign-out refreshes an expiring session first, then `ForgetDevice` (it needs a live access token), then `RevokeToken`, and clears the cookies even if Cognito fails.
+- The deploy zips the server function with `zip -y`: pnpm's symlinked `node_modules` resolve only if the links are kept; without it the function failed with `Cannot find module '@swc/helpers/...'` (seen on dev).
+- `/_next/static/*` is synced before the function update and the rest after it, so new HTML never points at missing chunks; nothing is deleted from the bucket.
+- `@next/eslint-plugin-next` and `eslint-plugin-react-hooks` live at the root because the root `eslint.config.js` loads them for `apps/web/**`.
+- In the `/app` header below 768 px the brand shows only its mark so the username fits.
+
+Pending: none for round 1.
+Acceptance 6 (deploy-dev web job green after merge) can only be proven after merge.
+
+Deferred:
+
+- Next's image optimization and revalidation functions are built by OpenNext and never deployed; harmless, skipped.
+
+External actions (clearance full, profile `fless-takemyword`, us-east-1, dev):
+
+- `infra/scripts/tf dev apply`: 27 added, 1 changed, 0 destroyed.
+- `infra/scripts/tf prd plan -lock=false`: 107 to add, not applied.
+- `secretsmanager put-secret-value` on `take-my-word-dev/web` with a random 32-byte `COOKIE_KEY`.
+- `aws s3 sync` to `take-my-word-dev-web-assets-115891590483` (two passes), `lambda update-function-code` on `take-my-word-dev-web` (twice, the second with `zip -y`), `cloudfront create-invalidation` on `EMI6CYP83OTMO`.
+- `cognito-idp admin-forget-device` on five `crew-e2e` devices left by my refresh-race experiment and one failed integration run; the pool now holds none.

@@ -55,3 +55,9 @@ variable "log_retention_days" {
   description = "CloudWatch Logs retention"
   type        = number
 }
+
+variable "function_url" {
+  description = "Whether the function gets an AWS_IAM Function URL, for a CloudFront origin with origin access control"
+  type        = bool
+  default     = false
+}

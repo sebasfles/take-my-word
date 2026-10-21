@@ -71,9 +71,10 @@ Each app's first task sets its commands; until then they are `unknown`.
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
 | api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
-| web | `apps/web` | unknown | unknown | unknown | unknown |
+| web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, `--workers=1`) |
 | desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
+| cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |
 | shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
 | infra | `infra` | `terraform fmt -check -recursive` | `terraform -chdir=environments/{core,dev,prd} validate`, after `init -backend=false` on a fresh clone | n/a | n/a |
 | workflows | `.` | `pnpm lint:workflows` (actionlint) | n/a | n/a | n/a |

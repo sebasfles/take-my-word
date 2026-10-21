@@ -105,3 +105,10 @@ resource "aws_lambda_function" "this" {
 
   depends_on = [aws_iam_role_policy.logs]
 }
+
+resource "aws_lambda_function_url" "this" {
+  count = var.function_url ? 1 : 0
+
+  function_name      = aws_lambda_function.this.function_name
+  authorization_type = "AWS_IAM"
+}
