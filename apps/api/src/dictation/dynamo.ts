@@ -1,8 +1,28 @@
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
-import { PutCommand, UpdateCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchGetCommand,
+  PutCommand,
+  type BatchGetCommandOutput,
+  UpdateCommand,
+  type DynamoDBDocumentClient,
+} from "@aws-sdk/lib-dynamodb";
+import { appRule } from "../app-rules/dynamo.ts";
+import { termRecord } from "../dictionary/dynamo.ts";
+import { queryPrefix, text, type Item, type Table } from "../lib/dynamo.ts";
+import {
+  appRuleKey,
+  dictationKey,
+  dictationRetentionSeconds,
+  quotaKey,
+  settingsKey,
+  stylePrefix,
+  termPrefix,
+  userKey,
+} from "../lib/table.ts";
+import { settingsFrom } from "../settings/defaults.ts";
 import type { DictationRecord, DictationStore } from "./dictation-store.ts";
+import type { ProfileStore } from "./profile.ts";
 import type { QuotaCharge, QuotaStore } from "./quota.ts";
-import { dictationKey, dictationRetentionSeconds, quotaKey, userKey } from "./table.ts";
 
 export function dynamoQuotaStore(client: DynamoDBDocumentClient, tableName: string): QuotaStore {
   return {
@@ -49,6 +69,7 @@ export function dynamoDictationStore(
             audioSeconds: record.audioSeconds,
             raw: record.raw,
             text: record.text,
+            styleId: record.styleId,
             providers: record.providers,
             latencyMs: record.latencyMs,
             tokens: record.tokens,
@@ -57,6 +78,48 @@ export function dynamoDictationStore(
           ConditionExpression: "attribute_not_exists(SK)",
         }),
       );
+    },
+  };
+}
+
+const batchGetAttempts = 3;
+
+async function batchGet(table: Table, keys: Item[]): Promise<Item[]> {
+  const found: Item[] = [];
+  let pending: Item[] | undefined = keys;
+  for (let attempt = 0; pending && pending.length > 0 && attempt < batchGetAttempts; attempt += 1) {
+    const result: BatchGetCommandOutput = await table.client.send(
+      new BatchGetCommand({ RequestItems: { [table.name]: { Keys: pending } } }),
+    );
+    found.push(...(result.Responses?.[table.name] ?? []));
+    pending = result.UnprocessedKeys?.[table.name]?.Keys;
+  }
+  if (pending && pending.length > 0) throw new Error("BatchGetItem left keys unprocessed");
+  return found;
+}
+
+export function dynamoProfileStore(table: Table): ProfileStore {
+  return {
+    async load(userId, appId) {
+      const pk = userKey(userId);
+      const keys: Item[] = [{ PK: pk, SK: settingsKey }];
+      if (appId !== undefined) keys.push({ PK: pk, SK: appRuleKey(appId) });
+      const [singles, styles, terms] = await Promise.all([
+        batchGet(table, keys),
+        queryPrefix(table, pk, stylePrefix, ["SK", "prompt"]),
+        queryPrefix(table, pk, termPrefix, ["SK", "term", "aliases", "useCount", "lastUsedAt"]),
+      ]);
+      const settings = singles.find((item) => item.SK === settingsKey);
+      const rule = singles.find((item) => item.SK !== settingsKey);
+      return {
+        ...(settings && { settings: settingsFrom(settings) }),
+        ...(rule && { rule: appRule(rule) }),
+        styles: styles.map((item) => ({
+          id: text(item.SK).slice(stylePrefix.length),
+          prompt: text(item.prompt),
+        })),
+        terms: terms.map(termRecord),
+      };
     },
   };
 }

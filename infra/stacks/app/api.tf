@@ -1,3 +1,24 @@
+locals {
+  api_routes = [
+    "GET /dictionary",
+    "POST /dictionary",
+    "PUT /dictionary/{id}",
+    "DELETE /dictionary/{id}",
+    "GET /styles",
+    "POST /styles",
+    "PUT /styles/{id}",
+    "DELETE /styles/{id}",
+    "GET /app-rules",
+    "POST /app-rules",
+    "PUT /app-rules/{id}",
+    "DELETE /app-rules/{id}",
+    "GET /me/settings",
+    "PUT /me/settings",
+    "GET /dictations",
+    "DELETE /dictations/{id}",
+  ]
+}
+
 module "certificate" {
   source = "../../modules/aws/acm"
 
@@ -19,10 +40,18 @@ module "api" {
     invoke_arn    = module.authorizer.invoke_arn
   }
 
-  routes = {
-    "POST /dictations" = {
-      function_name = module.dictate.name
-      invoke_arn    = module.dictate.invoke_arn
-    }
-  }
+  routes = merge(
+    {
+      "POST /dictations" = {
+        function_name = module.dictate.name
+        invoke_arn    = module.dictate.invoke_arn
+      }
+    },
+    {
+      for route in local.api_routes : route => {
+        function_name = module.api_function.name
+        invoke_arn    = module.api_function.invoke_arn
+      }
+    },
+  )
 }

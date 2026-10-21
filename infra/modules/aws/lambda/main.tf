@@ -43,12 +43,21 @@ resource "aws_iam_role_policy" "access" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      for sid, statement in var.policy_statements : {
-        Sid      = replace(sid, "/[^0-9A-Za-z]/", "")
-        Effect   = "Allow"
-        Action   = statement.actions
-        Resource = statement.resources
-      }
+      for sid, statement in var.policy_statements : merge(
+        {
+          Sid      = replace(sid, "/[^0-9A-Za-z]/", "")
+          Effect   = "Allow"
+          Action   = statement.actions
+          Resource = statement.resources
+        },
+        length(statement.conditions) == 0 ? {} : {
+          Condition = {
+            for test in distinct([for condition in statement.conditions : condition.test]) : test => {
+              for condition in statement.conditions : condition.variable => condition.values if condition.test == test
+            }
+          }
+        },
+      )
     ]
   })
 }

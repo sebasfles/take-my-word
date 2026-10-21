@@ -4,6 +4,7 @@ export interface TranscribeInput {
   audio: Buffer;
   container: AudioContainer;
   language: Language;
+  prompt?: string;
 }
 
 export interface Transcriber {

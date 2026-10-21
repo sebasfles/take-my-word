@@ -162,3 +162,17 @@ export function signInCrewE2eSession(): Promise<Session> {
 export async function signInCrewE2e(): Promise<string> {
   return (await signIn(crewE2eConfig())).accessToken;
 }
+
+export function crewE2eBConfig() {
+  loadWorkspaceEnv();
+  return {
+    userPoolId: requiredEnv("USER_POOL_ID"),
+    clientId: requiredEnv("USER_POOL_CLIENT_ID"),
+    username: requiredEnv("CREW_E2E_B_USERNAME"),
+    password: requiredEnv("CREW_E2E_B_PASSWORD"),
+  };
+}
+
+export async function signInCrewE2eB(): Promise<string> {
+  return (await signIn(crewE2eBConfig())).accessToken;
+}

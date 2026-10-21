@@ -115,6 +115,7 @@ Consolidated 2026-10-21 by the om-reviewer with the om-manager (Sebastian unavai
 - Refiner prompt (om-reviewer): the editing contract stays in code (today's `plainV1` rules), then the style prompt as a tone section, then the correction table; `plain` adds nothing; a custom prompt never replaces the contract.
 - History (om-reviewer, adjusts Scope): items carry `id`, `createdAt`, `locale`, `text`, `raw`, `styleId`, `audioSeconds`; no audio, latency or tokens; `id` is opaque (encodes the SK suffix), route `DELETE /dictations/{id}`; the cursor carries only the SK, the PK always comes from the caller; a malformed cursor answers 400.
 - Contracts (om-reviewer): `appId` lowercased on write and lookup; built-ins answer 403 `forbidden`; new error codes `not_found` 404, `conflict` 409, `forbidden` 403; missing items on PUT and DELETE answer 404.
+- Path ids (om-reviewer, adjusts Scope, before round 1): API Gateway decodes the path once before routing, so a raw term with `/`, `#` or `%` never reaches the Lambda (verified in dev by the om-developer); terms and app rules carry an opaque `id` (unpadded base64url of the normalized key) and the routes are `PUT/DELETE /dictionary/{id}` and `PUT/DELETE /app-rules/{id}`, like history; a malformed id answers 400; rejected: double-encoding by clients.
 - Acceptance 7 rewritten (om-manager): a rule `notepad.exe` with `formal` and `ctrl+v`; a dictation with that `appId` and no `styleId` uses formal; the rule is then pointed at a custom style, the style is deleted, the rule answers without `styleId` and the next dictation uses the default style.
 - Acceptance 4 (om-reviewer): `Kubernetes` serves the CRUD only; the dictation term must be one Whisper and the refiner both get wrong without the dictionary (rare or invented), shown with evidence.
 - Constraints: contracts only in `packages/shared` (CLAUDE.md); new items carry no `expiresAt`, so fix the infra/database.md invariant; `reusable-deploy` needs `API_FUNCTION_NAME` and `DICTIONARY_USAGE_FUNCTION_NAME` written by `stacks/app`, and dev must be applied before merge.
@@ -122,3 +123,53 @@ Consolidated 2026-10-21 by the om-reviewer with the om-manager (Sebastian unavai
 - clearance: full, AWS profile `fless-takemyword` (apply dev, plan prd), Cognito dev pool users, GitHub Actions re-runs on `sebasfles/take-my-word`.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+
+- Deploy fix: `stacks/app/deploy.tf` builds the trusted subject from `data.github_user` and `data.github_repository` ids (`repo:sebasfles@64487774/take-my-word@1427740478:environment:{env}`); applied to dev, then the failed `deploy-dev` run was re-run (attempt 2 green, promotion PR #2 opened): https://github.com/sebasfles/take-my-word/actions/runs/39539986525
+- `packages/shared`: contracts for dictionary, styles, app rules, settings and history; `normalizeTerm`; `appIdSchema` lowercases; error codes `unauthorized`, `forbidden`, `not_found`, `conflict`; the dictation response gains `styleId` and `latencyMs.profile`.
+- `apps/api`: `api` Lambda (Hono, `@hono/aws-lambda`) with routers in `dictionary/`, `styles/`, `app-rules/`, `settings/`, `history/`, each a store port plus its DynamoDB adapter; built-in styles in `styles/builtin/{plain,casual,formal}.v1.ts`.
+- `dictate`: profile read (BatchGet `SETTINGS` and `APPRULE#appId`, Query `STYLE#`, Query `DICT#`) concurrent with the quota charge; style resolution, Whisper prompt and refiner instructions as pure functions in `dictation/`; `styleId` saved and answered.
+- `dictionary-usage` Lambda: Unicode-boundary matching on folded text, conditional `ADD useCount`, batch item failures.
+- `infra`: `api` and `dictionary-usage` functions, 16 routes, filtered event source mapping (retry 2, bisect, batch failures), per-function IAM (`dictionary-usage` UpdateItem limited by `dynamodb:Attributes`), deploy role and Actions variables for the new functions, `reusable-deploy` updates four functions; the Lambda module accepts statement conditions.
+- E2E `apps/api/e2e/features.e2e.ts` with `crew-e2e` and `crew-e2e-b`; it cleans both users before and after and reran green.
+
+Decisions the plan did not record:
+
+- Path ids (agreed with the om-reviewer): terms and rules carry `id`, unpadded base64url of the folded term or lowercased appId; the gateway decodes paths once, so raw terms with `/`, `#` or `%` never reached the Lambda. History malformed ids answer 400 too, for consistency.
+- Whisper prompt budget counts UTF-8 bytes, a strict upper bound of BPE tokens; terms are taken greedily by decayed score, skipping one that does not fit. Proven in dev: Groq answers 400 `prompt length must be 896 characters or fewer` past 896 bytes and accepts 468 bytes, so the 224-byte cap never errors.
+- Refiner instructions: `plainV1` contract, then a localized "Style" heading saying only tone and register change, then a localized "Personal dictionary" heading with `- Term (alias, alias)` lines.
+- Built-in prompts are English text that tells the model to keep the dictation's language (casual: tú, contractions; formal: usted, no contractions); `plain` has an empty prompt.
+- Missing authorizer context in the `api` Lambda answers 401 `unauthorized` (new code) as a guard; the gateway answers 401 before it in practice.
+- `PUT /me/settings` replaces the whole settings object; `defaultStyleId` must exist (400 otherwise); stored settings with an invalid field fall back to that field's default on read.
+- App rules: `POST` of an existing app answers 409; `styleId` must exist on write (400); `PUT` without `styleId` removes it.
+- Aliases are deduplicated by folded form and an alias equal to the term is dropped; terms list sorted by folded key, custom styles by creation, rules by appId.
+- Style ids are random UUIDs; deleting a style releases rules and the default after the delete, best effort, logged on failure.
+- History: `?limit=` 1 to 100, default 20; cursor is base64url of the last SK; items carry no providers, latency or tokens.
+- Accent folding strips every combining mark, so `ñ` folds to `n` (`año` and `ano` collide as one term).
+- `dictionary-usage` logs `userId`, the dictation SK, matched and counted, never text or terms; it stops at the first failing record and reports it.
+- Terms table key attributes use `ExpressionAttributeNames` for every projection (`text`, `raw` are reserved words; found in dev).
+- `TABLE_NAME` added to `.env` for the e2e, which deletes `crew-e2e-b`'s `SETTINGS` item directly to prove the first-read creation.
+
+External actions (clearance `full`, profile `fless-takemyword`, us-east-1):
+
+| Command | Target | Env | Result |
+|---|---|---|---|
+| `infra/scripts/tf dev apply` (3 runs) | deploy role subject; new functions, routes, mapping, IAM; route rename to `{id}` | dev | 1 changed; 46 added, 3 changed; 8 added, 8 destroyed |
+| `gh run rerun 39539986525 --failed` through the GitHub App token | `deploy-dev` | GitHub | attempt 2 green, PR #2 opened |
+| `lambda update-function-code` plus `wait function-updated-v2` | `take-my-word-dev-{authorizer,dictate,api,dictionary-usage}` | dev | at the code of this round |
+| `cognito-idp admin-set-user-password --permanent`; `admin-create-user` and `admin-set-user-password` | `crew-e2e`; `crew-e2e-b` | dev pool | CONFIRMED; keys in workspace and root `.env`, values never printed |
+| `polly synthesize-speech`, direct Groq `audio/transcriptions` (3 prompt sizes) | test audio in `/tmp`, prompt limit probe | account, Groq | see decisions |
+| `infra/scripts/tf prd plan` | the app stack | prd | 80 to add, 0 to change, 0 to destroy; not applied |
+
+Evidence (dev, 2026-10-21 UTC):
+
+- Acceptance 4: without the term, raw and text "Hablé con Kelbaric sobre el contrato de mantenimiento."; with `Quelvarix` in the dictionary, raw and text "Hablé con Quelvarix sobre el contrato de mantenimiento.", `styleId` plain (also Brumvelt from "Brumbel", Zortaquin from "Sortaking").
+- Acceptance 5: `{"message":"usage recorded","function":"dictionary-usage","dictation":"DICTATION#2026-10-21T04:19:27.882Z#183ea1d5-b94e-4fe4-ab73-c2b47d88aa78","matched":1,"counted":1}`; `useCount` 2 seen by the e2e.
+- Acceptance 6: casual "Oye, porfa mándame el informe ya, que lo necesito para la reunión de mañana. Gracias, crack."; formal "Por favor, envíeme el informe ya. Lo necesito para la reunión de mañana. Gracias."
+
+Pending: none for round 1.
+
+Deferred: none.

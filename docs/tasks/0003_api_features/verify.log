@@ -1,0 +1,25 @@
+## 2026-10-21T04:21:59Z by om-developer target api on 268d578
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (180 tests, pnpm test, --no-file-parallelism)
+- e2e: pass exit 0 (32 tests, pnpm e2e against dev, --no-file-parallelism)
+
+## 2026-10-21T04:21:59Z by om-developer target shared on 268d578
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (15 tests, pnpm test, --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-21T04:21:59Z by om-developer target infra on 268d578
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T04:21:59Z by om-developer target workflows on 268d578
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+The amended round commit differs from 268d578 only in docs/tasks/0003_api_features (notes and this log).

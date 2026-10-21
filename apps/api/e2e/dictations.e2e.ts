@@ -1,4 +1,3 @@
-import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import {
   apiErrorSchema,
   dictationResponseSchema,
@@ -16,44 +15,12 @@ import {
   signInCrewE2eSession,
 } from "../scripts/sign-in.ts";
 import { wav } from "../src/testing/audio.ts";
+import { synthesize } from "./speech.ts";
 
 const fillers = /\b(eh|este|mmm)\b/i;
 let url: string;
 let token: string;
 let speech: Buffer;
-
-function pcmToWav(pcm: Buffer): Buffer {
-  const header = Buffer.alloc(44);
-  header.write("RIFF", 0, "ascii");
-  header.writeUInt32LE(36 + pcm.length, 4);
-  header.write("WAVEfmt ", 8, "ascii");
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
-  header.writeUInt32LE(16_000, 24);
-  header.writeUInt32LE(32_000, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write("data", 36, "ascii");
-  header.writeUInt32LE(pcm.length, 40);
-  return Buffer.concat([header, pcm]);
-}
-
-async function synthesize(text: string): Promise<Buffer> {
-  const polly = new PollyClient({ region: "us-east-1" });
-  const { AudioStream } = await polly.send(
-    new SynthesizeSpeechCommand({
-      Engine: "neural",
-      VoiceId: "Lupe",
-      LanguageCode: "es-US",
-      OutputFormat: "pcm",
-      SampleRate: "16000",
-      Text: text,
-    }),
-  );
-  if (!AudioStream) throw new Error("Polly returned no audio");
-  return pcmToWav(Buffer.from(await AudioStream.transformToByteArray()));
-}
 
 async function post(
   parts: { meta?: unknown; audio?: Buffer; audioType?: string },
