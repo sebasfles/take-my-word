@@ -24,6 +24,7 @@ export function memoryStores() {
   const rules = new Partitions<AppRuleRecord>();
   const settingsItems = new Map<string, Settings>();
   const dictations = new Partitions<DictationEntry>();
+  const expiries = new Partitions<number>();
 
   const dictionary: DictionaryStore = {
     list: (userId) => Promise.resolve([...terms.of(userId).values()]),
@@ -117,8 +118,9 @@ export function memoryStores() {
   };
 
   const history: HistoryStore = {
-    page(userId, { limit, after }) {
+    page(userId, { limit, after, now }) {
       const sorted = [...dictations.of(userId).values()]
+        .filter((entry) => (expiries.of(userId).get(entry.sk) ?? 0) > now.getTime() / 1000)
         .sort((a, b) => b.sk.localeCompare(a.sk))
         .filter((entry) => after === undefined || entry.sk < after);
       const entries = sorted.slice(0, limit);
@@ -134,8 +136,9 @@ export function memoryStores() {
     appRules,
     settings,
     history,
-    seedDictation(userId: string, entry: DictationEntry) {
+    seedDictation(userId: string, entry: DictationEntry, expiresAt: number) {
       dictations.of(userId).set(entry.sk, entry);
+      expiries.of(userId).set(entry.sk, expiresAt);
     },
   };
 }

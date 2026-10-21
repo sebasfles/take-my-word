@@ -24,6 +24,25 @@ const cleanText = "Quería decir que mañana nos vemos.";
 const whisper = "groq-whisper:whisper-large-v3-turbo";
 const speech = (seconds: number) => wav({ seconds, toneDbfs: -20 });
 
+class Rendezvous {
+  private readonly started = new Set<string>();
+  private readonly waiting: (() => void)[] = [];
+
+  async arrive(party: string): Promise<void> {
+    this.started.add(party);
+    if (this.started.size === 2) {
+      for (const release of this.waiting) release();
+      return;
+    }
+    await new Promise<void>((release, reject) => {
+      this.waiting.push(release);
+      setTimeout(() => {
+        reject(new Error(`${party} ran alone; the other call never started`));
+      }, 500);
+    });
+  }
+}
+
 class World {
   now = new Date("2026-10-20T15:00:00.000Z");
   clock = 0;
@@ -37,6 +56,7 @@ class World {
   lines: string[] = [];
   profile: DictationProfile = { styles: [], terms: [] };
   profileLoads: { userId: string; appId: string | undefined }[] = [];
+  rendezvous: Rendezvous | undefined;
 
   handler = createDictateHandler({
     providers: {
@@ -66,13 +86,14 @@ class World {
       },
     },
     quota: {
-      charge: (charge) => {
+      charge: async (charge) => {
+        await this.rendezvous?.arrive("quota");
         this.charges.push(charge);
         const key = `${charge.userId}/${charge.day}`;
         const used = this.used.get(key);
-        if (used !== undefined && used >= charge.capSeconds) return Promise.resolve(false);
+        if (used !== undefined && used >= charge.capSeconds) return false;
         this.used.set(key, (used ?? 0) + charge.seconds);
-        return Promise.resolve(true);
+        return true;
       },
     },
     dailyQuotaMinutes: 60,
@@ -83,9 +104,10 @@ class World {
       },
     },
     profile: {
-      load: (userId, appId) => {
+      load: async (userId, appId) => {
+        await this.rendezvous?.arrive("profile");
         this.profileLoads.push({ userId, appId });
-        return Promise.resolve(this.profile);
+        return this.profile;
       },
     },
     dictionary: { halfLifeDays: 30, promptTokenBudget: 224 },
@@ -397,8 +419,10 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
     expect(ok(json).styleId).toBe("plain");
   });
 
-  it("charges the quota and reads the profile in the same round trip and reports both", async () => {
-    const { json } = await post({});
+  it("charges the quota and reads the profile concurrently and reports both", async () => {
+    world.rendezvous = new Rendezvous();
+    const { status, json } = await post({});
+    expect(status).toBe(200);
     expect(world.profileLoads).toHaveLength(1);
     expect(ok(json).latencyMs).toMatchObject({ quota: 0, profile: 0 });
     expect(world.saved[0]?.latencyMs).toMatchObject({ profile: 0 });

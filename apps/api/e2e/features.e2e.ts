@@ -126,50 +126,67 @@ describe("api routes in a deployed environment", () => {
     expect((await call(method, path, { token: null, body })).status).toBe(401);
   });
 
-  it("keeps every item of one user invisible and untouchable for another", async () => {
-    const term = dictionaryTermSchema.parse(
-      (await call("POST", "/dictionary", { body: { term: "Privado" } })).json,
-    );
-    const style = styleSchema.parse(
-      (await call("POST", "/styles", { body: { name: "Mío", prompt: "Breve." } })).json,
-    );
-    const rule = appRuleSchema.parse(
-      (await call("POST", "/app-rules", { body: { appId: "private.exe", keystroke: "ctrl+v" } }))
-        .json,
-    );
-    const historyOfA = historyPageSchema.parse((await call("GET", "/dictations?limit=1")).json);
-    const asB = { token: tokenB };
+  it(
+    "keeps every item of one user invisible and untouchable for another",
+    async () => {
+      const term = dictionaryTermSchema.parse(
+        (await call("POST", "/dictionary", { body: { term: "Privado" } })).json,
+      );
+      const style = styleSchema.parse(
+        (await call("POST", "/styles", { body: { name: "Mío", prompt: "Breve." } })).json,
+      );
+      const rule = appRuleSchema.parse(
+        (await call("POST", "/app-rules", { body: { appId: "private.exe", keystroke: "ctrl+v" } }))
+          .json,
+      );
+      const dictated = await dictate(informalSpeech);
+      const newestOfA = historyPageSchema.parse((await call("GET", "/dictations?limit=1")).json)
+        .items[0];
+      expect(newestOfA?.text).toBe(dictated.text);
+      const dictationOfA = newestOfA?.id ?? "";
+      const asB = { token: tokenB };
 
-    expect(await terms(tokenB)).toEqual([]);
-    const stylesOfB = styleListSchema.parse((await call("GET", "/styles", asB)).json).styles;
-    expect(stylesOfB.map((entry) => entry.id)).toEqual(["plain", "casual", "formal"]);
-    expect(appRuleListSchema.parse((await call("GET", "/app-rules", asB)).json).rules).toEqual([]);
-    const historyOfB = historyPageSchema.parse((await call("GET", "/dictations", asB)).json);
-    const idsOfA = new Set(historyOfA.items.map((item) => item.id));
-    expect(historyOfB.items.filter((item) => idsOfA.has(item.id))).toEqual([]);
+      expect(await terms(tokenB)).toEqual([]);
+      const stylesOfB = styleListSchema.parse((await call("GET", "/styles", asB)).json).styles;
+      expect(stylesOfB.map((entry) => entry.id)).toEqual(["plain", "casual", "formal"]);
+      expect(appRuleListSchema.parse((await call("GET", "/app-rules", asB)).json).rules).toEqual(
+        [],
+      );
+      const idsOfB: string[] = [];
+      let cursor: string | undefined;
+      do {
+        const query = cursor === undefined ? "" : `&cursor=${cursor}`;
+        const page = historyPageSchema.parse(
+          (await call("GET", `/dictations?limit=100${query}`, asB)).json,
+        );
+        idsOfB.push(...page.items.map((item) => item.id));
+        cursor = page.cursor;
+      } while (cursor !== undefined);
+      expect(idsOfB).not.toContain(dictationOfA);
 
-    const forB = (body?: unknown) => ({ ...asB, body });
-    expect((await call("PUT", `/dictionary/${term.id}`, forB({ aliases: [] }))).status).toBe(404);
-    expect((await call("DELETE", `/dictionary/${term.id}`, asB)).status).toBe(404);
-    const styleEdit = forB({ name: "x", prompt: "y" });
-    expect((await call("PUT", `/styles/${style.id}`, styleEdit)).status).toBe(404);
-    expect((await call("DELETE", `/styles/${style.id}`, asB)).status).toBe(404);
-    expect((await call("PUT", `/app-rules/${rule.id}`, forB({ keystroke: "cmd+v" }))).status).toBe(
-      404,
-    );
-    expect((await call("DELETE", `/app-rules/${rule.id}`, asB)).status).toBe(404);
-    const dictationOfA = historyOfA.items[0];
-    if (dictationOfA) {
-      expect((await call("DELETE", `/dictations/${dictationOfA.id}`, asB)).status).toBe(404);
-    }
-    const borrowed = forB({ appId: "b.exe", styleId: style.id, keystroke: "ctrl+v" });
-    expect((await call("POST", "/app-rules", borrowed)).status).toBe(400);
+      const forB = (body?: unknown) => ({ ...asB, body });
+      expect((await call("PUT", `/dictionary/${term.id}`, forB({ aliases: [] }))).status).toBe(404);
+      expect((await call("DELETE", `/dictionary/${term.id}`, asB)).status).toBe(404);
+      const styleEdit = forB({ name: "x", prompt: "y" });
+      expect((await call("PUT", `/styles/${style.id}`, styleEdit)).status).toBe(404);
+      expect((await call("DELETE", `/styles/${style.id}`, asB)).status).toBe(404);
+      expect(
+        (await call("PUT", `/app-rules/${rule.id}`, forB({ keystroke: "cmd+v" }))).status,
+      ).toBe(404);
+      expect((await call("DELETE", `/app-rules/${rule.id}`, asB)).status).toBe(404);
+      expect((await call("DELETE", `/dictations/${dictationOfA}`, asB)).status).toBe(404);
+      const borrowed = forB({ appId: "b.exe", styleId: style.id, keystroke: "ctrl+v" });
+      expect((await call("POST", "/app-rules", borrowed)).status).toBe(400);
 
-    expect((await terms()).map((entry) => entry.term)).toContain("Privado");
-    await call("DELETE", `/dictionary/${term.id}`);
-    await call("DELETE", `/styles/${style.id}`);
-    await call("DELETE", `/app-rules/${rule.id}`);
-  });
+      expect((await terms()).map((entry) => entry.term)).toContain("Privado");
+      const stillOfA = historyPageSchema.parse((await call("GET", "/dictations?limit=1")).json);
+      expect(stillOfA.items[0]?.id).toBe(dictationOfA);
+      await call("DELETE", `/dictionary/${term.id}`);
+      await call("DELETE", `/styles/${style.id}`);
+      await call("DELETE", `/app-rules/${rule.id}`);
+    },
+    dictationTimeout,
+  );
 });
 
 describe("dictionary in a deployed environment", () => {

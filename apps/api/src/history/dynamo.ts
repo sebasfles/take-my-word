@@ -27,21 +27,35 @@ function entry(item: Item): DictationEntry {
 
 export function dynamoHistoryStore(table: Table): HistoryStore {
   return {
-    async page(userId, { limit, after }) {
+    async page(userId, { limit, after, now }) {
       const pk = userKey(userId);
-      const { Items, LastEvaluatedKey } = await table.client.send(
-        new QueryCommand({
-          TableName: table.name,
-          KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
-          ExpressionAttributeValues: { ":pk": pk, ":prefix": dictationPrefix },
-          ...projectionOf(projection),
-          ScanIndexForward: false,
-          Limit: limit,
-          ...(after !== undefined && { ExclusiveStartKey: { PK: pk, SK: after } }),
-        }),
-      );
-      const last = LastEvaluatedKey === undefined ? undefined : text(LastEvaluatedKey.SK);
-      return { entries: (Items ?? []).map(entry), ...(last && { last }) };
+      const { ProjectionExpression, ExpressionAttributeNames } = projectionOf(projection);
+      const entries: DictationEntry[] = [];
+      let start = after;
+      while (entries.length < limit) {
+        const { Items, LastEvaluatedKey } = await table.client.send(
+          new QueryCommand({
+            TableName: table.name,
+            KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+            FilterExpression: "#expiresAt > :now",
+            ExpressionAttributeNames: { ...ExpressionAttributeNames, "#expiresAt": "expiresAt" },
+            ExpressionAttributeValues: {
+              ":pk": pk,
+              ":prefix": dictationPrefix,
+              ":now": Math.floor(now.getTime() / 1000),
+            },
+            ProjectionExpression,
+            ScanIndexForward: false,
+            Limit: limit - entries.length,
+            ...(start !== undefined && { ExclusiveStartKey: { PK: pk, SK: start } }),
+          }),
+        );
+        entries.push(...(Items ?? []).map(entry));
+        if (LastEvaluatedKey === undefined) return { entries };
+        start = text(LastEvaluatedKey.SK);
+      }
+      const last = entries.at(-1)?.sk;
+      return { entries, ...(last !== undefined && { last }) };
     },
     remove: (userId, sk) =>
       unlessConditionFails(async () => {

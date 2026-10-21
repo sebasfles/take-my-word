@@ -11,7 +11,7 @@ export interface DictationEntry {
 export interface HistoryStore {
   page(
     userId: string,
-    options: { limit: number; after?: string },
+    options: { limit: number; after?: string; now: Date },
   ): Promise<{ entries: DictationEntry[]; last?: string }>;
   remove(userId: string, sk: string): Promise<boolean>;
 }

@@ -8,6 +8,7 @@ import type { DictationEntry, HistoryStore } from "./store.ts";
 
 export interface HistoryRoutesDeps {
   history: HistoryStore;
+  now: () => Date;
 }
 
 const dictationSk = /^DICTATION#\d{4}-\d{2}-\d{2}T[\d:.]+Z#[\w-]+$/;
@@ -29,7 +30,7 @@ function present({ sk, ...entry }: DictationEntry): HistoryItem {
   return { id: encodePathId(sk.slice(dictationPrefix.length)), ...entry };
 }
 
-export function historyRoutes({ history }: HistoryRoutesDeps) {
+export function historyRoutes({ history, now }: HistoryRoutesDeps) {
   return new Hono<ApiEnv>()
     .get("/", async (c) => {
       const query = historyQuerySchema.safeParse(c.req.query());
@@ -38,6 +39,7 @@ export function historyRoutes({ history }: HistoryRoutesDeps) {
       const after = cursor === undefined ? undefined : skFromCursor(cursor);
       const { entries, last } = await history.page(c.var.userId, {
         limit,
+        now: now(),
         ...(after !== undefined && { after }),
       });
       const body: HistoryPage = {

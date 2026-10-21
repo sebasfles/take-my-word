@@ -52,15 +52,19 @@ class World {
   }
 
   seedDictation(user: string, createdAt: string, requestId: string) {
-    this.stores.seedDictation(user, {
-      sk: `DICTATION#${createdAt}#${requestId}`,
-      createdAt,
-      locale: "es",
-      text: `texto ${requestId}`,
-      raw: `crudo ${requestId}`,
-      styleId: "plain",
-      audioSeconds: 3,
-    });
+    this.stores.seedDictation(
+      user,
+      {
+        sk: `DICTATION#${createdAt}#${requestId}`,
+        createdAt,
+        locale: "es",
+        text: `texto ${requestId}`,
+        raw: `crudo ${requestId}`,
+        styleId: "plain",
+        audioSeconds: 3,
+      },
+      Date.parse(createdAt) / 1000 + 90 * 86_400,
+    );
   }
 }
 
