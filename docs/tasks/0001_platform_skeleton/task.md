@@ -181,3 +181,19 @@ Pending for milestone 2: infra modules and stacks, the state bucket, `core` and 
 Pending for milestone 3: workflows, the rest of the TRD verification table, `.env` under Workspace files.
 
 Deferred: an integration test of the quota condition against DynamoDB Local; the unit tests cover the adapter's mapping and the pipeline's arithmetic, and Acceptance 7 covers the real condition.
+
+### Round 2 (round 1 findings, 4 of 4 applied)
+
+1. Charged duration no longer trusts the header alone.
+   - WAV must be 16 kHz mono 16-bit PCM, the documented desktop contract, or it answers 400; that fixes the byte rate, so the charge is the bytes after the data chunk header over 32,000 B/s, whatever data size the header declares.
+   - m4a is charged the larger of the declared duration and the payload at 320 kbps (40,000 B/s), the plausible AAC maximum; I picked charging the floor over answering 400, so a legitimate high-bitrate file never fails.
+   - Anything under `minAudioSeconds` (0.5 s, now in `packages/shared` so clients drop the same recordings) answers 400 before the charge.
+   - Tests: data size 0 and 2 charged by bytes, 48 kHz, stereo and 8-bit rejected, 0 and 0.4 s too short, a 1-unit `mvhd` on 400 KB and 800 KB payloads charged the floor, plus the handler's 400 without charge.
+2. The silence list is split into `hallucinations` (always silence) and `ambiguous` (`Gracias.`, `Thank you.`, `Chao.` and the like), which are silence only when the transcriber reports no speech.
+   - The Transcriber port returns an optional `noSpeechProbability`; `groq-whisper` asks for `verbose_json` and reports the lowest `no_speech_prob` across segments, so one spoken segment counts as speech; no segments means no signal, and an ambiguous phrase without a signal is refined.
+   - Threshold `SILENCE_NO_SPEECH_THRESHOLD`, default 0.6 (Whisper's own `no_speech_threshold`), inclusive.
+   - Tests prove both directions in `silence.test.ts` and `app.test.ts`.
+3. The Groq label is `groq-whisper:{model}`, so saved items and metrics carry `groq-whisper:whisper-large-v3-turbo`.
+4. The quota store test asserts the Key (`USER#u1`, `QUOTA#2026-10-20`) and resolves the update and condition placeholders to `seconds` 12, cap 3600 and `expiresAt`; the real condition semantics stay with the Acceptance 7 e2e in milestone 2.
+
+Pending and deferred: unchanged from round 1.

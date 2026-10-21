@@ -4,3 +4,10 @@ export class InvalidAudioError extends Error {
     this.name = "InvalidAudioError";
   }
 }
+
+export class AudioTooShortError extends Error {
+  constructor() {
+    super("audio is too short");
+    this.name = "AudioTooShortError";
+  }
+}

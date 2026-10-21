@@ -7,15 +7,52 @@ function client(send: (command: { input: Record<string, unknown> }) => Promise<u
   return { send } as unknown as DynamoDBDocumentClient;
 }
 
-const charge = { userId: "u1", day: "2026-10-20", seconds: 12, capSeconds: 3600, expiresAt: 1 };
+const charge = {
+  userId: "u1",
+  day: "2026-10-20",
+  seconds: 12,
+  capSeconds: 3600,
+  expiresAt: 1_792_800_000,
+};
+
+interface UpdateInput {
+  TableName: string;
+  Key: Record<string, unknown>;
+  UpdateExpression: string;
+  ConditionExpression: string;
+  ExpressionAttributeNames: Record<string, string>;
+  ExpressionAttributeValues: Record<string, unknown>;
+}
+
+function resolve(input: UpdateInput, pattern: RegExp, expression: string): [string, unknown] {
+  const match = pattern.exec(expression);
+  const [name, value] = [match?.[1] ?? "", match?.[2] ?? ""];
+  return [input.ExpressionAttributeNames[name] ?? name, input.ExpressionAttributeValues[value]];
+}
 
 describe("dynamoQuotaStore", () => {
-  it("allows the charge when the conditional update succeeds", async () => {
+  it("adds the seconds to the user's day counter, sets its TTL and conditions on the cap", async () => {
+    let input: UpdateInput | undefined;
     const store = dynamoQuotaStore(
-      client(() => Promise.resolve({})),
-      "t",
+      client((command) => {
+        input = command.input as unknown as UpdateInput;
+        return Promise.resolve({});
+      }),
+      "take-my-word-dev",
     );
     expect(await store.charge(charge)).toBe(true);
+    if (!input) throw new Error("no command sent");
+    expect(input.TableName).toBe("take-my-word-dev");
+    expect(input.Key).toEqual({ PK: "USER#u1", SK: "QUOTA#2026-10-20" });
+    expect(resolve(input, /ADD (\S+) (\S+)/, input.UpdateExpression)).toEqual(["seconds", 12]);
+    expect(resolve(input, /SET (\S+) = (\S+)/, input.UpdateExpression)).toEqual([
+      "expiresAt",
+      1_792_800_000,
+    ]);
+    expect(resolve(input, /(\S+) < (\S+)/, input.ConditionExpression)).toEqual(["seconds", 3600]);
+    expect(resolve(input, /attribute_not_exists\((\S+)\)/, input.ConditionExpression)[0]).toBe(
+      "seconds",
+    );
   });
 
   it("refuses the charge when the cap condition fails", async () => {

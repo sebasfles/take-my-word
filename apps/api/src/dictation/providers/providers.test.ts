@@ -24,6 +24,13 @@ function fakeFetch(status: number, json: unknown): { fetch: Fetch; captured: Cap
 const apiKey = () => Promise.resolve("secret-key");
 
 describe("groq-whisper transcriber", () => {
+  it("labels itself with its model", () => {
+    expect(groqWhisper({ apiKey }).label).toBe("groq-whisper:whisper-large-v3-turbo");
+    expect(groqWhisper({ apiKey, model: "whisper-large-v3" }).label).toBe(
+      "groq-whisper:whisper-large-v3",
+    );
+  });
+
   it("sends the audio with model and language and returns the trimmed text", async () => {
     const { fetch, captured } = fakeFetch(200, { text: " Hola, mundo. " });
     const transcriber = groqWhisper({ apiKey, fetch, model: "whisper-large-v3" });
@@ -32,11 +39,12 @@ describe("groq-whisper transcriber", () => {
       container: "wav",
       language: "es",
     });
-    expect(result.text).toBe("Hola, mundo.");
+    expect(result).toEqual({ text: "Hola, mundo." });
     const form = captured[0]?.body as FormData;
     expect(captured[0]?.headers.authorization).toBe("Bearer secret-key");
     expect(form.get("model")).toBe("whisper-large-v3");
     expect(form.get("language")).toBe("es");
+    expect(form.get("response_format")).toBe("verbose_json");
     const file = form.get("file") as File;
     expect(file.name).toBe("audio.wav");
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe("RIFF");
@@ -50,7 +58,21 @@ describe("groq-whisper transcriber", () => {
       language: "en",
     });
     await expect(failure).rejects.toThrow(ProviderError);
-    await expect(failure).rejects.toThrow(/^groq-whisper answered 429$/);
+    await expect(failure).rejects.toThrow(/^groq-whisper:whisper-large-v3-turbo answered 429$/);
+  });
+
+  it("reports no speech only when every segment is likely silent", async () => {
+    const transcribe = async (probabilities: number[]) => {
+      const segments = probabilities.map((no_speech_prob) => ({ no_speech_prob, text: "x" }));
+      const { fetch } = fakeFetch(200, { text: "Gracias.", segments });
+      return groqWhisper({ apiKey, fetch }).transcribe({
+        audio: Buffer.alloc(1),
+        container: "wav",
+        language: "es",
+      });
+    };
+    expect(await transcribe([0.9, 0.95])).toEqual({ text: "Gracias.", noSpeechProbability: 0.9 });
+    expect((await transcribe([0.95, 0.02])).noSpeechProbability).toBe(0.02);
   });
 
   it("fails on an unexpected shape", async () => {

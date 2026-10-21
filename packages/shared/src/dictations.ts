@@ -11,6 +11,7 @@ export const defaultRefiner: RefinerId = "openai";
 export const dictationFields = { audio: "audio", meta: "meta" } as const;
 
 export const maxAudioBytes = 4 * 1024 * 1024;
+export const minAudioSeconds = 0.5;
 
 export const audioContainers = ["wav", "m4a"] as const;
 export type AudioContainer = (typeof audioContainers)[number];

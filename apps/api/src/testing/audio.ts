@@ -4,12 +4,14 @@ export function wav({
   channels = 1,
   bitsPerSample = 16,
   extraChunk = false,
+  declaredDataSize,
 }: {
   seconds: number;
   sampleRate?: number;
   channels?: number;
   bitsPerSample?: number;
   extraChunk?: boolean;
+  declaredDataSize?: number;
 }): Buffer {
   const blockAlign = channels * (bitsPerSample / 8);
   const dataSize = Math.round(seconds * sampleRate) * blockAlign;
@@ -25,7 +27,11 @@ export function wav({
   fmt.writeUInt32LE(sampleRate * blockAlign, 16);
   fmt.writeUInt16LE(blockAlign, 20);
   fmt.writeUInt16LE(bitsPerSample, 22);
-  const data = Buffer.concat([Buffer.from("data"), u32le(dataSize), Buffer.alloc(dataSize)]);
+  const data = Buffer.concat([
+    Buffer.from("data"),
+    u32le(declaredDataSize ?? dataSize),
+    Buffer.alloc(dataSize),
+  ]);
   const body = Buffer.concat([Buffer.from("WAVE"), fmt, list, data]);
   return Buffer.concat([Buffer.from("RIFF"), u32le(body.length), body]);
 }
@@ -71,8 +77,10 @@ export function m4a({
   version = 0,
   fragmented = false,
   moovFirst = false,
+  mediaBytes = 32,
 }: {
   seconds: number;
+  mediaBytes?: number;
   timescale?: number;
   version?: 0 | 1;
   fragmented?: boolean;
@@ -83,6 +91,6 @@ export function m4a({
     version === 1 ? mvhdV1(timescale, units) : mvhdV0(timescale, fragmented ? 0 : units);
   const moov = fragmented ? box("moov", header, box("mvex", mehd(units))) : box("moov", header);
   const ftyp = box("ftyp", Buffer.from("M4A \0\0\0\0M4A isom"));
-  const mdat = box("mdat", Buffer.alloc(32));
+  const mdat = box("mdat", Buffer.alloc(mediaBytes));
   return moovFirst ? Buffer.concat([ftyp, moov, mdat]) : Buffer.concat([ftyp, mdat, moov]);
 }

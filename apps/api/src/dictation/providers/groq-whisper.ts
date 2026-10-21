@@ -7,7 +7,10 @@ export const groqWhisperId = "groq-whisper";
 export const defaultGroqWhisperModel = "whisper-large-v3-turbo";
 
 const endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
-const responseSchema = z.object({ text: z.string() });
+const responseSchema = z.object({
+  text: z.string(),
+  segments: z.array(z.object({ no_speech_prob: z.number() })).optional(),
+});
 const mimeTypes = { wav: "audio/wav", m4a: "audio/mp4" } as const;
 
 export interface GroqWhisperOptions extends HttpOptions {
@@ -20,8 +23,9 @@ export function groqWhisper({
   model = defaultGroqWhisperModel,
   ...http
 }: GroqWhisperOptions): Transcriber {
+  const label = `${groqWhisperId}:${model}`;
   return {
-    label: groqWhisperId,
+    label,
     async transcribe({ audio, container, language }: TranscribeInput) {
       const form = new FormData();
       form.append(
@@ -31,18 +35,23 @@ export function groqWhisper({
       );
       form.append("model", model);
       form.append("language", language);
-      form.append("response_format", "json");
+      form.append("response_format", "verbose_json");
       form.append("temperature", "0");
       const body = await postForJson(
-        groqWhisperId,
+        label,
         endpoint,
         { headers: { authorization: `Bearer ${await apiKey()}` }, body: form },
         http,
       );
       const parsed = responseSchema.safeParse(body);
-      if (!parsed.success)
-        throw new ProviderError(groqWhisperId, `${groqWhisperId} answered an unexpected shape`);
-      return { text: parsed.data.text.trim() };
+      if (!parsed.success) throw new ProviderError(label, `${label} answered an unexpected shape`);
+      const text = parsed.data.text.trim();
+      const segments = parsed.data.segments ?? [];
+      if (segments.length === 0) return { text };
+      return {
+        text,
+        noSpeechProbability: Math.min(...segments.map((segment) => segment.no_speech_prob)),
+      };
     },
   };
 }

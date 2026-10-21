@@ -1,17 +1,19 @@
 import {
   defaultRefiner,
   defaultTranscriber,
+  minAudioSeconds,
   type DictationResponse,
   type Language,
 } from "@take-my-word/shared";
 import { HttpError } from "../lib/http-error.ts";
 import type { Logger } from "../lib/log.ts";
 import type { Metrics } from "../lib/metrics.ts";
-import { audioDurationSeconds } from "./audio/duration.ts";
-import { InvalidAudioError } from "./audio/invalid-audio.ts";
+import { chargeableSeconds } from "./audio/duration.ts";
+import { AudioTooShortError, InvalidAudioError } from "./audio/invalid-audio.ts";
 import type { AudioSink } from "./audio-sink.ts";
 import type { DictationStore } from "./dictation-store.ts";
 import { ProviderError } from "./ports/provider-error.ts";
+import type { Transcript } from "./ports/transcriber.ts";
 import { plainV1 } from "./prompts/plain.v1.ts";
 import type { ProviderRegistry } from "./providers/registry.ts";
 import { quotaExceededMessage, quotaWindow, type QuotaStore } from "./quota.ts";
@@ -22,7 +24,7 @@ export interface DictateDeps {
   quota: QuotaStore;
   dailyQuotaMinutes: number;
   dictations: DictationStore;
-  isSilence: (raw: string) => boolean;
+  isSilence: (transcript: Transcript) => boolean;
   audioSink?: AudioSink;
   metrics: Metrics;
   log: Logger;
@@ -82,10 +84,21 @@ export async function dictate(
 
   let audioSeconds: number;
   try {
-    audioSeconds = audioDurationSeconds(audio.container, audio.bytes);
+    audioSeconds = chargeableSeconds(audio.container, audio.bytes);
   } catch (error) {
     if (error instanceof InvalidAudioError) {
-      throw new HttpError("bad_request", `The audio part is not a valid ${audio.container} file.`);
+      throw new HttpError(
+        "bad_request",
+        audio.container === "wav"
+          ? "The audio part is not a 16 kHz mono 16-bit PCM WAV file."
+          : "The audio part is not a valid m4a file.",
+      );
+    }
+    if (error instanceof AudioTooShortError) {
+      throw new HttpError(
+        "bad_request",
+        `Recordings under ${minAudioSeconds} s are not transcribed.`,
+      );
     }
     throw error;
   }
@@ -113,14 +126,16 @@ export async function dictate(
     });
   }
 
-  const [{ text: raw }, transcribeMs] = await callProvider(deps, transcriber.label, () =>
+  const [transcript, transcribeMs] = await callProvider(deps, transcriber.label, () =>
     transcriber.transcribe({ audio: audio.bytes, container: audio.container, language }),
   );
 
-  if (deps.isSilence(raw)) {
+  const raw = transcript.text;
+  if (deps.isSilence(transcript)) {
     const totalMs = Math.round(deps.elapsed() - startedAt);
     deps.log.info("dictation skipped", {
       skipped: "silence",
+      noSpeechProbability: transcript.noSpeechProbability,
       audioSeconds,
       transcriber: transcriber.label,
       quotaMs,

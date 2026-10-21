@@ -1,6 +1,7 @@
 import { InvalidAudioError } from "./invalid-audio.ts";
 
 const unknownDuration32 = 0xffffffff;
+const maxAacBytesPerSecond = 320_000 / 8;
 
 interface Box {
   type: string;
@@ -59,7 +60,7 @@ function fragmentDuration(bytes: Buffer, mehd: Box | undefined): number {
     : bytes.readUInt32BE(mehd.start + 4);
 }
 
-export function m4aDurationSeconds(bytes: Buffer): number {
+export function m4aSeconds(bytes: Buffer): number {
   const top = [...boxes(bytes, 0, bytes.length)];
   if (top[0]?.type !== "ftyp") throw new InvalidAudioError("not an MP4 container");
   const moov = top.find((box) => box.type === "moov");
@@ -72,5 +73,5 @@ export function m4aDurationSeconds(bytes: Buffer): number {
     ? duration
     : fragmentDuration(bytes, child(bytes, child(bytes, moov, "mvex"), "mehd"));
   if (units === 0) throw new InvalidAudioError("unknown duration");
-  return units / timescale;
+  return Math.max(units / timescale, bytes.length / maxAacBytesPerSecond);
 }

@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { DictationRecord } from "../dictation/dictation-store.ts";
 import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { RefineInput } from "../dictation/ports/refiner.ts";
-import type { TranscribeInput } from "../dictation/ports/transcriber.ts";
+import type { TranscribeInput, Transcript } from "../dictation/ports/transcriber.ts";
 import type { QuotaCharge } from "../dictation/quota.ts";
 import { createSilenceGuard } from "../dictation/silence.ts";
 import { createLogger } from "../lib/log.ts";
@@ -20,11 +20,12 @@ import { createDictateHandler, type DictateEvent } from "./app.ts";
 
 const rawTranscript = "eh bueno este quería decir que mañana nos vemos";
 const cleanText = "Quería decir que mañana nos vemos.";
+const whisper = "groq-whisper:whisper-large-v3-turbo";
 
 class World {
   now = new Date("2026-10-20T15:00:00.000Z");
   clock = 0;
-  transcript = rawTranscript;
+  transcript: Transcript = { text: rawTranscript, noSpeechProbability: 0.02 };
   transcribeError: Error | undefined;
   transcribed: TranscribeInput[] = [];
   refined: RefineInput[] = [];
@@ -37,12 +38,12 @@ class World {
     providers: {
       transcribers: {
         "groq-whisper": {
-          label: "groq-whisper",
+          label: whisper,
           transcribe: (input) => {
             this.transcribed.push(input);
             this.clock += 300;
             if (this.transcribeError) return Promise.reject(this.transcribeError);
-            return Promise.resolve({ text: this.transcript });
+            return Promise.resolve(this.transcript);
           },
         },
       },
@@ -121,7 +122,7 @@ describe("POST /dictations", () => {
     expect(body).toMatchObject({
       raw: rawTranscript,
       text: cleanText,
-      providers: { transcriber: "groq-whisper", refiner: "openai:gpt-5.4-nano" },
+      providers: { transcriber: whisper, refiner: "openai:gpt-5.4-nano" },
       latencyMs: { transcribe: 300, refine: 400, total: 700 },
     });
     expect(body.skipped).toBeUndefined();
@@ -150,14 +151,14 @@ describe("POST /dictations", () => {
   });
 
   it("answers empty text for silence without calling the refiner or saving", async () => {
-    world.transcript = "Gracias.";
+    world.transcript = { text: "Gracias.", noSpeechProbability: 0.93 };
     const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 2 }) }));
     expect(status).toBe(200);
     const body = ok(json);
     expect(body).toMatchObject({
       text: "",
       skipped: "silence",
-      providers: { transcriber: "groq-whisper" },
+      providers: { transcriber: whisper },
     });
     expect(body.providers.refiner).toBeUndefined();
     expect(world.refined).toHaveLength(0);
@@ -166,6 +167,35 @@ describe("POST /dictations", () => {
       expect.objectContaining({ message: "dictation skipped", skipped: "silence" }),
     );
     expect(world.used.get("user-1/2026-10-20")).toBe(2);
+  });
+
+  it("refines a real one-word reply that the transcriber heard as speech", async () => {
+    world.transcript = { text: "Gracias.", noSpeechProbability: 0.04 };
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 2 }) }));
+    expect(status).toBe(200);
+    expect(ok(json).skipped).toBeUndefined();
+    expect(world.refined[0]?.raw).toBe("Gracias.");
+    expect(world.saved).toHaveLength(1);
+  });
+
+  it("answers 400 without charging a recording under half a second", async () => {
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 0.3 }) }));
+    expect(status).toBe(400);
+    expect(failure(json).message).toBe("Recordings under 0.5 s are not transcribed.");
+    expect(world.charges).toHaveLength(0);
+    expect(world.transcribed).toHaveLength(0);
+  });
+
+  it("charges a WAV by the bytes sent when its header claims no data", async () => {
+    await world.post(dictationBody({ audio: wav({ seconds: 20, declaredDataSize: 0 }) }));
+    expect(world.charges[0]?.seconds).toBe(20);
+  });
+
+  it("charges an m4a at least its payload at 320 kbps when its header claims less", async () => {
+    const lying = m4a({ seconds: 1 / 44_100, mediaBytes: 800_000 });
+    const body = dictationBody({ audio: lying, audioType: "audio/mp4" });
+    expect((await world.post(body)).status).toBe(200);
+    expect(world.charges[0]?.seconds).toBeGreaterThanOrEqual(20);
   });
 
   it("charges the real duration and allows requests while the day is under the cap", async () => {
@@ -211,14 +241,12 @@ describe("POST /dictations", () => {
   });
 
   it("answers 502 when a provider fails, records the error metric and saves nothing", async () => {
-    world.transcribeError = new ProviderError("groq-whisper", "groq-whisper answered 503", 503);
+    world.transcribeError = new ProviderError(whisper, `${whisper} answered 503`, 503);
     const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
     expect(status).toBe(502);
     expect(failure(json).code).toBe("provider_failed");
     expect(world.saved).toHaveLength(0);
-    expect(world.logs()).toContainEqual(
-      expect.objectContaining({ Provider: "groq-whisper", Errors: 1 }),
-    );
+    expect(world.logs()).toContainEqual(expect.objectContaining({ Provider: whisper, Errors: 1 }));
   });
 
   it("answers 500 without details on an unexpected failure", async () => {
@@ -235,7 +263,7 @@ describe("POST /dictations", () => {
     await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
     const metrics = world.logs().filter((line) => "_aws" in line);
     expect(metrics).toEqual([
-      expect.objectContaining({ Provider: "groq-whisper", Latency: 300, Errors: 0 }),
+      expect.objectContaining({ Provider: whisper, Latency: 300, Errors: 0 }),
       expect.objectContaining({
         Provider: "openai:gpt-5.4-nano",
         Latency: 400,
@@ -248,7 +276,7 @@ describe("POST /dictations", () => {
 
   it("never logs the transcript or the clean text", async () => {
     await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
-    world.transcript = "Thank you.";
+    world.transcript = { text: "Thank you.", noSpeechProbability: 0.95 };
     await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
     const everything = world.lines.join("\n");
     expect(everything).not.toContain("mañana nos vemos");
