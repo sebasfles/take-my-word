@@ -120,4 +120,18 @@ describe("pnpm release:desktop", () => {
     expect(result.stderr).toContain("is empty; the tag message is the release notes");
     expect(git(work, "log", "--format=%s")).toBe("app");
   });
+
+  it.each(["0.1.0", "0.0.9", "0.1.0-rc.1"])(
+    "refuses %s, which is not newer than 0.1.0, before changing anything",
+    (version) => {
+      setUp("feat/0005_desktop_release");
+      write("../notes.md", "Notes.\n");
+      const result = release(version, "--notes", join(base, "notes.md"));
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(`${version} is not newer than the desktop's 0.1.0`);
+      expect(git(work, "log", "--format=%s")).toBe("app");
+      expect(git(work, "status", "--porcelain")).toBe("");
+      expect(git(origin, "tag", "--list")).toBe("");
+    },
+  );
 });

@@ -2,7 +2,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readVersions, versionProblem, writeVersion } from "./version.ts";
+import { compareVersions, readVersions, versionProblem, writeVersion } from "./version.ts";
 
 const desktop = join(import.meta.dirname, "..");
 const files = ["package.json", "src-tauri/Cargo.toml", "src-tauri/Cargo.lock"];
@@ -62,5 +62,30 @@ describe("desktop version", () => {
 
   it("refuses a version that is not semantic", () => {
     expect(() => writeVersion(dir, "1.2")).toThrow("1.2 is not a semantic version");
+  });
+
+  it("orders versions by semver precedence, prereleases included", () => {
+    const ascending = [
+      "0.0.9",
+      "0.1.0-alpha",
+      "0.1.0-alpha.1",
+      "0.1.0-alpha.beta",
+      "0.1.0-beta",
+      "0.1.0-beta.2",
+      "0.1.0-beta.11",
+      "0.1.0-rc.1",
+      "0.1.0",
+      "0.1.1",
+      "0.2.0",
+      "0.10.0",
+      "1.0.0",
+    ];
+    for (const [index, lower] of ascending.entries()) {
+      for (const higher of ascending.slice(index + 1)) {
+        expect(compareVersions(lower, higher)).toBe(-1);
+        expect(compareVersions(higher, lower)).toBe(1);
+      }
+      expect(compareVersions(lower, lower)).toBe(0);
+    }
   });
 });

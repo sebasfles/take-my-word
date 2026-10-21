@@ -10,12 +10,19 @@ const otherKey = readFileSync(join(fixtures, "other.pub"), "utf8");
 const signature = readFileSync(join(fixtures, "payload.bin.sig"), "utf8");
 const repo = "sebasfles/take-my-word";
 const asset = "Take.My.Word_1.2.3_x64-setup.exe";
+const assets = [
+  { id: 101, name: asset },
+  { id: 102, name: `${asset}.sig` },
+  { id: 103, name: fixedInstallerName },
+  { id: 104, name: "latest.json" },
+];
+const installerUrl = `https://api.github.com/repos/${repo}/releases/assets/101`;
 
 let dir: string;
 
 function manifest(changes: { version?: string; url?: string; signature?: string } = {}) {
   const entry = {
-    url: changes.url ?? `https://github.com/${repo}/releases/download/desktop-v1.2.3/${asset}`,
+    url: changes.url ?? installerUrl,
     signature: changes.signature ?? signature,
   };
   writeFileSync(
@@ -29,7 +36,7 @@ function manifest(changes: { version?: string; url?: string; signature?: string 
 }
 
 function check(version = "1.2.3", publicKey = signerKey) {
-  return checkRelease({ dir, publicKey, repo, tag: `desktop-v${version}`, version });
+  return checkRelease({ dir, assets, publicKey, repo, version });
 }
 
 describe("checkRelease", () => {
@@ -60,10 +67,7 @@ describe("checkRelease", () => {
   });
 
   it("rejects a manifest that announces another version for the signed installer", () => {
-    manifest({
-      version: "1.2.4",
-      url: `https://github.com/${repo}/releases/download/desktop-v1.2.4/${asset}`,
-    });
+    manifest({ version: "1.2.4" });
     expect(() => check("1.2.4")).toThrow(`${asset} is signed for 1.2.3, expected 1.2.4`);
   });
 
@@ -74,9 +78,13 @@ describe("checkRelease", () => {
     expect(() => check()).toThrow("the trusted comment does not match its signature");
   });
 
-  it("rejects an entry that points outside the release of the tag", () => {
-    manifest({ url: `https://github.com/${repo}/releases/download/desktop-v1.2.2/${asset}` });
-    expect(() => check()).toThrow("outside");
+  it.each([
+    ["an asset of another release", `https://api.github.com/repos/${repo}/releases/assets/99`],
+    ["another repository", "https://api.github.com/repos/someone/else/releases/assets/101"],
+    ["a non-API address", `https://github.com/${repo}/releases/download/desktop-v1.2.3/${asset}`],
+  ])("rejects an entry that points to %s", (_, url) => {
+    manifest({ url });
+    expect(() => check()).toThrow("which is no asset of this release");
   });
 
   it("rejects a fixed-name installer that differs from the signed one", () => {

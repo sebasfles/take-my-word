@@ -13,11 +13,16 @@ interface Manifest {
   platforms?: Record<string, { url?: unknown; signature?: unknown }>;
 }
 
+export interface ReleaseAsset {
+  id: number;
+  name: string;
+}
+
 export interface ReleaseCheck {
   dir: string;
+  assets: ReleaseAsset[];
   publicKey: string;
   repo: string;
-  tag: string;
   version: string;
 }
 
@@ -25,7 +30,7 @@ function sha256(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
-export function checkRelease({ dir, publicKey, repo, tag, version }: ReleaseCheck): string[] {
+export function checkRelease({ dir, assets, publicKey, repo, version }: ReleaseCheck): string[] {
   const manifest = JSON.parse(readFileSync(join(dir, "latest.json"), "utf8")) as Manifest;
   if (manifest.version !== version) {
     throw new Error(`latest.json announces ${String(manifest.version)}, expected ${version}`);
@@ -33,7 +38,8 @@ export function checkRelease({ dir, publicKey, repo, tag, version }: ReleaseChec
   if (typeof manifest.notes !== "string" || manifest.notes.trim() === "") {
     throw new Error("latest.json has no release notes");
   }
-  const prefix = `https://github.com/${repo}/releases/download/${tag}/`;
+  const prefix = `https://api.github.com/repos/${repo}/releases/assets/`;
+  const names = new Map(assets.map(({ id, name }) => [`${prefix}${String(id)}`, name]));
   const evidence: string[] = [`latest.json announces ${version}`];
   let installer: Buffer | undefined;
   const platforms = Object.entries(manifest.platforms ?? {});
@@ -42,12 +48,11 @@ export function checkRelease({ dir, publicKey, repo, tag, version }: ReleaseChec
   }
   for (const [platform, entry] of platforms) {
     const { url, signature } = entry;
-    if (typeof url !== "string" || !url.startsWith(prefix)) {
-      throw new Error(`${platform} points to ${String(url)}, outside ${prefix}`);
+    const asset = typeof url === "string" ? names.get(url) : undefined;
+    if (asset === undefined || /[\\/]/.test(asset)) {
+      throw new Error(`${platform} points to ${String(url)}, which is no asset of this release`);
     }
     if (typeof signature !== "string") throw new Error(`${platform} has no signature`);
-    const asset = decodeURIComponent(url.slice(prefix.length));
-    if (asset === "" || /[\\/]/.test(asset)) throw new Error(`${platform} names no single asset`);
     const data = readFileSync(join(dir, asset));
     const signed = verifyUpdaterSignature(publicKey, signature, data);
     if (signed.version !== version) {
@@ -83,21 +88,22 @@ if (import.meta.main) {
       config: { type: "string" },
       repo: { type: "string" },
       tag: { type: "string" },
+      assets: { type: "string" },
     },
   });
-  const { dir, config, repo, tag } = values;
-  if (!dir || !config || !repo || !tag?.startsWith("desktop-v")) {
+  const { dir, config, repo, tag, assets } = values;
+  if (!dir || !config || !repo || !assets || !tag?.startsWith("desktop-v")) {
     console.error(
-      "usage: node scripts/release-check.ts --dir <assets> --config <tauri.prd.conf.json> --repo <owner/name> --tag desktop-vX.Y.Z",
+      "usage: node scripts/release-check.ts --dir <downloads> --assets <assets.json> --config <tauri.prd.conf.json> --repo <owner/name> --tag desktop-vX.Y.Z",
     );
     process.exit(2);
   }
   const version = tag.slice("desktop-v".length);
   for (const line of checkRelease({
     dir,
+    assets: JSON.parse(readFileSync(assets, "utf8")) as ReleaseAsset[],
     publicKey: updaterPublicKey(config),
     repo,
-    tag,
     version,
   })) {
     console.log(line);

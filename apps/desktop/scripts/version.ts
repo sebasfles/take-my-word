@@ -24,6 +24,36 @@ export function isVersion(value: string): boolean {
   );
 }
 
+function identifiers(version: string): { core: number[]; pre: string[] } {
+  const [core = "", pre] = version.split(/-(.*)/s);
+  return { core: core.split(".").map(Number), pre: pre === undefined ? [] : pre.split(".") };
+}
+
+function compareIdentifier(a: string, b: string): number {
+  const numeric = /^\d+$/;
+  if (numeric.test(a) && numeric.test(b)) return Number(a) - Number(b);
+  if (numeric.test(a)) return -1;
+  if (numeric.test(b)) return 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function compareVersions(a: string, b: string): number {
+  const left = identifiers(a);
+  const right = identifiers(b);
+  for (let i = 0; i < 3; i++) {
+    const difference = (left.core[i] ?? 0) - (right.core[i] ?? 0);
+    if (difference !== 0) return Math.sign(difference);
+  }
+  if (left.pre.length === 0 || right.pre.length === 0) {
+    return Math.sign(right.pre.length - left.pre.length);
+  }
+  for (let i = 0; i < Math.min(left.pre.length, right.pre.length); i++) {
+    const difference = compareIdentifier(left.pre[i] ?? "", right.pre[i] ?? "");
+    if (difference !== 0) return Math.sign(difference);
+  }
+  return Math.sign(left.pre.length - right.pre.length);
+}
+
 function read(desktopDir: string, file: VersionFile): string {
   return readFileSync(join(desktopDir, files[file]), "utf8");
 }

@@ -2,7 +2,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { isVersion, readVersions, tagPrefix, versionProblem, writeVersion } from "./version.ts";
+import {
+  compareVersions,
+  isVersion,
+  readVersions,
+  tagPrefix,
+  versionProblem,
+  writeVersion,
+} from "./version.ts";
 
 const protectedBranches = ["develop", "main"];
 
@@ -33,7 +40,9 @@ export function release(version: string, notesFile: string | undefined): string 
   const current = readVersions(desktopDir);
   const problem = versionProblem(current);
   if (problem) throw new Error(problem);
-  if (current.cargoToml === version) throw new Error(`the desktop is already at ${version}`);
+  if (compareVersions(version, current.cargoToml) <= 0) {
+    throw new Error(`${version} is not newer than the desktop's ${current.cargoToml}`);
+  }
   const notes = notesFile === undefined ? undefined : resolve(notesFile);
   if (notes !== undefined && readFileSync(notes, "utf8").trim() === "") {
     throw new Error(`${notesFile ?? ""} is empty; the tag message is the release notes`);

@@ -143,3 +143,21 @@ Pending:
 Deferred:
 
 - None.
+
+### Round 2
+
+Done:
+
+- Finding 1: `release.ts` refuses any version that is not newer than the current one under semver precedence (prerelease included), before anything changes; `compareVersions` in `version.ts`, tested on the semver spec's ordering, plus `release.test.ts` cases for an equal, an older and an older-prerelease version.
+- Release creation diagnosed (run 39651783291): a raw `POST /releases` without `target_commitish` returns `201` with `X-Accepted-Github-Permissions: contents=write; contents=write,workflows=write`; `tauri-action`'s own create sends `target_commitish: <tag sha>`, and pointing a release at a commit whose tree changes workflows needs `workflows=write`, which `GITHUB_TOKEN` cannot hold.
+- `desktop-release` now creates (or reuses) the draft through the API with no target, passes its id to `tauri-action` as `releaseId` (so the action never creates or edits the release), and uploads the fixed-name installer, downloads assets, checks and publishes (`PATCH draft=false, make_latest=true`) by that id.
+- `tauri-action` v1 writes API asset URLs into `latest.json`; `release-check.ts` accepts only `https://api.github.com/repos/<repo>/releases/assets/<id>` with an id from this release's own asset list, and verifies those bytes. The updater downloads them with `Accept: application/octet-stream`; an anonymous download of a published asset returned 200 with the installer.
+- Dry run 4, run 39653476726, passed end to end on a throwaway `0.1.0-dryrun.4` commit: draft 419913394 created, installer built and signed, fixed-name installer uploaded, `latest.json` and both Windows entries verified against the committed key (sha256 `437d31af...b886b`, signed for `0.1.0-dryrun.4`), fixed-name installer identical. A throwaway step on that commit only also proved the publish `PATCH` (as a non-latest prerelease). Signing secrets appear only as `***` in the log. Tag, release and worktree deleted.
+
+Decisions not recorded in the plan:
+
+- The release is created by our workflow, not by `tauri-action`, for the `workflows=write` reason above; a rerun reuses the tag's existing draft.
+
+Pending:
+
+- Acceptance 3 and the real releases wait for 0007 and your hand-off of the release tags.
