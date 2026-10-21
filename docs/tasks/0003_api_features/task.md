@@ -173,3 +173,10 @@ Evidence (dev, 2026-10-21 UTC):
 Pending: none for round 1.
 
 Deferred: none.
+
+### Round 2 (round 1 findings, 1 of 1 applied)
+
+1. `verify-task` re-ran on a clean worktree at db3701b, after its commit, and `verify.log` gained blocks at that sha; this round's commit touches only `docs/tasks/0003_api_features`.
+   From here every round commits first and verifies the committed tree.
+
+Pending and deferred: unchanged from round 1.
