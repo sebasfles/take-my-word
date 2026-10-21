@@ -61,7 +61,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | auth | 2026-10-21 | Desktop and mobile must confirm their device and send `DeviceKey` on every refresh | Phases 2 and 4 build their logins |
 | dictation | 2026-10-20 | Cold starts of `dictate` paid by the user | MVP works end to end; measure cold vs warm |
 | dictation | 2026-10-21 | Audio part capped at 4 MiB: desktop WAV about 2 min, m4a about 8 | Desktop users hit the cap, or Opus joins |
-| dictation | 2026-10-21 | One daily cap for every user; the per-user override is not built | A task writes `USER`, or a user needs another cap |
+| dictation | 2026-10-21 | One daily cap for every user; the per-user override is not built | One user needs a different cap |
 | dictation | 2026-10-21 | m4a level is not measured, so its ambiguous phrases are always refined | Phase 4, when mobile drops silence with expo-audio metering |
 | dictation | 2026-10-21 | Loud noise can make Whisper loop on mixed hallucinations that get refined | A hallucination loop gets pasted in real use |
 | dictation | 2026-10-21 | A history page over many expired items costs one Query per batch until TTL deletes them | TTL lag leaves more than a page of expired items in a partition |

@@ -90,10 +90,10 @@ source: 0003_api_features
 ## 2026-10-21: The daily quota is one conditional counter per UTC day
 
 - Decision: `QUOTA#YYYY-MM-DD` under the user gets an atomic `ADD seconds` while the stored value is under the cap; the real duration is charged before transcription, never refunded, and the last allowed recording may overshoot the cap.
-- Alternatives rejected: counting dictations; reserving the duration first and refunding failures; a per-user cap stored on `USER`, deferred to the task that first writes `USER`.
+- Alternatives rejected: counting dictations; reserving the duration first and refunding failures; a per-user cap stored on `SETTINGS`, deferred until one user needs it.
 - Reason: providers bill minutes; DynamoDB serializes the condition, so concurrent requests overshoot by at most one recording (six parallel requests at the cap let two through).
 - Debt created: `DAILY_QUOTA_MINUTES` is one cap for every user; the prd's per-user override is not built.
-- Revisit when: a task writes `USER`, or one user needs a different cap.
+- Revisit when: one user needs a different cap.
 - Source: 0001_platform_skeleton
 
 ## 2026-10-21: Silence on WAV is decided by measuring the audio

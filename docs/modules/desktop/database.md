@@ -18,7 +18,7 @@ On the machine it keeps the Cognito tokens in the OS keychain and its local sett
 |---|---|---|
 | `take-my-word-{env}`, `APPRULE#appId` | styles | Read to map the focused app to a style and a paste keystroke. |
 | `take-my-word-{env}`, `STYLE#id` | styles | Listed in settings to pick a style for an app rule. |
-| `take-my-word-{env}`, `USER` | dictation | Settings read and written through `/me/settings`. |
+| `take-my-word-{env}`, `SETTINGS` | dictation | Settings read and written through `/me/settings`. |
 | `take-my-word-{env}`, `DICTATION#ts` | dictation | Created on the server by each dictation the app sends. |
 
 ## Invariants kept in code

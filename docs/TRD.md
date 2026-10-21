@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Technical Requirements Document
@@ -25,10 +25,11 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 ### api
 
 - Stack: Node 24, Hono, zod, AWS SDK v3; bundled with esbuild into two Lambdas, `api` (every CRUD route) and `dictate` (`POST /dictations`, more memory, 60 s timeout), plus `dictionary-usage` on the table stream and the Lambda authorizer.
-- Layout: one folder per module (`auth/`, `dictation/`, `dictionary/`, `styles/`), provider adapters under `dictation/providers/`.
+- Layout: one folder per Lambda entry (`api/`, `dictate/`, `authorizer/`, `dictionary-usage/`) and one per module (`dictation/`, `dictionary/`, `styles/`, `app-rules/`, `settings/`, `history/`), provider adapters under `dictation/providers/`, shared helpers in `lib/`.
 - Install: `pnpm install --frozen-lockfile` at the root.
 - Workspace files: `.env` at the repository root, gitignored, never committed or printed.
-  It holds `GROQ_API_KEY` and `OPENAI_API_KEY` (copied into the providers secret), `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM` (read by `infra/scripts/tf`), and `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD` and `API_URL` (read by `pnpm token` and `pnpm e2e` in `apps/api`).
+  It holds `GROQ_API_KEY` and `OPENAI_API_KEY` (copied into the providers secret), `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM` (read by `infra/scripts/tf`), and `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD`, `CREW_E2E_B_USERNAME`, `CREW_E2E_B_PASSWORD`, `TABLE_NAME` and `API_URL` (read by `pnpm token` and `pnpm e2e` in `apps/api`).
+  `pnpm e2e` also needs the `fless-takemyword` AWS profile, for Polly speech and for resetting `crew-e2e-b`'s `SETTINGS` item.
 - API spec: `none`; the zod contracts in `packages/shared` are the source of truth.
 - Data: one DynamoDB table `take-my-word-{env}`, no ORM, no migrations; item kinds per module in each `database.md`.
 - Delivery: GitHub Actions on `develop` (dev) and `main` (prd) build and run `aws lambda update-function-code`; see [infra](modules/infra/README.md).
