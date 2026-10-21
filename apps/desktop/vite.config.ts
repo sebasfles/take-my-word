@@ -6,5 +6,5 @@ export default defineConfig({
   clearScreen: false,
   server: { port: 1420, strictPort: true },
   build: { target: "es2024" },
-  test: { fileParallelism: false },
+  test: { environment: "jsdom", fileParallelism: false },
 });

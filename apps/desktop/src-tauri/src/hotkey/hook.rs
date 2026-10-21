@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::Key;
 #[cfg(not(windows))]
 use super::unsupported as platform;
@@ -23,6 +25,14 @@ pub struct HookError(pub String);
 
 pub type KeySink = Box<dyn FnMut(KeyEvent, &dyn KeyHook) + Send>;
 
-pub fn install(sink: KeySink) -> Result<(), HookError> {
+pub fn install(sink: KeySink) -> Result<Arc<dyn KeyHook + Send + Sync>, HookError> {
     platform::install(sink)
+}
+
+pub fn key_name(code: u32) -> String {
+    platform::key_name(code)
+}
+
+pub fn key_code_from_dom(code: &str) -> Option<u32> {
+    platform::key_code_from_dom(code)
 }

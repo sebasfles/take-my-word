@@ -176,3 +176,49 @@ Deferred or open:
 - Finding 2: a hotkey has two or three keys with at least one modifier; a single key, modifier or not, is rejected, and a config holding one falls back to Ctrl+Win (tests for both).
 - `ChordTracker` owns its hotkey; changing the hotkey without restart (milestone 2) replaces the tracker's hotkey on the key-events thread.
 - Windows smoke repeated on the debug build: two 2 s holds (both key orders) recorded 1990 and 1980 ms WAVs, 300 ms discarded, arrow cancelled, Start closed, no keys left down. WAVs deleted.
+
+### Round 3 (milestone 2: stub, paste, overlay, first run, settings, autostart, dev WAV)
+
+Done:
+
+- API contract mirrored in `src-tauri/src/api` field by field (`DictationMeta`, `DictationResponse`, `ApiErrorBody`, error codes and statuses); `HttpApi` is the real multipart client (reqwest blocking, no TLS feature yet, 60 s timeout) behind `DictationApi`.
+- Stub: an axum server on `127.0.0.1` with a random port, spawned on Tauri's runtime, answering after 700 ms. It validates what the API validates (WAV media type, 4 MB, 16 kHz mono 16-bit, half a second, meta JSON, locale pattern) and answers the contract's shapes. Modes from the tray submenu "API stub" (Normal, Silence, Quota exceeded 429, Network error) in every build; the network mode drops the connection after the headers.
+- Paste (`paste.rs`): waits until no modifier or hotkey key is physically down (30 s cap), pastes only into the window that was foreground at key down, checks the target's integrity level, snapshots every memory-based clipboard format, offers the text with delayed rendering plus `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` = 0 and `CanUploadToCloudClipboard` = 0, sends Ctrl+V through enigo tagged with `OWN_INJECTION_TAG`, and restores the snapshot 150 ms after the target reads the text.
+- Clipboard (`clipboard/win32.rs`): a thread owning a message-only window; delayed rendering tells exactly when the target reads (`WM_RENDERFORMAT`). GDI and private handle formats are skipped.
+- Foreground (`foreground`): window handle, executable name as `appId` (lowercase, the hosted app for `ApplicationFrameHost`), and elevation by token integrity level.
+- Locale from `sys-locale`, mapped to `es` or `en` with a two-letter region, else `es`.
+- Overlay: a transparent, undecorated, always-on-top, non-focusable window (480 by 64) created hidden at startup; listening, processing and error pills; errors close after 4 s or on click; a blocked or silent microphone links to `ms-settings:privacy-microphone`.
+- First run (shown until "Got it"; says when Windows blocks the microphone), settings (shortcut, start with Windows, quit), autostart through `tauri-plugin-autostart`, turned on at first run in release builds only.
+- Shortcut capture in the settings page: it starts only while the settings window is visible and the foreground window belongs to this process; the page records `KeyboardEvent.code` (AltGraph counts as Right Alt, keys outside the model such as Unidentified are ignored) and proposes the keys held at the first key release; Rust maps the codes, validates with `Hotkey::from_pressed` and `Hotkey::new`, keeps the proposal, and applies and saves it only on Save. Chord detection is suspended while a capture is open and resumes on Save, Cancel, foreground leaving this process, and the 15 s timeout.
+- Dev tooling, debug builds only: `--dictate-wav <file>` and `--stub-mode <stub-normal|stub-silence|stub-quota|stub-network>` reach the running instance through single instance; `--dump-dir` writes the encoded WAV.
+- Tests: 65 Rust (paste paths, worker outcomes, stub over HTTP in every mode, contract serialization, capture state and its exits, DOM code mapping, locale, microphone error mapping, a real clipboard round trip on Windows) and 16 UI (overlay, first run, settings capture including AltGr, Unidentified keys, blur and timeout).
+
+Decisions the plan did not record (ARD material for `document-task`):
+
+- The clipboard restore is driven by delayed rendering: restore 150 ms after the first read that follows the keystroke; a read before the keystroke (a clipboard monitor) falls back to a 500 ms wait; no read within 1.5 s means the paste did not land, so the text stays in the clipboard and a notification says so. Known limit: any reader after the keystroke counts as the target.
+- The restored clipboard also carries `ExcludeClipboardContentFromMonitorProcessing`, so history and monitors do not record the user's own content a second time.
+- Paste only into the window that was foreground at key down; a window switch during processing leaves the text in the clipboard with a notification.
+- The paste waits for every modifier, not only the hotkey's, so a held Shift never turns Ctrl+V into Ctrl+Shift+V.
+- A target whose integrity level cannot be read counts as elevated.
+- Shortcut capture moved from the hook to the settings page: with one of our WebView windows in the foreground, no low-level keyboard hook saw injected keys (neither ours nor an unrelated process's), while the page did receive them; with Notepad in the foreground both hooks saw every key. Cause not identified and physical input untested; since an unrelated process is affected too, it is not this app's debt. Tauri's `is_focused` and `Focused(false)` are not used for capture, because they report a blur whenever the WebView child takes keyboard focus.
+- No Start-menu guard during capture: capturing Ctrl+Win in the settings window left Start closed on Windows 26200 without one.
+- WASAPI reports a denied microphone as `E_ACCESSDENIED` inside a generic cpal backend error; it is mapped to the blocked state by its HRESULT.
+- A capture made only of exact zeros is reported as "No sound from the microphone" with the privacy link, instead of being sent as silence.
+- The hidden overlay's WebView2 runs at `MemoryUsageTargetLevel` Low and switches to Normal while shown.
+- `[profile.dev]` keeps line tables only for this crate and no debug info for dependencies: the Windows target went from 7.8 GB to 2.3 GB. `rust:lint` also runs clippy on the release profile, where the debug-only tooling is compiled out.
+
+Windows smoke (Windows 11 26200; debug build unless noted; input injected from PowerShell with real scan codes, only while no real input for 2 minutes, a watcher of real input aborting the run, the stub in network-error mode except for paste checks, the clipboard read before and after but never written):
+
+- First run on a fresh profile explains the shortcut; "Got it" writes `firstRunDone` and it does not come back.
+- Ctrl+Win held 2 s in a dedicated Notepad file pasted the stub's text, the clipboard was identical before and after, Notepad kept the foreground through listening and processing, no key was left down; release build the same from the installer.
+- Silence pasted nothing and closed the overlay; quota and network showed their error pills and pasted nothing.
+- `--dictate-wav` with a 48 kHz stereo 1.5 s file ran the full path; the dumped WAV was 16 kHz mono 16-bit, 1500 ms.
+- Holding 125 s stopped and sent at 120 000 ms while still held.
+- Shortcut: AltGr refused with its message; Ctrl+Win proposed with Start staying closed; Ctrl+Alt proposed, settings unchanged until Save, then Ctrl+Win stopped dictating and Ctrl+Alt started, also after a restart; Ctrl+Win captured back.
+- Autostart switch on writes the HKCU Run entry and off removes it.
+- Microphone access off through the Settings switch: first run shows the blocked note with "Open microphone settings", a hold shows "Windows blocks the microphone. Open settings"; after switching it back on, our app recorded real audio again (1480 ms, rms 6.1). Writing Deny to the consent registry directly is not enforced by Windows, so the toggle went through the Settings page.
+- Taskbar: no microphone indicator while idle (the stream is prepared but inactive), the indicator only during a hold; tray menu shows Settings, API stub and Quit.
+- Release installer 1.91 MiB: silent install, first run and autostart entry, dictation into Notepad, silent uninstall leaving nothing.
+- RAM, Task Manager's private working set of the app plus its WebView2 processes, release build idle in the tray: before the overlay memory target 91.7 MB with settings never opened, 114.6 MB with settings open, 107.8 MB in the step meant to close it (the window had not closed); after it 75.5 MB, 100.2 MB and 83.4 MB once settings was closed.
+- Logs carry no dictated text (checked by grepping the log for the stub's sentences).
+- Every run ended with the debug or installed app quit, Ctrl+Win, autostart off, microphone access Allow and the clipboard untouched; Wispr Flow's own recording was not exercised.

@@ -3,7 +3,8 @@ import { viewFromSearch } from "./view.ts";
 
 describe("viewFromSearch", () => {
   it("reads the view the shell asked for", () => {
-    expect(viewFromSearch("?view=settings")).toBe("settings");
+    expect(viewFromSearch("?view=overlay")).toBe("overlay");
+    expect(viewFromSearch("?view=first-run")).toBe("first-run");
   });
 
   it("falls back to settings for unknown or missing views", () => {

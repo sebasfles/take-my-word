@@ -10,3 +10,10 @@ Other targets: untouched; the regenerated pnpm-lock.yaml only adds desktop packa
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (2 vitest + 30 cargo tests, pnpm test && pnpm rust:test)
 - e2e: n/a
+
+## 2026-10-21T16:25:54Z by om-developer target desktop on 4ba374497a695494c0e30adbd3fe3d3ae6bb7813
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint; cargo fmt --check, clippy -D warnings on all targets and on the release profile, on C:\dev\take-my-word at 4ba3744)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (16 vitest + 65 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+Lockfile regenerated after the rebase on develop 399b242 (the jsdom peer changes vitest's resolved key): unit tests of shared (19, exit 0), api (179, exit 0) and web (95, exit 0) also pass on this commit.

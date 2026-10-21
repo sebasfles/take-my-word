@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -11,12 +12,13 @@ pub const FILE_NAME: &str = "settings.json";
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub hotkey: Hotkey,
+    pub first_run_done: bool,
 }
 
 pub fn load(path: &Path) -> Settings {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Settings::default(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Settings::default(),
         Err(error) => {
             log::warn!("reading {} failed, using defaults: {error}", path.display());
             return Settings::default();
@@ -28,6 +30,15 @@ pub fn load(path: &Path) -> Settings {
     })
 }
 
+pub fn save(path: &Path, settings: &Settings) -> io::Result<()> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let staging = path.with_extension("json.tmp");
+    fs::write(&staging, serde_json::to_vec_pretty(settings)?)?;
+    fs::rename(&staging, path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -35,9 +46,9 @@ mod tests {
 
     fn scratch(name: &str, contents: Option<&str>) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("tmw-config-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join(FILE_NAME);
-        let _ = fs::remove_file(&path);
         if let Some(contents) = contents {
             fs::write(&path, contents).unwrap();
         }
@@ -62,11 +73,14 @@ mod tests {
     }
 
     #[test]
-    fn a_stored_hotkey_is_loaded() {
-        let path = scratch("stored", Some(r#"{"hotkey":["alt","shift"]}"#));
-        assert_eq!(
-            load(&path).hotkey,
-            Hotkey::new(vec![HotkeyKey::Shift, HotkeyKey::Alt]).unwrap()
-        );
+    fn saved_settings_survive_a_restart() {
+        let path = scratch("saved", None);
+        let settings = Settings {
+            hotkey: Hotkey::new(vec![HotkeyKey::Shift, HotkeyKey::Alt]).unwrap(),
+            first_run_done: true,
+        };
+        save(&path, &settings).unwrap();
+        assert_eq!(load(&path), settings);
+        assert!(!path.with_extension("json.tmp").exists());
     }
 }

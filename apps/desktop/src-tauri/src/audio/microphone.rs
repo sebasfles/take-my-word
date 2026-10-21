@@ -4,7 +4,7 @@ use std::thread;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{ErrorKind, FromSample, SampleFormat, SizedSample, Stream, StreamConfig};
 
-use super::{AudioError, Capture, CaptureBuffer, Captured};
+use super::{AudioError, Capture, CaptureBuffer, Captured, MicrophoneStatus};
 
 enum Command {
     Start,
@@ -13,16 +13,23 @@ enum Command {
 
 pub struct Microphone {
     commands: mpsc::Sender<Command>,
+    status: MicrophoneStatus,
 }
 
 impl Microphone {
     pub fn spawn() -> Result<Self, AudioError> {
         let (commands, inbox) = mpsc::channel();
+        let status = MicrophoneStatus::default();
+        let reported = status.clone();
         thread::Builder::new()
             .name("microphone".into())
-            .spawn(move || serve(inbox))
+            .spawn(move || serve(inbox, &reported))
             .map_err(|error| AudioError::Device(error.to_string()))?;
-        Ok(Self { commands })
+        Ok(Self { commands, status })
+    }
+
+    pub fn status(&self) -> MicrophoneStatus {
+        self.status.clone()
     }
 }
 
@@ -111,14 +118,16 @@ impl Armed {
     }
 }
 
-fn arm() -> Option<Armed> {
-    Armed::new()
+fn arm(status: &MicrophoneStatus) -> Option<Armed> {
+    let armed = Armed::new();
+    status.record(&armed);
+    armed
         .inspect_err(|error| log::warn!("preparing the microphone failed: {error}"))
         .ok()
 }
 
-fn serve(inbox: mpsc::Receiver<Command>) {
-    let mut armed = arm();
+fn serve(inbox: mpsc::Receiver<Command>, status: &MicrophoneStatus) {
+    let mut armed = arm(status);
     let mut recording: Option<Result<Armed, AudioError>> = None;
     for command in inbox {
         match command {
@@ -128,6 +137,7 @@ fn serve(inbox: mpsc::Receiver<Command>) {
                         Some(ready) => ready.play().or_else(|_| Armed::new()?.play()),
                         None => Armed::new().and_then(Armed::play),
                     };
+                    status.record(&started);
                     recording = Some(started);
                 }
             }
@@ -138,7 +148,7 @@ fn serve(inbox: mpsc::Receiver<Command>) {
                     None => Err(AudioError::NotStarted),
                 };
                 let _ = reply.send(result);
-                armed = arm();
+                armed = arm(status);
             }
         }
     }
@@ -182,10 +192,32 @@ where
         .map_err(device_error)
 }
 
+const ACCESS_DENIED_HRESULT: &str = "-2147024891";
+
 fn device_error(error: cpal::Error) -> AudioError {
+    let access_denied = error
+        .message()
+        .is_some_and(|message| message.contains(ACCESS_DENIED_HRESULT));
     match error.kind() {
         ErrorKind::PermissionDenied => AudioError::PermissionDenied,
+        _ if access_denied => AudioError::PermissionDenied,
         ErrorKind::DeviceNotAvailable => AudioError::NoDevice,
         _ => AudioError::Device(error.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_wasapi_access_denied_means_the_privacy_setting_blocks_the_microphone() {
+        let denied = cpal::Error::with_message(
+            ErrorKind::BackendError,
+            "Failed to initialize audio client: Acceso denegado. (os error -2147024891)",
+        );
+        assert!(matches!(device_error(denied), AudioError::PermissionDenied));
+        let other = cpal::Error::with_message(ErrorKind::BackendError, "device busy (os error 5)");
+        assert!(matches!(device_error(other), AudioError::Device(_)));
     }
 }

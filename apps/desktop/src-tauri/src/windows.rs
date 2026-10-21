@@ -1,25 +1,74 @@
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
-const SETTINGS: &str = "settings";
+use crate::shell::Shell;
+
+pub const SETTINGS: &str = "settings";
+pub const FIRST_RUN: &str = "first-run";
+pub const OVERLAY: &str = "overlay";
 
 pub fn open_settings(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(SETTINGS) {
+    let Some(window) = open(app, SETTINGS, "Take My Word", (480.0, 480.0)) else {
+        return;
+    };
+    let app = app.clone();
+    window.on_window_event(move |event| {
+        let shell = app.state::<Shell>();
+        let cancelled = match event {
+            WindowEvent::Focused(false) => shell.cancel_capture_if_unfocused(),
+            WindowEvent::Destroyed => shell.cancel_capture(),
+            _ => false,
+        };
+        if cancelled {
+            crate::shell::capture_cancelled(&app);
+        }
+    });
+}
+
+pub fn open_first_run(app: &AppHandle) {
+    let _ = open(app, FIRST_RUN, "Welcome to Take My Word", (520.0, 470.0));
+}
+
+fn open(
+    app: &AppHandle,
+    label: &str,
+    title: &str,
+    (width, height): (f64, f64),
+) -> Option<tauri::WebviewWindow> {
+    if let Some(window) = app.get_webview_window(label) {
         let _ = window.unminimize();
         let _ = window.set_focus();
-        return;
+        return None;
     }
-    let built = WebviewWindowBuilder::new(
+    let url = WebviewUrl::App(format!("index.html?view={label}").into());
+    let built = WebviewWindowBuilder::new(app, label, url)
+        .title(title)
+        .inner_size(width, height)
+        .resizable(false)
+        .maximizable(false)
+        .center()
+        .build();
+    built
+        .inspect_err(|error| log::error!("opening {label} failed: {error}"))
+        .ok()
+}
+
+pub fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
+    WebviewWindowBuilder::new(
         app,
-        SETTINGS,
-        WebviewUrl::App("index.html?view=settings".into()),
+        OVERLAY,
+        WebviewUrl::App("index.html?view=overlay".into()),
     )
-    .title("Take My Word")
-    .inner_size(480.0, 560.0)
+    .title("Take My Word overlay")
+    .inner_size(480.0, 64.0)
+    .decorations(false)
+    .transparent(true)
+    .shadow(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
     .resizable(false)
-    .maximizable(false)
-    .center()
-    .build();
-    if let Err(error) = built {
-        log::error!("opening settings failed: {error}");
-    }
+    .focusable(false)
+    .focused(false)
+    .visible(false)
+    .build()
+    .map(|overlay| crate::overlay::set_memory_target(&overlay, crate::overlay::MemoryTarget::Low))
 }

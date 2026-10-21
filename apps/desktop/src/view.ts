@@ -1,4 +1,4 @@
-export const views = ["settings"] as const;
+export const views = ["settings", "first-run", "overlay"] as const;
 export type View = (typeof views)[number];
 
 export function viewFromSearch(search: string): View {

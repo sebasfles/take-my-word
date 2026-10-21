@@ -110,6 +110,7 @@ fn take(held: Duration, captured: Result<Captured, AudioError>) -> Take {
     }
     match captured {
         Ok(captured) if captured.duration() < MIN_RECORDING => Take::TooShort,
+        Ok(captured) if captured.is_digital_silence() => Take::Failed(AudioError::NoSignal),
         Ok(captured) => Take::Recorded { captured, held },
         Err(error) => Take::Failed(error),
     }
@@ -130,6 +131,7 @@ mod tests {
         events: Vec<String>,
         takes: Vec<Take>,
         mic_open: bool,
+        zeros: bool,
     }
 
     struct FakeMic {
@@ -149,8 +151,9 @@ mod tests {
             std::thread::sleep(self.stop_takes);
             self.log.borrow_mut().mic_open = false;
             let length = self.audio.map_err(|()| AudioError::PermissionDenied)?;
+            let level = if self.log.borrow().zeros { 0.0 } else { 0.1 };
             Ok(Captured {
-                samples: vec![0.1; (length.as_secs_f64() * f64::from(SAMPLE_RATE)) as usize],
+                samples: vec![level; (length.as_secs_f64() * f64::from(SAMPLE_RATE)) as usize],
                 channels: 1,
                 sample_rate: SAMPLE_RATE,
             })
@@ -298,6 +301,17 @@ mod tests {
         harness.send(ChordEvent::Released, 130_000);
         assert_eq!(harness.takes().len(), 1);
         assert_eq!(harness.session.deadline(), None);
+    }
+
+    #[test]
+    fn a_microphone_that_sends_exact_zeros_is_reported_instead_of_dictated() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(1)), Duration::ZERO);
+        harness.log.borrow_mut().zeros = true;
+        harness.hold(0, 1000);
+        assert_eq!(
+            harness.takes(),
+            vec!["failed: the microphone sent only digital silence"]
+        );
     }
 
     #[test]

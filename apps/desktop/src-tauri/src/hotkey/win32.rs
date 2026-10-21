@@ -1,12 +1,13 @@
-use std::sync::{OnceLock, mpsc};
+use std::sync::{Arc, OnceLock, mpsc};
 use std::thread;
 
 use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT,
-    KEYEVENTF_KEYUP, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
-    VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT,
+    GetAsyncKeyState, GetKeyNameTextW, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS,
+    KEYBDINPUT, KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, MapVirtualKeyW, SendInput, VIRTUAL_KEY,
+    VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU,
+    VK_RSHIFT, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_EXTENDED,
@@ -49,7 +50,7 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
-pub fn install(mut sink: KeySink) -> Result<(), HookError> {
+pub fn install(mut sink: KeySink) -> Result<Arc<dyn KeyHook + Send + Sync>, HookError> {
     let (raw_sender, raw_keys) = mpsc::channel();
     RAW_KEYS
         .set(raw_sender)
@@ -75,7 +76,80 @@ pub fn install(mut sink: KeySink) -> Result<(), HookError> {
         })
         .map_err(|error| HookError(error.to_string()))?;
 
-    Ok(())
+    Ok(Arc::new(WindowsHook))
+}
+
+pub fn key_code_from_dom(code: &str) -> Option<u32> {
+    let indexed = |prefix: &str, first: u32, count: u32| {
+        code.strip_prefix(prefix)
+            .and_then(|rest| match prefix {
+                "Key" => rest
+                    .chars()
+                    .next()
+                    .filter(|c| rest.len() == 1 && c.is_ascii_uppercase())
+                    .map(|c| c as u32 - 'A' as u32),
+                _ => rest.parse::<u32>().ok(),
+            })
+            .filter(|index| *index < count)
+            .map(|index| first + index)
+    };
+    let fixed = match code {
+        "Space" => 0x20,
+        "Enter" | "NumpadEnter" => 0x0D,
+        "Tab" => 0x09,
+        "Escape" => 0x1B,
+        "Backspace" => 0x08,
+        "Insert" => 0x2D,
+        "Delete" => 0x2E,
+        "Home" => 0x24,
+        "End" => 0x23,
+        "PageUp" => 0x21,
+        "PageDown" => 0x22,
+        "ArrowLeft" => 0x25,
+        "ArrowUp" => 0x26,
+        "ArrowRight" => 0x27,
+        "ArrowDown" => 0x28,
+        "CapsLock" => 0x14,
+        "Pause" => 0x13,
+        "ScrollLock" => 0x91,
+        "PrintScreen" => 0x2C,
+        "ContextMenu" => 0x5D,
+        "NumpadMultiply" => 0x6A,
+        "NumpadAdd" => 0x6B,
+        "NumpadSubtract" => 0x6D,
+        "NumpadDecimal" => 0x6E,
+        "NumpadDivide" => 0x6F,
+        "Backquote" => 0xC0,
+        "Minus" => 0xBD,
+        "Equal" => 0xBB,
+        "BracketLeft" => 0xDB,
+        "BracketRight" => 0xDD,
+        "Backslash" => 0xDC,
+        "Semicolon" => 0xBA,
+        "Quote" => 0xDE,
+        "Comma" => 0xBC,
+        "Period" => 0xBE,
+        "Slash" => 0xBF,
+        "IntlBackslash" => 0xE2,
+        _ => 0,
+    };
+    if fixed != 0 {
+        return Some(fixed);
+    }
+    indexed("Key", 0x41, 26)
+        .or_else(|| indexed("Digit", 0x30, 10))
+        .or_else(|| indexed("Numpad", 0x60, 10))
+        .or_else(|| indexed("F", 0x6F, 25).filter(|key| *key > 0x6F))
+}
+
+pub fn key_name(code: u32) -> String {
+    let scan = unsafe { MapVirtualKeyW(code, MAPVK_VK_TO_VSC) };
+    let mut buffer = [0u16; 64];
+    let length = unsafe { GetKeyNameTextW((scan << 16) as i32, &mut buffer) };
+    match length {
+        1.. => String::from_utf16_lossy(&buffer[..length as usize]),
+        _ => format!("Key {code:#04X}"),
+    }
 }
 
 fn pump_messages(ready: mpsc::Sender<Result<(), HookError>>) {
@@ -224,6 +298,20 @@ mod tests {
             translate(raw(VK_LCONTROL, 0x1D, 0, 0)).map(|event| event.key),
             Some(Key::Ctrl(Side::Left))
         );
+    }
+
+    #[test]
+    fn dom_codes_map_to_windows_virtual_keys() {
+        assert_eq!(key_code_from_dom("KeyA"), Some(0x41));
+        assert_eq!(key_code_from_dom("KeyZ"), Some(0x5A));
+        assert_eq!(key_code_from_dom("Digit7"), Some(0x37));
+        assert_eq!(key_code_from_dom("F1"), Some(0x70));
+        assert_eq!(key_code_from_dom("F13"), Some(0x7C));
+        assert_eq!(key_code_from_dom("F24"), Some(0x87));
+        assert_eq!(key_code_from_dom("Space"), Some(0x20));
+        for unknown in ["F0", "F25", "Keya", "KeyAB", "Lang1", ""] {
+            assert_eq!(key_code_from_dom(unknown), None, "{unknown}");
+        }
     }
 
     #[test]

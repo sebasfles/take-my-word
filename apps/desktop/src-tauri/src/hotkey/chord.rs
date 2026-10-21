@@ -23,6 +23,14 @@ impl ChordTracker {
         }
     }
 
+    pub fn hotkey(&self) -> &Hotkey {
+        &self.hotkey
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
     pub fn on_key(&mut self, event: KeyEvent, keyboard: &dyn KeyHook) -> Option<ChordEvent> {
         let chord = if event.down {
             if !self.active {

@@ -14,6 +14,10 @@ impl Captured {
         self.samples.len() / usize::from(self.channels.max(1))
     }
 
+    pub fn is_digital_silence(&self) -> bool {
+        self.samples.iter().all(|sample| *sample == 0.0)
+    }
+
     pub fn duration(&self) -> Duration {
         Duration::from_secs_f64(self.frames() as f64 / f64::from(self.sample_rate.max(1)))
     }
