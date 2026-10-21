@@ -5,9 +5,9 @@ source: 0004_web_landing
 
 # Technical Requirements Document
 
-Describes the whole application.
-Nothing is built yet: every section states the planned shape, and phase 1 (`docs/tasks/`) turns it into code.
+Describes the whole application as it is built today; planned parts say so in their section.
 One public monorepo, `sebasfles/take-my-word`, holds every app, the infrastructure and these docs.
+Built and deployed to dev and prd: `apps/api`, `apps/web`, `packages/shared`, `infra`; in progress: `apps/desktop`; planned: `apps/mobile`.
 
 ## Components
 
