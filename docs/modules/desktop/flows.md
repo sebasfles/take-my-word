@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0002_desktop_shell
+source: 0007_desktop_integration
 ---
 
 # Desktop: flows
@@ -11,16 +11,19 @@ Only flows that deserve a diagram. A CRUD does not.
 
 Runs every time the user holds the hotkey.
 An error closes after 4 s or on click; a failure that lands while the next hold is open arrives as a notification instead.
+Every caller of the session waits on one lock, so only one renewal runs at a time; the hotkey only reads a flag and never waits.
 
 ```mermaid
 stateDiagram-v2
   [*] --> Idle
-  Idle --> Listening: hotkey down
+  Idle --> Idle: hotkey down signed out, "sign in" shown, sign-in window opens
+  Idle --> Listening: hotkey down, background renewal starts
   Listening --> Idle: hotkey up under 0.5 s, discarded
   Listening --> Processing: hotkey up
   Processing --> Pasting: text returned
   Processing --> Idle: empty text, nothing pasted
-  Processing --> Error: network, quota or microphone failure
+  Processing --> Error: network, daily limit, size, format or microphone failure
+  Processing --> Error: session ended, sign-in window opens
   Pasting --> Idle: clipboard restored
   Error --> Idle: 4 s or click
 ```
@@ -37,7 +40,9 @@ sequenceDiagram
   D->>D: record WAV, read active window
   U->>D: release hotkey
   D->>O: show processing
-  D->>A: WAV, appId, styleId, access token
+  D->>D: access token, renewed under the lock with under 5 min left
+  D->>A: WAV, appId, locale, access token
+  Note over D,A: 401 or 403 without the error envelope: renew once, retry once
   A-->>D: clean text
   D->>D: save clipboard, offer text (delayed rendering)
   D->>F: paste keystroke from app rule

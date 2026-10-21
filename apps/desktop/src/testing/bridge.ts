@@ -1,10 +1,22 @@
 import { vi } from "vitest";
-import type { OverlayState, Overview } from "../bridge.ts";
+import type { AccountStep, AccountView, Onboarding, OverlayState, Overview } from "../bridge.ts";
 
 export const listeners: {
   overlay?: (state: OverlayState) => void;
   captureCancelled?: () => void;
+  accountChanged?: (signedIn: boolean) => void;
 } = {};
+
+export const signedIn: AccountView = { signedIn: true, username: "sebastian" };
+
+export const onboarding: Onboarding = {
+  styles: [
+    { id: "plain", name: "Plain" },
+    { id: "casual", name: "Casual" },
+    { id: "formal", name: "Formal" },
+  ],
+  selected: "plain",
+};
 
 export const overview: Overview = {
   hotkey: ["Ctrl", "Win"],
@@ -26,9 +38,26 @@ export const fakeBridge = {
   openMicrophoneSettings: vi.fn(() => Promise.resolve(undefined)),
   dismissOverlay: vi.fn(() => Promise.resolve(undefined)),
   finishFirstRun: vi.fn(() => Promise.resolve(undefined)),
+  accountStatus: vi.fn(() => Promise.resolve({ ...signedIn })),
+  signIn: vi.fn<(username: string, password: string) => Promise<AccountStep>>(() =>
+    Promise.resolve("onboarding"),
+  ),
+  choosePassword: vi.fn<(password: string) => Promise<AccountStep>>(() =>
+    Promise.resolve("onboarding"),
+  ),
+  onboarding: vi.fn(() => Promise.resolve(structuredClone(onboarding))),
+  saveDefaultStyle: vi.fn<(styleId: string) => Promise<undefined>>(() =>
+    Promise.resolve(undefined),
+  ),
+  openSignIn: vi.fn(() => Promise.resolve(undefined)),
+  signOut: vi.fn(() => Promise.resolve(undefined)),
   quit: vi.fn(() => Promise.resolve(undefined)),
   onOverlay: vi.fn((handler: (state: OverlayState) => void) => {
     listeners.overlay = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onAccountChanged: vi.fn((handler: (signedIn: boolean) => void) => {
+    listeners.accountChanged = handler;
     return Promise.resolve(() => undefined);
   }),
   onHotkeyCaptureCancelled: vi.fn((handler: () => void) => {

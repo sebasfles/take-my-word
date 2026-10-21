@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0009_web_account
+source: 0007_desktop_integration
 ---
 
 # Dictation: technical
@@ -59,4 +59,5 @@ Optional, with code defaults: `GROQ_WHISPER_MODEL` (`whisper-large-v3-turbo`), `
 ## Testing
 
 - Unit tests next to the code with fake ports; `pnpm e2e` in `apps/api` runs the deployed path against `API_URL` (see TRD).
+- The desktop's serde mirror of the dictation, error, settings and style contracts is checked against JSON Schema generated from `packages/shared`, so changing a contract fails `ci` until `pnpm contract` in `apps/desktop` and the mirror follow.
 - `apps/web` `pnpm e2e` seeds a throwaway user through the API, pages history with `?limit=1`, and deletes a dictation through CloudFront.

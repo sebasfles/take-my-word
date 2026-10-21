@@ -80,9 +80,11 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-20 | Clipboard monitors that ignore the exclusion format still see the dictated text | Users report missed pastes in an app class |
 | desktop | 2026-10-21 | macOS and Linux have no key hook yet | Phase 5 builds macOS and Linux |
 | desktop | 2026-10-21 | A prepared microphone stream may switch a Bluetooth headset to hands-free or hold it; untested | A Bluetooth headset is used, or its audio quality drops |
-| desktop | 2026-10-21 | The Rust mirror of the shared contract can drift unchecked | 0007 adds the JSON Schema contract test |
 | desktop | 2026-10-21 | Any clipboard read after the keystroke counts as the paste target | A paste reported as done does not land in a real app |
-| desktop | 2026-10-21 | Release builds ship the API stub and its tray menu | 0007 wires the real API |
+| desktop | 2026-10-21 | Two SRP implementations, Rust and `packages/cognito`, to keep equal | Cognito changes the SRP variant, or a third client needs SRP |
+| desktop | 2026-10-21 | No keychain on macOS and Linux; a rotated refresh token that fails to save is lost at the next start | Phase 5, or a sign-out after a keychain error |
+| desktop | 2026-10-21 | axum and tokio compile, unlinked, into release builds | Release build time matters |
+| desktop | 2026-10-21 | The contract test skips string patterns, lengths and integer bounds | A client bug comes from a constraint the shapes do not carry |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

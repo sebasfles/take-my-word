@@ -125,4 +125,26 @@ describe("Settings", () => {
       expect((toggle as HTMLInputElement).checked).toBe(false);
     });
   });
+
+  it("signs out and then offers to sign in again", async () => {
+    render(<Settings />);
+    await screen.findByText("Signed in as sebastian");
+    fakeBridge.accountStatus.mockResolvedValue({ signedIn: false, username: null });
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(fakeBridge.signOut).toHaveBeenCalledOnce();
+    await screen.findByText("Signed out. Sign in to dictate.");
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(fakeBridge.openSignIn).toHaveBeenCalledOnce();
+    fakeBridge.accountStatus.mockResolvedValue({ signedIn: true, username: "sebastian" });
+  });
+
+  it("follows a session that ends elsewhere", async () => {
+    render(<Settings />);
+    await screen.findByText("Signed in as sebastian");
+    fakeBridge.accountStatus.mockResolvedValueOnce({ signedIn: false, username: null });
+    act(() => {
+      listeners.accountChanged?.(false);
+    });
+    await screen.findByText("Signed out. Sign in to dictate.");
+  });
 });

@@ -1,0 +1,66 @@
+## 2026-10-21T18:17:51Z by om-developer target desktop on 8c9f6a0
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (17 vitest + 83 cargo tests, 2 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T18:17:51Z by om-developer target workflows on 8c9f6a0
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T18:30:12Z by om-developer target desktop on 58e7734
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (17 vitest + 83 cargo tests, 2 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T19:00:24Z by om-developer target desktop on ac8582b
+- lint: fail exit 1 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+screenshots/tauri-core.ts: Expected the Promise rejection reason to be an Error (@typescript-eslint/prefer-promise-reject-errors), 3 places
+
+## 2026-10-21T19:00:24Z by om-developer target desktop on d772244
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T19:43:26Z by om-developer target desktop on 4b4b707
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T19:43:26Z by om-developer target workflows on 4b4b707
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T19:43:26Z by om-developer target root (Acceptance 1) on 6d6eaf5 (same code as 4b4b707)
+- lint: pass exit 0 (pnpm -r --workspace-concurrency=1 lint && pnpm lint:workflows)
+- typecheck: pass exit 0 (pnpm -r --workspace-concurrency=1 typecheck)
+- unit: pass exit 0 (19 + 179 + 25 + 95 vitest tests; pnpm -r --workspace-concurrency=1 test)
+- e2e: n/a
+
+## 2026-10-21T19:58:43Z by om-developer target desktop on c66b839
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T20:18:44Z by om-developer target desktop on 278df71
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, mirror C:\dev\tmw-0007)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (25 vitest + 102 cargo tests, 3 ignored; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T20:18:44Z by om-developer target desktop linux-check on 278df71
+- lint: pass exit 0 (cargo clippy --all-targets --locked -- -D warnings, ubuntu:24.04 container with the desktop-ci apt packages; red on bf716e3 with "field device_group_key is never read")
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

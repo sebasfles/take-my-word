@@ -31,11 +31,74 @@ const pressShortcut = async (page: Page) => {
   await page.keyboard.up("Control");
 };
 
+const signIn = async (page: Page) => {
+  await page.getByLabel("Username").fill("sebastian");
+  await page.getByLabel("Password").fill("not-a-real-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+};
+
+const choosePassword = async (page: Page) => {
+  await signIn(page);
+  await page.getByRole("heading", { name: "Choose your password" }).waitFor();
+};
+
 const shots: Shot[] = [
+  { name: "account-sign-in", query: "view=account" },
+  {
+    name: "account-sign-in-error",
+    query: "view=account&signin=wrong",
+    act: async (page) => {
+      await signIn(page);
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "account-choose-password",
+    query: "view=account&signin=new-password",
+    act: choosePassword,
+  },
+  {
+    name: "account-choose-password-error",
+    query: "view=account&signin=new-password&password=weak",
+    act: async (page) => {
+      await choosePassword(page);
+      await page.getByLabel("New password").fill("not-a-real-password");
+      await page.getByLabel("Repeat the password").fill("not-a-real-password");
+      await page.getByRole("button", { name: "Save and sign in" }).click();
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "account-onboarding",
+    query: "view=account&step=onboarding",
+    act: async (page) => {
+      await page.getByRole("radio", { name: "Plain" }).waitFor();
+    },
+  },
+  {
+    name: "account-onboarding-error",
+    query: "view=account&step=onboarding&styles=fail",
+    act: async (page) => {
+      await page.getByRole("alert").waitFor();
+    },
+  },
   { name: "first-run-ready", query: "view=first-run" },
   { name: "first-run-microphone-blocked", query: "view=first-run&mic=denied" },
   { name: "first-run-microphone-missing", query: "view=first-run&mic=missing" },
-  { name: "settings-idle", query: "view=settings" },
+  {
+    name: "settings-idle",
+    query: "view=settings",
+    act: async (page) => {
+      await page.getByText("Signed in as sebastian").waitFor();
+    },
+  },
+  {
+    name: "settings-signed-out",
+    query: "view=settings&account=signed-out",
+    act: async (page) => {
+      await page.getByText("Signed out").waitFor();
+    },
+  },
   {
     name: "settings-listening",
     query: "view=settings",
@@ -72,6 +135,10 @@ const shots: Shot[] = [
   { name: "overlay-processing", query: "view=overlay&overlay=processing" },
   { name: "overlay-error", query: "view=overlay&overlay=error" },
   { name: "overlay-error-microphone", query: "view=overlay&overlay=error-microphone" },
+  { name: "overlay-error-quota", query: "view=overlay&overlay=error-quota" },
+  { name: "overlay-error-too-long", query: "view=overlay&overlay=error-too-long" },
+  { name: "overlay-error-format", query: "view=overlay&overlay=error-format" },
+  { name: "overlay-error-sign-in", query: "view=overlay&overlay=error-sign-in" },
 ];
 
 const server = await createServer({

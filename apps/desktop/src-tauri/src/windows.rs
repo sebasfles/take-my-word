@@ -4,10 +4,18 @@ use crate::shell::Shell;
 
 pub const SETTINGS: &str = "settings";
 pub const FIRST_RUN: &str = "first-run";
+pub const ACCOUNT: &str = "account";
 pub const OVERLAY: &str = "overlay";
 
+pub fn product_name(app: &AppHandle) -> String {
+    app.config()
+        .product_name
+        .clone()
+        .unwrap_or_else(|| "Take My Word".into())
+}
+
 pub fn open_settings(app: &AppHandle) {
-    let Some(window) = open(app, SETTINGS, "Take My Word", (480.0, 480.0)) else {
+    let Some(window) = open(app, SETTINGS, "", &product_name(app), (480.0, 560.0)) else {
         return;
     };
     let app = app.clone();
@@ -25,12 +33,24 @@ pub fn open_settings(app: &AppHandle) {
 }
 
 pub fn open_first_run(app: &AppHandle) {
-    let _ = open(app, FIRST_RUN, "Welcome to Take My Word", (520.0, 470.0));
+    let _ = open(
+        app,
+        FIRST_RUN,
+        "",
+        "Welcome to Take My Word",
+        (520.0, 470.0),
+    );
+}
+
+pub fn open_account(app: &AppHandle, onboarding: bool) {
+    let query = if onboarding { "&step=onboarding" } else { "" };
+    let _ = open(app, ACCOUNT, query, &product_name(app), (440.0, 560.0));
 }
 
 fn open(
     app: &AppHandle,
     label: &str,
+    query: &str,
     title: &str,
     (width, height): (f64, f64),
 ) -> Option<tauri::WebviewWindow> {
@@ -39,7 +59,7 @@ fn open(
         let _ = window.set_focus();
         return None;
     }
-    let url = WebviewUrl::App(format!("index.html?view={label}").into());
+    let url = WebviewUrl::App(format!("index.html?view={label}{query}").into());
     let built = WebviewWindowBuilder::new(app, label, url)
         .title(title)
         .inner_size(width, height)

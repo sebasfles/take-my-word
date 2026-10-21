@@ -17,6 +17,7 @@ pub enum Take {
 }
 
 pub trait Sink {
+    fn may_record(&mut self) -> bool;
     fn listening(&mut self);
     fn finished(&mut self, take: Take);
 }
@@ -79,7 +80,7 @@ impl<C: Capture, S: Sink> Session<C, S> {
     }
 
     fn begin(&mut self, at: Instant) {
-        if self.recording_since.is_some() {
+        if self.recording_since.is_some() || !self.sink.may_record() {
             return;
         }
         self.sink.listening();
@@ -132,6 +133,7 @@ mod tests {
         takes: Vec<Take>,
         mic_open: bool,
         zeros: bool,
+        signed_out: bool,
     }
 
     struct FakeMic {
@@ -163,6 +165,12 @@ mod tests {
     struct FakeSink(Rc<RefCell<Log>>);
 
     impl Sink for FakeSink {
+        fn may_record(&mut self) -> bool {
+            let mut log = self.0.borrow_mut();
+            log.events.push("may record".into());
+            !log.signed_out
+        }
+
         fn listening(&mut self) {
             self.0.borrow_mut().events.push("listening".into());
         }
@@ -237,8 +245,23 @@ mod tests {
         let mut harness = Harness::new(Ok(Duration::from_millis(1950)), Duration::ZERO);
         harness.hold(0, 2000);
         assert_eq!(harness.takes(), vec!["recorded 2000ms of 1950ms"]);
-        assert_eq!(harness.log.borrow().events, vec!["listening", "start"]);
+        assert_eq!(
+            harness.log.borrow().events,
+            vec!["may record", "listening", "start"]
+        );
         assert!(!harness.log.borrow().mic_open);
+    }
+
+    #[test]
+    fn a_hold_the_sink_refuses_never_opens_the_microphone() {
+        let mut harness = Harness::new(Ok(Duration::from_millis(1950)), Duration::ZERO);
+        harness.log.borrow_mut().signed_out = true;
+        harness.hold(0, 2000);
+        assert!(harness.takes().is_empty());
+        assert_eq!(harness.log.borrow().events, vec!["may record"]);
+        harness.log.borrow_mut().signed_out = false;
+        harness.hold(3000, 5000);
+        assert_eq!(harness.takes(), vec!["recorded 2000ms of 1950ms"]);
     }
 
     #[test]
