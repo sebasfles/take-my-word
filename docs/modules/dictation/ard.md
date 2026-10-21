@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Dictation: architecture and debt
@@ -67,3 +67,58 @@ source: setup
 - Debt created: none.
 - Revisit when: an STT adapter without a prompt (Transcribe custom vocabularies are async per-user resources) joins.
 - Source: setup
+
+## 2026-10-21: The audio part is capped at 4 MiB, replacing 5 MB
+
+- Decision: `dictate` answers 413 for an audio part over 4 MiB (4,194,304 bytes); API Gateway itself answers 413 above about 4.7 MB, where the base64 body passes the 6 MiB Lambda payload.
+- Alternatives rejected: a presigned S3 upload, which would persist audio.
+- Reason: the synchronous Lambda payload is the real ceiling, and one request keeps every client simple.
+- Debt created: a desktop WAV dictation is capped at about 2 minutes (m4a at about 8).
+- Revisit when: desktop users hit the cap, or Opus joins the accepted formats.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: The charge comes from the bytes, not from what the header claims
+
+- Decision: WAV must be 16 kHz mono 16-bit PCM and is charged by the bytes after its data chunk header; m4a is charged the larger of its declared duration and its size at 320 kbps; under 0.5 s answers 400.
+- Alternatives rejected: trusting the header's duration; answering 400 when an m4a header claims less than its size allows.
+- Reason: a header claiming zero seconds would reach Groq uncharged; the floor keeps a legitimate high-bitrate m4a working.
+- Debt created: none.
+- Revisit when: a client needs another WAV layout.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: The daily quota is one conditional counter per UTC day
+
+- Decision: `QUOTA#YYYY-MM-DD` under the user gets an atomic `ADD seconds` while the stored value is under the cap; the real duration is charged before transcription, never refunded, and the last allowed recording may overshoot the cap.
+- Alternatives rejected: counting dictations; reserving the duration first and refunding failures; a per-user cap stored on `USER`, deferred to the task that first writes `USER`.
+- Reason: providers bill minutes; DynamoDB serializes the condition, so concurrent requests overshoot by at most one recording (six parallel requests at the cap let two through).
+- Debt created: `DAILY_QUOTA_MINUTES` is one cap for every user; the prd's per-user override is not built.
+- Revisit when: a task writes `USER`, or one user needs a different cap.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: Silence on WAV is decided by measuring the audio
+
+- Decision: the WAV probe measures the RMS of the fifth-loudest 30 ms frame (the level at least 150 ms reaches); under `SILENCE_FLOOR_DBFS` (-55) the request answers empty text before the quota and any provider, and is not charged; known hallucinations always answer empty text; ambiguous phrases ("Gracias.", "Thank you.") do only on WAV under `SPEECH_LEVEL_DBFS` (-40). Silence is never saved.
+- Alternatives rejected: Whisper's `no_speech_prob`, which Groq reports as 0 on `whisper-large-v3-turbo` even for digital silence; the loudest frame, which one click lifts to about -27 dBFS; a phrase list alone, which drops real one-word replies.
+- Reason: measured in dev, near-silence sits at -70.6 dBFS, the quietest spoken sample at -47.9 and normal speech at -17.9; WAV needs no decoder to measure.
+- Debt created: m4a is not measured, so its ambiguous phrases are always refined and only unambiguous hallucinations drop; loud non-speech noise can make Whisper loop on mixed hallucination phrases, which the whole-transcript guard misses and the refiner turns into text.
+- Revisit when: phase 4, when mobile drops silent recordings with expo-audio metering; or a hallucination loop gets pasted in real use.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: The refiner defaults to `gpt-5.4-nano`; models are adapter settings
+
+- Decision: `openai` defaults to `gpt-5.4-nano` through the Responses API and `groq-whisper` to `whisper-large-v3-turbo`, each changeable by `OPENAI_MODEL` and `GROQ_WHISPER_MODEL`; labels carry the model (`openai:gpt-5.4-nano`) in responses, saved items and metrics.
+- Alternatives rejected: `gpt-6-luna` as the default, as the setup entry has it.
+- Reason: the project's OpenAI credits cover `gpt-5.4-nano`, and the label keeps a model switch visible in data.
+- Debt created: none.
+- Revisit when: the evaluation harness compares refiners.
+- Source: 0001_platform_skeleton
+
+## 2026-10-21: Dictations keep the raw transcript next to the clean text
+
+- Decision: `DICTATION#ts` stores `raw` and `text`, written once with `attribute_not_exists` under an ISO-time plus request-id sort key; skipped silence is not saved.
+- Alternatives rejected: storing only the clean text.
+- Reason: raw shows what the refiner changed, for history and for the evaluation harness, at no audio cost.
+- Debt created: none.
+- Revisit when: history needs to hide raw from the user.
+- Source: 0001_platform_skeleton
+

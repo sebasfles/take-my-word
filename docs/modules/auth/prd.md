@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Auth: product
@@ -32,7 +32,7 @@ Errors and empty states: a wrong username or password shows one generic message 
 ### Stay signed in
 
 1. The app renews the session in the background; the user never sees it.
-2. If the session was revoked, the next dictation fails and the app returns to the sign-in form, keeping nothing of the failed recording.
+2. A revoked session keeps working for up to about an hour, until its current access expires; then the next renewal fails and the app returns to the sign-in form, keeping nothing of a failed recording.
 
 ### Sign out
 
@@ -44,7 +44,7 @@ Errors and empty states: a wrong username or password shows one generic message 
 
 - Accounts exist only by invitation; there is no self-service sign-up and no captcha.
 - Username and password is the only way to sign in in v1.
-- A session lasts until sign-out or revocation, not a fixed number of days.
+- A session lasts until sign-out or revocation, not a fixed number of days; revocation takes effect within about an hour.
 - Each device has its own session, so losing one device is fixed by revoking that device alone.
 - Every action in the product (dictating, dictionary, styles, app rules, settings, history) requires a signed-in user and only touches that user's data.
 

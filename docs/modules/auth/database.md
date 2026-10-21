@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Auth: database
@@ -24,9 +24,9 @@ Auth owns no item kind in `take-my-word-{env}`.
 
 ## Invariants kept in code
 
-- The user id comes only from the authorizer context, never from a path, query or body.
+- The user id comes only from the authorizer context, never from a path, query or body; the authorizer accepts only access tokens of the pool's native client.
 - Deleting a Cognito user does not delete their items; that cleanup has no owner yet.
 
 ## Migrations of note
 
-- None; nothing is built.
+- None; 0001 created the dev pool, with `crew-e2e` for end-to-end runs and Sebastian's user.

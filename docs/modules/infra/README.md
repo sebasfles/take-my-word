@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Infra
@@ -13,7 +13,7 @@ Terraform describes everything and only Sebastian applies it; GitHub Actions onl
 
 - Owns: Terraform (`core`, `dev`, `prd`, `stacks/app`, `modules/aws/*`), the HTTP API, the Lambdas as resources, the DynamoDB table resource, the provider-key secret, the dev debug bucket, web hosting, DNS, CloudWatch metrics, the deploy roles and the workflows.
 - Does not own: the code inside each Lambda, the Cognito configuration choices (auth), the item kinds in the table (dictation, dictionary, styles), desktop releases and mobile builds (desktop, mobile).
-- Code: `infra/`, `.github/workflows` (planned).
+- Code: `infra/`, `.github/workflows`.
 
 ## Documents
 
