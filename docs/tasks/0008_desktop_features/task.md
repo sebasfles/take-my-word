@@ -236,3 +236,13 @@ Windows run during milestone 4 work, before this reiteration (announced busy, en
 Parked for milestone 4: the waveform and the clipboard fix live on the local branch `wip/0008-milestone-4` (commit 6b27214, before the rebase on 8fe11f1); they come back on their own commit.
 
 Pending (milestone 4): waveform, Windows smoke under the new rules (including Spanish into the scratch window with `["es"]` and `["en","es"]`, and a dev redeploy with its SHAs right before it), measurements on the final commit, `desktop-ci` and `linux-check`, docs.
+
+### Round 6
+
+Did:
+- Finding 1: the round 5 notes no longer name any of Sebastian's files; the round 5 commit was rewritten locally (nothing pushed), and `git log -p origin/develop..HEAD` has none of the four strings the om-reviewer listed.
+- Finding 2: deleted from `C:\dev\tmw-0008-smoke` the Notepad captures (`check-notepad.png`, `check-notepad2.png`, `check-notepad3.png`, `a3-notepad.png`, `debug-a.png`, `debug-c.png`) and the scripts that read window text, tab names or the clipboard (`probe.ps1`, `stage-b.ps1`, `stage-b2.ps1`, `stage-c.ps1`, `stage-d.ps1`, `stage-g.ps1`, `uia.ps1`, `cliphistory.ps1`, plus `stage-f.ps1` and `stage-h.ps1`, which listed Notepad tab names and window titles).
+- Finding 3: recorded as a rule for milestone 4: no script reads the text of a window it did not open or prints clipboard contents; the clipboard is compared by hash only; "nothing landed" is checked only in the scratch window the run opened.
+- Finding 4: `pnpm integration` passed (4) against dev with the branch API; `pnpm e2e` failed because dev's web is another branch's build (see verify.log); its rerun waits for develop's web on dev.
+
+Pending and deferred: unchanged from round 5.
