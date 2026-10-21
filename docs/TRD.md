@@ -44,7 +44,7 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 
 ### desktop
 
-- Stack: Tauri 2 with Rust for the OS layer (`rdev` key hook, `cpal` recording, `enigo` paste, active window, keychain) and React + TypeScript for the settings window and overlay.
+- Stack: Tauri 2 with Rust for the OS layer (a native `WH_KEYBOARD_LL` key hook on Windows, macOS and Linux in phase 5; `cpal` recording, `enigo` paste, active window, keychain) and React + TypeScript for the settings window and overlay.
 - Layout: `src/` (UI), `src-tauri/` (Rust shell and plugins).
 - Install: root `pnpm install --frozen-lockfile`, Rust toolchain via `rustup`, platform prerequisites of Tauri 2.
 - Workspace files: none beyond the build-time API and Cognito configuration.

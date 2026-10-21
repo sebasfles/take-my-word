@@ -22,6 +22,7 @@ source: 0002_desktop_shell
 - Debt created: on macOS the user must set "Press Fn key to" to do nothing and grant Accessibility on first run.
 - Revisit when: an OS update breaks the hook, or users ask for toggle mode instead of hold.
 - Source: setup
+- Superseded by 2026-10-21: Native Windows key hook instead of rdev
 
 ## 2026-10-20: WAV 16 kHz mono, no client encoding
 
@@ -31,6 +32,7 @@ source: 0002_desktop_shell
 - Debt created: uploads are larger than they would be with Opus, and long dictations hit the cap sooner.
 - Revisit when: payload size shows up in measured latency or users hit the length cap.
 - Source: setup
+- Superseded by 2026-10-21: Recordings capped at two minutes
 
 ## 2026-10-20: Paste through the clipboard with a per-app keystroke
 
