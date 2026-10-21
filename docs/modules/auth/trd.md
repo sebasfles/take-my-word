@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Auth: technical
@@ -14,7 +14,7 @@ The pool and the authorizer run in dev since 0001; phase 2 brings the desktop lo
 | `infra/modules/aws/cognito` | User pool (Essentials, admin-created users only) and the `native` app client. |
 | `infra/stacks/app` | Instantiates the pool per env and attaches the authorizer to the HTTP API. |
 | `apps/api/src/authorizer` | Lambda authorizer: `aws-jwt-verify` against the pool's JWKS, access tokens of the native client only, `userId` from `sub`. |
-| `apps/api/scripts/srp.ts`, `sign-in.ts` | SRP sign-in, device confirmation and refresh on the AWS SDK; `pnpm token` prints a `crew-e2e` access token. |
+| `apps/api/scripts/srp.ts`, `sign-in.ts` | SRP sign-in, device confirmation and refresh on the AWS SDK; `pnpm token` prints a `crew-e2e` access token; the e2e also signs in `crew-e2e-b`. |
 | `apps/desktop`, `apps/mobile`, `apps/web` | Login forms and token storage (phases 2, 4, 5). |
 
 ## Endpoints owned
@@ -36,7 +36,7 @@ The authorizer answers HTTP API simple responses, cached 5 minutes per `Authoriz
 
 ## Depended on by
 
-- dictation, dictionary, styles: every route reads the authorizer's `userId`.
+- dictation, dictionary, styles: every route reads the authorizer's `userId`; the `api` Lambda answers 401 `unauthorized` itself if that context is ever missing.
 - desktop, mobile, web: need a valid access token before calling the API.
 
 ## Configuration
@@ -47,4 +47,4 @@ The authorizer answers HTTP API simple responses, cached 5 minutes per `Authoriz
 ## Testing
 
 - `apps/api/src/authorizer/authorize.test.ts` signs RS256 tokens locally and runs the real verifier.
-- `pnpm e2e` checks 401 and 403 at the gateway and the refresh rotation of a confirmed device.
+- `pnpm e2e` checks 401 and 403 at the gateway, 401 on every route without a token, that `crew-e2e-b` can neither see nor change `crew-e2e`'s items, and the refresh rotation of a confirmed device.

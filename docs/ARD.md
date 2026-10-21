@@ -64,7 +64,11 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | dictation | 2026-10-21 | One daily cap for every user; the per-user override is not built | A task writes `USER`, or a user needs another cap |
 | dictation | 2026-10-21 | m4a level is not measured, so its ambiguous phrases are always refined | Phase 4, when mobile drops silence with expo-audio metering |
 | dictation | 2026-10-21 | Loud noise can make Whisper loop on mixed hallucinations that get refined | A hallucination loop gets pasted in real use |
+| dictation | 2026-10-21 | A history page over many expired items costs one Query per batch until TTL deletes them | TTL lag leaves more than a page of expired items in a partition |
+| dictionary | 2026-10-21 | Folding merges ñ and umlauts with their base letter; such terms cannot coexist | A user needs two terms that differ only by ñ or an umlaut |
+| dictionary | 2026-10-21 | The byte budget leaves part of Whisper's 224 prompt tokens unused | Users keep more top terms than fit and transcription misses them |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |
+| styles | 2026-10-21 | A failed release after a style delete leaves a rule naming that style | A client shows a dangling style to a user |
 | desktop | 2026-10-20 | Rust toolchain in a TypeScript monorepo | Rust layer grows past OS glue |
 | desktop | 2026-10-20 | macOS first run needs the Fn setting changed and Accessibility granted | An OS update breaks the hook, or toggle mode is requested |
 | desktop | 2026-10-20 | Larger uploads than Opus; long dictations hit the cap sooner | Payload size shows in latency or users hit the cap |

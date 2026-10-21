@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Dictation: architecture and debt
@@ -123,3 +123,21 @@ source: 0001_platform_skeleton
 - Revisit when: history needs to hide raw from the user.
 - Source: 0001_platform_skeleton
 
+
+## 2026-10-21: Settings are replaced whole and read with per-field defaults
+
+- Decision: `PUT /me/settings` replaces the whole `SETTINGS` item and refuses a default style that does not exist; on read, any stored field that no longer parses (a removed provider, a malformed locale) falls back to that field's default instead of failing.
+- Alternatives rejected: a partial update on `PUT`; failing the read on an invalid field.
+- Reason: clients read the settings before editing them, so a full replace keeps one shape and one validation; per-field defaults keep `dictate` and the settings screen working when a provider is retired.
+- Debt created: none.
+- Revisit when: two clients edit settings at the same time and overwrite each other.
+- Source: 0003_api_features
+
+## 2026-10-21: History hides expired dictations and refills short pages
+
+- Decision: the history Query filters `expiresAt > now`; since DynamoDB applies `Limit` before the filter, the store queries again from `LastEvaluatedKey` for the remaining count until the page is full or the partition ends, and the cursor is the last returned item's sort key; `limit` is 1 to 100, default 20; ids and cursors are unpadded base64url and a malformed one answers 400.
+- Alternatives rejected: trusting TTL, which deletes days after expiry; a single Query that may return a short or empty page with a cursor.
+- Reason: the product promises text for 90 days, not 90 days plus TTL lag, and a client should never get an empty page while older items exist.
+- Debt created: a page over many expired items costs one Query per item batch until TTL catches up.
+- Revisit when: TTL lag leaves more than a page of expired items in a partition.
+- Source: 0003_api_features

@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Dictionary: product
@@ -33,7 +33,7 @@ The user writes a term once and stops fixing it by hand.
 3. Each time a term shows up in a saved dictation, it rises in priority; terms not used for weeks slowly lose it.
 
 Errors and empty states: with no terms, dictation works the same, only without corrections.
-Adding a term that already exists is rejected with a message.
+Adding a term that already exists, in any capitalization or with or without accents, is rejected with a message.
 
 ## Rules
 
@@ -43,6 +43,8 @@ Adding a term that already exists is rejected with a message.
 - The correction stage always sees every term with its aliases, so a low-priority term is still fixed after transcription.
 - Priority halves after about a month without use; the period is configurable.
 - Priority is not shown or edited by hand.
+- A dictionary holds up to 500 terms, each up to 64 characters with up to 10 aliases.
+- Capitals and accents do not make a different term: "Kubernetes" and "kubérnetes" are the same, and so are "año" and "ano".
 
 ## Out of scope
 
@@ -52,5 +54,4 @@ Adding a term that already exists is rejected with a message.
 
 ## Open questions
 
-- Maximum number of terms or aliases per user.
-- None at setup time.
+- None.

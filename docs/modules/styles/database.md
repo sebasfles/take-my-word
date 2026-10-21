@@ -1,34 +1,35 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Styles: database
 
-Attributes live in the code to be written (zod contracts in `packages/shared` and the repositories in `apps/api`); this file says what the module owns and what it must keep true.
-Everything sits in the single DynamoDB table `take-my-word-{env}`, with no ORM and no migrations.
+Everything sits in the single DynamoDB table `take-my-word-{env}`; attributes live in `packages/shared` and `apps/api`.
 
 ## Items owned
 
 | Item | Purpose |
 |---|---|
-| `STYLE#id` | A built-in or custom style: name and the prompt the refiner applies |
-| `APPRULE#appId` | A desktop app mapped to a style and a paste keystroke |
+| `STYLE#{id}` under `USER#{sub}` | A custom style: name, directions, creation time; no TTL. |
+| `APPRULE#{appId}` under `USER#{sub}` | A desktop app (lowercased) mapped to an optional style and a paste keystroke; no TTL. |
+
+Built-in styles are not items; they live in code and are the same for everyone.
 
 ## Items referenced
 
 | Item | Owner module | Relationship |
 |---|---|---|
-| `USER` | auth | Custom styles and app rules belong to one user |
-| `DICTATION#ts` | dictation | A dictation is cleaned with one style; whether it records the style id is not decided |
+| `SETTINGS` | dictation | Holds the default style; reset to `plain` when that style is deleted. |
+| `DICTATION#ts` | dictation | Records the `styleId` the dictation used. |
 
 ## Invariants kept in code
 
 - Every style works in both locales; there is never one item per language.
-- Built-in styles are read-only for users.
-- An app rule points to a style that exists; deleting a custom style resets the rules that pointed to it to the default style.
-- Whether built-in styles are stored once for everyone or seeded per user is not decided.
+- Built-in styles cannot be changed; custom style ids are random and never collide with them.
+- A rule or a default is written only with a style that exists; deleting a style then removes `styleId` from the rules that held it and resets the default, best effort, so a dangling id can remain and resolution skips it.
+- At most 20 custom styles and 100 rules per user; the count check is not transactional.
 
 ## Migrations of note
 
-- None; the table is schemaless and nothing is built yet.
+- None; 0003 added the item kinds.

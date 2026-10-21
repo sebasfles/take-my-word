@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Auth: architecture and debt
@@ -59,3 +59,12 @@ source: 0001_platform_skeleton
 - Revisit when: phase 2 and phase 4 build their logins.
 - Source: 0001_platform_skeleton
 
+
+## 2026-10-21: The api Lambda refuses a request without the authorizer's user
+
+- Decision: the `api` Lambda reads `userId` only from the authorizer context and answers 401 with the new `unauthorized` code when it is missing, before any route runs.
+- Alternatives rejected: trusting that API Gateway never routes a request without the authorizer.
+- Reason: a route attached without the authorizer by a later Terraform change would otherwise run with no user and could read an empty key; the guard costs one check.
+- Debt created: none.
+- Revisit when: routes stop being attached by hand in Terraform.
+- Source: 0003_api_features

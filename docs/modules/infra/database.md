@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0001_platform_skeleton
+source: 0003_api_features
 ---
 
 # Infra: database
@@ -22,18 +22,18 @@ Infra owns no item kind.
 
 | Table | Owner module | Relationship |
 |---|---|---|
-| `take-my-word-{env}`, `USER` | dictation | User settings under each user's partition. |
+| `take-my-word-{env}`, `SETTINGS`, `QUOTA#date` | dictation | User settings and the daily quota under each user's partition. |
 | `take-my-word-{env}`, `DICTATION#ts` | dictation | Relies on the table's TTL; its inserts feed the stream. |
-| `take-my-word-{env}`, `DICT#term` | dictionary | Updated by `dictionary-usage` from the stream. |
+| `take-my-word-{env}`, `DICT#term` | dictionary | Counted by `dictionary-usage` from the stream. |
 | `take-my-word-{env}`, `STYLE#id`, `APPRULE#appId` | styles | Plain CRUD through `api`. |
 
 ## Invariants kept in code
 
 - One table per env; dev and prd never share a table, a secret or a user pool.
-- TTL stays enabled on `expiresAt`, which every item kind sets, or history outlives its 90 days.
+- TTL stays enabled on `expiresAt`, which `DICTATION#ts` and `QUOTA#date` set; settings, terms, styles and rules carry none and live until deleted.
 - The stream stays enabled with new images, or dictionary ranking stops.
 - prd has no debug bucket; no audio is persisted outside dev.
-- Only `api`, `dictate` and `dictionary-usage` get access to the table, and only `dictate` to the secret.
+- Only `api`, `dictate` and `dictionary-usage` get access to the table, each with its own action list, and only `dictate` to the secret; `dictionary-usage` may update only `PK`, `SK`, `useCount` and `lastUsedAt`, and per-user scoping is enforced in code from the authorizer's `userId`.
 
 ## Migrations of note
 
