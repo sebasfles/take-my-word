@@ -6,6 +6,7 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
+use crate::dictation::Notifier;
 use crate::windows::OVERLAY;
 
 const ERROR_VISIBLE: Duration = Duration::from_secs(4);
@@ -34,15 +35,17 @@ pub trait Overlay {
 }
 
 #[derive(Clone)]
-pub struct GatedOverlay<O> {
+pub struct GatedOverlay<O, N> {
     inner: O,
+    notifier: N,
     recording: Arc<Mutex<bool>>,
 }
 
-impl<O: Overlay> GatedOverlay<O> {
-    pub fn new(inner: O) -> Self {
+impl<O: Overlay, N: Notifier> GatedOverlay<O, N> {
+    pub fn new(inner: O, notifier: N) -> Self {
         Self {
             inner,
+            notifier,
             recording: Arc::new(Mutex::new(false)),
         }
     }
@@ -64,17 +67,21 @@ impl<O: Overlay> GatedOverlay<O> {
     }
 }
 
-impl<O: Overlay> Overlay for GatedOverlay<O> {
+impl<O: Overlay, N: Notifier> Overlay for GatedOverlay<O, N> {
     fn set(&self, state: OverlayState) {
         let recording = self
             .recording
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        if *recording && state != OverlayState::Listening {
-            log::info!("kept the overlay on listening during a hold");
+        if !*recording || state == OverlayState::Listening {
+            self.inner.set(state);
             return;
         }
-        self.inner.set(state);
+        log::info!("kept the overlay on listening during a hold");
+        if let OverlayState::Error { message, .. } = state {
+            self.notifier
+                .notify(&format!("The previous dictation was not pasted. {message}"));
+        }
     }
 }
 
@@ -174,30 +181,51 @@ mod tests {
     use super::*;
 
     #[derive(Default)]
-    struct Shown(RefCell<Vec<OverlayState>>);
+    struct Seen {
+        overlay: RefCell<Vec<OverlayState>>,
+        notices: RefCell<Vec<String>>,
+    }
 
-    impl Overlay for &Shown {
+    impl Overlay for &Seen {
         fn set(&self, state: OverlayState) {
-            self.0.borrow_mut().push(state);
+            self.overlay.borrow_mut().push(state);
+        }
+    }
+
+    impl Notifier for &Seen {
+        fn notify(&self, message: &str) {
+            self.notices.borrow_mut().push(message.into());
         }
     }
 
     #[test]
     fn a_dictation_finishing_during_the_next_hold_leaves_the_overlay_on_listening() {
-        let shown = Shown::default();
-        let overlay = GatedOverlay::new(&shown);
+        let seen = Seen::default();
+        let overlay = GatedOverlay::new(&seen, &seen);
         overlay.begin_recording();
         overlay.set(OverlayState::Hidden);
-        overlay.set(OverlayState::Error {
-            message: "Can't reach Take My Word.".into(),
-            action: None,
-        });
-        assert_eq!(*shown.0.borrow(), vec![OverlayState::Listening]);
+        overlay.set(OverlayState::Processing);
+        assert_eq!(*seen.overlay.borrow(), vec![OverlayState::Listening]);
+        assert!(seen.notices.borrow().is_empty());
         overlay.end_recording();
         overlay.set(OverlayState::Processing);
         assert_eq!(
-            *shown.0.borrow(),
+            *seen.overlay.borrow(),
             vec![OverlayState::Listening, OverlayState::Processing]
         );
+    }
+
+    #[test]
+    fn an_error_held_back_during_a_hold_still_reaches_the_user() {
+        let seen = Seen::default();
+        let overlay = GatedOverlay::new(&seen, &seen);
+        overlay.begin_recording();
+        overlay.set(OverlayState::Error {
+            message: "Can't reach Take My Word. Check your connection.".into(),
+            action: None,
+        });
+        assert_eq!(*seen.overlay.borrow(), vec![OverlayState::Listening]);
+        assert_eq!(seen.notices.borrow().len(), 1);
+        assert!(seen.notices.borrow()[0].contains("Can't reach Take My Word"));
     }
 }

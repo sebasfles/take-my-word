@@ -23,7 +23,7 @@ const STUB_DELAY: Duration = Duration::from_millis(700);
 
 pub struct Shell {
     pub stub: Stub,
-    pub overlay: GatedOverlay<WindowOverlay>,
+    pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     pub microphone: MicrophoneStatus,
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
@@ -41,7 +41,7 @@ impl Shell {
         settings: Settings,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         windows::create_overlay(app)?;
-        let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()));
+        let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
         let stub = Stub::start(STUB_DELAY)?;
@@ -201,7 +201,7 @@ pub fn capture_cancelled(app: &AppHandle) {
 }
 
 struct ShellSink {
-    overlay: GatedOverlay<WindowOverlay>,
+    overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
 }
@@ -255,7 +255,8 @@ impl Modifiers for HeldModifiers {
     }
 }
 
-struct TrayNotifier(AppHandle);
+#[derive(Clone)]
+pub struct TrayNotifier(AppHandle);
 
 impl Notifier for TrayNotifier {
     fn notify(&self, message: &str) {
