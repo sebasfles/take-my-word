@@ -1,0 +1,265 @@
+import {
+  apiErrorSchema,
+  dictationResponseSchema,
+  maxAudioBytes,
+  type ApiError,
+  type DictationResponse,
+} from "@take-my-word/shared";
+import { beforeEach, describe, expect, it } from "vitest";
+import type { DictationRecord } from "../dictation/dictation-store.ts";
+import { ProviderError } from "../dictation/ports/provider-error.ts";
+import type { RefineInput } from "../dictation/ports/refiner.ts";
+import type { TranscribeInput } from "../dictation/ports/transcriber.ts";
+import type { QuotaCharge } from "../dictation/quota.ts";
+import { createSilenceGuard } from "../dictation/silence.ts";
+import { createLogger } from "../lib/log.ts";
+import { createMetrics } from "../lib/metrics.ts";
+import { m4a, wav } from "../testing/audio.ts";
+import { dictationBody, multipartContentType } from "../testing/multipart.ts";
+import { createDictateHandler, type DictateEvent } from "./app.ts";
+
+const rawTranscript = "eh bueno este quería decir que mañana nos vemos";
+const cleanText = "Quería decir que mañana nos vemos.";
+
+class World {
+  now = new Date("2026-10-20T15:00:00.000Z");
+  clock = 0;
+  transcript = rawTranscript;
+  transcribeError: Error | undefined;
+  transcribed: TranscribeInput[] = [];
+  refined: RefineInput[] = [];
+  saved: DictationRecord[] = [];
+  used = new Map<string, number>();
+  charges: QuotaCharge[] = [];
+  lines: string[] = [];
+
+  handler = createDictateHandler({
+    providers: {
+      transcribers: {
+        "groq-whisper": {
+          label: "groq-whisper",
+          transcribe: (input) => {
+            this.transcribed.push(input);
+            this.clock += 300;
+            if (this.transcribeError) return Promise.reject(this.transcribeError);
+            return Promise.resolve({ text: this.transcript });
+          },
+        },
+      },
+      refiners: {
+        openai: {
+          label: "openai:gpt-5.4-nano",
+          refine: (input) => {
+            this.refined.push(input);
+            this.clock += 400;
+            return Promise.resolve({
+              text: cleanText,
+              usage: { inputTokens: 150, outputTokens: 9 },
+            });
+          },
+        },
+      },
+    },
+    quota: {
+      charge: (charge) => {
+        this.charges.push(charge);
+        const key = `${charge.userId}/${charge.day}`;
+        const used = this.used.get(key);
+        if (used !== undefined && used >= charge.capSeconds) return Promise.resolve(false);
+        this.used.set(key, (used ?? 0) + charge.seconds);
+        return Promise.resolve(true);
+      },
+    },
+    dailyQuotaMinutes: 60,
+    dictations: {
+      save: (record) => {
+        this.saved.push(record);
+        return Promise.resolve();
+      },
+    },
+    isSilence: createSilenceGuard(),
+    metrics: createMetrics((line) => this.lines.push(line)),
+    log: createLogger({}, (line) => this.lines.push(line)),
+    now: () => this.now,
+    elapsed: () => this.clock,
+  });
+
+  async post(body: Buffer, contentType = multipartContentType) {
+    const event = {
+      headers: { "content-type": contentType },
+      body: body.toString("base64"),
+      isBase64Encoded: true,
+      requestContext: { authorizer: { lambda: { userId: "user-1" } } },
+    } as unknown as DictateEvent;
+    const result = await this.handler(event, { awsRequestId: `req-${this.saved.length}` });
+    return { status: result.statusCode, json: JSON.parse(result.body ?? "") as unknown };
+  }
+
+  logs(): Record<string, unknown>[] {
+    return this.lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+}
+
+let world: World;
+beforeEach(() => {
+  world = new World();
+});
+
+function ok(json: unknown): DictationResponse {
+  return dictationResponseSchema.parse(json);
+}
+
+function failure(json: unknown): ApiError["error"] {
+  return apiErrorSchema.parse(json).error;
+}
+
+describe("POST /dictations", () => {
+  it("transcribes, refines, saves and answers raw, text, providers and stage latency", async () => {
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 7 }) }));
+    expect(status).toBe(200);
+    const body = ok(json);
+    expect(body).toMatchObject({
+      raw: rawTranscript,
+      text: cleanText,
+      providers: { transcriber: "groq-whisper", refiner: "openai:gpt-5.4-nano" },
+      latencyMs: { transcribe: 300, refine: 400, total: 700 },
+    });
+    expect(body.skipped).toBeUndefined();
+    expect(world.transcribed[0]).toMatchObject({ container: "wav", language: "es" });
+    expect(world.refined[0]?.raw).toBe(rawTranscript);
+    expect(world.saved).toHaveLength(1);
+    expect(world.saved[0]).toMatchObject({
+      userId: "user-1",
+      audioSeconds: 7,
+      raw: rawTranscript,
+      text: cleanText,
+      tokens: { inputTokens: 150, outputTokens: 9 },
+    });
+  });
+
+  it("passes m4a to the transcriber as m4a and English locales as English", async () => {
+    const body = dictationBody({
+      audio: m4a({ seconds: 5 }),
+      audioType: "audio/mp4",
+      meta: { locale: "en-US" },
+    });
+    const { status } = await world.post(body);
+    expect(status).toBe(200);
+    expect(world.transcribed[0]).toMatchObject({ container: "m4a", language: "en" });
+    expect(world.refined[0]?.instructions).not.toEqual(expect.stringContaining("español"));
+  });
+
+  it("answers empty text for silence without calling the refiner or saving", async () => {
+    world.transcript = "Gracias.";
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 2 }) }));
+    expect(status).toBe(200);
+    const body = ok(json);
+    expect(body).toMatchObject({
+      text: "",
+      skipped: "silence",
+      providers: { transcriber: "groq-whisper" },
+    });
+    expect(body.providers.refiner).toBeUndefined();
+    expect(world.refined).toHaveLength(0);
+    expect(world.saved).toHaveLength(0);
+    expect(world.logs()).toContainEqual(
+      expect.objectContaining({ message: "dictation skipped", skipped: "silence" }),
+    );
+    expect(world.used.get("user-1/2026-10-20")).toBe(2);
+  });
+
+  it("charges the real duration and allows requests while the day is under the cap", async () => {
+    world.used.set("user-1/2026-10-20", 3599);
+    const first = await world.post(dictationBody({ audio: wav({ seconds: 30 }) }));
+    expect(first.status).toBe(200);
+    expect(world.charges[0]).toMatchObject({ seconds: 30, capSeconds: 3600, day: "2026-10-20" });
+    expect(world.used.get("user-1/2026-10-20")).toBe(3629);
+  });
+
+  it("answers 429 naming the daily limit once the cap is reached, before any provider call", async () => {
+    world.used.set("user-1/2026-10-20", 3600);
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    expect(status).toBe(429);
+    expect(failure(json)).toEqual({
+      code: "quota_exceeded",
+      message: "Daily limit of 60 minutes of audio reached; it resets at 00:00 UTC.",
+    });
+    expect(world.transcribed).toHaveLength(0);
+  });
+
+  it("allows the user again after UTC midnight", async () => {
+    world.used.set("user-1/2026-10-20", 3600);
+    world.now = new Date("2026-10-21T00:00:00.000Z");
+    const { status } = await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    expect(status).toBe(200);
+  });
+
+  it("answers 400 without charging when the audio does not parse as its declared container", async () => {
+    const body = dictationBody({ audio: m4a({ seconds: 3 }), audioType: "audio/wav" });
+    const { status, json } = await world.post(body);
+    expect(status).toBe(400);
+    expect(failure(json).code).toBe("bad_request");
+    expect(world.charges).toHaveLength(0);
+  });
+
+  it("answers 413 for audio over the limit and 415 for other content types", async () => {
+    const big = await world.post(dictationBody({ audio: Buffer.alloc(maxAudioBytes + 1) }));
+    expect(big.status).toBe(413);
+    const json = await world.post(Buffer.from("{}"), "application/json");
+    expect(json.status).toBe(415);
+    expect(world.charges).toHaveLength(0);
+  });
+
+  it("answers 502 when a provider fails, records the error metric and saves nothing", async () => {
+    world.transcribeError = new ProviderError("groq-whisper", "groq-whisper answered 503", 503);
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    expect(status).toBe(502);
+    expect(failure(json).code).toBe("provider_failed");
+    expect(world.saved).toHaveLength(0);
+    expect(world.logs()).toContainEqual(
+      expect.objectContaining({ Provider: "groq-whisper", Errors: 1 }),
+    );
+  });
+
+  it("answers 500 without details on an unexpected failure", async () => {
+    world.transcribeError = new TypeError("boom");
+    const { status, json } = await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    expect(status).toBe(500);
+    expect(failure(json)).toEqual({
+      code: "internal",
+      message: "Something went wrong; try again.",
+    });
+  });
+
+  it("emits one metric per provider call with latency and tokens", async () => {
+    await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    const metrics = world.logs().filter((line) => "_aws" in line);
+    expect(metrics).toEqual([
+      expect.objectContaining({ Provider: "groq-whisper", Latency: 300, Errors: 0 }),
+      expect.objectContaining({
+        Provider: "openai:gpt-5.4-nano",
+        Latency: 400,
+        InputTokens: 150,
+        OutputTokens: 9,
+        Errors: 0,
+      }),
+    ]);
+  });
+
+  it("never logs the transcript or the clean text", async () => {
+    await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    world.transcript = "Thank you.";
+    await world.post(dictationBody({ audio: wav({ seconds: 3 }) }));
+    const everything = world.lines.join("\n");
+    expect(everything).not.toContain("mañana nos vemos");
+    expect(everything).not.toContain("Thank you");
+    expect(world.logs()).toContainEqual(
+      expect.objectContaining({
+        message: "dictation done",
+        requestId: "req-0",
+        userId: "user-1",
+        totalMs: 700,
+      }),
+    );
+  });
+});

@@ -68,11 +68,11 @@ Phase 1 sets every command; until then they are `unknown`.
 
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
-| api | `apps/api` | unknown | unknown | unknown | unknown |
+| api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | unknown |
 | web | `apps/web` | unknown | unknown | unknown | unknown |
 | desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
-| shared | `packages/shared` | unknown | unknown | unknown | n/a |
+| shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
 | infra | `infra` | `terraform fmt -check -recursive` | `terraform validate` per environment | n/a | n/a |
 
 ## Modules

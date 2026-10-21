@@ -143,3 +143,41 @@ Review focus beyond the Pipeline: secret values never reach git, logs, plan outp
 clearance: full: AWS account 115891590483 (profile `fless-takemyword`) for the state bucket, core and dev apply, prd plan, Cognito users, secret value and dev code pushes; GitHub `sebasfles/take-my-word` for `main`, rulesets, environments and variables through the App, and the PR.
 
 ## om-developer notes
+
+### Round 1 (milestone 1: monorepo, shared, api with unit tests)
+
+Done:
+
+- Root pnpm workspace (`workspaceConcurrency: 1`, `onlyBuiltDependencies: esbuild`), `.nvmrc` 24, `tsconfig.base.json` (strict, bundler resolution, no emit), flat eslint (`strictTypeChecked` plus prettier), prettier, vitest with `fileParallelism: false` and `--no-file-parallelism`.
+- `packages/shared`: request meta, response, error and audio constants in `src/dictations.ts` and `src/errors.ts`.
+- `apps/api`: `authorizer` and `dictate` handlers, the pipeline in `src/dictation/dictate.ts`, ports, `groq-whisper` and `openai` adapters, WAV and m4a duration probes, multipart reader, quota and dictation stores on DynamoDB, silence guard, `plain` v1 prompt, EMF metrics, JSON logs, provider secret cache, dev debug audio sink, esbuild build to `dist/{dictate,authorizer}.zip`.
+- 96 unit tests: shared meta contract; probes; upload limits and content types; quota window; DynamoDB adapters with a fake client; secret cache; both adapters with a fake fetch; the whole handler with fake ports (200 WAV and m4a, silence, quota overshoot, 429, UTC reset, 400, 413, 415, 502, 500, metrics, no text in logs); the authorizer with real `aws-jwt-verify` against locally signed RS256 tokens.
+- Checked by hand, not committed: the built bundles load on Node 24 and answer 415 and 400; the probes read real ffmpeg WAV and m4a files (mdat first and faststart) to the exact duration.
+- `docs/TRD.md`: api and shared rows of the verification table, so `verify-task` has commands; the rest of the table waits for milestone 3.
+
+Decisions the plan did not record:
+
+- TypeScript 6.0.3, not 7.0: `typescript-eslint` 8.72 supports TypeScript below 6.1 only.
+- pnpm 10.34.7 pinned in `packageManager` (installed and current on the 10 line).
+- `packages/shared` ships TypeScript source (`exports` to `src/index.ts`) with no build step; esbuild and vitest consume it directly.
+- Response: `providers` is `{ transcriber, refiner? }`, `latencyMs` is `{ quota, transcribe, refine?, save?, total }`; on silence `refiner`, `refine` and `save` are absent.
+- Errors: `{ error: { code, message } }` with codes `bad_request` 400, `payload_too_large` 413, `unsupported_media_type` 415, `quota_exceeded` 429, `provider_failed` 502, `internal` 500; 401 and 403 come from API Gateway with its own body.
+- Provider labels: the transcriber reports `groq-whisper` without its model (Acceptance 4), the refiner `openai:{model}`; models come from `GROQ_WHISPER_MODEL` and `OPENAI_MODEL`, defaulting to `whisper-large-v3-turbo` and `gpt-5.4-nano`.
+- Locale is `es` or `en` with an optional region (`es-CO`); the prompt and Whisper's `language` follow the language, so "one prompt per locale pair" reads as one per language.
+- The refiner uses the Responses API with `instructions` plus the transcript as `input`, `store: false`, no reasoning setting (the model default is `none`); a response that is not `completed` is a provider failure, never partial text.
+- The 4 MB cap is 4 MiB (4,194,304 bytes) on the audio part; a body over 4 MiB plus 64 KiB answers 413 before parsing.
+- `meta` is accepted as a plain field or as a JSON file part, so React Native's `FormData` can send it.
+- Audio types: `audio/wav`, `audio/wave`, `audio/x-wav`, `audio/vnd.wave` are WAV; `audio/mp4`, `audio/m4a`, `audio/x-m4a` are m4a.
+- WAV duration is the data chunk over the byte rate, for any PCM layout, capped by the bytes present; m4a duration is `mvhd`, falling back to `mehd` for fragmented files.
+- Table attributes: keys `PK` and `SK`, TTL attribute `expiresAt` (epoch seconds) on every item, quota counter `seconds`; dictation SK is `DICTATION#{ISO time}#{Lambda request id}`. Infra must enable TTL on `expiresAt`.
+- The silence list holds common Whisper hallucinations in both languages, compared without case, punctuation or brackets; a recording that is only "Gracias." or "Thank you." is treated as silence.
+- Each provider call times out at 25 s; failures log the provider and HTTP status only, never the provider's body; unhandled errors log their name only.
+- Provider keys load on the first request, not at init, and a failed read is not cached; the empty placeholders answer 500.
+- Debug audio goes to `{userId}/{ISO time}-{request id}.{ext}` after the quota charge, and a failed write is logged, not fatal.
+- Authorizer env is `USER_POOL_ID` and `USER_POOL_CLIENT_ID`; it returns HTTP API simple responses with `context.userId`, so the API needs payload format 2.0, simple responses and identity source `$request.header.Authorization`.
+- Bundles are ESM `index.mjs` (handler `index.handler`), minified with names kept, with source maps and a `createRequire` banner for CommonJS dependencies; the AWS SDK is bundled, not taken from the runtime.
+
+Pending for milestone 2: infra modules and stacks, the state bucket, `core` and `dev` apply, `prd` plan, `crew-e2e` and the SRP token script in `apps/api/scripts`, Lambda `NODE_OPTIONS=--enable-source-maps`, e2e for Acceptance 2 to 8, and the api e2e row of the TRD.
+Pending for milestone 3: workflows, the rest of the TRD verification table, `.env` under Workspace files.
+
+Deferred: an integration test of the quota condition against DynamoDB Local; the unit tests cover the adapter's mapping and the pipeline's arithmetic, and Acceptance 7 covers the real condition.
