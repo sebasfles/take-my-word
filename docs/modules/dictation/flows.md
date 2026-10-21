@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Dictation: flows
@@ -18,21 +18,28 @@ sequenceDiagram
   participant D as dictate Lambda
   participant T as Table take-my-word-env
   participant S as Groq whisper
-  participant R as OpenAI gpt-6-luna
+  participant R as OpenAI refiner
   C->>G: POST /dictations, audio and Cognito JWT
   G->>D: request with user id
-  D->>T: check daily quota, read settings, dictionary, style
-  alt over quota
-    D-->>C: refused
+  alt WAV under the level floor
+    D-->>C: empty text, nothing charged
+  end
+  par
+    D->>T: charge the day's quota
+  and
+    D->>T: read settings, app rule, styles, dictionary
+  end
+  alt day already at the cap
+    D-->>C: 429
   end
   D->>S: audio and top dictionary terms as prompt
   S-->>D: raw transcript
-  alt empty or silence hallucination
-    D-->>C: empty text
+  alt empty, hallucination, or ambiguous phrase on quiet WAV
+    D-->>C: empty text, nothing saved
   end
-  D->>R: raw transcript, style prompt, full dictionary, locale
+  D->>R: raw transcript, editing rules, resolved style, full dictionary, locale
   R-->>D: clean text
-  D->>T: save DICTATION with TTL 90 days
-  D-->>C: raw and clean text
+  D->>T: save DICTATION with styleId and TTL 90 days
+  D-->>C: raw and clean text, styleId
   T-)T: stream to dictionary-usage
 ```

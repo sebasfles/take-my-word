@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Auth: database
@@ -19,14 +19,13 @@ Auth owns no item kind in `take-my-word-{env}`.
 
 | Table | Owner module | Relationship |
 |---|---|---|
-| `take-my-word-{env}`, `USER` | dictation | Keyed by the Cognito user id the authorizer emits. |
-| `take-my-word-{env}`, `DICT#term`, `STYLE#id`, `APPRULE#appId`, `DICTATION#ts` | dictionary, styles, dictation | Every item sits under the same user key. |
+| `take-my-word-{env}`, `SETTINGS`, `QUOTA#date`, `DICT#term`, `STYLE#id`, `APPRULE#appId`, `DICTATION#ts` | dictation, dictionary, styles | Every item sits under `USER#{sub}`, the Cognito user id the authorizer emits; there is no `USER` item. |
 
 ## Invariants kept in code
 
-- The user id comes only from the authorizer context, never from a path, query or body.
+- The user id comes only from the authorizer context, never from a path, query, body, cursor or id; the authorizer accepts only access tokens of the pool's native client.
 - Deleting a Cognito user does not delete their items; that cleanup has no owner yet.
 
 ## Migrations of note
 
-- None; nothing is built.
+- None; 0001 created the dev pool with `crew-e2e` and Sebastian's user, 0003 added `crew-e2e-b` for cross-user checks.

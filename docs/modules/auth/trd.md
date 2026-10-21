@@ -1,48 +1,64 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0004_web_landing
 ---
 
 # Auth: technical
 
-Planned; no code yet, phase 1 builds the pool and the authorizer, phase 2 the desktop login, phase 4 the mobile login.
+The pool and the authorizer run in dev since 0001, the web login since 0004; phase 2 brings the desktop login, phase 4 the mobile login.
 
 ## Structure
 
 | Path | What |
 |---|---|
-| `infra/modules/aws/cognito` | Terraform module for the user pool and its app clients. |
+| `infra/modules/aws/cognito` | User pool (Essentials, admin-created users only) and the `native` app client. |
 | `infra/stacks/app` | Instantiates the pool per env and attaches the authorizer to the HTTP API. |
-| `apps/api` | Lambda authorizer that validates the Cognito JWT and passes the user id to `api` and `dictate`; separate function from both. |
-| `apps/desktop` | Login form against Cognito (SRP), token storage in the OS keychain, silent refresh. |
-| `apps/mobile` | Login form against Cognito (SRP), token storage in `expo-secure-store`, silent refresh. |
-| `apps/web` | Login form for settings, history and account; session handling on the Next.js side. |
+| `apps/api/src/authorizer` | Lambda authorizer: `aws-jwt-verify` against the pool's JWKS, access tokens of the native client only, `userId` from `sub`. |
+| `packages/cognito` | Node-only client: SRP sign-in, the new-password challenge, device confirmation, refresh, `ForgetDevice` and `RevokeToken`; used by `apps/web` and by the api scripts and e2e. |
+| `apps/api/scripts/sign-in.ts` | `.env` helpers; `pnpm token` prints a `crew-e2e` access token; the e2e also signs in `crew-e2e-b`. |
+| `apps/web/src/lib` | `session.ts` (sealed cookies), `auth.ts` (sign-in, new password, the one refresh path, sign-out), `handlers.ts` (route handlers), `refresh-lock.ts` (Web Lock around renewal). |
+| `apps/desktop`, `apps/mobile` | Login forms and token storage (phases 2 and 4). |
 
 ## Endpoints owned
 
 None of the API routes; auth gates all of them.
-Sign-in, refresh and sign-out go straight from the clients to Cognito, not through `apps/api`.
-The authorizer runs on every route of the HTTP API and its result is cached 5 minutes.
+Desktop and mobile go straight to Cognito; the web goes through its own route handlers, so tokens never reach browser JS:
 
-Jobs, listeners or scheduled work: none.
+| Route (web) | Purpose |
+|---|---|
+| `POST /api/session` | Sign in with SRP and confirm the device, or start the new-password step. |
+| `POST /api/session/password` | Answer `NEW_PASSWORD_REQUIRED` with the sealed challenge. |
+| `POST /api/session/refresh` | Renew an expiring session; called by the browser under a Web Lock. |
+| `POST /api/session/sign-out` | Forget the device, revoke the refresh token, clear the cookies. |
+
+Each checks `Origin` against `WEB_ORIGIN`.
+The authorizer answers HTTP API simple responses, cached 5 minutes per `Authorization` header; a request without the header gets 401 from API Gateway, an invalid token 403.
+
+## Client contract
+
+- Sign in with `USER_SRP_AUTH`; the client allows no other flow.
+- After the first sign-in on a device, call `ConfirmDevice` with a device SRP verifier and keep `DeviceKey` and `DeviceGroupKey` with the refresh token.
+- Renew with `GetTokensFromRefreshToken`, always passing `DeviceKey`, and store the rotated refresh token it returns; without the confirmed key the answer is `Invalid Refresh Token.`.
+- Never resend an old refresh token: inside the 10 s grace it still renews but revokes the access token of the previous renewal, after it Cognito answers `Refresh token reuse detected`.
 
 ## Depends on
 
-- Amazon Cognito (Essentials tier): user pool, SRP sign-in, refresh token rotation, device tracking.
-- infra: account, Terraform stacks, the HTTP API the authorizer attaches to.
+- Amazon Cognito (Essentials tier); infra for the account, the stacks and the HTTP API.
 
 ## Depended on by
 
-- dictation: every `POST /dictations` and `GET /dictations` call carries the user id from the authorizer.
-- dictionary, styles: their CRUD routes are scoped to the authorizer's user id.
-- desktop, mobile: both need a valid access token before recording.
+- dictation, dictionary, styles: every route reads the authorizer's `userId`; the `api` Lambda answers 401 `unauthorized` itself if that context is ever missing.
+- desktop, mobile, web: need a valid access token before calling the API.
 
 ## Configuration
 
-- User pool id and app client id per env, exposed by Terraform to the authorizer and baked into each client build.
-- Token lifetimes live in Terraform: access 1 h, refresh 10 years with rotation.
+- Authorizer environment: `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, set by `infra/stacks/app`.
+- Web function environment: `USER_POOL_ID`, `USER_POOL_CLIENT_ID` (the `native` client), `WEB_ORIGIN`, `WEB_SECRET_ID`; the secret `take-my-word-{env}/web` holds `COOKIE_KEY` (32 bytes, base64), written outside Terraform.
+- Web session: `__Host-tmw-session` and `__Host-tmw-refresh`, AES-256-GCM sealed, HttpOnly, Secure, SameSite=Lax; Max-Age 400 days with remember me, renewed on every refresh, a browser-session cookie without it; `__Host-tmw-challenge` holds the new-password challenge for 3 minutes.
+- Token lifetimes in Terraform: access and id 1 h, refresh 3650 days with rotation (10 s grace).
 
 ## Testing
 
-- Not written yet; phase 1 verifies the gate with curl and a token from a Cognito user.
-- Module-specific run: see TRD.
+- `apps/api/src/authorizer/authorize.test.ts` signs RS256 tokens locally and runs the real verifier.
+- `pnpm e2e` checks 401 and 403 at the gateway, 401 on every route without a token, that `crew-e2e-b` can neither see nor change `crew-e2e`'s items, and the refresh rotation of a confirmed device.
+- `apps/web`: unit tests for sealing, cookies, redirect rules, the auth flows and the handlers; `pnpm integration` against the dev pool (refresh past `exp` with `DeviceKey`, a second tab without a second rotation, sign-out, and a throwaway user through the new-password step); `pnpm e2e` with Playwright on dev.

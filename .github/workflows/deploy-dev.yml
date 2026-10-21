@@ -1,0 +1,94 @@
+name: deploy-dev
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - apps/api/**
+      - apps/web/**
+      - packages/shared/**
+      - packages/cognito/**
+      - .github/workflows/**
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-changes.yml
+
+  api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      environment: dev
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/reusable-deploy-web.yml
+    with:
+      environment: dev
+
+  promotion-pr:
+    needs: [api, web]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Open the promotion pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --no-tags --quiet origin main
+
+          if [ "$(git rev-list --count origin/main..HEAD)" -eq 0 ]; then
+            echo "develop holds nothing main does not; no promotion pull request to open."
+            exit 0
+          fi
+
+          number=$(gh pr list --base main --head develop --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            echo "Pull request #$number is already open; its head is develop, so it already carries these commits."
+            exit 0
+          fi
+
+          {
+            echo "Promotes \`develop\` to \`main\`."
+            echo
+            echo "[Compare \`main\` with \`develop\`](https://github.com/$GITHUB_REPOSITORY/compare/main...develop)"
+            echo
+            echo "## Commits not yet in \`main\`"
+            echo
+            git log --no-merges --reverse --format='- %s' origin/main..HEAD
+          } > "$RUNNER_TEMP/promotion-body.md"
+
+          gh pr create \
+            --base main \
+            --head develop \
+            --title 'Promote develop to main' \
+            --body-file "$RUNNER_TEMP/promotion-body.md"

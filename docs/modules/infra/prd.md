@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0001_platform_skeleton
 ---
 
 # Infra: product
@@ -35,7 +35,7 @@ Errors: a failed deploy leaves the previous version serving and shows as a faile
 
 ## Rules
 
-- dev and prd are fully separate: separate data, separate users, separate addresses.
+- dev and prd are fully separate: separate data, separate users, separate addresses; the API answers at `api.dev.takemyword.fless.dev` and `api.takemyword.fless.dev`.
 - Automation may only replace the code of the running services; anything structural goes through Sebastian.
 - The service runs only in us-east-1 and us-east-2.
 - Recorded audio is never kept; dev alone may keep it for one day to debug.
@@ -56,4 +56,3 @@ Errors: a failed deploy leaves the previous version serving and shows as a faile
 ## Open questions
 
 - Whether prd keeps backups of user data beyond the 90-day history window.
-- The public address of the API, under the project's domain or the default cloud address.

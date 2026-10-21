@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Mobile: database
@@ -17,7 +17,7 @@ The server data sits in the single DynamoDB table `take-my-word-{env}`; the app 
 
 | Item | Owner module | Relationship |
 |---|---|---|
-| `USER` | auth | The signed-in user; default style and locale come from its settings |
+| `SETTINGS` | dictation | The signed-in user's settings; default style and locale come from it |
 | `STYLE#id` | styles | Read to fill the manual style picker |
 | `DICTATION#ts` | dictation | Created by each `POST /dictations` from the app; mobile only shows the returned text |
 

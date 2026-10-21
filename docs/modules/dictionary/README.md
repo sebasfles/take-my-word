@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Dictionary
@@ -8,7 +8,7 @@ source: setup
 The user's personal list of terms, each with optional "sounds like" aliases, that every dictation must spell right.
 It steers transcription with the most used and most recent terms and gives the refiner the full list as a correction table.
 Usage is counted from saved dictations, so priority follows what the user actually says.
-Planned for phase 3; nothing is built yet.
+The API and the usage counter run in dev since 0003; the desktop editor and the web view come with 0008 and 0009.
 
 ## Boundaries
 

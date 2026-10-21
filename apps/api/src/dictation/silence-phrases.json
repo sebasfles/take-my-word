@@ -1,0 +1,32 @@
+{
+  "hallucinations": [
+    "Gracias por ver.",
+    "Gracias por ver el video.",
+    "Gracias por ver el vídeo.",
+    "Suscríbete.",
+    "¡Suscríbete al canal!",
+    "Subtítulos realizados por la comunidad de Amara.org",
+    "Subtítulos por la comunidad de Amara.org",
+    "Subtítulos en español",
+    "[Música]",
+    "[Aplausos]",
+    "Thanks for watching!",
+    "Thank you for watching.",
+    "Please subscribe.",
+    "Subtitles by the Amara.org community",
+    "[Music]",
+    "[Applause]",
+    "[BLANK_AUDIO]"
+  ],
+  "ambiguous": [
+    "Gracias.",
+    "Muchas gracias.",
+    "Gracias por su atención.",
+    "Hasta la próxima.",
+    "Chao.",
+    "Adiós.",
+    "You",
+    "Thank you.",
+    "Bye."
+  ]
+}

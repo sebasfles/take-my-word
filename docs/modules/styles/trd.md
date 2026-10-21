@@ -1,49 +1,58 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0003_api_features
 ---
 
 # Styles: technical
-
-Planned; no code yet, phase 3 builds it.
 
 ## Structure
 
 | Path | What |
 |---|---|
-| `apps/api` | Styles and app rules routes in the `api` Lambda (Hono); style prompt lookup inside the `dictate` pipeline |
-| `packages/shared` | zod contracts for styles and app rules, shared by api, web and desktop |
-| `apps/web` | Settings screens to list, create, edit and delete custom styles and app rules |
-| `apps/desktop` | Active window detection, matching to an app rule, applying its style and paste keystroke |
-| `apps/mobile` | Manual style picker (phase 4) reading the style list |
-
-Exact folders inside each app are decided when phase 3 starts.
+| `apps/api/src/styles` | Style routes in the `api` Lambda, the store port and its DynamoDB adapter, the style-exists check. |
+| `apps/api/src/styles/builtin` | `plain`, `casual` and `formal` as code, one versioned file each (`casual.v1.ts`). |
+| `apps/api/src/app-rules` | App rule routes, store port and DynamoDB adapter. |
+| `apps/api/src/dictation/style-resolution.ts` | Which style a dictation uses (owned here, called by `dictate`). |
+| `packages/shared/src/styles.ts`, `app-rules.ts` | Contracts, limits, built-in ids and the paste keystroke enum. |
+| `apps/web`, `apps/desktop`, `apps/mobile` | Settings screens, app matching and paste (0009, 0008, phase 4). |
 
 ## Endpoints owned
 
 | Method | Route | Purpose | Spec |
 |---|---|---|---|
-| CRUD | `/styles` | List built-in and custom styles; create, update and delete custom ones | none yet |
-| CRUD | `/app-rules` | Per-user mapping of a desktop app to a style and a paste keystroke | none yet |
+| GET | `/styles` | Built-ins first, then the user's custom styles. | zod in `packages/shared` |
+| POST | `/styles` | Create a custom style. | zod in `packages/shared` |
+| PUT | `/styles/{id}` | Edit a custom style; 403 `forbidden` for a built-in. | zod in `packages/shared` |
+| DELETE | `/styles/{id}` | Delete a custom style and release what pointed to it; 403 for a built-in. | zod in `packages/shared` |
+| GET | `/app-rules` | The user's app rules. | zod in `packages/shared` |
+| POST | `/app-rules` | Create a rule; 409 when the app already has one. | zod in `packages/shared` |
+| PUT | `/app-rules/{id}` | Replace a rule's style and keystroke. | zod in `packages/shared` |
+| DELETE | `/app-rules/{id}` | Remove a rule. | zod in `packages/shared` |
 
-Jobs, listeners or scheduled work: none.
+`{id}` of a rule is the opaque `id` it is listed with, as for dictionary terms.
+
+## Style resolution
+
+`dictate` uses the request's `styleId`, else the rule of the request's `appId`, else the user's `defaultStyleId`, else `plain`; an unknown or deleted id falls through to the next one and never fails a dictation.
+The refiner gets the editing contract first, then the style's directions under a heading that limits them to tone and register.
 
 ## Depends on
 
-- auth: the Lambda authorizer supplies the user id that partitions every style and app rule.
-- infra: the `take-my-word-{env}` DynamoDB table and the `api` Lambda behind API Gateway.
+- auth: the authorizer's `userId` partitions every style and rule.
+- dictation: owns the settings that hold the default style.
+- infra: the table and the `api` Lambda.
 
 ## Depended on by
 
-- dictation: `POST /dictations` accepts `styleId` and `appId`, resolves the style prompt and passes it to the refiner; without them it falls back to the user's settings.
-- desktop: resolves the focused app to an app rule before sending audio, then pastes with the rule's keystroke.
-- mobile: shows the style list in its manual picker.
+- dictation: resolves the style of every dictation.
+- desktop: matches the focused app to a rule and pastes with its keystroke (0008).
+- mobile: lists the styles in its picker (phase 4).
 
 ## Configuration
 
-- None planned.
+- None.
 
 ## Testing
 
-- Tests live next to the code in `apps/api`, `packages/shared`, `apps/web` and `apps/desktop`.
-- Module-specific run: see TRD.
+- Unit tests next to the code: resolution order and fall-through, built-ins read-only, release on delete, limits, routes against in-memory stores.
+- `pnpm e2e` in `apps/api` shows casual and formal text for one recording and a rule falling back after its style is deleted.

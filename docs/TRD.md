@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0004_web_landing
 ---
 
 # Technical Requirements Document
@@ -25,20 +25,22 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 ### api
 
 - Stack: Node 24, Hono, zod, AWS SDK v3; bundled with esbuild into two Lambdas, `api` (every CRUD route) and `dictate` (`POST /dictations`, more memory, 60 s timeout), plus `dictionary-usage` on the table stream and the Lambda authorizer.
-- Layout: one folder per module (`auth/`, `dictation/`, `dictionary/`, `styles/`), provider adapters under `dictation/providers/`.
+- Layout: one folder per Lambda entry (`api/`, `dictate/`, `authorizer/`, `dictionary-usage/`) and one per module (`dictation/`, `dictionary/`, `styles/`, `app-rules/`, `settings/`, `history/`), provider adapters under `dictation/providers/`, shared helpers in `lib/`.
 - Install: `pnpm install --frozen-lockfile` at the root.
-- Workspace files: `.env` with table name, secret id and Cognito ids for local runs.
+- Workspace files: `.env` at the repository root, gitignored, never committed or printed.
+  It holds `GROQ_API_KEY` and `OPENAI_API_KEY` (copied into the providers secret), `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM` (read by `infra/scripts/tf`), and `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD`, `CREW_E2E_B_USERNAME`, `CREW_E2E_B_PASSWORD`, `TABLE_NAME` and `API_URL` (read by `pnpm token` and `pnpm e2e` in `apps/api`).
+  `pnpm e2e` also needs the `fless-takemyword` AWS profile, for Polly speech and for resetting `crew-e2e-b`'s `SETTINGS` item.
 - API spec: `none`; the zod contracts in `packages/shared` are the source of truth.
 - Data: one DynamoDB table `take-my-word-{env}`, no ORM, no migrations; item kinds per module in each `database.md`.
 - Delivery: GitHub Actions on `develop` (dev) and `main` (prd) build and run `aws lambda update-function-code`; see [infra](modules/infra/README.md).
 
 ### web
 
-- Stack: Next.js App Router, React, TypeScript; built with OpenNext, served by Lambda behind CloudFront.
-- Layout: route groups for landing, sign-in, settings (dictionary, styles, app rules), history.
-- Install: root `pnpm install --frozen-lockfile`.
-- Workspace files: `.env.local` with API base URL and Cognito ids.
-- Delivery: same workflow as api; static assets to S3, CloudFront invalidation.
+- Stack: Next.js 16 App Router, React 19, TypeScript, plain CSS; built with OpenNext 4 (incremental and tag caches off, images unoptimized), served by a Lambda Function URL behind CloudFront; Next.js and OpenNext pinned.
+- Layout: `src/app` (landing, `sign-in`, `app` for the account, `api` for the route handlers), `src/lib` (session, auth flows, handlers, `es` and `en` dictionaries, API client), `src/components`; `public/static/` is the only public folder; `integration/` and `e2e/` run against dev.
+- Install: root `pnpm install --frozen-lockfile`; `pnpm exec playwright install chromium` for e2e and screenshots.
+- Workspace files: the root `.env` (`USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `API_URL`, `CREW_E2E_*`, `TABLE_NAME`) for `pnpm integration` and `pnpm e2e`; `pnpm screenshots` needs none.
+- Delivery: `reusable-deploy-web` on the same pushes as api, gated per job; static assets to S3, code to the Lambda, CloudFront invalidation; see [infra](modules/infra/trd.md).
 
 ### desktop
 
@@ -64,16 +66,18 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 ## Verification targets
 
 `verify-task` reads this table literally.
-Phase 1 sets every command; until then they are `unknown`.
+Each app's first task sets its commands; until then they are `unknown`.
 
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
-| api | `apps/api` | unknown | unknown | unknown | unknown |
-| web | `apps/web` | unknown | unknown | unknown | unknown |
+| api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
+| web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the `fless-takemyword` profile for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, `--workers=1`) |
 | desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
-| shared | `packages/shared` | unknown | unknown | unknown | n/a |
-| infra | `infra` | `terraform fmt -check -recursive` | `terraform validate` per environment | n/a | n/a |
+| cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |
+| shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
+| infra | `infra` | `terraform fmt -check -recursive` | `terraform -chdir=environments/{core,dev,prd} validate`, after `init -backend=false` on a fresh clone | n/a | n/a |
+| workflows | `.` | `pnpm lint:workflows` (actionlint) | n/a | n/a | n/a |
 
 ## Modules
 
