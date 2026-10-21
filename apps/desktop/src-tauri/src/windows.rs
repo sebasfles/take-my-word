@@ -6,6 +6,7 @@ pub const SETTINGS: &str = "settings";
 pub const FIRST_RUN: &str = "first-run";
 pub const ACCOUNT: &str = "account";
 pub const OVERLAY: &str = "overlay";
+pub const UPDATE: &str = "update";
 
 pub fn product_name(app: &AppHandle) -> String {
     app.config()
@@ -70,6 +71,36 @@ fn open(
     built
         .inspect_err(|error| log::error!("opening {label} failed: {error}"))
         .ok()
+}
+
+pub fn open_update(app: &AppHandle) {
+    if app.get_webview_window(UPDATE).is_some() {
+        return;
+    }
+    let built = WebviewWindowBuilder::new(
+        app,
+        UPDATE,
+        WebviewUrl::App("index.html?view=update".into()),
+    )
+    .title(product_name(app))
+    .inner_size(460.0, 400.0)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .center()
+    .focused(false)
+    .build();
+    match built {
+        Ok(window) => {
+            let app = app.clone();
+            window.on_window_event(move |event| {
+                if let WindowEvent::Destroyed = event {
+                    crate::updater::postpone(&app);
+                }
+            });
+        }
+        Err(error) => log::error!("opening {UPDATE} failed: {error}"),
+    }
 }
 
 pub fn create_overlay(app: &AppHandle) -> tauri::Result<()> {

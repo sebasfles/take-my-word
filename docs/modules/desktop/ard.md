@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0007_desktop_integration
+source: 0005_desktop_release
 ---
 
 # Desktop: architecture and debt
@@ -189,3 +189,39 @@ source: 0007_desktop_integration
 - Revisit when: a client bug comes from a constraint the shapes do not carry.
 - Source: 0007_desktop_integration
 
+
+## 2026-10-21: The updater runs in Rust over native TLS
+
+- Decision: `tauri-plugin-updater` is built with `native-tls` (SChannel) instead of its default `rustls-tls`; the check, the offer, the download and the install run in Rust, and the update window only renders a view and answers through three commands.
+- Alternatives rejected: the plugin's default `rustls-tls`; giving the WebView the updater permission.
+- Reason: `rustls-tls` switches the shared `reqwest` to `rustls-no-provider`, which made every other client panic when built, so release builds would have crashed at start; native TLS also keeps rustls and ring out of the binary, and the WebView stays without updater rights.
+- Debt created: none.
+- Revisit when: macOS and Linux builds need a TLS stack of their own.
+- Source: 0005_desktop_release
+
+## 2026-10-21: Updates wait for no dictation in flight and never take focus
+
+- Decision: each hold carries a guard from key down until the worker has pasted or dropped its job; the update window opens only when no guard is alive, without focus, and the install waits for the same after the download.
+- Alternatives rejected: gating on the overlay's recording flag, which ends at key up while the paste is still pending.
+- Reason: an update window that takes focus, or an install that quits the app, between key up and the paste would send the text to the wrong window or lose it; on Windows the dialog appeared with the user's window still in the foreground.
+- Debt created: none.
+- Revisit when: dictations can run without a hold, such as a toggle mode.
+- Source: 0005_desktop_release
+
+## 2026-10-21: Releases are verified against the committed key before they are published
+
+- Decision: `desktop-release` creates the draft release through the API with no target commit and hands its id to `tauri-action`; before publishing, it downloads `latest.json` and every installer it names, checks they are assets of that draft, verifies the minisign signature with the public key in `tauri.prd.conf.json` and the version signed into its trusted comment, and requires the fixed-name copy to match; the updater also requires the signed version.
+- Alternatives rejected: letting `tauri-action` create the release; trusting `latest.json` as built.
+- Reason: `tauri-action` creates the release pointed at the tagged commit, and a commit whose workflows differ from the default branch needs a `workflows` permission that `GITHUB_TOKEN` cannot hold, so it failed with 403; a release that would brick the updater or ship an unsigned installer never reaches "latest".
+- Debt created: `latest.json` points to `api.github.com` asset URLs, which anonymous clients may fetch 60 times per hour per IP.
+- Revisit when: an update download fails with a rate-limit error, or users share one public IP.
+- Source: 0005_desktop_release
+
+## 2026-10-21: Installers ship without a code-signing certificate
+
+- Decision: the NSIS installer and the app are signed only for the updater (minisign); Windows code signing is out of v1.
+- Alternatives rejected: buying a code-signing certificate now.
+- Reason: the users are an invited circle who can pass the warning once; the updater's own signature already protects every later version.
+- Debt created: Windows SmartScreen warns on the first install.
+- Revisit when: the app is offered beyond the invited circle, or SmartScreen blocks installs.
+- Source: 0005_desktop_release

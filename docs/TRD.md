@@ -1,13 +1,13 @@
 ---
 updated: 2026-10-21
-source: 0007_desktop_integration
+source: 0005_desktop_release
 ---
 
 # Technical Requirements Document
 
 Describes the whole application as it is built today; planned parts say so in their section.
 One public monorepo, `sebasfles/take-my-word`, holds every app, the infrastructure and these docs.
-Built and deployed to dev and prd: `apps/api`, `apps/web`, `packages/shared`, `infra`; in progress: `apps/desktop`; planned: `apps/mobile`.
+Built and deployed to dev and prd: `apps/api`, `apps/web`, `packages/shared`, `infra`; released on Windows through GitHub Releases: `apps/desktop`; planned: `apps/mobile`.
 
 ## Components
 
@@ -47,8 +47,11 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 - Stack: Tauri 2 with Rust for the OS layer (a native `WH_KEYBOARD_LL` key hook on Windows, macOS and Linux in phase 5; `cpal` recording, `enigo` paste, active window, keychain) and React + TypeScript for the settings window and overlay.
 - Layout: `src/` (UI), `src-tauri/` (Rust shell and plugins).
 - Install: root `pnpm install --frozen-lockfile`, Rust toolchain via `rustup`, platform prerequisites of Tauri 2.
-- Workspace files: none; dev and prd API URLs and pool ids are public and committed, and `pnpm tauri:build:dev` or `pnpm tauri:build:prd` picks one at build time.
-- Delivery: `tauri-action` on tags `desktop-v*` publishes installers and `latest.json` to GitHub Releases; Windows first, macOS and Linux in phase 5.
+- Workspace files: none to build; dev and prd API URLs and pool ids are public and committed, and `pnpm tauri:build:dev` or `pnpm tauri:build:prd` picks one at build time.
+  The root `.env` keeps `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, the updater key that `desktop-release` reads from Actions secrets; only the prd config carries the updater.
+- Delivery: `pnpm release:desktop X.Y.Z` bumps the version, tags `desktop-vX.Y.Z` with the notes and pushes; `desktop-release` builds the prd installer with `tauri-action`, verifies `latest.json` against the committed public key and publishes the GitHub Release as latest, with the installer also under `take-my-word-windows-x64-setup.exe` for the landing.
+  The first tag, `desktop-v0.1.0`, was made by hand; never rewrite at or below a pushed tag.
+  The installer is not code-signed, so SmartScreen warns on first install; Windows first, macOS and Linux in phase 5.
 
 ### mobile
 

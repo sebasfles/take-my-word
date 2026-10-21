@@ -4,10 +4,17 @@ import { Account } from "./views/Account.tsx";
 import { FirstRun } from "./views/FirstRun.tsx";
 import { Overlay } from "./views/Overlay.tsx";
 import { Settings } from "./views/Settings.tsx";
+import { Update } from "./views/Update.tsx";
 import { viewFromSearch } from "./view.ts";
 import "./styles.css";
 
-const screens = { settings: Settings, "first-run": FirstRun, account: Account, overlay: Overlay };
+const screens = {
+  settings: Settings,
+  "first-run": FirstRun,
+  account: Account,
+  overlay: Overlay,
+  update: Update,
+};
 const view = viewFromSearch(window.location.search);
 const Screen = screens[view];
 const root = document.getElementById("root");

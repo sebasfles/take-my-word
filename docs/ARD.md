@@ -85,9 +85,12 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-21 | No keychain on macOS and Linux; a rotated refresh token that fails to save is lost at the next start | Phase 5, or a sign-out after a keychain error |
 | desktop | 2026-10-21 | axum and tokio compile, unlinked, into release builds | Release build time matters |
 | desktop | 2026-10-21 | The contract test skips string patterns, lengths and integer bounds | A client bug comes from a constraint the shapes do not carry |
+| desktop | 2026-10-21 | `latest.json` points to `api.github.com` asset URLs, limited to 60 anonymous requests per hour per IP | An update download fails with a rate-limit error, or users share one public IP |
+| desktop | 2026-10-21 | SmartScreen warns on the first install of the unsigned installer | The app is offered beyond the invited circle, or SmartScreen blocks installs |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |
 | infra | 2026-10-20 | Cold starts on the first dictation after idle time | Parked latency work starts |
 | infra | 2026-10-21 | Old web chunks stay in the assets bucket forever | The bucket's size shows on the bill |
 | infra | 2026-10-21 | The web's CSP restricts framing only, no `script-src` | The web renders others' content or adds third-party scripts |
+| infra | 2026-10-21 | Updater key secrets sit outside Terraform and the key has no rotation path | The key leaks or must change, or the repository gains other maintainers |

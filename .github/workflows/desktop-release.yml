@@ -1,0 +1,167 @@
+name: desktop-release
+
+on:
+  push:
+    tags:
+      - desktop-v*
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  FIXED_INSTALLER: take-my-word-windows-x64-setup.exe
+  PRD_CONFIG: apps/desktop/src-tauri/tauri.prd.conf.json
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read the version and notes from the annotated tag
+        id: tag
+        run: |
+          git fetch --no-tags --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          if [[ "$(git cat-file -t "refs/tags/$TAG")" != tag ]]; then
+            echo "::error::$TAG is a lightweight tag; pnpm release:desktop creates an annotated tag carrying the notes"
+            exit 1
+          fi
+          notes="$(git tag --list --format='%(contents)' "$TAG")"
+          if [[ -z "${notes//[[:space:]]/}" ]]; then
+            echo "::error::$TAG has no message; the tag message is the release notes"
+            exit 1
+          fi
+          version="${TAG#desktop-v}"
+          prerelease=false
+          if [[ "$version" == *-* ]]; then prerelease=true; fi
+          delimiter="notes-$(openssl rand -hex 16)"
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "notes<<$delimiter"
+            echo "$notes"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v6.1.0
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: The tag names the app version
+        run: node apps/desktop/scripts/version.ts --tag "$TAG"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Create the draft release
+        id: draft
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          NOTES: ${{ steps.tag.outputs.notes }}
+          PRERELEASE: ${{ steps.tag.outputs.prerelease }}
+        run: |
+          id="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq "[.[] | select(.draft and .tag_name == \"$TAG\") | .id] | first // empty")"
+          if [[ -z "$id" ]]; then
+            id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" \
+              -f name="Take My Word $VERSION" -f body="$NOTES" -F draft=true -F prerelease="$PRERELEASE" \
+              --jq .id)"
+          fi
+          echo "draft release $id for $TAG"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Build, sign and upload to the draft
+        uses: tauri-apps/tauri-action@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: --config src-tauri/tauri.prd.conf.json
+          releaseId: ${{ steps.draft.outputs.id }}
+          releaseBody: ${{ steps.tag.outputs.notes }}
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+
+      - name: Upload the prd installer under its fixed name
+        env:
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          shopt -s nullglob
+          installers=(apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe)
+          prd="apps/desktop/src-tauri/target/release/bundle/nsis/Take My Word_${VERSION}_x64-setup.exe"
+          if [[ ${#installers[@]} -ne 1 || "${installers[0]}" != "$prd" ]]; then
+            echo "::error::expected only the prd installer $prd, found: ${installers[*]}"
+            exit 1
+          fi
+          release="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
+          stale="$(gh api "$release/assets?per_page=100" --jq ".[] | select(.name == \"$FIXED_INSTALLER\") | .id")"
+          if [[ -n "$stale" ]]; then gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$stale"; fi
+          gh api -X POST "https://uploads.github.com/$release/assets?name=$FIXED_INSTALLER" \
+            -H "Content-Type: application/octet-stream" --input "${installers[0]}" --jq '"uploaded \(.name) as asset \(.id)"'
+
+      - name: Verify latest.json and the installers against the committed public key
+        env:
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
+        run: |
+          dir="$RUNNER_TEMP/release-assets"
+          mkdir -p "$dir"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?per_page=100" > "$RUNNER_TEMP/assets.json"
+          node -e 'for (const a of JSON.parse(require("node:fs").readFileSync(0, "utf8"))) if (/(\.exe|^latest\.json)$/.test(a.name)) console.log(a.id + "\t" + a.name)' \
+            < "$RUNNER_TEMP/assets.json" |
+            while IFS=$'\t' read -r asset name; do
+              gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > "$dir/$name"
+            done
+          node apps/desktop/scripts/release-check.ts --dir "$dir" --assets "$RUNNER_TEMP/assets.json" \
+            --config "$PRD_CONFIG" --repo "$GITHUB_REPOSITORY" --tag "$TAG"
+
+      - name: Publish as the latest release
+        if: steps.tag.outputs.prerelease == 'false'
+        env:
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
+        run: |
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" -F draft=false -f make_latest=true \
+            --jq '"published \(.tag_name) at \(.html_url)"'
+
+      - name: The public links serve this version
+        if: steps.tag.outputs.prerelease == 'false'
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          base="https://github.com/$GITHUB_REPOSITORY/releases/latest/download"
+          for attempt in 1 2 3 4 5 6; do
+            announced="$(curl -fsSL "$base/latest.json" | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).version' || true)"
+            if [[ "$announced" == "$VERSION" ]] && curl -fsSIL -o /dev/null "$base/$FIXED_INSTALLER"; then
+              echo "attempt $attempt: latest.json announces $VERSION and $FIXED_INSTALLER downloads"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::the latest links do not serve $VERSION yet (latest.json says '$announced')"
+          exit 1
