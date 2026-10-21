@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0002_desktop_shell
 ---
 
 # Desktop
@@ -13,7 +13,7 @@ Windows first; macOS and Linux follow.
 
 - Owns: the tray, the hotkey hook, recording, the overlay, active window detection, pasting and clipboard restore, the desktop login form and keychain storage, installers and the updater.
 - Does not own: transcription and cleanup (dictation), styles and app rules data (styles), terms (dictionary), the user pool and token rules (auth).
-- Code: `apps/desktop` (planned).
+- Code: `apps/desktop`.
 
 ## Documents
 

@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-21
+source: 0002_desktop_shell
 ---
 
 # Desktop: database
@@ -10,7 +10,7 @@ The item schema of `take-my-word-{env}` will live in `packages/shared` and `apps
 ## Tables owned
 
 Desktop owns no table and no item kind.
-On the machine it keeps the Cognito tokens in the OS keychain and its local settings (hotkey) in the app's data folder.
+On the machine it keeps the Cognito tokens in the OS keychain (0007) and its local settings (hotkey, first-run flag) in `settings.json` in the app's config folder.
 
 ## Tables referenced
 
@@ -25,8 +25,8 @@ On the machine it keeps the Cognito tokens in the OS keychain and its local sett
 
 - The `appId` desktop sends is the same identifier it stores in app rules, so the server can resolve the rule.
 - The refresh token in the keychain is overwritten on every renewal, never kept beside the old one.
-- Audio is never written to disk outside the recording buffer.
+- Audio is never written to disk; only debug builds can dump a recording, behind a flag.
 
 ## Migrations of note
 
-- None; nothing is built.
+- None.

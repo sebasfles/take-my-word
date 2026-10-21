@@ -76,8 +76,13 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | styles | 2026-10-21 | Built-in style descriptions on the web do not follow prompt changes | A built-in prompt changes intent, or a fourth built-in arrives |
 | desktop | 2026-10-20 | Rust toolchain in a TypeScript monorepo | Rust layer grows past OS glue |
 | desktop | 2026-10-20 | macOS first run needs the Fn setting changed and Accessibility granted | An OS update breaks the hook, or toggle mode is requested |
-| desktop | 2026-10-20 | Larger uploads than Opus; long dictations hit the cap sooner | Payload size shows in latency or users hit the cap |
-| desktop | 2026-10-20 | Clipboard managers see the text briefly | Users report missed pastes in an app class |
+| desktop | 2026-10-20 | Larger uploads than Opus; dictations stop at two minutes | Payload size shows in latency or users hit the cap |
+| desktop | 2026-10-20 | Clipboard monitors that ignore the exclusion format still see the dictated text | Users report missed pastes in an app class |
+| desktop | 2026-10-21 | macOS and Linux have no key hook yet | Phase 5 builds macOS and Linux |
+| desktop | 2026-10-21 | A prepared microphone stream may switch a Bluetooth headset to hands-free or hold it; untested | A Bluetooth headset is used, or its audio quality drops |
+| desktop | 2026-10-21 | The Rust mirror of the shared contract can drift unchecked | 0007 adds the JSON Schema contract test |
+| desktop | 2026-10-21 | Any clipboard read after the keystroke counts as the paste target | A paste reported as done does not land in a real app |
+| desktop | 2026-10-21 | Release builds ship the API stub and its tray menu | 0007 wires the real API |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

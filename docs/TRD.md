@@ -44,7 +44,7 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 
 ### desktop
 
-- Stack: Tauri 2 with Rust for the OS layer (`rdev` key hook, `cpal` recording, `enigo` paste, active window, keychain) and React + TypeScript for the settings window and overlay.
+- Stack: Tauri 2 with Rust for the OS layer (a native `WH_KEYBOARD_LL` key hook on Windows, macOS and Linux in phase 5; `cpal` recording, `enigo` paste, active window, keychain) and React + TypeScript for the settings window and overlay.
 - Layout: `src/` (UI), `src-tauri/` (Rust shell and plugins).
 - Install: root `pnpm install --frozen-lockfile`, Rust toolchain via `rustup`, platform prerequisites of Tauri 2.
 - Workspace files: none beyond the build-time API and Cognito configuration.
@@ -67,12 +67,14 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 
 `verify-task` reads this table literally.
 Each app's first task sets its commands; until then they are `unknown`.
+Desktop `rust:*` scripts run from WSL: `apps/desktop/scripts/windows.sh` mirrors the worktree to `C:\dev\take-my-word` (override with `TMW_WINDOWS_CHECKOUT`), records the commit in `.synced-commit` there, and runs cargo through `powershell.exe` with its exit code; the Windows host needs rustup (MSVC), Visual Studio Build Tools with the C++ workload, Node 24 and pnpm on the user `Path`.
+Locally the real-clipboard test is ignored; `desktop-ci` runs every desktop check on windows-latest with `--include-ignored`, uploads the NSIS installer as an artifact, and runs clippy on Ubuntu so non-Windows builds keep compiling. `pnpm screenshots <dir>` in `apps/desktop` renders every view state with a mocked Tauri bridge at 390, 768 and 1280 px.
 
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
 | api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
 | web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the `fless-takemyword` profile for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, with the `fless-takemyword` profile and `TABLE_NAME` for throwaway users, `--workers=1`) |
-| desktop | `apps/desktop` | unknown | unknown | unknown | n/a |
+| desktop | `apps/desktop` | `pnpm lint && pnpm rust:lint` (prettier, eslint, cargo fmt, clippy on all targets and on release) | `pnpm typecheck` | `pnpm test && pnpm rust:test` (vitest `--no-file-parallelism`, cargo `--test-threads=1`) | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
 | cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |
 | shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
