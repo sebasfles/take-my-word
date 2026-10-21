@@ -1,13 +1,13 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Dictation
 
 Turns a short recording into clean text: transcribe, refine with the user's dictionary and style, return, keep the text 90 days.
 Every surface uses it: desktop pastes the result, mobile copies or shares it, web shows the history.
-`POST /dictations` runs in dev since 0001; history and settings since 0003, the web history screen in phase 5.
+`POST /dictations` runs since 0001, history and settings since 0003, the web history since 0009.
 
 ## Boundaries
 

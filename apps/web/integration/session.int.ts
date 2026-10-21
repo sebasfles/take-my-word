@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { fetchSettings } from "../src/lib/api.ts";
+import { accountApi } from "../src/lib/api.ts";
 import {
   apiUrl,
   clock,
@@ -40,7 +40,7 @@ describe("web session against the dev pool", () => {
     expect(after.accessToken).not.toBe(before.accessToken);
     expect(after.deviceKey).toBe(before.deviceKey);
 
-    const settings = await fetchSettings(apiUrl, after.accessToken);
+    const settings = await accountApi(apiUrl, after.accessToken).settings();
     expect(settings.kind).toBe("ok");
   });
 
@@ -53,7 +53,7 @@ describe("web session against the dev pool", () => {
     const secondTab = await refresh(renewed);
     expect(secondTab.status).toBe(200);
     expect(secondTab.headers.getSetCookie()).toEqual([]);
-    const settings = await fetchSettings(apiUrl, sessionOf(renewed).accessToken);
+    const settings = await accountApi(apiUrl, sessionOf(renewed).accessToken).settings();
     expect(settings.kind).toBe("ok");
     const later = await refreshPastExpiry(renewed);
     expect(later.status).toBe(200);

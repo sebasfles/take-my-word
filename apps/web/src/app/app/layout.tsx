@@ -1,14 +1,27 @@
 import type { ReactNode } from "react";
+import { AccountNav } from "@/components/account-nav.tsx";
 import { SignOutButton } from "@/components/sign-out-button.tsx";
 import { SiteHeader } from "@/components/site-header.tsx";
-import { accessClaims } from "@/lib/session.ts";
-import { currentDictionary, currentLocale, requireAppSession } from "@/lib/server/request.ts";
+import { StateStringsProvider } from "@/components/state-strings.tsx";
+import {
+  currentDictionary,
+  currentLocale,
+  currentUsername,
+  requireAppSession,
+} from "@/lib/server/request.ts";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const { session } = await requireAppSession();
-  const username = accessClaims(session.accessToken)?.username ?? "";
+  await requireAppSession();
+  const username = await currentUsername();
   const locale = await currentLocale();
   const t = await currentDictionary();
+  const links = [
+    { href: "/app", text: t.sections.account },
+    { href: "/app/dictionary", text: t.sections.dictionary },
+    { href: "/app/styles", text: t.sections.styles },
+    { href: "/app/rules", text: t.sections.rules },
+    { href: "/app/history", text: t.sections.history },
+  ];
 
   return (
     <>
@@ -19,7 +32,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </p>
         <SignOutButton text={t.app.signOut} />
       </SiteHeader>
-      {children}
+      <div className="container shell">
+        <AccountNav label={t.sections.label} links={links} />
+        <main className="shell-main">
+          <StateStringsProvider value={t.state}>{children}</StateStringsProvider>
+        </main>
+      </div>
     </>
   );
 }

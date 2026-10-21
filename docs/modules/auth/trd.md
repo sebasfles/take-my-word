@@ -1,11 +1,11 @@
 ---
 updated: 2026-10-21
-source: 0004_web_landing
+source: 0009_web_account
 ---
 
 # Auth: technical
 
-The pool and the authorizer run in dev since 0001, the web login since 0004; phase 2 brings the desktop login, phase 4 the mobile login.
+The pool and the authorizer run in dev since 0001 and in prd since 0006, the web login since 0004; phase 2 brings the desktop login, phase 4 the mobile login.
 
 ## Structure
 
@@ -16,7 +16,7 @@ The pool and the authorizer run in dev since 0001, the web login since 0004; pha
 | `apps/api/src/authorizer` | Lambda authorizer: `aws-jwt-verify` against the pool's JWKS, access tokens of the native client only, `userId` from `sub`. |
 | `packages/cognito` | Node-only client: SRP sign-in, the new-password challenge, device confirmation, refresh, `ForgetDevice` and `RevokeToken`; used by `apps/web` and by the api scripts and e2e. |
 | `apps/api/scripts/sign-in.ts` | `.env` helpers; `pnpm token` prints a `crew-e2e` access token; the e2e also signs in `crew-e2e-b`. |
-| `apps/web/src/lib` | `session.ts` (sealed cookies), `auth.ts` (sign-in, new password, the one refresh path, sign-out), `handlers.ts` (route handlers), `refresh-lock.ts` (Web Lock around renewal). |
+| `apps/web/src/lib` | `session.ts` (sealed cookies), `auth.ts` (sign-in, new password, the one refresh path, sign-out), `handlers.ts` (route handlers), `refresh-lock.ts` (Web Lock around renewal), `server/account.ts` (every account page reads the API through it, or renders the renewal step). |
 | `apps/desktop`, `apps/mobile` | Login forms and token storage (phases 2 and 4). |
 
 ## Endpoints owned
@@ -30,8 +30,9 @@ Desktop and mobile go straight to Cognito; the web goes through its own route ha
 | `POST /api/session/password` | Answer `NEW_PASSWORD_REQUIRED` with the sealed challenge. |
 | `POST /api/session/refresh` | Renew an expiring session; called by the browser under a Web Lock. |
 | `POST /api/session/sign-out` | Forget the device, revoke the refresh token, clear the cookies. |
+| `DELETE /api/dictations/{id}` | Delete a dictation with the session's token; 401 when the session needs renewing, so the browser renews under the Web Lock and retries once. |
 
-Each checks `Origin` against `WEB_ORIGIN`.
+Each checks `Origin` against `WEB_ORIGIN`; no page calls the API from the browser.
 The authorizer answers HTTP API simple responses, cached 5 minutes per `Authorization` header; a request without the header gets 401 from API Gateway, an invalid token 403.
 
 ## Client contract

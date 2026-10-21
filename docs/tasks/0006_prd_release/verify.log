@@ -1,0 +1,12 @@
+## 2026-10-21T06:03:18Z by om-devops target infra on be53ebc
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform init -backend=false and validate for core, dev, prd on a fresh export of the commit)
+- unit: n/a
+- e2e: n/a
+Earlier run in the worktree failed (exit 1): core had no providers, and dev and prd keep the S3 backend from the apply; the fresh export is the TRD's "fresh clone".
+
+## 2026-10-21T06:03:18Z by om-devops target workflows on be53ebc
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

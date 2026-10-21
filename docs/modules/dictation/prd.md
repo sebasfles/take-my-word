@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Dictation: product
@@ -26,8 +26,9 @@ If a provider fails the user sees an error and nothing is pasted.
 
 ### Review history
 
-1. The user opens history (web in phase 5; the API serves it since 0003).
-2. The user sees past dictations as text, newest first, from the last 90 days, with the raw transcript and the style used, a page at a time.
+1. The user opens history on the web.
+2. The user sees past dictations as text, newest first, from the last 90 days, with the date, the style used, the seconds of audio and the raw transcript collapsed under the text, a page at a time.
+3. The user deletes a dictation after confirming; it leaves the list at once.
 
 Errors and empty states: with no dictations, the list is empty.
 

@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0006_prd_release
 ---
 
 # Infra: database
@@ -37,4 +37,4 @@ Infra owns no item kind.
 
 ## Migrations of note
 
-- None; 0001 created the dev table.
+- None; 0001 created the dev table, 0006 the prd table, empty, with point-in-time recovery and deletion protection.

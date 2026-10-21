@@ -1,11 +1,9 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Dictation: technical
-
-`POST /dictations`, history and settings are built; the web history screen waits for phase 5.
 
 ## Structure
 
@@ -16,7 +14,7 @@ source: 0003_api_features
 | `apps/api/src/history`, `apps/api/src/settings` | History and settings routes in the `api` Lambda, with their stores |
 | `apps/api/src/dictation/ports`, `providers` | Transcriber and Refiner ports; adapters `groq-whisper` and `openai` |
 | `packages/shared/src/dictations.ts`, `history.ts`, `settings.ts` | Request meta, response, history page, settings and limits shared by every client |
-| `apps/web` | History screen (phase 5) |
+| `apps/web` | Account and history pages; `DELETE /api/dictations/[id]` forwards a delete with the session's token |
 
 ## Endpoints owned
 
@@ -61,3 +59,4 @@ Optional, with code defaults: `GROQ_WHISPER_MODEL` (`whisper-large-v3-turbo`), `
 ## Testing
 
 - Unit tests next to the code with fake ports; `pnpm e2e` in `apps/api` runs the deployed path against `API_URL` (see TRD).
+- `apps/web` `pnpm e2e` seeds a throwaway user through the API, pages history with `?limit=1`, and deletes a dictation through CloudFront.

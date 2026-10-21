@@ -17,3 +17,13 @@ export function appAccess(session: WebSession | null, now: number): Access {
 export function signInRedirect(session: WebSession | null): string | null {
   return session === null ? null : appPath;
 }
+
+export type AppData<T> = { kind: "renew" } | { kind: "ready"; data: T };
+
+export async function whenFresh<T>(
+  access: Exclude<Access, { kind: "redirect" }>,
+  load: (accessToken: string) => Promise<T>,
+): Promise<AppData<T>> {
+  if (access.kind === "renew") return { kind: "renew" };
+  return { kind: "ready", data: await load(access.session.accessToken) };
+}

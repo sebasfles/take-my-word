@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0009_web_account
 ---
 
 # Dictation: architecture and debt
@@ -141,3 +141,21 @@ source: 0003_api_features
 - Debt created: a page over many expired items costs one Query per item batch until TTL catches up.
 - Revisit when: TTL lag leaves more than a page of expired items in a partition.
 - Source: 0003_api_features
+
+## 2026-10-21: The web history re-reads every shown page and stops at 1000 dictations
+
+- Decision: `/app/history?limit=&pages=` renders `limit * pages` dictations on the server, read from the API in requests of at most 100, asking for one more than it shows to know whether "load more" applies; at 1000 shown the link disappears.
+- Alternatives rejected: rendering only the page after a cursor, which loses the earlier pages on refresh; appending pages in the browser, which needs the API from client code.
+- Reason: the list survives a delete and a refresh exactly as the user left it, every read stays on the server, and one render costs at most 11 requests.
+- Debt created: dictations past the newest 1000 are not reachable on the web.
+- Revisit when: a user keeps more than 1000 dictations in 90 days.
+- Source: 0009_web_account
+
+## 2026-10-21: The web shows no daily quota until the API exposes usage
+
+- Decision: the Account page leaves the daily quota out; the cap lives only in `dictate`'s `DAILY_QUOTA_MINUTES` and no route returns the minutes used.
+- Alternatives rejected: hardcoding the cap in the web; reading `QUOTA#date` from the web function.
+- Reason: the web reads only through the API and its shared contracts.
+- Debt created: users cannot see how much of the day's allowance is left.
+- Revisit when: the follow-up adds `GET /me/usage`.
+- Source: 0009_web_account
