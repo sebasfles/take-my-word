@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "3.1154.0",
+    "@take-my-word/brand": "workspace:*",
     "@take-my-word/cognito": "workspace:*",
     "@take-my-word/shared": "workspace:*",
     "next": "16.3.8",

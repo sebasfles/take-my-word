@@ -123,3 +123,38 @@ Review focus beyond the Pipeline: e2e assertions kept, no token leakage, contras
 clearance: full (dev only: web code and assets deployed to dev from this machine with `reusable-deploy-web`'s steps, throwaway Cognito users, dev table and Polly via `fless-takemyword`; no Terraform, no api deploy, no prd).
 
 ## om-developer notes
+
+### Round 1
+
+Did:
+
+- Three directions as real code in `packages/brand/src/directions/{a,b,c}/` (tokens, generated `tokens.css`, mark, app icon, wordmark, hero, fonts with OFL), sharing `board.tsx`, `demo.tsx`, `header.tsx` and `copy.ts`.
+  A "Tinta": Fraunces and Instrument Sans, terracotta on paper, a quotation mark that turns into three bars.
+  B "Pulso": Bricolage Grotesque and Figtree, marigold on cream, a speech bubble with the waveform inside.
+  C "Eco": Instrument Serif and Schibsted Grotesk, laurel green on ivory, a comma that ripples into sound waves.
+- `packages/brand` foundations meant to stay: the `Tokens` schema (`tokens.ts`), `tokensCss` generator (`css.ts`, `scripts/generate.ts`), WCAG contrast (`color.ts`) and the pair list for Acceptance 3 (`contrast.ts`), the `Waveform` component (`waveform.tsx`, `waveform.css`; level or demo loop, static under reduced motion in demo mode, no transition in level mode).
+- Tests: generated CSS equals the generator output per direction; every text pair of `contrast.ts` meets AA in light and dark for all three directions; contrast math against WCAG reference values; the gallery gate in `apps/web`.
+- Gallery routes `/directions/[id]` (board) and `/directions/[id]/hero` in `apps/web`, behind `TMW_GALLERY=1`, which only `pnpm screenshots` sets; `noindex`.
+- `pnpm screenshots <dir> directions` renders, per direction, board and hero at 390 and 1280 in light and dark, a listening frame of the hero, and the 16 px favicon, tray and size row at device scale 1; it fails on horizontal overflow.
+  The hero frames are frozen with the Web Animations API at fixed points of the 9 s loop.
+- Wiring: `@take-my-word/brand` in `apps/web` (`transpilePackages`), `packages/brand/` in the `reusable-changes` web filter and in the `deploy-dev` and `deploy-prd` path triggers, `brand` rows in `docs/TRD.md` (components and verification), react-hooks lint on `packages/brand/**/*.tsx`, generated `tokens.css` excluded from Prettier.
+
+Screenshots: `.workspaces/0010_brand_web/screenshots/directions/{a,b,c}/`, files `board-{light,dark}-{390,1280}.png`, `hero-{light,dark}-{390,1280}.png`, `hero-listening-{light,dark}-{390,1280}.png`, `favicon-16-*-1x.png`, `tray-16-*-1x.png`, `mark-sizes-*-1x.png`.
+
+Pending, after the direction is chosen: everything else in Scope, starting with promoting the chosen direction to the package root and deleting the other two with their fonts.
+
+Decisions not in the plan:
+
+- Token CSS custom properties are unprefixed and grouped by kind (`--color-*`, `--accent-*`, `--neutral-*`, `--font-*`, `--text-*`, `--space-*`, `--radius-*`, `--shadow-*`, `--z-*`, `--duration-*`, `--ease-*`); the generator scopes them to a selector so the same code serves `:root` later.
+- Theme selectors are `[data-theme="dark"]` and `:not([data-theme="light"])` under `prefers-color-scheme`, matching the cookie-driven attribute on `<html>` from Context & decisions.
+- Semantic success, warning, error and info colors are shared across directions; only accent, neutrals, surfaces, fonts, weights, tracking and radii vary.
+- Fonts are the Google Fonts latin subset (covers every Spanish diacritic and «» ¿ ¡); subsetting and fallback metrics are tuned only for the chosen direction.
+- The hero demo is pure CSS keyframes on one 9 s loop (`--duration-demo`), no JavaScript.
+
+External actions:
+
+- Deployed `6592c0a` to dev with `reusable-deploy-web`'s steps from this machine (`fless-takemyword`, us-east-1): `_next/static` synced immutable to `take-my-word-dev-web-assets-115891590483`, `take-my-word-dev-web` code updated (CodeSha256 `kn/6b8IGSbFn0jwrdbr4XEmh5DgDUxTiUPUfGXbTxCI=`), remaining assets synced, CloudFront `EMI6CYP83OTMO` invalidated (`I1HXO3YALK6ULZN3DDR9M2P7NT`).
+  Checked after: `/` and `/sign-in` 200, `/directions/a` and `/directions/a/hero` 404.
+- `pnpm integration` and `pnpm e2e` ran against that deployment with throwaway users; all green.
+
+Verified targets: `brand`, `web` (with integration and e2e) and `workflows`, the ones this diff touches; `api`, `desktop`, `shared`, `cognito` and `infra` are untouched.

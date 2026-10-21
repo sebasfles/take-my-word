@@ -9,6 +9,7 @@ import { fakeAccessToken } from "../src/testing/tokens.ts";
 
 const root = join(import.meta.dirname, "..");
 const out = process.argv[2] ?? join(root, "..", "..", "..", "screenshots");
+const mode = process.argv[3] ?? "pages";
 const apiPort = 4510;
 const webPort = 4511;
 const webOrigin = `http://localhost:${webPort}`;
@@ -159,6 +160,7 @@ const web = spawn(join(root, "node_modules", ".bin", "next"), ["start", "-p", St
     USER_POOL_CLIENT_ID: "screenshots",
     WEB_COOKIE_KEY: key.toString("base64"),
     WEB_ORIGIN: webOrigin,
+    TMW_GALLERY: "1",
   },
   stdio: ["ignore", "pipe", "inherit"],
 });
@@ -207,9 +209,56 @@ async function shoot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: join(out, `${name}.png`), fullPage: true });
 }
 
-mkdirSync(out, { recursive: true });
-const browser = await chromium.launch();
-try {
+async function freeze(page: Page, seconds: number): Promise<void> {
+  await page.evaluate(async (at) => {
+    await document.fonts.ready;
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      animation.currentTime = at * 1000;
+    }
+  }, seconds);
+}
+
+async function shootDirections(): Promise<void> {
+  for (const id of ["a", "b", "c"]) {
+    const dir = join(out, "directions", id);
+    mkdirSync(dir, { recursive: true });
+    for (const scheme of ["light", "dark"] as const) {
+      for (const width of [390, 1280]) {
+        const context = await browser.newContext({
+          viewport: { width, height: 900 },
+          deviceScaleFactor: 2,
+          colorScheme: scheme,
+        });
+        const page = await context.newPage();
+        await page.goto(`${webOrigin}/directions/${id}`);
+        await freeze(page, 0);
+        await shoot(page, join("directions", id, `board-${scheme}-${String(width)}`));
+        await page.goto(`${webOrigin}/directions/${id}/hero`);
+        await freeze(page, 7.4);
+        await shoot(page, join("directions", id, `hero-${scheme}-${String(width)}`));
+        await freeze(page, 3);
+        await page.screenshot({
+          path: join(dir, `hero-listening-${scheme}-${String(width)}.png`),
+          fullPage: true,
+        });
+        await context.close();
+      }
+      const actual = await browser.newContext({ deviceScaleFactor: 1, colorScheme: scheme });
+      const page = await actual.newPage();
+      await page.goto(`${webOrigin}/directions/${id}`);
+      await freeze(page, 0);
+      for (const testId of ["favicon-16", "tray-16", "mark-sizes"]) {
+        await page
+          .getByTestId(testId)
+          .screenshot({ path: join(dir, `${testId}-${scheme}-1x.png`) });
+      }
+      await actual.close();
+    }
+  }
+}
+
+async function shootPages(): Promise<void> {
   for (const locale of ["es", "en"] as const) {
     for (const width of widths) {
       const context = await browser.newContext({
@@ -284,6 +333,13 @@ try {
       await context.close();
     }
   }
+}
+
+mkdirSync(out, { recursive: true });
+const browser = await chromium.launch();
+try {
+  if (mode === "directions") await shootDirections();
+  else await shootPages();
 } finally {
   await browser.close();
   web.kill();

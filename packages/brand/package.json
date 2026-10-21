@@ -1,0 +1,24 @@
+{
+  "name": "@take-my-word/brand",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.ts",
+    "lint": "eslint . && prettier --check --ignore-path ../../.gitignore --ignore-path ../../.prettierignore .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --no-file-parallelism"
+  },
+  "peerDependencies": {
+    "react": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}
