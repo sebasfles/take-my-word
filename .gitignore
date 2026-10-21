@@ -1,0 +1,8 @@
+node_modules/
+.workspaces/
+docs/tasks/_drafts/
+.claude/agent-memory/
+.env
+.env.*
+!.env.example
+.DS_Store
