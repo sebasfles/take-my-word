@@ -56,7 +56,11 @@ describe("Onboarding", () => {
     next();
     const example = styleExamples.en;
     expect(screen.getByText(example.said)).toBeTruthy();
-    for (const text of Object.values(example.styles)) expect(screen.getByText(text)).toBeTruthy();
+    const shown = Array.from(
+      document.querySelectorAll(".example-text"),
+      (text) => text.textContent,
+    );
+    expect(shown).toEqual(Object.values(example.styles));
     fireEvent.click(screen.getByRole("radio", { name: "Formal" }));
     next();
     await screen.findByRole("heading", { name: "You're ready" });

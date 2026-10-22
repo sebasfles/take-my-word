@@ -49,7 +49,7 @@ pub struct Shell {
     keys: Arc<Mutex<Keys>>,
     keyboard: Arc<dyn KeyHook + Send + Sync>,
     session: mpsc::Sender<Input>,
-    microphone_check: Mutex<Waveform>,
+    microphone_check: Mutex<(CheckGate, Waveform)>,
     main_window: Mutex<Option<Placement>>,
     settings: Mutex<Settings>,
     settings_path: PathBuf,
@@ -153,7 +153,7 @@ impl Shell {
             keys,
             keyboard: keyboard.unwrap_or_else(|| Arc::new(NoHook)),
             session,
-            microphone_check: Mutex::new(microphone_check),
+            microphone_check: Mutex::new((CheckGate::default(), microphone_check)),
             main_window: Mutex::new(settings.main_window),
             settings: Mutex::new(settings),
             settings_path,
@@ -214,7 +214,21 @@ impl Shell {
     }
 
     pub fn check_microphone(&self, on: bool) {
-        let mut waveform = lock(&self.microphone_check);
+        let mut check = lock(&self.microphone_check);
+        let change = check.0.want(on);
+        self.apply_check(&mut check.1, change);
+    }
+
+    pub fn main_window_shown(&self, shown: bool) {
+        let mut check = lock(&self.microphone_check);
+        let change = check.0.show(shown);
+        self.apply_check(&mut check.1, change);
+    }
+
+    fn apply_check(&self, waveform: &mut Waveform, change: Option<bool>) {
+        let Some(on) = change else {
+            return;
+        };
         if on {
             waveform.start();
         } else {
@@ -390,6 +404,42 @@ impl Sink for ShellSink {
     }
 }
 
+#[derive(Debug)]
+struct CheckGate {
+    wanted: bool,
+    shown: bool,
+}
+
+impl Default for CheckGate {
+    fn default() -> Self {
+        Self {
+            wanted: false,
+            shown: true,
+        }
+    }
+}
+
+impl CheckGate {
+    fn running(&self) -> bool {
+        self.wanted && self.shown
+    }
+
+    fn change(&mut self, update: impl FnOnce(&mut Self)) -> Option<bool> {
+        let before = self.running();
+        update(self);
+        let after = self.running();
+        (before != after).then_some(after)
+    }
+
+    fn want(&mut self, wanted: bool) -> Option<bool> {
+        self.change(|gate| gate.wanted = wanted)
+    }
+
+    fn show(&mut self, shown: bool) -> Option<bool> {
+        self.change(|gate| gate.shown = shown)
+    }
+}
+
 struct NoHook;
 
 impl KeyHook for NoHook {
@@ -449,5 +499,23 @@ impl Notifier for TrayNotifier {
         if let Err(error) = shown {
             log::warn!("showing a notification failed: {error}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_microphone_check_runs_only_while_its_step_is_shown_in_a_visible_window() {
+        let mut gate = CheckGate::default();
+        assert_eq!(gate.want(true), Some(true));
+        assert_eq!(gate.show(false), Some(false));
+        assert_eq!(gate.show(false), None);
+        assert_eq!(gate.show(true), Some(true));
+        assert_eq!(gate.want(false), Some(false));
+        assert_eq!(gate.show(false), None);
+        assert_eq!(gate.want(true), None);
+        assert_eq!(gate.show(true), Some(true));
     }
 }

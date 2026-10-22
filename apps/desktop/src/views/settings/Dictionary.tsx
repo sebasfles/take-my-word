@@ -40,43 +40,49 @@ export function Dictionary({ focusAdd }: { focusAdd: number }) {
   const terms = state.kind === "ready" ? state.data : null;
 
   return (
-    <SectionPage title="settings.dictionary" intro="dictionary.intro">
-      <AddTerm
-        focus={focusAdd}
-        count={terms?.length ?? 0}
-        disabled={terms === null}
-        onAdded={(term) => {
-          update((current) => sorted([...current, term]));
-        }}
-      />
-      <LoadState state={state} onRetry={retry} />
-      {terms && (
-        <section className="list-section">
-          <p className="muted">
-            {t("common.count", { count: terms.length, max: dictionaryLimits.terms })}
-          </p>
-          {terms.length === 0 ? (
-            <Empty title="dictionary.emptyTitle" body="dictionary.empty" />
-          ) : (
-            <ul className="list">
-              {terms.map((term) => (
-                <TermRow
-                  key={term.id}
-                  term={term}
-                  onChanged={(changed) => {
-                    update((current) =>
-                      current.map((item) => (item.id === changed.id ? changed : item)),
-                    );
-                  }}
-                  onDeleted={() => {
-                    update((current) => current.filter((item) => item.id !== term.id));
-                  }}
-                />
-              ))}
-            </ul>
+    <SectionPage title="settings.dictionary" intro="dictionary.intro" wide>
+      <div className="editor">
+        <div className="editor-form">
+          <AddTerm
+            focus={focusAdd}
+            count={terms?.length ?? 0}
+            disabled={terms === null}
+            onAdded={(term) => {
+              update((current) => sorted([...current, term]));
+            }}
+          />
+        </div>
+        <div className="editor-list">
+          <LoadState state={state} onRetry={retry} />
+          {terms && (
+            <section className="list-section">
+              <p className="muted">
+                {t("common.count", { count: terms.length, max: dictionaryLimits.terms })}
+              </p>
+              {terms.length === 0 ? (
+                <Empty title="dictionary.emptyTitle" body="dictionary.empty" />
+              ) : (
+                <ul className="list">
+                  {terms.map((term) => (
+                    <TermRow
+                      key={term.id}
+                      term={term}
+                      onChanged={(changed) => {
+                        update((current) =>
+                          current.map((item) => (item.id === changed.id ? changed : item)),
+                        );
+                      }}
+                      onDeleted={() => {
+                        update((current) => current.filter((item) => item.id !== term.id));
+                      }}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
-        </section>
-      )}
+        </div>
+      </div>
     </SectionPage>
   );
 }
@@ -94,6 +100,7 @@ function AddTerm({
 }) {
   const [term, setTerm] = useState("");
   const [aliases, setAliases] = useState("");
+  const [advanced, setAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Note | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -108,6 +115,7 @@ function AddTerm({
     const parsed = splitAliases(aliases);
     const problem = checkTerm(term, parsed, count);
     setError(problem);
+    if (problem && checkAliases(parsed)) setAdvanced(true);
     if (problem) return;
     setBusy(true);
     api
@@ -146,7 +154,13 @@ function AddTerm({
           {t("dictionary.termHint")}
         </span>
       </div>
-      <details className="advanced" open={aliases !== ""}>
+      <details
+        className="advanced"
+        open={advanced}
+        onToggle={(event) => {
+          setAdvanced(event.currentTarget.open);
+        }}
+      >
         <summary>{t("dictionary.advanced")}</summary>
         <div className="field">
           <label htmlFor={`${id}-aliases`}>{t("dictionary.aliases")}</label>

@@ -52,7 +52,7 @@
   justify-self: center;
   gap: var(--space-8);
   width: 100%;
-  max-width: calc(var(--size-prose) + var(--space-16));
+  max-width: calc(var(--size-narrow) * 2 + var(--space-16));
   padding: var(--space-8) var(--space-8) var(--space-12);
   container-type: inline-size;
 }

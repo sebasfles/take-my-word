@@ -105,7 +105,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Mic check (om-reviewer): audio never leaves the process or is stored; capture runs only while the step is visible; blocked and missing microphone states kept; a hold during it still dictates.
 - Design checkpoint (om-reviewer, as 0011): round 1 code is reviewed as usual and I send its screenshot paths (overlay hands-free and processing, onboarding steps, History and General at 1920) to the om-manager for one design answer before the rest is restyled.
 - Screenshots (om-reviewer): 1280x800, 1920x1080, 2560x1440 and the minimum 380x480, device scale 1, light and dark, es and en; fixed windows at their real size; in `.workspaces/0014_desktop_ux/`.
-- Release (om-manager, as 0012): clean review, PR, "awaiting release go"; rebase on `develop` once 0013 is merged; I run `pnpm release:desktop 0.3.0 --notes {{file}}` on the om-developer's prepared notes (short, English then Spanish); merge commit, never rebase at or below the tag. Update evidence (Acceptance 8): Sebastian's own prd app updating after publish; the run only reads `DisplayVersion` and the prd log; prd landing checked after publish.
+- No release (Sebastian through the om-manager, 2026-10-22, replaces Scope "Release" and Acceptance 8's release part): 0014 merges to `develop` with no tag; desktop 0.3.0, the update check and the landing check move to 0015 (a "What do you do?" onboarding step and setting), which starts after 0013 and 0014 merge. Acceptance 8 is now `ci`, `desktop-ci` windows and linux-check green. The onboarding plan stays easy to extend: one more step after languages is one entry in `plan.ts` plus its view, with no other step or the resume and rerun logic edited. Rebase on `develop` if 0013 merges first.
 - Acceptance 7 (om-reviewer): 0011's method (private working set of app plus WebView2 after opening and closing the main window; CPU seconds over 5 idle minutes) on dev release builds of the `develop` head and the final commit, same session; pass at RAM ≤ base + 10 MB, CPU ≤ base + 1.0 s.
 - Windows runs (om-reviewer): crew-e2e-b from the root `.env`, its settings saved and restored, its dictations deleted, signed out; the dev config folder and credentials snapshotted and restored around the fresh-install run; injected chords press Alt before Win so prd's Ctrl+Win never fires; Acceptance 5 launches the way a user does, with another window the run opened in front and the app minimized. Choose-password covered by tests and screenshots.
 - One PR, no phases (Sebastian's global rule).
@@ -114,7 +114,7 @@ Constraints: `desktop/ard.md` "Updates wait for no dictation in flight" and "Ove
 
 Review focus beyond the Pipeline: chord state machine tests (double tap, stop at release, shortcut during hands-free, held second press, Esc swallow only while hands-free); no gesture logic in TS; nothing stretched or half-empty at 1920 and 2560; closing the main window frees it; onboarding resume and rerun paths.
 
-clearance: full: GitHub as sebasfles (push, PR, the `desktop-v0.3.0` tag on my hand-off, the release), the Windows host under the machine rules, dev sign-in as crew-e2e-b; Sebastian's prd install only read; no AWS profile, no Terraform, no deploys.
+clearance: full: GitHub as sebasfles (push, PR; no tag, no release), the Windows host under the machine rules, dev sign-in as crew-e2e-b; Sebastian's prd install untouched; no AWS profile, no Terraform, no deploys.
 
 ## om-developer notes
 
@@ -148,3 +148,22 @@ Pending:
 
 Deferred:
 - With a user's dictation languages set to Spanish only, English speech dictated with casual or formal comes back translated to Spanish while plain keeps English (seen with crew-e2e-b before setting both languages); a dictation or styles task should look at it.
+
+### Round 2
+
+Findings:
+1. Dictionary: Advanced opens and closes only by the user's toggle; it opens on its own when a "sounds like" it holds is refused. Tests: clearing the field keeps it open; a refused variant opens it.
+2. Microphone check: Rust runs it only while the step wants it and the main window is shown (not minimized or hidden), through `CheckGate` in the shell, fed by the window's resize events and reset when the window opens; unit test over the gate.
+3. Hands-free note: the dismissal lives in Main's phase, so the note stays gone across sections; test in `Main.test.tsx` (dismiss, History, back to General).
+4. Styles view tests: the built-ins show "what you said" and each output with only changed words marked; a custom style is a card in the same grid described by its prompt.
+
+Design answer:
+- Onboarding steps are components in a registry keyed by the catalog in `plan.ts` (`steps`, each with a scope: machine, account or user). A new step is one catalog entry plus its view in the registry; the plan, resume after sign-in, rerun and the save on leaving the last user step derive from scopes. A plan test inserts a "role" user step after languages and checks order, resume, rerun and where the save happens.
+- Frame: centered at `--size-content`, two columns above 1280 (content beside a sunken visual panel), one column at 1280 and below with the visual on top; headline at `--text-4xl`. Visuals: mark and waveform demo (welcome), mark and tagline (sign in), the live level (microphone), large keycaps animating hold and double tap plus Esc (hotkey), the tray menu over a taskbar corner (ready). Languages and style stay full width.
+- Style examples: new samples run through the dev API as before (crew-e2e-b settings saved and restored, 33 dictations deleted across the candidate runs); picked the Spanish and English samples where all three outputs differ. Changed words are marked against "what you said" with a word-level diff that treats curly and straight quotes as equal; custom styles share the grid.
+- History is one centered list at about 896 px; Dictionary, App rules and Styles' own styles put the form beside the list above 56rem of content, sticky; Account stays one centered panel.
+- Scope change applied: no release work in this task.
+
+Observed: across nine samples the refiner's casual output differs from plain only by punctuation or sentence splits; recorded for the dictation or styles owner, not changed here (prompts are out of scope).
+
+Pending: the Windows run, on `computer available`.

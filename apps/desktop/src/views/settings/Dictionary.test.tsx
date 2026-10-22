@@ -152,6 +152,36 @@ describe("Dictionary", () => {
     expect(within(plain).queryByText("Sounds like")).toBeNull();
   });
 
+  it("keeps Advanced open while the user clears what they typed in it", async () => {
+    serve({ listTerms: () => ({ terms: [] }) });
+    render(<Dictionary focusAdd={0} />);
+    await screen.findByText("No words yet");
+    const advanced = screen
+      .getByText("Advanced: how it sounds")
+      .closest("details") as HTMLDetailsElement;
+    advanced.open = true;
+    fireEvent(advanced, new Event("toggle"));
+    type("Sounds like", "cuberneti");
+    type("Sounds like", "");
+    expect(advanced.open).toBe(true);
+    expect(screen.getByLabelText("Sounds like")).toBeTruthy();
+  });
+
+  it("opens Advanced on its own when what it holds is refused", async () => {
+    serve({ listTerms: () => ({ terms: [] }) });
+    render(<Dictionary focusAdd={0} />);
+    await screen.findByText("No words yet");
+    const advanced = screen
+      .getByText("Advanced: how it sounds")
+      .closest("details") as HTMLDetailsElement;
+    type("Word as it must be written", "Kubernetes");
+    type("Sounds like", "x".repeat(65));
+    advanced.open = false;
+    fireEvent(advanced, new Event("toggle"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(advanced.open).toBe(true);
+  });
+
   it("focuses the term field when asked to add a word", async () => {
     serve({ listTerms: () => ({ terms: [kubernetes] }) });
     const { rerender } = render(<Dictionary focusAdd={0} />);

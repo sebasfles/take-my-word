@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type AppState, bridge, keepListening } from "../bridge.ts";
 import { Onboarding } from "./onboarding/Onboarding.tsx";
-import { planFor, type StepId } from "./onboarding/plan.ts";
+import { planFor, type StepId, steps } from "./onboarding/plan.ts";
 import { Settings } from "./Settings.tsx";
 
 type Phase =
@@ -10,7 +10,7 @@ type Phase =
   | { kind: "app"; handsFreeNote: boolean };
 
 const phaseOf = (state: AppState, rerun: boolean): Phase => {
-  const plan = planFor(state, rerun);
+  const plan = planFor(steps, state, rerun);
   return plan.length > 0
     ? { kind: "onboarding", plan }
     : { kind: "app", handsFreeNote: state.handsFreeNote };
@@ -61,6 +61,10 @@ export function Main() {
   return (
     <Settings
       handsFreeNote={phase.handsFreeNote}
+      onDismissNote={() => {
+        setPhase({ kind: "app", handsFreeNote: false });
+        void bridge.dismissHandsFreeNote();
+      }}
       onRerun={() => {
         route(true);
       }}

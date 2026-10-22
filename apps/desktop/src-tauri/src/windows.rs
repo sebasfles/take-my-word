@@ -231,13 +231,20 @@ pub fn open_main(app: &AppHandle, query: &str) {
             return;
         }
     };
+    shell.main_window_shown(true);
     bring_to_front(&window);
     let app = app.clone();
     let tracked = window.clone();
     window.on_window_event(move |event| {
         let shell = app.state::<Shell>();
         match event {
-            WindowEvent::Resized(_) | WindowEvent::Moved(_) => remember(&tracked, &shell),
+            WindowEvent::Resized(_) => {
+                remember(&tracked, &shell);
+                let minimized = tracked.is_minimized().unwrap_or(false);
+                let visible = tracked.is_visible().unwrap_or(true);
+                shell.main_window_shown(visible && !minimized);
+            }
+            WindowEvent::Moved(_) => remember(&tracked, &shell),
             WindowEvent::CloseRequested { .. } => {
                 remember(&tracked, &shell);
                 shell.save_main_window();

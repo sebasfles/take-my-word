@@ -48,7 +48,7 @@ export function Styles() {
   const custom = data?.styles.filter((style) => !style.builtin) ?? [];
 
   return (
-    <SectionPage title="settings.styles" intro="styles.intro">
+    <SectionPage title="settings.styles" intro="styles.intro" wide>
       <LoadState state={state} onRetry={retry} />
       {data && (
         <>
@@ -67,44 +67,50 @@ export function Styles() {
                 {t("common.count", { count: custom.length, max: styleLimits.customStyles })}
               </p>
             </div>
-            <StyleForm
-              submitLabel="styles.create"
-              check={(style) => checkStyle(style, custom.length)}
-              save={(style) => api.createStyle(style)}
-              expected={{ limit: full }}
-              onSaved={(created) => {
-                update((current) => ({ ...current, styles: [...current.styles, created] }));
-              }}
-            />
-            {custom.length === 0 ? (
-              <Empty title="styles.customEmptyTitle" body="styles.customEmpty" />
-            ) : (
-              <ul className="list">
-                {custom.map((style) => (
-                  <CustomStyleRow
-                    key={style.id}
-                    style={style}
-                    onChanged={(changed) => {
-                      update((current) => ({
-                        ...current,
-                        styles: current.styles.map((item) =>
-                          item.id === changed.id ? changed : item,
-                        ),
-                      }));
-                    }}
-                    onDeleted={() => {
-                      update((current) => ({
-                        styles: current.styles.filter((item) => item.id !== style.id),
-                        settings:
-                          current.settings.defaultStyleId === style.id
-                            ? { ...current.settings, defaultStyleId: fallbackStyleId }
-                            : current.settings,
-                      }));
-                    }}
-                  />
-                ))}
-              </ul>
-            )}
+            <div className="editor">
+              <div className="editor-form">
+                <StyleForm
+                  submitLabel="styles.create"
+                  check={(style) => checkStyle(style, custom.length)}
+                  save={(style) => api.createStyle(style)}
+                  expected={{ limit: full }}
+                  onSaved={(created) => {
+                    update((current) => ({ ...current, styles: [...current.styles, created] }));
+                  }}
+                />
+              </div>
+              <div className="editor-list">
+                {custom.length === 0 ? (
+                  <Empty title="styles.customEmptyTitle" body="styles.customEmpty" />
+                ) : (
+                  <ul className="list">
+                    {custom.map((style) => (
+                      <CustomStyleRow
+                        key={style.id}
+                        style={style}
+                        onChanged={(changed) => {
+                          update((current) => ({
+                            ...current,
+                            styles: current.styles.map((item) =>
+                              item.id === changed.id ? changed : item,
+                            ),
+                          }));
+                        }}
+                        onDeleted={() => {
+                          update((current) => ({
+                            styles: current.styles.filter((item) => item.id !== style.id),
+                            settings:
+                              current.settings.defaultStyleId === style.id
+                                ? { ...current.settings, defaultStyleId: fallbackStyleId }
+                                : current.settings,
+                          }));
+                        }}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           </section>
         </>
       )}

@@ -225,5 +225,6 @@
   "settings.handsFreeNote.dismiss": "Entendido",
   "dictionary.termHint": "Por ejemplo: Kubernetes, Valparaíso o el nombre de tu empresa.",
   "dictionary.advanced": "Avanzado: cómo suena",
-  "dictionary.soundsLike": "Suena como"
+  "dictionary.soundsLike": "Suena como",
+  "hotkey.escape": "cancela el manos libres."
 }

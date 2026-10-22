@@ -42,9 +42,11 @@ const sections: { id: SettingsSection; label: MessageId; icon: IconName }[] = [
 
 export function Settings({
   handsFreeNote,
+  onDismissNote,
   onRerun,
 }: {
   handsFreeNote: boolean;
+  onDismissNote: () => void;
   onRerun: () => void;
 }) {
   const [section, setSection] = useState<SettingsSection>(() =>
@@ -89,7 +91,9 @@ export function Settings({
           </ul>
         </div>
       </nav>
-      {section === "general" && <General handsFreeNote={handsFreeNote} onRerun={onRerun} />}
+      {section === "general" && (
+        <General handsFreeNote={handsFreeNote} onDismissNote={onDismissNote} onRerun={onRerun} />
+      )}
       {section === "dictionary" && <Dictionary focusAdd={focusAdd} />}
       {section === "styles" && <Styles />}
       {section === "appRules" && <AppRules />}
@@ -99,10 +103,17 @@ export function Settings({
   );
 }
 
-function General({ handsFreeNote, onRerun }: { handsFreeNote: boolean; onRerun: () => void }) {
+function General({
+  handsFreeNote,
+  onDismissNote,
+  onRerun,
+}: {
+  handsFreeNote: boolean;
+  onDismissNote: () => void;
+  onRerun: () => void;
+}) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [autostartError, setAutostartError] = useState(false);
-  const [note, setNote] = useState(handsFreeNote);
 
   useEffect(() => {
     void bridge.overview().then(setOverview);
@@ -122,14 +133,7 @@ function General({ handsFreeNote, onRerun }: { handsFreeNote: boolean; onRerun: 
 
   return (
     <SectionPage title="settings.general" intro="settings.general.intro" wide>
-      {note && (
-        <HandsFreeNote
-          onDismiss={() => {
-            setNote(false);
-            void bridge.dismissHandsFreeNote();
-          }}
-        />
-      )}
+      {handsFreeNote && <HandsFreeNote onDismiss={onDismissNote} />}
       <div className="general">
         <div className="panel general-main">
           <ShortcutRow

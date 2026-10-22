@@ -41,6 +41,17 @@ describe("Main", () => {
     expect(screen.getByText("Step 1 of 6")).toBeTruthy();
   });
 
+  it("keeps the hands-free note gone after it is dismissed, across sections", async () => {
+    fakeBridge.appState.mockResolvedValueOnce({ ...appState, handsFreeNote: true });
+    render(<Main />);
+    fireEvent.click(await screen.findByRole("button", { name: "Got it" }));
+    expect(fakeBridge.dismissHandsFreeNote).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    await screen.findByRole("heading", { name: "General" });
+    expect(screen.queryByText("Hands-free dictation")).toBeNull();
+  });
+
   it("returns to sign-in when the session ends while the app is open", async () => {
     render(<Main />);
     await screen.findByRole("heading", { name: "General" });

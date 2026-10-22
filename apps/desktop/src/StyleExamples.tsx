@@ -3,6 +3,7 @@ import { type ReactNode, useId } from "react";
 import { language, t } from "./i18n.ts";
 import { styleExamples } from "./styleExamples.ts";
 import { styleDescription, styleName } from "./styleNames.ts";
+import { changesFrom } from "./wordDiff.ts";
 
 export interface ChoosableStyle {
   id: string;
@@ -65,19 +66,25 @@ export function StyleExamples({
           option(
             style,
             <>
-              <span className="example-text">{example.styles[style.id]}</span>
+              <span className="example-text">
+                {changesFrom(example.said, example.styles[style.id]).map((piece, index) =>
+                  piece.changed ? (
+                    <mark key={index} className="example-change">
+                      {piece.text}
+                    </mark>
+                  ) : (
+                    piece.text
+                  ),
+                )}
+              </span>
               <span className="example-note">{styleDescription(style)}</span>
             </>,
           ),
         )}
+        {custom.map((style) =>
+          option(style, <span className="example-note clamp">{styleDescription(style)}</span>),
+        )}
       </div>
-      {custom.length > 0 && (
-        <div className="example-grid">
-          {custom.map((style) =>
-            option(style, <span className="example-note clamp">{styleDescription(style)}</span>),
-          )}
-        </div>
-      )}
     </fieldset>
   );
 }

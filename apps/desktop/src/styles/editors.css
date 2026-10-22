@@ -224,20 +224,27 @@
   overflow-wrap: anywhere;
 }
 
-.cards {
+.editor {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--space-24) * 4.25)), 1fr));
   align-items: start;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  gap: var(--space-6);
 }
 
-.dictation {
+@container (min-width: 56rem) {
+  .editor {
+    grid-template-columns: calc(var(--space-24) * 4) minmax(0, 1fr);
+  }
+
+  .editor-form {
+    position: sticky;
+    top: var(--space-6);
+  }
+}
+
+.editor-list {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-5);
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .advanced summary {
