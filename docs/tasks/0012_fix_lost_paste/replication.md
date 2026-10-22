@@ -35,3 +35,11 @@ Each of the four logged, within the same second: `clipboard read by msrdc.exe (w
 The fifth had no `msrdc.exe` read; the scratch window read with its own window and the text landed.
 The windowless reader is `Wispr Flow.exe` (another dictation app on the host): Wait Chain Traversal found its thread blocked sending the render request to the clipboard owner, and it reads only after a Ctrl+V, never on a clipboard update alone.
 Logs: `.workspaces/0012_fix_lost_paste/evidence/windows-run-0012-host/run1/replicate.out` and `probe1.out`.
+
+## om-reviewer verification
+
+2026-10-22, 17:22 to 17:23 UTC, commit 21c0c7c (worktree head 17fa8b8, same code), dev debug build on the Windows 11 host with WSLg up, signed in as crew-e2e-b, launched with no console, run by the om-reviewer with the om-developer's harness.
+5 of 5 `--dictate-wav` pastes into the run's `tmw-scratch.exe`, with the run's windowless reader active, landed, and the previous clipboard came back each time; none was reported pasted with nothing landed.
+Each paste logged the run's windowless reader and `msrdc.exe` withheld before the keystroke, then `tmw-scratch.exe` (with a window) rendered and counted for attempt 1.
+After: signed out, 0 credential targets, dev folders removed, clipboard restored, crew-e2e-b settings, rules and dictations equal to before.
+Logs: `.workspaces/0012_fix_lost_paste/.reviewer/run/accept.out`.

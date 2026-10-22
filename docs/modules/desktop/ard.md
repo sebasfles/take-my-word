@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-22
-source: 0011_desktop_rebrand
+source: 0012_fix_lost_paste
 ---
 
 # Desktop: architecture and debt
@@ -82,9 +82,9 @@ source: 0011_desktop_rebrand
 
 ## 2026-10-21: Paste through a delayed-rendered clipboard
 
-- Decision: the paste offers the text with delayed rendering, marked with `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` 0 and `CanUploadToCloudClipboard` 0, after saving every memory-based format; it pastes only into the window focused at key down, after every modifier is up and when the target is not elevated, restores 150 ms after the target reads (500 ms if something read before the keystroke), retries a busy clipboard for 3 s, and leaves the text with a notification when nothing reads it within 1.5 s.
+- Decision: the paste offers the text with delayed rendering, marked with `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` 0 and `CanUploadToCloudClipboard` 0, after saving every memory-based format; it pastes only into the window focused at key down, after every modifier is up and when the target is not elevated; nothing renders before the paste keystroke, which waits until readers reacting to the offer are answered (40 to 100 ms); the clipboard is restored once readers go quiet (150 ms after the last render request, at most 1 s), a busy clipboard is retried for 3 s, and the text stays with a notification when no read counts within 1.5 s.
 - Alternatives rejected: a fixed wait before restoring.
-- Reason: delayed rendering tells when the target actually read the text, and the missing read doubles as the paste-failure signal.
+- Reason: delayed rendering tells when the target actually read the text, and the missing read doubles as the paste-failure signal; Chromium drops a paste whose clipboard changes before it finishes, so the restore waits for quiet instead of a fixed delay (0012).
 - Debt created: any reader after the keystroke counts as the target, and a clipboard monitor that ignores the exclusion format still sees the text.
 - Resolved by: 0008_desktop_features, 2026-10-21
 - Revisit when: a paste reported as done does not land in a real app.
@@ -267,12 +267,13 @@ source: 0011_desktop_rebrand
 ## 2026-10-21: The paste gives the text only to the target's processes
 
 - Decision: the offer carries the target window's process and a hosted app's, and the clipboard window renders the text only when the reader that opened the clipboard is one of them or descends from one (a walk up the parent chain); others get nothing and do not count as the paste; each read is logged with the reader's executable, never the text.
-  WebView2 opens the clipboard without a window, so its paste is served by the rule for unidentifiable readers below, not by the process tree; the tree is covered by unit tests, for hosts that read from a child process that has a window.
 - Alternatives rejected: counting any read after the keystroke, as before.
 - Reason: on Windows a clipboard reader that ignores the exclusion format (WSLg's `msrdc.exe` there) read first, counted as the target, and the clipboard was restored before the target pasted, so a paste reported done landed nothing.
 - Debt created: a reader that opens the clipboard without a window, or whose window reads as process 0, still gets the text and counts as the target, so such a monitor reading first can still end a paste early; a reused process id in the parent chain can admit an unrelated process.
-- Revisit when: met on 2026-10-21: in 0011's Windows run `msrdc.exe` was withheld and then a process-0 reader got the text in 2 of 2 console-free `--dictate-wav` pastes, reported as pasted while nothing landed; a bug task follows.
+- Resolved by: 0012_fix_lost_paste, 2026-10-22
+- Revisit when: met on 2026-10-21: in 0011's Windows run `msrdc.exe` was withheld and then a process-0 reader got the text in 2 of 2 console-free `--dictate-wav` pastes, reported as pasted while nothing landed.
 - Source: 0008_desktop_features
+- Superseded by 2026-10-22: A read counts only when it is the target's proven first read after the keystroke
 
 ## 2026-10-21: History copy uses its own clipboard owner
 
@@ -318,3 +319,14 @@ source: 0011_desktop_rebrand
 - Debt created: none.
 - Revisit when: macOS joins and needs an `.icns`.
 - Source: 0011_desktop_rebrand
+
+## 2026-10-22: A read counts only when it is the target's proven first read after the keystroke
+
+- Decision: a reader with a window is placed by its process; a reader without one counts only when Wait Chain Traversal finds a GUI thread of the target's process tree blocked sending this render request to the clipboard thread (probed in depth order from the target, main threads first, at most 200 ms, one process-wide session serialized behind a mutex and never closed); a failed, denied or spent probe is unproven and never counts.
+  Only the first read after the keystroke can count, and only when its render succeeds; any other first reader contends the attempt, a contended attempt is retried once after a new settle and a recheck of modifiers, focus and elevation, and a failed render ends the paste with the text kept; after a counted read, later requests of the same paste are answered without rendering.
+  The target's process tree and threads are taken on a helper thread at the offer and fixed before the first keystroke.
+- Alternatives rejected: counting any read without a window after the keystroke, which still lets a monitor that reads first win; never counting reads without a window, which loses WebView2 and Chromium pastes; asynchronous Wait Chain Traversal (70 threads in 3049 ms against 806 ms); probing every thread of the system (about 7 ms per thread).
+- Reason: on the base build a dictation app reading after every Ctrl+V without a window (Wispr Flow on Sebastian's machine) took the text first in 4 of 5 pastes, the paste was reported done and the restore removed the text; with this rule 10 of 10 landed with that app and a test reader racing it; one session per thread crashed the process in 32 of 200 test runs when two sessions closed at once.
+- Debt created: the retry can paste twice if the target keeps retrying to open the clipboard for longer than the settle after a contention; a thread or process the target creates after the offer is never proven, so its read leaves the text with a notification; a monitor that wins the race on both attempts leaves the text with a notification; proving a Chromium read costs about 65 to 190 ms.
+- Revisit when: a paste lands twice, a target's read is reported unproven in the log, or the share of pastes left in the clipboard grows on machines with such a monitor.
+- Source: 0012_fix_lost_paste
