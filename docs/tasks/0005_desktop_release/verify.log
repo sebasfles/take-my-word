@@ -1,0 +1,71 @@
+## 2026-10-21T18:06:25Z by om-developer target desktop on b25d8fb
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (39 vitest + 76 cargo tests, 1 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T18:06:25Z by om-developer target web on b25d8fb
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: fail exit 1 (pnpm integration && pnpm e2e)
+integration/new-password.int.ts: CredentialsProviderError: Could not load credentials from any providers.
+The step needs the fless-takemyword AWS profile; this task's clearance excludes AWS, so it cannot run here. pnpm e2e did not run.
+
+## 2026-10-21T18:06:25Z by om-developer target workflows on b25d8fb
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T18:26:15Z by om-developer target desktop on e09eab6
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (43 vitest + 76 cargo tests, 1 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T18:35:42Z by om-developer target desktop on a63507c
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (45 vitest + 76 cargo tests, 1 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-21T18:35:42Z by om-developer target workflows on a63507c
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T20:37:12Z by om-developer target desktop on 48947ff
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, plus cargo clippy --release --features prd, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (54 vitest + 112 cargo tests, 3 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+The first unit run exited 1 before cargo started: WSL interop failed to launch powershell.exe (UtilAcceptVsock accept4 failed 110); vitest had passed 54/54. The rerun above is the artefact.
+
+## 2026-10-21T20:37:12Z by om-developer target web on 48947ff
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: n/a (needs the fless-takemyword AWS profile, outside this task's clearance; accepted by the om-reviewer)
+
+## 2026-10-21T20:37:12Z by om-developer target workflows on 48947ff
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-21T21:09:13Z by om-developer target desktop on e6abb89
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, plus cargo clippy --release --features prd --locked, Windows mirror C:\dev\tmw-0005)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (pnpm check:version reports 0.1.1; 54 vitest + 112 cargo tests, 3 ignored; pnpm check:version && pnpm test && pnpm rust:test, cargo --locked)
+- e2e: n/a
+
+## 2026-10-21T21:30:12Z by om-developer target workflows on e1f38a4
+- lint: pass exit 0 (command -v shellcheck && shellcheck --version && pnpm lint:workflows -verbose; shellcheck 0.11.0 at ~/.local/bin, so a missing shellcheck fails the step)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+Negative control: actionlint on desktop-release.yml from b2182f8 exits 1 with SC2016, so the shellcheck rule is active.
+Earlier workflows blocks in this log (b25d8fb, a63507c, 48947ff) ran without shellcheck installed, so actionlint skipped every run: script; their pass was a false negative.
+Also ran ci's Lint step, pnpm lint at the root: exit 0.

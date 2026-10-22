@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0007_desktop_integration
+source: 0005_desktop_release
 ---
 
 # Desktop: product
@@ -15,13 +15,13 @@ It must feel like typing got faster: no window to open, no copy and paste, the u
 
 ### First run
 
-1. The user installs the app and it lives in the system tray, starting with Windows unless turned off.
+1. The user downloads the installer from the landing, installs it, and the app lives in the system tray, starting with Windows unless turned off.
 2. The app asks for username and password; a temporary password must be replaced by the user's own before going on.
 3. The first time a user signs in on this machine, the app asks for a default style, with the current one preselected; dictating already works while the choice is pending.
 4. The app explains which keys to hold (Ctrl+Win on Windows, Fn on macOS, Ctrl+Super on Linux) and that the microphone listens only during the hold.
 5. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
 
-Errors and empty states: a wrong username or password gets one generic message; an unreachable service says so; if Windows blocks the microphone or none is found, first run says so and links to the privacy setting.
+Errors and empty states: Windows SmartScreen warns on the first install because the installer is not code-signed; a wrong username or password gets one generic message; an unreachable service says so; if Windows blocks the microphone or none is found, first run says so and links to the privacy setting.
 
 ### Dictate
 
@@ -54,7 +54,11 @@ Errors and empty states: a rejected combination is explained and the old hotkey 
 
 ### Update
 
-1. When a new version is released the app asks before updating (phase 5).
+1. At start and every 6 hours the app looks for a new version.
+2. When there is one, a small window shows the version and its notes, in Spanish or English like Windows, without taking focus from the app the user is typing in.
+3. "Install and restart" downloads it, installs it once no dictation is in progress, and the app comes back on the new version; "Later" hides it until the next check.
+
+Errors and empty states: a failed download or install says so and offers to try again; the current version keeps running.
 
 ## Rules
 

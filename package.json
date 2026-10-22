@@ -12,7 +12,8 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "format": "prettier --write .",
-    "lint:workflows": "github-actionlint"
+    "lint:workflows": "github-actionlint",
+    "release:desktop": "node apps/desktop/scripts/release.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

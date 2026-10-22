@@ -1,11 +1,21 @@
 import { vi } from "vitest";
-import type { AccountStep, AccountView, Onboarding, OverlayState, Overview } from "../bridge.ts";
+import type {
+  AccountStep,
+  AccountView,
+  Onboarding,
+  OverlayState,
+  Overview,
+  UpdateView,
+} from "../bridge.ts";
 
 export const listeners: {
   overlay?: (state: OverlayState) => void;
   captureCancelled?: () => void;
   accountChanged?: (signedIn: boolean) => void;
+  update?: (view: UpdateView) => void;
 } = {};
+
+export const pendingUpdate: { view: UpdateView | null } = { view: null };
 
 export const signedIn: AccountView = { signedIn: true, username: "sebastian" };
 
@@ -52,6 +62,13 @@ export const fakeBridge = {
   openSignIn: vi.fn(() => Promise.resolve(undefined)),
   signOut: vi.fn(() => Promise.resolve(undefined)),
   quit: vi.fn(() => Promise.resolve(undefined)),
+  updateView: vi.fn(() => Promise.resolve(pendingUpdate.view)),
+  installUpdate: vi.fn(() => Promise.resolve(undefined)),
+  postponeUpdate: vi.fn(() => Promise.resolve(undefined)),
+  onUpdate: vi.fn((handler: (view: UpdateView) => void) => {
+    listeners.update = handler;
+    return Promise.resolve(() => undefined);
+  }),
   onOverlay: vi.fn((handler: (state: OverlayState) => void) => {
     listeners.overlay = handler;
     return Promise.resolve(() => undefined);

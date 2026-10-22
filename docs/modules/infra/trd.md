@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0006_prd_release
+source: 0005_desktop_release
 ---
 
 # Infra: technical
@@ -16,7 +16,7 @@ source: 0006_prd_release
 | `infra/stacks/app` | Everything one env runs, plus the per-env deploy role scoped to that env's Actions environment. |
 | `infra/modules/aws/*` | Reusable modules: `lambda` (IAM statements may carry conditions, optional `AWS_IAM` Function URL), `http_api`, `cognito`, `dynamodb`, `acm`, `secrets`, `s3` (private bucket), `cloudfront` (distribution with OAC to a bucket and a Function URL, security headers policy, alias records). |
 | `infra/scripts/tf` | `infra/scripts/tf <env> <terraform args>` (`core`, `dev` or `prd`): feeds `GITHUB_APP_PEM` from `.env` as `TF_VAR_github_app_pem` and uses the `fless-takemyword` profile. |
-| `.github/workflows` | `ci` (no path filter, also runs the OpenNext build); `deploy-dev` and `deploy-prd` run `reusable-changes`, then `reusable-deploy` (api) and `reusable-deploy-web` only for the side the push touched; desktop and mobile release paths live in their modules. |
+| `.github/workflows` | `ci` (no path filter, also runs the OpenNext build); `deploy-dev` and `deploy-prd` run `reusable-changes`, then `reusable-deploy` (api) and `reusable-deploy-web` only for the side the push touched; `desktop-release` builds and publishes the desktop on `desktop-v*` tags with no AWS access (desktop module); mobile release paths live in its module. |
 
 ## Resources per env
 
@@ -47,6 +47,7 @@ Jobs, listeners or scheduled work: none.
 - The deploy role grants `UpdateFunctionCode` and `GetFunction` on that env's functions only, `s3:ListBucket` and `s3:PutObject` on the web bucket and `cloudfront:CreateInvalidation` on the web distribution, and trusts exactly the repository's immutable subject, `repo:sebasfles@64487774/take-my-word@1427740478:environment:{env}`, built from the GitHub user and repository ids.
 - The Lambda module ignores `filename`, `source_code_hash` and `publish`, so Terraform never fights CI over code.
 - Terraform is applied only from Sebastian's machine with the `fless-takemyword` profile.
+- `desktop-release` is the only workflow with `contents: write` and the only one that sees the updater signing key; it assumes no AWS role.
 
 ## Depends on
 
@@ -64,6 +65,8 @@ Jobs, listeners or scheduled work: none.
 - Hosted zone `takemyword.fless.dev` (`Z06585121NIUBTW9PNNB1`).
 - Lambda environment variables are wired by `stacks/app`; `DEBUG_BUCKET` only while the dev variable `debug_audio` is on.
 - `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME`, `DICTIONARY_USAGE_FUNCTION_NAME`, `WEB_FUNCTION_NAME`, `WEB_ASSETS_BUCKET` and `WEB_DISTRIBUTION_ID` are written by `stacks/app` into the env's Actions environment, which `core` creates.
+- Repository Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (the updater key, minisign, password-protected) are set by hand with `gh secret set` from stdin, outside Terraform; the values also sit in the root `.env` and Sebastian's password manager, and the public half in `apps/desktop/src-tauri/tauri.prd.conf.json`.
+  Rotating the key strands installed apps, which only trust the old public key.
 - State: S3 bucket `takemyword-terraform-state-115891590483` (versioned, encrypted, public access blocked, created by hand), one key per root, S3 lockfile.
 - Apply order on a fresh account: state bucket, `core`, then each env.
 - A newly applied env answers `not deployed` (503) until code reaches it: write its two secrets from `.env` and a fresh `COOKIE_KEY` (stdin, never arguments), then push the code once by hand in `reusable-deploy` order, or let the next deploy run do it.

@@ -131,6 +131,11 @@ const shots: Shot[] = [
       await page.getByRole("alert").waitFor();
     },
   },
+  { name: "update-available", query: "view=update&update=available" },
+  { name: "update-available-en", query: "view=update&update=available&lang=en" },
+  { name: "update-downloading", query: "view=update&update=downloading" },
+  { name: "update-installing", query: "view=update&update=installing" },
+  { name: "update-failed", query: "view=update&update=failed" },
   { name: "overlay-listening", query: "view=overlay&overlay=listening" },
   { name: "overlay-processing", query: "view=overlay&overlay=processing" },
   { name: "overlay-error", query: "view=overlay&overlay=error" },

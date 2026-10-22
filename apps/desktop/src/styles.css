@@ -435,3 +435,23 @@ kbd {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.update-notes {
+  max-height: 120px;
+  overflow-y: auto;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.update-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}

@@ -1,7 +1,26 @@
 const FALLBACK: &str = "es";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    Es,
+    En,
+}
+
 pub fn system_locale() -> String {
     api_locale(sys_locale::get_locale().as_deref())
+}
+
+pub fn system_language() -> Language {
+    language(&system_locale())
+}
+
+fn language(locale: &str) -> Language {
+    if locale.starts_with("en") {
+        Language::En
+    } else {
+        Language::Es
+    }
 }
 
 fn api_locale(tag: Option<&str>) -> String {
@@ -40,5 +59,16 @@ mod tests {
         assert_eq!(api_locale(Some("fr-FR")), "es");
         assert_eq!(api_locale(Some("")), "es");
         assert_eq!(api_locale(None), "es");
+    }
+
+    #[test]
+    fn the_ui_language_follows_the_dictation_locale() {
+        for (tag, expected) in [
+            ("en-GB", Language::En),
+            ("es-CL", Language::Es),
+            ("fr-FR", Language::Es),
+        ] {
+            assert_eq!(language(&api_locale(Some(tag))), expected);
+        }
     }
 }

@@ -45,6 +45,18 @@ export function problemOf(reason: unknown): Problem {
   return { message: "Something went wrong. Try again.", backToSignIn: false };
 }
 
+export type UpdatePhase =
+  | { phase: "available" }
+  | { phase: "downloading"; percent: number | null }
+  | { phase: "installing" }
+  | { phase: "failed" };
+
+export type UpdateView = {
+  language: "es" | "en";
+  version: string;
+  notes: string;
+} & UpdatePhase;
+
 export const bridge = {
   overview: () => invoke<Overview>("overview"),
   captureHotkey: () => invoke<undefined>("capture_hotkey"),
@@ -64,6 +76,13 @@ export const bridge = {
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
   quit: () => invoke<undefined>("quit"),
+  updateView: () => invoke<UpdateView | null>("update_view"),
+  installUpdate: () => invoke<undefined>("install_update"),
+  postponeUpdate: () => invoke<undefined>("postpone_update"),
+  onUpdate: (handler: (view: UpdateView) => void): Promise<UnlistenFn> =>
+    listen<UpdateView>("update", (event) => {
+      handler(event.payload);
+    }),
   onOverlay: (handler: (state: OverlayState) => void): Promise<UnlistenFn> =>
     listen<OverlayState>("overlay", (event) => {
       handler(event.payload);

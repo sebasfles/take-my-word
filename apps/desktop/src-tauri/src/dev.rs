@@ -65,12 +65,14 @@ fn dictate(app: &AppHandle, args: &[String]) -> bool {
     match read_wav(Path::new(path)) {
         Ok(captured) => {
             let held = captured.duration();
+            let shell = app.state::<Shell>();
             let job = Job {
                 take: Take::Recorded { captured, held },
                 target: SystemWindow.foreground(),
+                busy: shell.activity.start(),
             };
             log::info!("dev: dictating {path}");
-            let _ = app.state::<Shell>().jobs.send(job);
+            let _ = shell.jobs.send(job);
         }
         Err(error) => log::warn!("dev: reading {path} failed: {error}"),
     }

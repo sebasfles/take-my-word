@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0004_web_landing
+source: 0005_desktop_release
 ---
 
 # Infra: architecture and debt
@@ -112,3 +112,12 @@ source: 0004_web_landing
 - Debt created: no `script-src` restriction.
 - Revisit when: the web renders content a user did not write, or adds third-party scripts.
 - Source: 0004_web_landing
+
+## 2026-10-21: The desktop updater key lives in repository Actions secrets
+
+- Decision: the minisign key that signs desktop updates is two repository Actions secrets, set by hand with `gh secret set` from stdin and read only by `desktop-release`, which runs with no AWS role.
+- Alternatives rejected: environment secrets, since releases are not per env; AWS Secrets Manager, which would give a release job AWS access for no gain.
+- Reason: the key is only needed where GitHub builds the release, and keeping AWS out of that job keeps its blast radius to the repository.
+- Debt created: the secrets sit outside Terraform, and the key has no rotation path, because installed apps trust only the public key they shipped with.
+- Revisit when: the key leaks or must change, or the repository gains other maintainers.
+- Source: 0005_desktop_release
