@@ -45,3 +45,27 @@
 - typecheck: n/a
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-22T03:24:52Z by om-developer target brand on e4bda22
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T03:24:52Z by om-developer target web on e4bda22
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (integration and e2e need a dev web deploy and dev users beyond the clearance; recorded by the om-reviewer)
+
+## 2026-10-22T03:24:52Z by om-developer target desktop on e4bda22
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011, mirror at e4bda22 clean)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (133 vitest and 149 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T03:24:52Z by om-developer target workflows on e4bda22
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
