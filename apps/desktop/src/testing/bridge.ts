@@ -1,15 +1,21 @@
 import { vi } from "vitest";
+import type { Route } from "../api.ts";
+import type { Language } from "../i18n.ts";
 import type {
   AccountStep,
   AccountView,
   Onboarding,
   OverlayState,
   Overview,
+  UiLanguage,
   UpdateView,
 } from "../bridge.ts";
 
 export const listeners: {
   overlay?: (state: OverlayState) => void;
+  overlayLevel?: (level: number) => void;
+  settingsNavigate?: (query: string) => void;
+  uiLanguage?: (language: Language) => void;
   captureCancelled?: () => void;
   accountChanged?: (signedIn: boolean) => void;
   update?: (view: UpdateView) => void;
@@ -21,12 +27,23 @@ export const signedIn: AccountView = { signedIn: true, username: "sebastian" };
 
 export const onboarding: Onboarding = {
   styles: [
-    { id: "plain", name: "Plain" },
-    { id: "casual", name: "Casual" },
-    { id: "formal", name: "Formal" },
+    { id: "plain", name: "Plain", builtin: true },
+    { id: "casual", name: "Casual", builtin: true },
+    { id: "formal", name: "Formal", builtin: true },
+    { id: "c7d1", name: "Client emails", builtin: false },
   ],
   selected: "plain",
+  dictationLanguages: ["es"],
 };
+
+export const storedSettings = {
+  defaultStyleId: "plain",
+  locale: "es",
+  dictationLanguages: ["es"],
+  providers: { transcriber: "groq-whisper", refiner: "openai" },
+};
+
+export const uiLanguage: UiLanguage = { choice: null, windows: "es" };
 
 export const overview: Overview = {
   hotkey: ["Ctrl", "Win"],
@@ -40,7 +57,7 @@ export const fakeBridge = {
   cancelHotkeyCapture: vi.fn(() => Promise.resolve(undefined)),
   proposeHotkey: vi.fn((codes: string[]) =>
     codes.includes("AltRight")
-      ? Promise.reject(new Error("Right Alt is AltGr on many keyboards"))
+      ? Promise.reject(Object.assign(new Error("hotkey.rightAlt"), { backToSignIn: false }))
       : Promise.resolve(["Ctrl", "Shift"]),
   ),
   confirmHotkey: vi.fn(() => Promise.resolve(["Ctrl", "Shift"])),
@@ -56,11 +73,20 @@ export const fakeBridge = {
     Promise.resolve("onboarding"),
   ),
   onboarding: vi.fn(() => Promise.resolve(structuredClone(onboarding))),
-  saveDefaultStyle: vi.fn<(styleId: string) => Promise<undefined>>(() =>
-    Promise.resolve(undefined),
+  saveOnboarding: vi.fn<(styleId: string, dictationLanguages: Language[]) => Promise<undefined>>(
+    () => Promise.resolve(undefined),
   ),
+  uiLanguage: vi.fn(() => Promise.resolve({ ...uiLanguage })),
+  setUiLanguage: vi.fn((choice: Language | null) => Promise.resolve({ ...uiLanguage, choice })),
   openSignIn: vi.fn(() => Promise.resolve(undefined)),
   signOut: vi.fn(() => Promise.resolve(undefined)),
+  apiRequest: vi.fn<(route: Route) => Promise<unknown>>((route) => {
+    if (route.route === "getSettings") return Promise.resolve(structuredClone(storedSettings));
+    if (route.route === "replaceSettings") return Promise.resolve(route.body);
+    return Promise.resolve(null);
+  }),
+  runningApps: vi.fn(() => Promise.resolve(["notepad.exe", "outlook.exe"])),
+  copyText: vi.fn<(text: string) => Promise<undefined>>(() => Promise.resolve(undefined)),
   quit: vi.fn(() => Promise.resolve(undefined)),
   updateView: vi.fn(() => Promise.resolve(pendingUpdate.view)),
   installUpdate: vi.fn(() => Promise.resolve(undefined)),
@@ -73,8 +99,20 @@ export const fakeBridge = {
     listeners.overlay = handler;
     return Promise.resolve(() => undefined);
   }),
+  onOverlayLevel: vi.fn((handler: (level: number) => void) => {
+    listeners.overlayLevel = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onUiLanguage: vi.fn((handler: (language: Language) => void) => {
+    listeners.uiLanguage = handler;
+    return Promise.resolve(() => undefined);
+  }),
   onAccountChanged: vi.fn((handler: (signedIn: boolean) => void) => {
     listeners.accountChanged = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onSettingsNavigate: vi.fn((handler: (query: string) => void) => {
+    listeners.settingsNavigate = handler;
     return Promise.resolve(() => undefined);
   }),
   onHotkeyCaptureCancelled: vi.fn((handler: () => void) => {

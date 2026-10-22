@@ -5,6 +5,7 @@ use reqwest::blocking::{Client, RequestBuilder};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use super::routes::{Method, Request};
 use super::{AUDIO_FIELD, ApiErrorBody, ApiFailure, DictationMeta, DictationResponse, META_FIELD};
 use crate::auth::Secret;
 
@@ -73,6 +74,30 @@ impl HttpApi {
         send(request, Some(token))
     }
 
+    pub fn forward(
+        &self,
+        token: &Secret,
+        request: &Request<'_>,
+    ) -> Result<serde_json::Value, ApiFailure> {
+        let url = self.url(&request.path);
+        let builder = match request.method {
+            Method::Get => self.client.get(url),
+            Method::Post => self.client.post(url),
+            Method::Put => self.client.put(url),
+            Method::Delete => self.client.delete(url),
+        }
+        .timeout(REQUEST_TIMEOUT);
+        let builder = match request.body {
+            Some(body) => builder.json(body),
+            None => builder,
+        };
+        let body = send_bytes(builder, Some(token))?;
+        if body.is_empty() {
+            return Ok(serde_json::Value::Null);
+        }
+        serde_json::from_slice(&body).map_err(invalid)
+    }
+
     fn url(&self, path: &str) -> String {
         format!("{}{path}", self.base_url)
     }
@@ -82,6 +107,10 @@ fn send<T: DeserializeOwned>(
     request: RequestBuilder,
     token: Option<&Secret>,
 ) -> Result<T, ApiFailure> {
+    serde_json::from_slice(&send_bytes(request, token)?).map_err(invalid)
+}
+
+fn send_bytes(request: RequestBuilder, token: Option<&Secret>) -> Result<Vec<u8>, ApiFailure> {
     let request = match token {
         Some(token) => request.bearer_auth(token.expose()),
         None => request,
@@ -90,7 +119,7 @@ fn send<T: DeserializeOwned>(
     let status = response.status();
     let body = response.bytes().map_err(network)?;
     if status.is_success() {
-        return serde_json::from_slice(&body).map_err(invalid);
+        return Ok(body.to_vec());
     }
     Err(ApiFailure::Rejected {
         status: status.as_u16(),

@@ -9,13 +9,16 @@ mod config;
 #[cfg(debug_assertions)]
 mod dev;
 mod dictation;
+mod editors;
 mod env;
 mod foreground;
 mod hotkey;
+mod i18n;
 mod keychain;
 mod locale;
 mod overlay;
 mod paste;
+mod rules;
 mod session;
 mod shell;
 mod tray;
@@ -60,9 +63,14 @@ pub fn run() {
             account::sign_in,
             account::choose_password,
             account::onboarding,
-            account::save_default_style,
+            account::save_onboarding,
             account::open_sign_in,
             account::sign_out,
+            editors::api_request,
+            editors::running_apps,
+            editors::copy_text,
+            commands::ui_language,
+            commands::set_ui_language,
             commands::quit,
             updater::update_view,
             updater::install_update,
@@ -73,6 +81,7 @@ pub fn run() {
             env::check_identifier(&app.config().identifier)?;
             let settings_path = app.path().app_config_dir()?.join(config::FILE_NAME);
             let settings = config::load(&settings_path);
+            i18n::choose(settings.ui_language);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
             let signed_in = shell.account.is_signed_in();
             app.manage(updater::Updates::new());

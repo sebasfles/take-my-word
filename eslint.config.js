@@ -42,7 +42,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["apps/web/**/*.tsx"],
+    files: ["apps/web/**/*.tsx", "packages/brand/**/*.tsx"],
     ...reactHooks.configs.flat.recommended,
   },
   {

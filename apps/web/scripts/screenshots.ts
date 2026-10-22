@@ -1,14 +1,15 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { accessClaims, sessionCookies } from "../src/lib/session.ts";
 import { fakeAccessToken } from "../src/testing/tokens.ts";
 
 const root = join(import.meta.dirname, "..");
 const out = process.argv[2] ?? join(root, "..", "..", "..", "screenshots");
+const only = process.argv[3];
 const apiPort = 4510;
 const webPort = 4511;
 const webOrigin = `http://localhost:${webPort}`;
@@ -29,6 +30,7 @@ const full = {
   settings: {
     defaultStyleId: "c-slack",
     locale: "es-MX",
+    dictationLanguages: ["es", "en"],
     providers: { transcriber: "groq-whisper", refiner: "openai" },
   },
   styles: [
@@ -81,6 +83,7 @@ const full = {
       "Te mando el informe en cuanto termine la reunión con el cliente; si necesitas algo antes, avísame por Slack y lo vemos.",
       "",
       "Recordatorio: renovar el certificado del dominio antes del viernes.",
+      "Resumen de la reunión con Ñandú Labs: acordamos migrar el clúster de Kubernetes en dos fases, primero los servicios de lectura y después los de escritura. Raúl se encarga del plan de reversión y de avisar a soporte con una semana de anticipación. Quedó pendiente confirmar el presupuesto de OpenTelemetry, que depende de la cotización que llega el lunes; si no llega, lo revisamos el miércoles en la llamada de seguimiento con el cliente y ajustamos las fechas.",
     ];
     const text = texts[index % texts.length] ?? "";
     return {
@@ -98,7 +101,8 @@ const full = {
 const empty = {
   settings: {
     defaultStyleId: "plain",
-    locale: "es",
+    locale: "en",
+    dictationLanguages: ["en"],
     providers: { transcriber: "groq-whisper", refiner: "openai" },
   },
   styles: builtins,
@@ -107,11 +111,15 @@ const empty = {
   dictations: [],
 };
 
-function userOf(authorization: string | undefined): typeof full | null {
+type Mode = "full" | "empty" | "slow" | "broken";
+
+const modes: Record<string, Mode> = { nuevo: "empty", lento: "slow", roto: "broken" };
+
+function userOf(authorization: string | undefined): Mode | null {
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : "";
   const claims = accessClaims(token);
   if (claims === null) return null;
-  return claims.username === "nuevo" ? empty : full;
+  return modes[claims.username] ?? "full";
 }
 
 function respond(user: typeof full, url: URL): unknown {
@@ -136,17 +144,25 @@ function respond(user: typeof full, url: URL): unknown {
 }
 
 const api = createServer((request, response) => {
-  const user = userOf(request.headers.authorization);
-  const body =
-    user === null || request.method !== "GET"
-      ? undefined
-      : respond(user, new URL(request.url ?? "/", "http://mock"));
-  if (body === undefined) {
-    response.writeHead(user === null ? 401 : 404).end();
+  const mode = userOf(request.headers.authorization);
+  if (mode === "broken") {
+    response.writeHead(503).end();
     return;
   }
-  response.writeHead(200, { "content-type": "application/json" });
-  response.end(JSON.stringify(body));
+  const body =
+    mode === null || request.method !== "GET"
+      ? undefined
+      : respond(mode === "empty" ? empty : full, new URL(request.url ?? "/", "http://mock"));
+  const send = () => {
+    if (body === undefined) {
+      response.writeHead(mode === null ? 401 : 404).end();
+      return;
+    }
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(body));
+  };
+  if (mode === "slow") setTimeout(send, 20_000);
+  else send();
 });
 await new Promise<void>((resolve) => api.listen(apiPort, resolve));
 
@@ -154,11 +170,12 @@ const web = spawn(join(root, "node_modules", ".bin", "next"), ["start", "-p", St
   cwd: root,
   env: {
     ...process.env,
-    API_URL: `http://127.0.0.1:${apiPort}`,
+    API_URL: `http://127.0.0.1:${String(apiPort)}`,
     USER_POOL_ID: "us-east-1_screenshots",
     USER_POOL_CLIENT_ID: "screenshots",
     WEB_COOKIE_KEY: key.toString("base64"),
     WEB_ORIGIN: webOrigin,
+    TMW_GALLERY: "1",
   },
   stdio: ["ignore", "pipe", "inherit"],
 });
@@ -198,92 +215,220 @@ async function signedIn(context: BrowserContext, username = "sebastian"): Promis
   );
 }
 
-async function shoot(page: Page, name: string): Promise<void> {
+const demoFrame = 7.4;
+
+async function settle(page: Page, at = demoFrame): Promise<void> {
   await page.mouse.move(0, 0);
+  await page.evaluate(async (seconds) => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+    await document.fonts.ready;
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      animation.currentTime = seconds * 1000;
+    }
+  }, at);
+}
+
+async function shoot(
+  page: Page,
+  path: string,
+  options: { fullPage?: boolean } = {},
+): Promise<void> {
+  await settle(page);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
-  if (overflow > 0) throw new Error(`${name} scrolls horizontally by ${String(overflow)} px`);
-  await page.screenshot({ path: join(out, `${name}.png`), fullPage: true });
+  if (overflow > 0) throw new Error(`${path} scrolls horizontally by ${String(overflow)} px`);
+  mkdirSync(join(out, path, ".."), { recursive: true });
+  await page.screenshot({ path: join(out, `${path}.png`), fullPage: options.fullPage ?? true });
+}
+
+const pages: [string, string, string][] = [
+  ["account", "/app", "default-style"],
+  ["dictionary", "/app/dictionary", "terms"],
+  ["styles", "/app/styles", "builtin-style"],
+  ["rules", "/app/rules", "rules"],
+  ["history", "/app/history", "dictations"],
+];
+
+const labels = {
+  en: { submit: "Sign in" },
+  es: { submit: "Entrar" },
+} as const;
+
+async function shootPages(browser: Browser): Promise<void> {
+  for (const locale of ["en", "es"] as const) {
+    for (const scheme of ["light", "dark"] as const) {
+      for (const width of widths) {
+        const name = (page: string) => join(locale, scheme, `${page}-${String(width)}`);
+        const context = await browser.newContext({
+          viewport: { width, height: 900 },
+          deviceScaleFactor: 2,
+          colorScheme: scheme,
+          timezoneId: "America/Mexico_City",
+        });
+        await context.addCookies([{ name: "tmw-lang", value: locale, url: webOrigin }]);
+        const page = await context.newPage();
+        await page.goto(`${webOrigin}/`);
+        await shoot(page, name("landing"));
+        await page.goto(`${webOrigin}/sign-in`);
+        await shoot(page, name("sign-in"));
+
+        await page.route("**/api/session", (route) =>
+          route.fulfill({ status: 401, json: { error: "invalid_credentials" } }),
+        );
+        await page.locator("#username").fill("sebastian");
+        await page.locator("#password").fill("not-the-password");
+        await page.getByRole("button", { name: labels[locale].submit }).click();
+        await page.locator("#sign-in-error").waitFor();
+        await shoot(page, name("sign-in-error"));
+        await page.unroute("**/api/session");
+
+        await page.route("**/api/session", (route) =>
+          route.fulfill({ status: 200, json: { step: "new-password" } }),
+        );
+        await page.goto(`${webOrigin}/sign-in`);
+        await page.locator("#username").fill("sebastian");
+        await page.locator("#password").fill("temporary-password");
+        await page.getByRole("button", { name: labels[locale].submit }).click();
+        await page.locator("#new-password").waitFor();
+        await shoot(page, name("choose-password"));
+        await page.unroute("**/api/session");
+
+        await signedIn(context);
+        for (const [pageName, path, testId] of pages) {
+          await page.goto(`${webOrigin}${path}`);
+          await page.getByTestId(testId).first().waitFor();
+          await shoot(page, name(pageName));
+        }
+        await page.goto(`${webOrigin}/app/history`);
+        await page.getByTestId("dictation").first().locator("summary").click();
+        await page.getByTestId("dictation").nth(1).getByRole("button").first().click();
+        await shoot(page, name("history-open"));
+
+        for (const [user, state, testId] of [
+          ["nuevo", "empty", "empty-state"],
+          ["roto", "error", "error-state"],
+        ] as const) {
+          await signedIn(context, user);
+          for (const [pageName, path] of pages) {
+            await page.goto(`${webOrigin}${path}`);
+            const target = state === "empty" && pageName === "account" ? "default-style" : testId;
+            await page.getByTestId(target).first().waitFor();
+            await shoot(page, name(`${pageName}-${state}`));
+          }
+        }
+
+        await signedIn(context, "lento");
+        for (const [pageName, path] of pages) {
+          await page.goto(`${webOrigin}${path}`, { waitUntil: "commit" });
+          await page.getByTestId("loading-state").waitFor();
+          await shoot(page, name(`${pageName}-loading`));
+        }
+        await context.close();
+      }
+    }
+  }
+}
+
+async function shootHero(browser: Browser): Promise<void> {
+  for (const scheme of ["light", "dark"] as const) {
+    for (const [width, height] of [
+      [1280, 800],
+      [1440, 900],
+      [390, 844],
+    ] as const) {
+      const context = await browser.newContext({
+        viewport: { width, height },
+        deviceScaleFactor: 2,
+        colorScheme: scheme,
+      });
+      const page = await context.newPage();
+      await page.goto(`${webOrigin}/`);
+      await shoot(page, join("hero", `first-screen-${scheme}-${String(width)}x${String(height)}`), {
+        fullPage: false,
+      });
+      await settle(page, 3);
+      await page.screenshot({
+        path: join(out, "hero", `listening-${scheme}-${String(width)}x${String(height)}.png`),
+      });
+      await context.close();
+    }
+  }
+
+  for (const width of [390, 1280]) {
+    const viewport = { width, height: width === 390 ? 844 : 800 };
+    const reduced = await browser.newContext({
+      viewport,
+      deviceScaleFactor: 2,
+      reducedMotion: "reduce",
+    });
+    const still = await reduced.newPage();
+    await still.goto(`${webOrigin}/`);
+    await still.evaluate(() => document.fonts.ready);
+    await still.screenshot({ path: join(out, "hero", `reduced-motion-${String(width)}.png`) });
+    await reduced.close();
+
+    const videoDir = join(out, "hero", "video-tmp");
+    const recording = await browser.newContext({
+      viewport,
+      recordVideo: { dir: videoDir, size: viewport },
+    });
+    const page = await recording.newPage();
+    await page.goto(`${webOrigin}/`);
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(10_000);
+    const video = page.video();
+    await recording.close();
+    if (video !== null)
+      renameSync(await video.path(), join(out, "hero", `loop-${String(width)}.webm`));
+  }
+
+  const icons = await browser.newContext({ deviceScaleFactor: 1 });
+  const page = await icons.newPage();
+  await page.goto(`${webOrigin}/manifest.webmanifest`);
+  await page.setContent(
+    `<body style="margin:0;padding:8px;background:#ececec;display:flex;gap:8px;align-items:center">
+      <img src="${webOrigin}/static/favicon.ico" width="16" height="16">
+      <img src="${webOrigin}/static/favicon.svg" width="16" height="16">
+      <img src="${webOrigin}/static/favicon.ico" width="32" height="32">
+      <img src="${webOrigin}/static/apple-touch-icon.png" width="60" height="60">
+    </body>`,
+  );
+  await page.waitForLoadState("networkidle");
+  await page.screenshot({ path: join(out, "hero", "favicon-16.png"), fullPage: true });
+  await icons.close();
+}
+
+async function shootGallery(browser: Browser): Promise<void> {
+  for (const scheme of ["light", "dark"] as const) {
+    for (const width of widths) {
+      const context = await browser.newContext({
+        viewport: { width, height: 900 },
+        deviceScaleFactor: 2,
+        colorScheme: scheme,
+      });
+      const page = await context.newPage();
+      await page.goto(`${webOrigin}/gallery`);
+      await shoot(page, join("gallery", `primitives-${scheme}-${String(width)}`));
+      await page.getByRole("button", { name: "Open dialog" }).focus();
+      await page.keyboard.press("Enter");
+      await page.getByRole("dialog").waitFor();
+      await page.waitForTimeout(400);
+      await page.screenshot({
+        path: join(out, "gallery", `dialog-${scheme}-${String(width)}.png`),
+      });
+      await context.close();
+    }
+  }
 }
 
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 try {
-  for (const locale of ["es", "en"] as const) {
-    for (const width of widths) {
-      const context = await browser.newContext({
-        viewport: { width, height: 900 },
-        deviceScaleFactor: 2,
-        colorScheme: "light",
-        timezoneId: "America/Mexico_City",
-      });
-      await context.addCookies([{ name: "tmw-lang", value: locale, url: webOrigin }]);
-      const page = await context.newPage();
-      const shots: [string, string][] = [
-        ["landing", "/"],
-        ["sign-in", "/sign-in"],
-      ];
-      for (const [name, path] of shots) {
-        await page.goto(`${webOrigin}${path}`);
-        await page.screenshot({
-          path: join(out, `${name}-${locale}-${String(width)}.png`),
-          fullPage: true,
-        });
-      }
-      await page.goto(`${webOrigin}/sign-in`);
-      await page.getByRole("textbox").first().fill("sebastian");
-      await page.locator("input[type=password]").fill("not-the-password");
-      await page.route("**/api/session", (route) =>
-        route.fulfill({ status: 401, json: { error: "invalid_credentials" } }),
-      );
-      await page.getByRole("button", { name: locale === "es" ? "Entrar" : "Sign in" }).click();
-      await page.locator("#sign-in-error").waitFor();
-      await page.mouse.move(0, 0);
-      await page.screenshot({
-        path: join(out, `sign-in-error-${locale}-${String(width)}.png`),
-        fullPage: true,
-      });
-      await page.unroute("**/api/session");
-      await page.route("**/api/session", (route) =>
-        route.fulfill({ status: 200, json: { step: "new-password" } }),
-      );
-      await page.goto(`${webOrigin}/sign-in`);
-      await page.getByRole("textbox").first().fill("sebastian");
-      await page.locator("input[type=password]").fill("temporary-password");
-      await page.getByRole("button", { name: locale === "es" ? "Entrar" : "Sign in" }).click();
-      await page.locator("#new-password").waitFor();
-      await page.mouse.move(0, 0);
-      await page.screenshot({
-        path: join(out, `sign-in-new-password-${locale}-${String(width)}.png`),
-        fullPage: true,
-      });
-      const pages: [string, string, string][] = [
-        ["account", "/app", "default-style"],
-        ["dictionary", "/app/dictionary", "terms"],
-        ["styles", "/app/styles", "builtin-style"],
-        ["rules", "/app/rules", "rules"],
-        ["history", "/app/history", "dictations"],
-      ];
-      await signedIn(context);
-      for (const [name, path, testId] of pages) {
-        await page.goto(`${webOrigin}${path}`);
-        await page.getByTestId(testId).first().waitFor();
-        await shoot(page, `${name}-${locale}-${String(width)}`);
-      }
-      await page.goto(`${webOrigin}/app/history`);
-      await page.getByTestId("dictation").first().locator("summary").click();
-      await page.getByTestId("dictation").nth(1).getByRole("button").click();
-      await shoot(page, `history-open-${locale}-${String(width)}`);
-      await signedIn(context, "nuevo");
-      for (const [name, path] of pages) {
-        await page.goto(`${webOrigin}${path}`);
-        await page.getByTestId(name === "account" ? "default-style" : "empty-state").waitFor();
-        await shoot(page, `${name}-empty-${locale}-${String(width)}`);
-      }
-      await context.close();
-    }
-  }
+  if (only === undefined || only === "hero") await shootHero(browser);
+  if (only === undefined || only === "gallery") await shootGallery(browser);
+  if (only === undefined || only === "pages") await shootPages(browser);
 } finally {
   await browser.close();
   web.kill();

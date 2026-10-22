@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0009_web_account
+source: 0008_desktop_features
 ---
 
 # Dictation: architecture and debt
@@ -159,3 +159,21 @@ source: 0009_web_account
 - Debt created: users cannot see how much of the day's allowance is left.
 - Revisit when: the follow-up adds `GET /me/usage`.
 - Source: 0009_web_account
+
+## 2026-10-21: Dictation languages live in settings and pick the transcription language
+
+- Decision: `SETTINGS` holds `dictationLanguages`, one or both of `en` and `es`, default `["en"]`; with one, Whisper gets that language; with several, Whisper detects it (Groq's `verbose_json`, only English and Spanish names count), and a detected language outside the list, or none, transcribes the audio again in the first one; the quota is charged once, before transcription; the refiner and `DICTATION#` get the language used; meta `locale` is optional and ignored.
+- Alternatives rejected: the device's language per request; always letting Whisper detect.
+- Reason: the user knows which languages they speak, and a single language keeps Whisper from guessing on short or accented dictations.
+- Debt created: with several languages, a dictation detected as neither costs a second transcription.
+- Revisit when: re-transcriptions show up in cost or latency.
+- Source: 0008_desktop_features
+
+## 2026-10-21: Settings keep dictation languages across older clients
+
+- Decision: a stored item without `dictationLanguages` reads as the language of its `locale`; `GET` keeps returning `locale`, derived from the first dictation language; a `PUT` without `dictationLanguages` keeps the stored ones and ignores any `locale` sent.
+- Alternatives rejected: requiring the field on `PUT`; storing `locale` as sent.
+- Reason: released desktops and the web replace the settings whole from schemas without the field, and must neither wipe the languages nor fail to parse.
+- Debt created: none.
+- Revisit when: every client sends `dictationLanguages`.
+- Source: 0008_desktop_features

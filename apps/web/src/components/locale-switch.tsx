@@ -26,7 +26,7 @@ export function LocaleSwitch(props: { target: Locale; text: string; label: strin
   return (
     <button
       type="button"
-      className="button button-ghost locale-switch"
+      className="locale-switch"
       lang={props.target}
       aria-label={props.label}
       disabled={pending}

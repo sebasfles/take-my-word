@@ -1,4 +1,5 @@
 mod capture;
+mod level;
 mod microphone;
 mod wav;
 
@@ -8,6 +9,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 pub use capture::{CaptureBuffer, Captured};
+pub use level::Level;
 pub use microphone::Microphone;
 pub use wav::encode_wav;
 

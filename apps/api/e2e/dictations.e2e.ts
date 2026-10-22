@@ -1,10 +1,13 @@
 import {
   apiErrorSchema,
   dictationResponseSchema,
+  historyPageSchema,
   maxAudioBytes,
+  settingsSchema,
   type ApiError,
+  type Language,
 } from "@take-my-word/shared";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { confirmDevice, forgetDevice, refresh } from "@take-my-word/cognito";
 import {
   crewE2eConfig,
@@ -136,5 +139,66 @@ describe("POST /dictations in a deployed environment", () => {
     } finally {
       await forgetDevice({ userPoolId, accessToken: first.accessToken, deviceKey });
     }
+  }, 60_000);
+});
+
+describe("dictation languages in a deployed environment", () => {
+  let english: Buffer;
+  let spanish: Buffer;
+  let stored: unknown;
+
+  async function settings(method: "GET" | "PUT", body?: unknown) {
+    const response = await fetch(`${url}/me/settings`, {
+      method,
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      ...(body !== undefined && { body: JSON.stringify(body) }),
+    });
+    return settingsSchema.parse(await response.json());
+  }
+
+  async function dictateIn(languages: Language[], audio: Buffer) {
+    const current = await settings("GET");
+    await settings("PUT", { ...current, dictationLanguages: languages });
+    const { status, json } = await post({ meta: {}, audio });
+    expect(status).toBe(200);
+    const text = dictationResponseSchema.parse(json).text;
+    const history = await fetch(`${url}/dictations?limit=1`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const newest = historyPageSchema.parse(await history.json()).items[0];
+    return { text, locale: newest?.locale };
+  }
+
+  beforeAll(async () => {
+    stored = await settings("GET");
+    [english, spanish] = await Promise.all([
+      synthesize("Let's meet tomorrow at three in the office, and bring the report.", "en"),
+      synthesize("Nos vemos mañana a las tres en la oficina, y trae el informe.", "es"),
+    ]);
+  }, 60_000);
+
+  afterAll(async () => {
+    await settings("PUT", stored);
+  });
+
+  it("transcribes English with English only", async () => {
+    const { text, locale } = await dictateIn(["en"], english);
+    expect(text).toMatch(/tomorrow/i);
+    expect(locale).toBe("en");
+  }, 60_000);
+
+  it("transcribes Spanish with Spanish only", async () => {
+    const { text, locale } = await dictateIn(["es"], spanish);
+    expect(text).toMatch(/mañana/i);
+    expect(locale).toBe("es");
+  }, 60_000);
+
+  it("detects each language when both are chosen", async () => {
+    const first = await dictateIn(["en", "es"], english);
+    expect(first.text).toMatch(/tomorrow/i);
+    expect(first.locale).toBe("en");
+    const second = await dictateIn(["en", "es"], spanish);
+    expect(second.text).toMatch(/mañana/i);
+    expect(second.locale).toBe("es");
   }, 60_000);
 });

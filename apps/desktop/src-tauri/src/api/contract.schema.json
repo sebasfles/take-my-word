@@ -29,10 +29,7 @@
         "minLength": 1,
         "maxLength": 256
       }
-    },
-    "required": [
-      "locale"
-    ]
+    }
   },
   "dictationResponse": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -164,6 +161,17 @@
         "type": "string",
         "pattern": "^(es|en)(-[A-Z]{2})?$"
       },
+      "dictationLanguages": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "es",
+            "en"
+          ]
+        }
+      },
       "providers": {
         "type": "object",
         "properties": {
@@ -190,6 +198,7 @@
     "required": [
       "defaultStyleId",
       "locale",
+      "dictationLanguages",
       "providers"
     ],
     "additionalProperties": false
@@ -230,6 +239,50 @@
     },
     "required": [
       "styles"
+    ],
+    "additionalProperties": false
+  },
+  "appRuleList": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "appId": {
+              "type": "string"
+            },
+            "styleId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "keystroke": {
+              "type": "string",
+              "enum": [
+                "ctrl+v",
+                "ctrl+shift+v",
+                "shift+insert",
+                "cmd+v"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "appId",
+            "keystroke"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "rules"
     ],
     "additionalProperties": false
   }

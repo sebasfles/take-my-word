@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { bridge, type Overview } from "../bridge.ts";
+import { t } from "../i18n.ts";
 import { Keys } from "../Keys.tsx";
 
 export function FirstRun() {
@@ -15,49 +16,46 @@ export function FirstRun() {
   return (
     <main className="page">
       <header className="page-header">
-        <h1>Welcome to Take My Word</h1>
-        <p className="muted">Talk instead of typing, in any app.</p>
+        <h1>{t("firstRun.title")}</h1>
+        <p className="muted">{t("firstRun.tagline")}</p>
       </header>
 
       <ol className="steps">
         <li>
           <span className="step-number">1</span>
-          <span>Put the cursor where the text should go.</span>
+          <span>{t("firstRun.step1")}</span>
         </li>
         <li>
           <span className="step-number">2</span>
           <span>
-            Hold <Keys keys={overview?.hotkey ?? ["Ctrl", "Win"]} /> and speak.
+            {t("firstRun.step2Before")} <Keys keys={overview?.hotkey ?? ["Ctrl", "Win"]} />{" "}
+            {t("firstRun.step2After")}
           </span>
         </li>
         <li>
           <span className="step-number">3</span>
-          <span>Release. The text is pasted and your clipboard stays as it was.</span>
+          <span>{t("firstRun.step3")}</span>
         </li>
       </ol>
 
       <section className="note">
-        <h2>Microphone</h2>
-        <p className="muted">
-          Take My Word listens only while you hold the shortcut, and never stores the audio.
-        </p>
+        <h2>{t("firstRun.microphone")}</h2>
+        <p className="muted">{t("firstRun.microphoneNote")}</p>
         {blocked && (
           <div className="callout" role="alert">
-            <p>
-              Windows is blocking the microphone. Turn on access for desktop apps, then try again.
-            </p>
+            <p>{t("firstRun.microphoneBlocked")}</p>
             <button
               type="button"
               className="button"
               onClick={() => void bridge.openMicrophoneSettings()}
             >
-              Open microphone settings
+              {t("firstRun.openMicrophoneSettings")}
             </button>
           </div>
         )}
         {missing && (
           <div className="callout" role="alert">
-            <p>No microphone found. Connect one and Take My Word will use it.</p>
+            <p>{t("firstRun.microphoneMissing")}</p>
           </div>
         )}
       </section>
@@ -68,7 +66,7 @@ export function FirstRun() {
           className="button button-primary"
           onClick={() => void bridge.finishFirstRun()}
         >
-          Got it
+          {t("firstRun.done")}
         </button>
       </footer>
     </main>

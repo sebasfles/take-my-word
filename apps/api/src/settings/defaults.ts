@@ -1,7 +1,11 @@
 import {
+  defaultDictationLanguages,
   defaultRefiner,
   defaultTranscriber,
+  dictationLanguagesSchema,
   fallbackStyleId,
+  languageOfLocale,
+  localeFor,
   localeSchema,
   refinerIds,
   styleIdSchema,
@@ -12,13 +16,15 @@ import { z } from "zod";
 
 export const defaultSettings: Settings = {
   defaultStyleId: fallbackStyleId,
-  locale: "es",
+  locale: localeFor(defaultDictationLanguages),
+  dictationLanguages: [...defaultDictationLanguages],
   providers: { transcriber: defaultTranscriber, refiner: defaultRefiner },
 };
 
 const storedSettingsSchema = z.object({
   defaultStyleId: styleIdSchema.catch(defaultSettings.defaultStyleId),
-  locale: localeSchema.catch(defaultSettings.locale),
+  locale: localeSchema.optional().catch(undefined),
+  dictationLanguages: dictationLanguagesSchema.optional().catch(undefined),
   providers: z
     .object({
       transcriber: z.enum(transcriberIds).catch(defaultSettings.providers.transcriber),
@@ -28,5 +34,16 @@ const storedSettingsSchema = z.object({
 });
 
 export function settingsFrom(item: Record<string, unknown>): Settings {
-  return storedSettingsSchema.parse(item);
+  const stored = storedSettingsSchema.parse(item);
+  const dictationLanguages =
+    stored.dictationLanguages ??
+    (stored.locale === undefined
+      ? [...defaultDictationLanguages]
+      : [languageOfLocale(stored.locale)]);
+  return {
+    defaultStyleId: stored.defaultStyleId,
+    locale: localeFor(dictationLanguages, stored.locale),
+    dictationLanguages,
+    providers: stored.providers,
+  };
 }

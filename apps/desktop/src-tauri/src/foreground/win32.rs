@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, LPARAM};
@@ -5,12 +6,16 @@ use windows::Win32::Security::{
     GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, TOKEN_MANDATORY_LABEL,
     TOKEN_QUERY, TokenIntegrityLevel,
 };
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
+};
 use windows::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32,
     PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumChildWindows, GetForegroundWindow, GetWindowThreadProcessId,
+    EnumChildWindows, EnumWindows, GetForegroundWindow, GetWindowTextLengthW,
+    GetWindowThreadProcessId, IsWindowVisible,
 };
 use windows::core::{BOOL, PWSTR};
 
@@ -31,12 +36,7 @@ pub fn foreground() -> ForegroundApp {
             elevated: true,
         };
     };
-    let mut app_id = process.executable_name();
-    if app_id.as_deref() == Some(FRAME_HOST)
-        && let Some(hosted) = hosted_app(window, pid)
-    {
-        app_id = Some(hosted);
-    }
+    let app_id = app_id_of(window, pid, &process);
     let elevated = match (process.integrity(), own_integrity()) {
         (Some(theirs), Some(ours)) => theirs > ours,
         _ => true,
@@ -46,6 +46,63 @@ pub fn foreground() -> ForegroundApp {
         app_id,
         elevated,
     }
+}
+
+fn app_id_of(window: HWND, pid: u32, process: &Handle) -> Option<String> {
+    let app_id = process.executable_name();
+    if app_id.as_deref() == Some(FRAME_HOST) {
+        return hosted_app(window, pid).or(app_id);
+    }
+    app_id
+}
+
+pub fn running_apps() -> Vec<String> {
+    unsafe extern "system" fn visit(window: HWND, found: LPARAM) -> BOOL {
+        let found = unsafe { &mut *(found.0 as *mut Vec<HWND>) };
+        let shown = unsafe { IsWindowVisible(window) }.as_bool()
+            && unsafe { GetWindowTextLengthW(window) } > 0;
+        if shown {
+            found.push(window);
+        }
+        BOOL(1)
+    }
+    let mut windows = Vec::<HWND>::new();
+    let _ = unsafe { EnumWindows(Some(visit), LPARAM(&mut windows as *mut Vec<HWND> as isize)) };
+    windows
+        .into_iter()
+        .filter_map(|window| {
+            let pid = process_of(window);
+            if pid == std::process::id() {
+                return None;
+            }
+            app_id_of(window, pid, &Handle::process(pid)?)
+        })
+        .collect()
+}
+
+pub fn executable_of(pid: u32) -> Option<String> {
+    if pid == 0 {
+        return None;
+    }
+    Handle::process(pid)?.executable_name()
+}
+
+pub fn parent_processes() -> HashMap<u32, u32> {
+    let mut parents = HashMap::new();
+    let Ok(snapshot) = (unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }) else {
+        return parents;
+    };
+    let snapshot = Handle(snapshot);
+    let mut entry = PROCESSENTRY32W {
+        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+        ..PROCESSENTRY32W::default()
+    };
+    let mut more = unsafe { Process32FirstW(snapshot.0, &mut entry) }.is_ok();
+    while more {
+        parents.insert(entry.th32ProcessID, entry.th32ParentProcessID);
+        more = unsafe { Process32NextW(snapshot.0, &mut entry) }.is_ok();
+    }
+    parents
 }
 
 pub fn foreground_is_this_process() -> bool {
@@ -59,7 +116,22 @@ fn process_of(window: HWND) -> u32 {
     pid
 }
 
+pub fn reader_processes(window: isize) -> Vec<u32> {
+    let window = HWND(window as *mut _);
+    let pid = process_of(window);
+    if pid == 0 {
+        return Vec::new();
+    }
+    let mut readers = vec![pid];
+    readers.extend(hosted_pid(window, pid));
+    readers
+}
+
 fn hosted_app(frame: HWND, frame_pid: u32) -> Option<String> {
+    Handle::process(hosted_pid(frame, frame_pid)?)?.executable_name()
+}
+
+fn hosted_pid(frame: HWND, frame_pid: u32) -> Option<u32> {
     struct Search {
         frame_pid: u32,
         found: Option<u32>,
@@ -84,7 +156,7 @@ fn hosted_app(frame: HWND, frame_pid: u32) -> Option<String> {
             LPARAM(&mut search as *mut Search as isize),
         )
     };
-    Handle::process(search.found?)?.executable_name()
+    search.found
 }
 
 fn own_integrity() -> Option<u32> {
@@ -155,6 +227,27 @@ fn token_integrity(process: HANDLE) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn running_apps_never_list_this_app_and_are_lowercase_executables() {
+        let own = Handle::process(std::process::id())
+            .and_then(|process| process.executable_name())
+            .unwrap();
+        for app in running_apps() {
+            assert_ne!(app, own);
+            assert_eq!(app, app.to_lowercase());
+        }
+    }
+
+    #[test]
+    fn the_process_snapshot_knows_this_process_and_its_parent() {
+        let parents = parent_processes();
+        assert!(
+            parents
+                .get(&std::process::id())
+                .is_some_and(|parent| *parent != 0)
+        );
+    }
 
     #[test]
     fn this_process_reports_at_least_medium_integrity() {

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError, mpsc};
 use std::thread;
 use std::time::Instant;
 
@@ -7,21 +7,22 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::activity::{Activity, Busy};
-use crate::api::{AuthedApi, HttpApi};
+use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi};
 #[cfg(debug_assertions)]
 use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
 use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
-use crate::clipboard;
+use crate::clipboard::{self, Clipboard, ClipboardError};
 use crate::config::{self, Settings};
-use crate::dictation::{Job, Notifier, SIGN_IN_TO_DICTATE, Worker};
+use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
+use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
-use crate::locale;
-use crate::overlay::{GatedOverlay, Overlay, OverlayState, WindowOverlay};
+use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverlay};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
+use crate::rules::{RuleCache, RuleSource};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
 use crate::{account, env};
@@ -35,6 +36,7 @@ pub type AppApi = AuthedApi<Arc<AppAccount>>;
 pub struct Shell {
     pub account: Arc<AppAccount>,
     pub api: AppApi,
+    pub rules: Arc<RuleCache>,
     #[cfg(debug_assertions)]
     pub stub: Stub,
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
@@ -47,6 +49,7 @@ pub struct Shell {
     settings: Mutex<Settings>,
     settings_path: PathBuf,
     proposed: Mutex<Option<Hotkey>>,
+    copies: OnceLock<Mutex<Box<dyn Clipboard + Send>>>,
 }
 
 impl Shell {
@@ -59,6 +62,7 @@ impl Shell {
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
+        let waveform = Waveform::new(app.clone(), microphone.level());
         let provider = CognitoProvider {
             cognito: Cognito::for_environment(env::CURRENT)?,
             device_name: device_name(app),
@@ -71,6 +75,7 @@ impl Shell {
             Box::new(move |signed_in| account::changed(&listener_app, signed_in)),
         ));
         let api = AuthedApi::new(HttpApi::new(env::CURRENT.api_url)?, Arc::clone(&account));
+        let rules = Arc::new(RuleCache::default());
         let dictation_api = api.clone();
         #[cfg(debug_assertions)]
         let stub = Stub::start(STUB_DELAY)?;
@@ -96,7 +101,7 @@ impl Shell {
             paste,
             overlay: overlay.clone(),
             notifier: TrayNotifier(app.clone()),
-            locale: locale::system_locale(),
+            keystrokes: Arc::clone(&rules),
         };
         thread::Builder::new()
             .name("dictation".into())
@@ -105,9 +110,12 @@ impl Shell {
         let sink = ShellSink {
             app: app.clone(),
             account: Arc::clone(&account),
+            api: api.clone(),
+            rules: Arc::clone(&rules),
             overlay: overlay.clone(),
             jobs: jobs.clone(),
             target: ForegroundApp::default(),
+            waveform,
             activity: activity.clone(),
             busy: None,
         };
@@ -118,6 +126,7 @@ impl Shell {
         Ok(Self {
             account,
             api,
+            rules,
             #[cfg(debug_assertions)]
             stub,
             overlay,
@@ -130,6 +139,7 @@ impl Shell {
             settings: Mutex::new(settings),
             settings_path,
             proposed: Mutex::new(None),
+            copies: OnceLock::new(),
         })
     }
 
@@ -143,6 +153,15 @@ impl Shell {
         if let Err(error) = config::save(&self.settings_path, &settings) {
             log::error!("saving settings failed: {error}");
         }
+    }
+
+    pub fn copy(&self, text: &str) -> Result<(), ClipboardError> {
+        let copies = self.copies.get_or_init(|| Mutex::new(clipboard::system()));
+        lock(copies).put_text(text)
+    }
+
+    pub fn reload_rules(&self) {
+        self.rules.load(&self.api);
     }
 
     pub fn hotkey(&self) -> Hotkey {
@@ -167,9 +186,9 @@ impl Shell {
         });
     }
 
-    pub fn propose_hotkey(&self, codes: &[String]) -> Result<Vec<String>, String> {
+    pub fn propose_hotkey(&self, codes: &[String]) -> Result<Vec<String>, Message> {
         if !lock(&self.keys).is_capturing(Instant::now()) {
-            return Err("The recording ended. Click Change to try again.".into());
+            return Err(Message::HotkeyCaptureEnded);
         }
         let pressed = codes
             .iter()
@@ -177,7 +196,7 @@ impl Shell {
             .collect::<Option<Vec<_>>>();
         let Some(pressed) = pressed else {
             lock(&self.keys).finish_capture(None);
-            return Err("That key cannot be part of the shortcut.".into());
+            return Err(Message::HotkeyKeyNotAllowed);
         };
         match Hotkey::from_pressed(&pressed) {
             Ok(hotkey) => {
@@ -189,7 +208,7 @@ impl Shell {
             Err(error) => {
                 log::info!("hotkey capture rejected: {error}");
                 lock(&self.keys).finish_capture(None);
-                Err(error.to_string())
+                Err(error.message())
             }
         }
     }
@@ -251,12 +270,21 @@ fn device_name(app: &AppHandle) -> String {
     }
 }
 
+impl RuleSource for AppApi {
+    fn app_rules(&self) -> Result<AppRuleList, ApiFailure> {
+        AuthedApi::app_rules(self)
+    }
+}
+
 struct ShellSink {
     app: AppHandle,
     account: Arc<AppAccount>,
+    api: AppApi,
+    rules: Arc<RuleCache>,
     overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
+    waveform: Waveform,
     activity: Activity,
     busy: Option<Busy>,
 }
@@ -265,10 +293,14 @@ impl Sink for ShellSink {
     fn may_record(&mut self) -> bool {
         if self.account.is_signed_in() {
             self.account.renew_in_background();
+            if self.rules.claim_refresh(Instant::now()) {
+                let (api, rules) = (self.api.clone(), Arc::clone(&self.rules));
+                thread::spawn(move || rules.load(&api));
+            }
             return true;
         }
         self.overlay.set(OverlayState::Error {
-            message: SIGN_IN_TO_DICTATE.into(),
+            message: Message::SignInToDictate,
             action: None,
         });
         windows::open_account(&self.app, false);
@@ -278,10 +310,12 @@ impl Sink for ShellSink {
     fn listening(&mut self) {
         self.busy = Some(self.activity.start());
         self.overlay.begin_recording();
+        self.waveform.start();
         self.target = SystemWindow.foreground();
     }
 
     fn finished(&mut self, take: Take) {
+        self.waveform.stop();
         self.overlay.end_recording();
         let _ = self.jobs.send(Job {
             take,
@@ -329,13 +363,13 @@ impl Modifiers for HeldModifiers {
 pub struct TrayNotifier(AppHandle);
 
 impl Notifier for TrayNotifier {
-    fn notify(&self, message: &str) {
+    fn notify(&self, sentence: &[Message]) {
         let shown = self
             .0
             .notification()
             .builder()
             .title(windows::product_name(&self.0))
-            .body(message)
+            .body(i18n::sentence(sentence))
             .show();
         if let Err(error) = shown {
             log::warn!("showing a notification failed: {error}");

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@take-my-word/brand";
 import { signedFetch } from "@/lib/signed-fetch.ts";
 
 export function SignOutButton({ text }: { text: string }) {
@@ -19,13 +20,8 @@ export function SignOutButton({ text }: { text: string }) {
   }
 
   return (
-    <button
-      type="button"
-      className="button button-secondary"
-      disabled={pending}
-      onClick={() => void signOut()}
-    >
+    <Button variant="secondary" size="sm" loading={pending} onClick={() => void signOut()}>
       {text}
-    </button>
+    </Button>
   );
 }

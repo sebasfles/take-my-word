@@ -6,6 +6,7 @@ import type { Deleted } from "./api.ts";
 import {
   deleteDictationHandler,
   localeHandler,
+  themeHandler,
   newPasswordHandler,
   refreshHandler,
   signInHandler,
@@ -14,6 +15,7 @@ import {
   type HandlerDeps,
 } from "./handlers.ts";
 import { localeCookieName, localeFrom } from "./i18n.ts";
+import { themeCookieName, themeFrom } from "./theme.ts";
 import { refreshCookieName, sessionCookieName, sessionCookies } from "./session.ts";
 
 const origin = "https://dev.takemyword.fless.dev";
@@ -258,18 +260,39 @@ describe("POST /api/locale", () => {
   const handler = localeHandler(() => origin);
 
   it("switches the language through a cookie the pages read", async () => {
-    const response = await handler(post("/api/locale", { locale: "en" }));
+    const response = await handler(post("/api/locale", { locale: "es" }));
     expect(response.status).toBe(200);
     const header = setCookies(response).get(localeCookieName) ?? "";
-    expect(header).toMatch(/^tmw-lang=en;/);
+    expect(header).toMatch(/^tmw-lang=es;/);
     expect(header).toMatch(/Max-Age=31536000/);
-    expect(localeFrom(header.split(";")[0]?.split("=")[1])).toBe("en");
+    expect(localeFrom(header.split(";")[0]?.split("=")[1], "en-US,en;q=0.9")).toBe("es");
   });
 
   it("refuses an unknown language and a foreign origin", async () => {
     expect((await handler(post("/api/locale", { locale: "fr" }))).status).toBe(400);
     expect(
       (await handler(post("/api/locale", { locale: "en" }, { origin: "https://evil.example" })))
+        .status,
+    ).toBe(403);
+  });
+});
+
+describe("POST /api/theme", () => {
+  const handler = themeHandler(() => origin);
+
+  it("remembers the chosen theme in a cookie the layout reads", async () => {
+    const response = await handler(post("/api/theme", { theme: "dark" }));
+    expect(response.status).toBe(200);
+    const header = setCookies(response).get(themeCookieName) ?? "";
+    expect(header).toMatch(/^tmw-theme=dark;/);
+    expect(header).toMatch(/HttpOnly/i);
+    expect(themeFrom(header.split(";")[0]?.split("=")[1])).toBe("dark");
+  });
+
+  it("refuses an unknown theme and a foreign origin", async () => {
+    expect((await handler(post("/api/theme", { theme: "sepia" }))).status).toBe(400);
+    expect(
+      (await handler(post("/api/theme", { theme: "dark" }, { origin: "https://evil.example" })))
         .status,
     ).toBe(403);
   });

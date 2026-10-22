@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setLanguage } from "../i18n.ts";
 import { fakeBridge, listeners } from "../testing/bridge.ts";
 import { Settings } from "./Settings.tsx";
 
@@ -7,6 +8,8 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../bridge.ts")>()),
   bridge: fakeBridge,
 }));
+
+setLanguage("en");
 
 function keys() {
   return Array.from(document.querySelectorAll("kbd"), (key) => key.textContent);
@@ -85,6 +88,22 @@ describe("Settings", () => {
     expect(fakeBridge.proposeHotkey).not.toHaveBeenCalled();
   });
 
+  it("ends a capture when the user leaves the section", async () => {
+    await startCapture();
+    chord(ctrl, shift);
+    await screen.findByRole("button", { name: "Save" });
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(fakeBridge.cancelHotkeyCapture).toHaveBeenCalledOnce();
+    expect(fakeBridge.confirmHotkey).not.toHaveBeenCalled();
+  });
+
+  it("leaves Rust alone when the user leaves the section without capturing", async () => {
+    render(<Settings />);
+    await screen.findByText("Win");
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(fakeBridge.cancelHotkeyCapture).not.toHaveBeenCalled();
+  });
+
   it("gives up after fifteen seconds", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await startCapture();
@@ -105,7 +124,10 @@ describe("Settings", () => {
   });
 
   it("explains why a capture could not start", async () => {
-    fakeBridge.captureHotkey.mockRejectedValueOnce("Click Change in the settings window.");
+    fakeBridge.captureHotkey.mockRejectedValueOnce({
+      message: "hotkey.notInSettings",
+      backToSignIn: false,
+    });
     render(<Settings />);
     await screen.findByText("Win");
     fireEvent.click(screen.getByRole("button", { name: "Change" }));
@@ -128,6 +150,7 @@ describe("Settings", () => {
 
   it("signs out and then offers to sign in again", async () => {
     render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
     fakeBridge.accountStatus.mockResolvedValue({ signedIn: false, username: null });
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -138,8 +161,64 @@ describe("Settings", () => {
     fakeBridge.accountStatus.mockResolvedValue({ signedIn: true, username: "sebastian" });
   });
 
+  it("opens on the section the shell asks for and moves between sections", async () => {
+    window.history.replaceState(null, "", "?view=settings&section=account");
+    render(<Settings />);
+    await screen.findByText("Signed in as sebastian");
+    expect(screen.getByRole("button", { name: "Account" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    await screen.findByText("Win");
+    expect(screen.queryByText("Signed in as sebastian")).toBeNull();
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("moves an open window to the dictionary with the add field focused", async () => {
+    fakeBridge.apiRequest.mockImplementation((route) =>
+      Promise.resolve(route.route === "listTerms" ? { terms: [] } : null),
+    );
+    render(<Settings />);
+    await screen.findByText("Win");
+    act(() => {
+      listeners.settingsNavigate?.("&section=dictionary&focus=add");
+    });
+    await screen.findByRole("heading", { name: "Dictionary" });
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText("Term"));
+    });
+    fakeBridge.apiRequest.mockRestore();
+  });
+
+  it("adds a dictation language by reading the settings again and replacing them whole", async () => {
+    render(<Settings />);
+    const english = await screen.findByRole("checkbox", { name: "English" });
+    fireEvent.click(english);
+    await screen.findByText("Saved.");
+    const routes = fakeBridge.apiRequest.mock.calls.map(([route]) => route);
+    expect(routes.at(-2)).toEqual({ route: "getSettings" });
+    expect(routes.at(-1)).toMatchObject({
+      route: "replaceSettings",
+      body: { defaultStyleId: "plain", dictationLanguages: ["es", "en"] },
+    });
+  });
+
+  it("offers Windows' language, English and Spanish for the app and saves the choice", async () => {
+    render(<Settings />);
+    const select = await screen.findByLabelText("App language");
+    await vi.waitFor(() => {
+      expect((select as HTMLSelectElement).disabled).toBe(false);
+    });
+    expect(screen.getByRole("option", { name: "Windows language (Español)" })).toBeTruthy();
+    fireEvent.change(select, { target: { value: "en" } });
+    expect(fakeBridge.setUiLanguage).toHaveBeenCalledWith("en");
+    fireEvent.change(select, { target: { value: "windows" } });
+    expect(fakeBridge.setUiLanguage).toHaveBeenLastCalledWith(null);
+  });
+
   it("follows a session that ends elsewhere", async () => {
     render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
     fakeBridge.accountStatus.mockResolvedValueOnce({ signedIn: false, username: null });
     act(() => {

@@ -1,26 +1,28 @@
 ---
-updated: 2026-10-21
-source: 0005_desktop_release
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Desktop: technical
 
-Built on Windows by 0002, signed in to the real API by 0007, released and self-updating since 0005; phase 3 adds app rules, phase 5 macOS and Linux.
+Built on Windows by 0002, signed in to the real API by 0007, released and self-updating since 0005, with the editors, app rules and Spanish and English since 0008; phase 5 adds macOS and Linux.
 
 ## Structure
 
 | Path | What |
 |---|---|
 | `apps/desktop/src-tauri/src/hotkey` | Native `WH_KEYBOARD_LL` hook behind `KeyHook`, chord tracking, Start-menu guard, hotkey model |
-| `apps/desktop/src-tauri/src/audio` | `cpal` capture with a pre-armed stream, filtered resampling to 16 kHz mono 16-bit WAV |
+| `apps/desktop/src-tauri/src/audio` | `cpal` capture with a pre-armed stream, filtered resampling to 16 kHz mono 16-bit WAV, the input level meter |
 | `apps/desktop/src-tauri/src/session.rs`, `dictation.rs` | Hold, cancel, cap and the signed-out gate on the session thread; encode, send, paste and report on a worker |
-| `apps/desktop/src-tauri/src/paste.rs`, `clipboard`, `foreground` | Paste through a delayed-rendered clipboard, restore, focus and integrity checks, `appId` |
+| `apps/desktop/src-tauri/src/paste.rs`, `clipboard`, `foreground` | Paste through a delayed-rendered clipboard given only to the target's processes, restore, focus and integrity checks, `appId`, running apps |
+| `apps/desktop/src-tauri/src/rules.rs` | The user's app rules kept in memory for the paste keystroke |
+| `apps/desktop/src-tauri/src/i18n.rs`, `apps/desktop/src/i18n` | Message ids and the `es` and `en` dictionaries shared by Rust and the views |
 | `apps/desktop/src-tauri/src/auth` | SRP port, the six Cognito calls, `Secret`, and `Account`: the session behind one lock |
 | `apps/desktop/src-tauri/src/keychain` | Refresh token and device keys in Windows Credential Manager; unsupported elsewhere |
-| `apps/desktop/src-tauri/src/api` | Serde mirror of the `packages/shared` contracts, the bearer client with its one retry, and the debug-only stub |
+| `apps/desktop/src-tauri/src/api` | Serde mirror of the contracts Rust reads, the route forwarder, the bearer client with its one retry, and the debug-only stub |
 | `apps/desktop/src-tauri/src/updater.rs`, `activity.rs` | Update check, offer, download and install; the in-flight dictation guard that keeps them out of a hold or a pending paste |
 | `apps/desktop/src-tauri/src/env.rs`, `account.rs` | Build-time environment; sign-in, new password, onboarding and sign-out commands and windows |
-| `apps/desktop/src` | React views: sign-in, choose password and style pick, first run, settings, overlay, update |
+| `apps/desktop/src` | React views: sign-in, choose password, onboarding, first run, settings and its sections, overlay, update; `api.ts` validates every forwarded route with the shared schemas |
 | `apps/desktop/scripts` | Version check, `pnpm release:desktop`, and the release check that verifies `latest.json` against the committed key |
 | `apps/desktop/contract` | JSON Schema of the mirrored contracts generated from `packages/shared` (`pnpm contract`) |
 | `apps/desktop/screenshots` | Mocked Tauri bridge and the Playwright script behind `pnpm screenshots` |
@@ -33,17 +35,17 @@ Windows code sits behind the hook, foreground, clipboard and keychain modules; o
 
 None; desktop is a client.
 
-Calls, all from Rust with the access token: `POST /dictations` (audio, `locale` from the Windows language, `appId`), `GET /styles`, `GET` and `PUT /me/settings` (read first, since `PUT` replaces the item).
+Calls, all from Rust with the access token: `POST /dictations` (audio and `appId`; the API picks the language), `GET /styles`, `GET /app-rules`, `GET` and `PUT /me/settings` (read first, since `PUT` replaces the item), and the editors' routes through the forwarder: dictionary, styles and app rules CRUD, settings, history page and delete.
 Cognito directly, as unsigned JSON calls: `InitiateAuth`, `RespondToAuthChallenge`, `ConfirmDevice`, `GetTokensFromRefreshToken`, `ForgetDevice`, `RevokeToken`.
 
-Jobs, listeners or scheduled work: the key hook, the microphone thread and the clipboard thread run for the app's lifetime; a renewal starts in the background at hotkey down; prd release builds check `releases/latest/download/latest.json` at start and every 6 hours.
+Jobs, listeners or scheduled work: the key hook, the microphone thread and the clipboard thread run for the app's lifetime; a renewal, and a rule refresh when the rules are older than 5 min, start in the background at hotkey down; a level emitter runs only during a hold; prd release builds check `releases/latest/download/latest.json` at start and every 6 hours.
 
 ## Depends on
 
 - dictation: `POST /dictations` turns the WAV into clean text; settings hold the default style.
 - auth: the pool, the client contract and the authorizer.
-- styles: the style list for onboarding; app rules map the focused app to a style and a paste keystroke from phase 3.
-- GitHub Releases: installers and `latest.json`, downloaded anonymously by the updater and the landing.
+- styles, dictionary: the editors' data; app rules map the focused app to a style and a paste keystroke.
+- GitHub Releases: installers and `latest.json`, downloaded anonymously by the updater and the landing; the landing reads the version through `desktopReleaseManifestSchema` in `packages/shared`.
 
 ## Depended on by
 
@@ -56,7 +58,7 @@ Jobs, listeners or scheduled work: the key hook, the microphone thread and the c
 - Keychain service and config folder are the identifier, so dev and prd never share them.
 - The updater lives in `tauri.prd.conf.json` only (public key, endpoint, signed version required, `createUpdaterArtifacts`); the app registers it only when that config is present and the build is not debug, so dev and debug builds never check.
 - Version: `Cargo.toml`, `package.json` and the `Cargo.lock` entry stay equal (`pnpm check:version`, run by `ci`); `tauri.conf.json` has none, so Tauri reads `Cargo.toml`.
-- `settings.json` in the config folder: hotkey, first-run flag, and the Cognito `sub` of users who already picked a style on this machine; autostart lives in the OS (`HKCU\...\Run`).
+- `settings.json` in the config folder: hotkey, first-run flag, the Cognito `sub` of users already onboarded on this machine, and the app language when chosen; autostart lives in the OS (`HKCU\...\Run`).
 - Debug builds only: `--dump-dir`, and `--dictate-wav` and `--stub-mode` sent to the running instance through single instance; the stub's tray submenu, off by default.
 
 ## Releases
@@ -69,7 +71,7 @@ Jobs, listeners or scheduled work: the key hook, the microphone thread and the c
 
 ## Testing
 
-- `cargo test`: hook model, session gate, paste, worker and error messages, stub routing, Cognito request shapes against a local fake, SRP against vectors from `packages/cognito`, the account (renewal, single renewal under concurrency, sign-in, new password, sign-out order), the bearer retry, the keychain on the real Credential Manager, and the contract against `contract.schema.json`.
+- `cargo test`: hook model, session gate, paste and its reader rule, worker and error messages, route forwarding, rule cache ordering, level meter on a speech WAV and silence, dictionaries, stub routing, Cognito request shapes against a local fake, SRP against vectors from `packages/cognito`, the account (renewal, single renewal under concurrency, sign-in, new password, sign-out order), the bearer retry, the keychain on the real Credential Manager, and the contract against `contract.schema.json`.
 - `auth::dev_pool` tests are ignored: with `TMW_DEV_USERNAME` and `TMW_DEV_PASSWORD` they sign in to the dev pool, call the dev API and clean up after themselves.
-- Vitest covers the views with a mocked bridge and fails `ci` when `contract.schema.json` is stale; `pnpm screenshots <dir>` renders every state at 390, 768 and 1280 px.
-- Physical keyboard, microphone and paste behavior need a manual check from the PR installer; the update path was checked on Windows from 0.1.0 to 0.1.1.
+- Vitest covers the views with a mocked bridge, both dictionaries for missing keys, and fails `ci` when `contract.schema.json` is stale; `pnpm screenshots <dir>` renders every state in both languages at 390, 768 and 1280 px and fails on sideways scroll.
+- Physical keyboard, microphone and paste behavior need a manual check from the PR installer; the update path was checked on Windows from 0.1.0 to 0.1.1, and the editors, paste keystrokes, languages and a silent hold in 0008, in scratch windows the run launched.

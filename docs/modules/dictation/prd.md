@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0009_web_account
+source: 0008_desktop_features
 ---
 
 # Dictation: product
@@ -9,7 +9,7 @@ source: 0009_web_account
 
 The user speaks and gets clean, ready-to-use text: fillers removed, punctuation added, personal dictionary and chosen style applied.
 It is the core of Take My Word ("Your Word, Our Command."): hold a key, speak, release, and the text lands where the user is typing.
-Spanish first, English second.
+Spanish and English; each user says which of the two they speak.
 
 ## User flows
 
@@ -24,9 +24,16 @@ Silence produces empty text and nothing is pasted; a short reply such as "Gracia
 Over the daily quota the dictation is refused and the user is told the daily limit is reached.
 If a provider fails the user sees an error and nothing is pasted.
 
+### Choose dictation languages
+
+1. The user picks one or both of English and Spanish, during the desktop's onboarding or later in its settings.
+2. With one, every dictation is transcribed in it; with both, each dictation is recognized as one or the other.
+
+Errors and empty states: at least one language stays chosen.
+
 ### Review history
 
-1. The user opens history on the web.
+1. The user opens history on the web or in the desktop settings.
 2. The user sees past dictations as text, newest first, from the last 90 days, with the date, the style used, the seconds of audio and the raw transcript collapsed under the text, a page at a time.
 3. The user deletes a dictation after confirming; it leaves the list at once.
 
@@ -44,7 +51,9 @@ Errors and empty states: with no dictations, the list is empty.
 - Audio is never kept; only the text, deleted after 90 days.
 - A user only ever sees their own dictations.
 - The style comes from the user's pick, else the active app's rule on desktop, else the user's default, else `plain`; a style that no longer exists never makes a dictation fail.
-- A new user's settings start with the `plain` style and Spanish; the language setting is a client preference, each dictation still says its own language.
+- A new user's settings start with the `plain` style and English; users who existed before dictation languages keep the language they had.
+- With both languages chosen, a dictation recognized as neither is transcribed in the first one; the allowance is charged once.
+- The language comes from the user's settings, never from the device; older clients that still send one are ignored.
 - The transcription and cleanup providers follow the user's settings; a dictation may override them.
 - The result is the cleaned text and nothing else.
 

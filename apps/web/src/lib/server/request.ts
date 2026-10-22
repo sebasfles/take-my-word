@@ -1,13 +1,21 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { appAccess, type Access } from "../gate.ts";
 import { dictionary, localeCookieName, localeFrom, type Locale } from "../i18n.ts";
 import { accessClaims, readSession, type WebSession } from "../session.ts";
+import { themeCookieName, themeFrom, type Theme } from "../theme.ts";
 import { getCookieKey } from "./config.ts";
 
 export const currentLocale = cache(async (): Promise<Locale> => {
-  return localeFrom((await cookies()).get(localeCookieName)?.value);
+  return localeFrom(
+    (await cookies()).get(localeCookieName)?.value,
+    (await headers()).get("accept-language"),
+  );
+});
+
+export const currentTheme = cache(async (): Promise<Theme> => {
+  return themeFrom((await cookies()).get(themeCookieName)?.value);
 });
 
 export async function currentDictionary() {

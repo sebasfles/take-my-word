@@ -179,7 +179,7 @@ async fn dictations(
     };
     match mode {
         StubMode::Off | StubMode::Normal => {
-            axum::Json(canned(&meta.locale, shared.delay)).into_response()
+            axum::Json(canned(meta.locale.as_deref().unwrap_or("es"), shared.delay)).into_response()
         }
         StubMode::Silence => axum::Json(silence(shared.delay)).into_response(),
         StubMode::QuotaExceeded => api_error(
@@ -250,7 +250,11 @@ fn validate(upload: &Upload) -> Result<DictationMeta, Rejection> {
     };
     let meta: DictationMeta = serde_json::from_str(meta)
         .map_err(|_| (ApiErrorCode::BadRequest, "The meta part is not valid JSON."))?;
-    if !valid_locale(&meta.locale) {
+    if meta
+        .locale
+        .as_deref()
+        .is_some_and(|locale| !valid_locale(locale))
+    {
         return Err((
             ApiErrorCode::BadRequest,
             "Invalid locale: expected es or en, optionally with a region.",
@@ -365,7 +369,7 @@ mod tests {
 
     fn meta(locale: &str) -> DictationMeta {
         DictationMeta {
-            locale: locale.into(),
+            locale: Some(locale.into()),
             app_id: Some("notepad.exe".into()),
             ..DictationMeta::default()
         }
@@ -380,6 +384,8 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(accepted, meta("es-CL"));
+        let without_locale = validate(&upload("audio/wav", wav(1.0), r#"{"appId":"notepad.exe"}"#));
+        assert_eq!(without_locale.map(|meta| meta.locale), Ok(None));
     }
 
     #[test]
@@ -406,7 +412,7 @@ mod tests {
                 ApiErrorCode::BadRequest,
             ),
             (
-                upload("audio/wav", wav(1.0), r#"{}"#),
+                upload("audio/wav", wav(1.0), r#"{"locale":"#),
                 ApiErrorCode::BadRequest,
             ),
             (
@@ -482,7 +488,7 @@ mod tests {
 
         stub.set_mode(StubMode::Normal);
         assert!(matches!(
-            api.dictate(wav(1.0), &DictationMeta::default()),
+            api.dictate(wav(1.0), &meta("fr")),
             Err(ApiFailure::Rejected {
                 status: 400,
                 code: Some(ApiErrorCode::BadRequest)

@@ -2,35 +2,74 @@ use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, Wry};
 
+use crate::i18n::{Message, text};
 use crate::{account, windows};
 
 const SETTINGS: &str = "settings";
+const ADD_WORD: &str = "add-word";
 const ACCOUNT: &str = "account";
 const QUIT: &str = "quit";
 
-struct AccountItem(MenuItem<Wry>);
+struct Items {
+    add_word: MenuItem<Wry>,
+    settings: MenuItem<Wry>,
+    account: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
+}
 
 fn account_label(signed_in: bool) -> &'static str {
-    if signed_in { "Sign out" } else { "Sign in" }
+    text(if signed_in {
+        Message::TraySignOut
+    } else {
+        Message::TraySignIn
+    })
 }
 
 pub fn show_signed_in(app: &AppHandle, signed_in: bool) {
-    if let Some(item) = app.try_state::<AccountItem>()
-        && let Err(error) = item.0.set_text(account_label(signed_in))
+    if let Some(items) = app.try_state::<Items>()
+        && let Err(error) = items.account.set_text(account_label(signed_in))
     {
         log::warn!("updating the tray failed: {error}");
     }
 }
 
+pub fn relabel(app: &AppHandle, signed_in: bool) {
+    let Some(items) = app.try_state::<Items>() else {
+        return;
+    };
+    let relabeled = items
+        .add_word
+        .set_text(text(Message::TrayAddWord))
+        .and_then(|()| items.settings.set_text(text(Message::TraySettings)))
+        .and_then(|()| items.account.set_text(account_label(signed_in)))
+        .and_then(|()| items.quit.set_text(text(Message::TrayQuit)));
+    if let Err(error) = relabeled {
+        log::warn!("relabeling the tray failed: {error}");
+    }
+}
+
 pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
-    let settings = MenuItem::with_id(app, SETTINGS, "Settings", true, None::<&str>)?;
+    let settings = MenuItem::with_id(
+        app,
+        SETTINGS,
+        text(Message::TraySettings),
+        true,
+        None::<&str>,
+    )?;
+    let add_word = MenuItem::with_id(
+        app,
+        ADD_WORD,
+        text(Message::TrayAddWord),
+        true,
+        None::<&str>,
+    )?;
     let account_item =
         MenuItem::with_id(app, ACCOUNT, account_label(signed_in), true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let quit = MenuItem::with_id(app, QUIT, "Quit", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, QUIT, text(Message::TrayQuit), true, None::<&str>)?;
     #[cfg(debug_assertions)]
     let stub = stub::Menu::build(app)?;
-    let mut items: Vec<&dyn IsMenuItem<Wry>> = vec![&settings, &account_item];
+    let mut items: Vec<&dyn IsMenuItem<Wry>> = vec![&add_word, &settings, &account_item];
     #[cfg(debug_assertions)]
     items.push(&stub.submenu);
     items.extend([&separator as &dyn IsMenuItem<Wry>, &quit]);
@@ -41,6 +80,7 @@ pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             SETTINGS => windows::open_settings(app),
+            ADD_WORD => windows::add_word(app),
             ACCOUNT => account::toggle_from_tray(app),
             QUIT => app.exit(0),
             #[cfg(debug_assertions)]
@@ -52,7 +92,12 @@ pub fn build(app: &AppHandle, signed_in: bool) -> tauri::Result<()> {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
-    app.manage(AccountItem(account_item));
+    app.manage(Items {
+        add_word,
+        settings,
+        account: account_item,
+        quit,
+    });
     Ok(())
 }
 

@@ -147,7 +147,7 @@ export function apiClient(token: string) {
     setDefaultStyle: (defaultStyleId: string) =>
       call("PUT", "/me/settings", {
         defaultStyleId,
-        locale: "es",
+        dictationLanguages: ["es"],
         providers: { transcriber: "groq-whisper", refiner: "openai" },
       }),
     addRule: async (appId: string, styleId: string) =>

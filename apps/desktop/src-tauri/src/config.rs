@@ -5,6 +5,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::hotkey::Hotkey;
+use crate::locale::Language;
 
 pub const FILE_NAME: &str = "settings.json";
 
@@ -14,6 +15,8 @@ pub struct Settings {
     pub hotkey: Hotkey,
     pub first_run_done: bool,
     pub onboarded_users: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ui_language: Option<Language>,
 }
 
 pub fn load(path: &Path) -> Settings {
@@ -57,6 +60,25 @@ mod tests {
     }
 
     #[test]
+    fn the_app_language_is_saved_only_when_chosen() {
+        let path = scratch("ui-language", None);
+        let chosen = Settings {
+            ui_language: Some(Language::Es),
+            ..Settings::default()
+        };
+        save(&path, &chosen).unwrap();
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains(r#""uiLanguage": "es""#)
+        );
+        assert_eq!(load(&path), chosen);
+        save(&path, &Settings::default()).unwrap();
+        assert!(!fs::read_to_string(&path).unwrap().contains("uiLanguage"));
+        assert_eq!(load(&path).ui_language, None);
+    }
+
+    #[test]
     fn missing_or_invalid_files_fall_back_to_ctrl_win() {
         assert_eq!(load(&scratch("missing", None)), Settings::default());
         assert_eq!(load(&scratch("broken", Some("{"))), Settings::default());
@@ -80,6 +102,7 @@ mod tests {
             hotkey: Hotkey::new(vec![HotkeyKey::Shift, HotkeyKey::Alt]).unwrap(),
             first_run_done: true,
             onboarded_users: vec!["2448e4f8-2081-70f1-5c1b-1f2e3d4c5b6a".into()],
+            ui_language: Some(Language::En),
         };
         save(&path, &settings).unwrap();
         assert_eq!(load(&path), settings);

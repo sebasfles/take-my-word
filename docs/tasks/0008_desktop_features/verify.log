@@ -1,0 +1,74 @@
+## 2026-10-21T21:01:25Z by om-developer target desktop on bdf200b
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (37 vitest + 112 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+## 2026-10-21T21:07:05Z by om-developer target desktop on round 2 commit (same code as 23ef4c6; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (39 vitest + 112 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+## 2026-10-21T21:34:29Z by om-developer target desktop on round 3 commit (same code as 8828585; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 vitest + 120 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+## 2026-10-21T21:50:17Z by om-developer target desktop on round 4 commit (same code as 13d7277; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (89 vitest including 0005's release scripts + 131 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+- root and workflows: not run; the rebase had no conflict there and this branch changes no root file or workflow.
+## 2026-10-21T23:26:02Z by om-developer target desktop on round 5 commit (same code as 9248c54; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (92 vitest + 131 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+- contract first red: before the Rust mirror changed, `cargo test contract` failed on dictationMeta.locale (required in Rust, optional in shared) and settings.dictationLanguages (missing in Rust); exit 101, artefact .verify/contract-red.out.
+
+## 2026-10-21T23:26:02Z by om-developer target shared on round 5 commit (same code as 9248c54; run on 62b7490, which differs from it only in apps/desktop/src/LanguageRoot.test.tsx)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (22 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-21T23:26:02Z by om-developer target api on round 5 commit (same code as 9248c54; lint, typecheck and unit ran on 62b7490, which differs from it only in a desktop test)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (191 tests, pnpm test)
+- e2e: pass exit 0 (35 tests, pnpm e2e against dev after deploying 9248c54; the dictation languages cases also ran verbose, 3 passed, artefact .verify/api-e2e-languages.out)
+
+## 2026-10-21T23:26:02Z by om-developer target web on round 5 commit (same code as 9248c54; run on 62b7490, which differs from it only in a desktop test)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (95 tests, pnpm test)
+- e2e: n/a (web e2e not in this round's scope; its helper now saves dictationLanguages ["es"] so Spanish speech stays Spanish)
+## 2026-10-21T23:34:43Z by om-developer target web on round 6 commit (web code same as 9248c54; API on dev deployed from 9248c54, SHAs in round 5 notes, rechecked before the run)
+- lint: pass exit 0 (pnpm lint, round 5 artefact)
+- typecheck: pass exit 0 (pnpm typecheck, round 5 artefact)
+- unit: pass exit 0 (95 tests, pnpm test, round 5 artefact)
+- integration: pass exit 0 (4 tests, pnpm integration against the dev pool and the branch API, artefact .verify/web-integration.out)
+- e2e: fail exit 1 (5 failed, 3 passed, pnpm e2e --workers=1, artefact .verify/web-e2e.out)
+  Cause: dev's web Lambda was redeployed at 23:27:42 UTC, six minutes after the branch API deploy, with a build that is not develop's (the live page answers html lang "en" and carries display and text fonts develop's web does not have, matching 0010_brand_web). develop's e2e expects the Spanish default, so it failed on "lang es" and on the "Usuario" label before reaching settings. Rerun pending once dev's web is develop's again.
+## 2026-10-22T00:59:33Z by om-developer target desktop on round 7 commit (same code as 476fcb0; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (93 vitest + 137 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+- real clipboard: pass (cargo test clipboard::win32 -- --include-ignored, 3 passed, run inside the announced Windows run)
+- linux-check equivalent: pass exit 0 (cargo clippy --all-targets --locked -- -D warnings in rust:latest, rustc 1.99.1, with the job's apt packages, on 476fcb0; artefact .verify/linux-check.out). desktop-ci itself runs on the PR only.
+
+## 2026-10-22T00:59:33Z by om-developer target web on round 7 commit (web code same as 476fcb0; dev API redeployed from b7163db, whose API code equals 476fcb0's, SHAs authorizer SEc1e2CL+cw21lqWKSowFIDyoyA5JRBwSUXQK7lxNAg=, dictate n0j+B5t1L34R1P4ZM5K99NMVujF9px++PZkLw9tIuLM=, api K2MG5IGWOQzIzT9Y1BTXigl70Cd4oZKFSEg32oJrbXI=, dictionary-usage yBOqjy0YaOvbBCBupg351VkjU/Xi13duedB3GBEyFNM=; live web 8fe11f1, html lang es, deployed 23:36:09Z)
+- lint: pass exit 0 (round 5 artefact, web code unchanged since)
+- typecheck: pass exit 0 (round 5 artefact)
+- unit: pass exit 0 (95 tests, round 5 artefact)
+- integration: pass exit 0 (4 tests, pnpm integration against dev, artefact .verify/web-integration.out)
+- e2e: pass exit 0 (10 tests, pnpm e2e --workers=1 against dev, artefact .verify/web-e2e.out)
+## 2026-10-22T01:24:25Z by om-developer target desktop on round 8 commit (same code as 393a188; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (93 vitest + 140 cargo tests, pnpm test && pnpm rust:test)
+- real clipboard: pass exit 0 (scripts/windows.sh cargo test --locked clipboard::win32 -- --include-ignored --test-threads=1, 3 passed, on 393a188 inside an announced run with the clipboard snapshotted and restored by hash, artefact .verify/desktop-real-clipboard.out)
+- linux-check equivalent: pass exit 0 (cargo clippy --all-targets --locked -- -D warnings in rust:latest, rustc 1.99.1, with the job's apt packages, on 393a188, artefact .verify/linux-check.out)
+- e2e: n/a; desktop-ci runs on the PR.
+- correction: the round 7 block's "real clipboard: pass" had no exit code or artefact; it is superseded by this block's step.

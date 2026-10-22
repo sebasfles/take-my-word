@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@take-my-word/brand";
 import { useStateStrings } from "@/components/state-strings.tsx";
 
 export default function AccountLoading() {
@@ -9,10 +10,13 @@ export default function AccountLoading() {
       <p className="visually-hidden" role="status">
         {t.loading}
       </p>
-      <div className="skeleton skeleton-title" />
-      <div className="skeleton skeleton-line" />
-      <div className="skeleton skeleton-block" />
-      <div className="skeleton skeleton-block" />
+      <Skeleton className="skeleton-title" />
+      <Skeleton width="70%" />
+      <div className="skeleton-cards">
+        <Skeleton lines={3} className="skeleton-card" />
+        <Skeleton lines={3} className="skeleton-card" />
+        <Skeleton lines={2} className="skeleton-card" />
+      </div>
     </div>
   );
 }

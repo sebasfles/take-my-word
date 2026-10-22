@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0005_desktop_release
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Infra: architecture and debt
@@ -121,3 +121,22 @@ source: 0005_desktop_release
 - Debt created: the secrets sit outside Terraform, and the key has no rotation path, because installed apps trust only the public key they shipped with.
 - Revisit when: the key leaks or must change, or the repository gains other maintainers.
 - Source: 0005_desktop_release
+
+## 2026-10-22: The web loads the brand fonts through next/font
+
+- Decision: `apps/web` loads the brand's woff2 files with `next/font/local`, which serves them from `/_next/static`, preloads them through `Link` response headers and sets `--font-face-display` and `--font-face-text`; the brand tokens read those variables first, and the desktop keeps the brand's own `@font-face`.
+- Alternatives rejected: the brand's `@font-face` in the web too, discovered only after the CSS; copying fonts to `/static/`, which the plan reserves for fixed URLs.
+- Reason: without preload the swap moved the hero by a line on mobile (CLS 0.112); preloaded, Lighthouse measured CLS 0.000.
+- Debt created: two font-loading paths for one set of files.
+- Revisit when: the desktop needs preloading, or Next changes how `next/font/local` resolves files outside the app.
+- Source: 0010_brand_web
+
+## 2026-10-22: Brand assets are copied into the web's static folder, guarded by a test
+
+- Decision: `pnpm --filter @take-my-word/web static` copies the favicons, PWA icons and OG card from `packages/brand/src/assets` into `apps/web/public/static`; a unit test fails if the copies differ from the brand's or anything else is there.
+- Alternatives rejected: generating them inside the web build; serving them from `/_next/static`, whose hashed URLs cannot back favicons and social cards.
+- Reason: these files need fixed URLs, and the brand stays their only source.
+- Debt created: `desktop-ci` does not watch `packages/brand/` yet.
+- Revisit when: 0011 makes the desktop consume the brand package.
+- Source: 0010_brand_web
+

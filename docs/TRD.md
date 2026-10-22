@@ -18,6 +18,7 @@ Built and deployed to dev and prd: `apps/api`, `apps/web`, `packages/shared`, `i
 | desktop | app | `apps/desktop` | `develop` | Tauri 2 (Rust shell), React + TypeScript UI |
 | mobile | app | `apps/mobile` | `develop` | Expo managed workflow, EAS Build, Submit and Update |
 | shared | package | `packages/shared` | `develop` | TypeScript, zod contracts shared by api, web, desktop and mobile |
+| brand | package | `packages/brand` | `develop` | TypeScript and plain CSS: tokens, fonts, assets and primitives shared by web and desktop |
 | infra | code | `infra` | `develop` | Terraform, AWS provider |
 
 Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
@@ -81,6 +82,7 @@ Locally the real-clipboard test is ignored; `desktop-ci` runs every desktop chec
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
 | cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |
 | shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
+| brand | `packages/brand` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
 | infra | `infra` | `terraform fmt -check -recursive` | `terraform -chdir=environments/{core,dev,prd} validate`, after `init -backend=false` on a fresh clone | n/a | n/a |
 | workflows | `.` | `pnpm lint:workflows` (actionlint) | n/a | n/a | n/a |
 
