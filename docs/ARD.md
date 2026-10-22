@@ -69,6 +69,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | dictation | 2026-10-21 | A history page over many expired items costs one Query per batch until TTL deletes them | TTL lag leaves more than a page of expired items in a partition |
 | dictation | 2026-10-21 | Dictations past the newest 1000 are not reachable on the web | A user keeps more than 1000 dictations in 90 days |
 | dictation | 2026-10-21 | Users cannot see how much of the daily allowance is left | `GET /me/usage` lands |
+| dictation | 2026-10-21 | With several dictation languages, a dictation detected as neither costs a second transcription | Re-transcriptions show up in cost or latency |
 | dictionary | 2026-10-21 | Folding merges ñ and umlauts with their base letter; such terms cannot coexist | A user needs two terms that differ only by ñ or an umlaut |
 | dictionary | 2026-10-21 | The byte budget leaves part of Whisper's 224 prompt tokens unused | Users keep more top terms than fit and transcription misses them |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |
@@ -80,13 +81,15 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-20 | Clipboard monitors that ignore the exclusion format still see the dictated text | Users report missed pastes in an app class |
 | desktop | 2026-10-21 | macOS and Linux have no key hook yet | Phase 5 builds macOS and Linux |
 | desktop | 2026-10-21 | A prepared microphone stream may switch a Bluetooth headset to hands-free or hold it; untested | A Bluetooth headset is used, or its audio quality drops |
-| desktop | 2026-10-21 | Any clipboard read after the keystroke counts as the paste target | A paste reported as done does not land in a real app |
 | desktop | 2026-10-21 | Two SRP implementations, Rust and `packages/cognito`, to keep equal | Cognito changes the SRP variant, or a third client needs SRP |
 | desktop | 2026-10-21 | No keychain on macOS and Linux; a rotated refresh token that fails to save is lost at the next start | Phase 5, or a sign-out after a keychain error |
 | desktop | 2026-10-21 | axum and tokio compile, unlinked, into release builds | Release build time matters |
 | desktop | 2026-10-21 | The contract test skips string patterns, lengths and integer bounds | A client bug comes from a constraint the shapes do not carry |
 | desktop | 2026-10-21 | `latest.json` points to `api.github.com` asset URLs, limited to 60 anonymous requests per hour per IP | An update download fails with a rate-limit error, or users share one public IP |
 | desktop | 2026-10-21 | SmartScreen warns on the first install of the unsigned installer | The app is offered beyond the invited circle, or SmartScreen blocks installs |
+| desktop | 2026-10-21 | A new CRUD route needs a forwarder variant before the views can use it | The editors need a route the enum lacks |
+| desktop | 2026-10-21 | A rule edited elsewhere reaches this machine's paste keystroke up to 5 min later | A paste uses a stale keystroke after an edit elsewhere |
+| desktop | 2026-10-21 | Window-less or process-0 clipboard readers still get the dictation and count as the target; a reused pid can admit an unrelated process | A paste reported as done does not land again, or a target app's reads are withheld |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

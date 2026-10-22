@@ -1,9 +1,11 @@
 use crate::activity::Busy;
-use crate::api::{ApiErrorCode, ApiFailure, DictationApi, DictationMeta};
+use crate::api::{ApiErrorCode, ApiFailure, DictationApi, DictationMeta, PasteKeystroke};
 use crate::audio::{self, AudioError, Captured};
 use crate::foreground::ForegroundApp;
+use crate::i18n::Message;
 use crate::overlay::{Overlay, OverlayAction, OverlayState};
 use crate::paste::{PasteResult, Undelivered};
+use crate::rules::Keystrokes;
 use crate::session::Take;
 
 pub struct Job {
@@ -13,22 +15,27 @@ pub struct Job {
 }
 
 pub trait Paste {
-    fn paste(&mut self, text: &str, target: Option<isize>) -> PasteResult;
+    fn paste(
+        &mut self,
+        text: &str,
+        target: Option<isize>,
+        keystroke: PasteKeystroke,
+    ) -> PasteResult;
 }
 
 pub trait Notifier {
-    fn notify(&self, message: &str);
+    fn notify(&self, sentence: &[Message]);
 }
 
-pub struct Worker<A, P, O, N> {
+pub struct Worker<A, P, O, N, K> {
     pub api: A,
     pub paste: P,
     pub overlay: O,
     pub notifier: N,
-    pub locale: String,
+    pub keystrokes: K,
 }
 
-impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
+impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A, P, O, N, K> {
     pub fn handle(&mut self, job: Job) {
         let Job { take, target, busy } = job;
         match take {
@@ -51,15 +58,14 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
             Ok(wav) => wav,
             Err(error) => {
                 log::warn!("dictation failed: {error}");
-                self.overlay.set(error_state(GENERIC_FAILURE, None));
+                self.overlay.set(error_state(Message::Generic, None));
                 return;
             }
         };
         #[cfg(debug_assertions)]
         crate::dev::dump_recording(&wav);
         let meta = DictationMeta {
-            locale: self.locale.clone(),
-            app_id: target.app_id,
+            app_id: target.app_id.clone(),
             ..DictationMeta::default()
         };
         let response = match self.api.dictate(wav, &meta) {
@@ -75,68 +81,62 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier> Worker<A, P, O, N> {
             log::info!("dictation returned no text");
             return;
         }
-        match self.paste.paste(&response.text, target.window) {
+        let keystroke = self.keystrokes.for_app(target.app_id.as_deref());
+        log::info!(
+            "pasting into {} with {keystroke:?}",
+            target.app_id.as_deref().unwrap_or("an unknown app")
+        );
+        match self.paste.paste(&response.text, target.window, keystroke) {
             PasteResult::Pasted => log::info!("pasted a dictation"),
             PasteResult::PastedClipboardLost => {
                 log::info!("pasted a dictation but could not restore the clipboard");
-                self.notifier.notify(CLIPBOARD_LOST);
+                self.notifier.notify(&[Message::ClipboardLost]);
             }
             PasteResult::LeftInClipboard(reason) => {
                 log::info!("left a dictation in the clipboard: {reason:?}");
-                self.notifier.notify(match reason {
-                    Undelivered::FocusChanged => NOT_PASTED_FOCUS_CHANGED,
-                    Undelivered::Elevated => NOT_PASTED_ELEVATED,
-                    Undelivered::KeysHeld | Undelivered::NotRead => NOT_PASTED,
-                });
+                self.notifier.notify(&[match reason {
+                    Undelivered::FocusChanged => Message::NotPastedFocusChanged,
+                    Undelivered::Elevated => Message::NotPastedElevated,
+                    Undelivered::KeysHeld | Undelivered::NotRead => Message::NotPasted,
+                }]);
             }
-            PasteResult::Failed => self.overlay.set(error_state(PASTE_FAILURE, None)),
+            PasteResult::Failed => self.overlay.set(error_state(Message::PasteFailed, None)),
         }
     }
 }
 
-const GENERIC_FAILURE: &str = "Something went wrong. Try again.";
-const PASTE_FAILURE: &str = "Couldn't paste. Try again.";
-const NOT_PASTED: &str = "Couldn't paste into that window. The text is on your clipboard.";
-const CLIPBOARD_LOST: &str = "The text was pasted, but another app held the clipboard, so what you had copied before could not be put back.";
-const NOT_PASTED_FOCUS_CHANGED: &str = "The window changed while you were dictating, so nothing was pasted. The text is on your clipboard.";
-const NOT_PASTED_ELEVATED: &str =
-    "That window runs as administrator, so the text couldn't be pasted. It is on your clipboard.";
-
-fn error_state(message: &str, action: Option<OverlayAction>) -> OverlayState {
-    OverlayState::Error {
-        message: message.into(),
-        action,
-    }
+fn error_state(message: Message, action: Option<OverlayAction>) -> OverlayState {
+    OverlayState::Error { message, action }
 }
 
 fn microphone_error(error: &AudioError) -> OverlayState {
     match error {
         AudioError::PermissionDenied => error_state(
-            "Windows blocks the microphone.",
+            Message::MicrophoneBlocked,
             Some(OverlayAction::MicrophoneSettings),
         ),
         AudioError::NoSignal => error_state(
-            "No sound from the microphone.",
+            Message::MicrophoneSilent,
             Some(OverlayAction::MicrophoneSettings),
         ),
-        AudioError::NoDevice => error_state("No microphone found.", None),
-        _ => error_state("The microphone failed. Try again.", None),
+        AudioError::NoDevice => error_state(Message::MicrophoneMissing, None),
+        _ => error_state(Message::MicrophoneFailed, None),
     }
 }
 
-pub const SIGN_IN_TO_DICTATE: &str = "Sign in to Take My Word to dictate.";
-
 fn api_error(failure: &ApiFailure) -> OverlayState {
     let message = match failure {
-        ApiFailure::Network(_) => "Can't reach Take My Word. Check your connection.",
-        ApiFailure::SignedOut => SIGN_IN_TO_DICTATE,
+        ApiFailure::Network(_) => Message::DictationUnreachable,
+        ApiFailure::SignedOut => Message::SignInToDictate,
         ApiFailure::Rejected {
             code: Some(ApiErrorCode::QuotaExceeded),
             ..
-        } => "You've reached today's dictation limit.",
-        ApiFailure::Rejected { status: 413, .. } => "That dictation was too long.",
-        ApiFailure::Rejected { status: 415, .. } => "That recording format isn't supported.",
-        ApiFailure::Rejected { .. } | ApiFailure::InvalidResponse(_) => GENERIC_FAILURE,
+        } => Message::QuotaReached,
+        ApiFailure::Rejected { status: 413, .. } => Message::TooLong,
+        ApiFailure::Rejected { status: 415, .. } => Message::UnsupportedFormat,
+        ApiFailure::Rejected { .. }
+        | ApiFailure::InvalidRequest
+        | ApiFailure::InvalidResponse(_) => Message::Generic,
     };
     error_state(message, None)
 }
@@ -157,6 +157,7 @@ mod tests {
         busy_while_pasting: Vec<bool>,
         overlay: Vec<OverlayState>,
         pasted: Vec<String>,
+        keystrokes: Vec<PasteKeystroke>,
         notices: usize,
         sent: Vec<DictationMeta>,
     }
@@ -180,11 +181,17 @@ mod tests {
     struct FakePaste(Shared, PasteResult);
 
     impl Paste for FakePaste {
-        fn paste(&mut self, text: &str, _target: Option<isize>) -> PasteResult {
+        fn paste(
+            &mut self,
+            text: &str,
+            _target: Option<isize>,
+            keystroke: PasteKeystroke,
+        ) -> PasteResult {
             let mut world = self.0.borrow_mut();
             let busy = !world.activity.is_idle();
             world.busy_while_pasting.push(busy);
             world.pasted.push(text.into());
+            world.keystrokes.push(keystroke);
             self.1
         }
     }
@@ -197,10 +204,21 @@ mod tests {
         }
     }
 
+    struct Rules;
+
+    impl Keystrokes for Rules {
+        fn for_app(&self, app_id: Option<&str>) -> PasteKeystroke {
+            match app_id {
+                Some("notepad.exe") => PasteKeystroke::ShiftInsert,
+                _ => PasteKeystroke::CtrlV,
+            }
+        }
+    }
+
     struct FakeNotifier(Shared);
 
     impl Notifier for FakeNotifier {
-        fn notify(&self, _message: &str) {
+        fn notify(&self, _sentence: &[Message]) {
             self.0.borrow_mut().notices += 1;
         }
     }
@@ -230,7 +248,7 @@ mod tests {
             paste: FakePaste(Rc::clone(&world), pasting),
             overlay: FakeOverlay(Rc::clone(&world)),
             notifier: FakeNotifier(Rc::clone(&world)),
-            locale: "es-CL".into(),
+            keystrokes: Rules,
         };
         worker.handle(Job {
             take,
@@ -271,12 +289,13 @@ mod tests {
     }
 
     #[test]
-    fn text_is_pasted_after_the_overlay_closes_with_locale_and_app() {
+    fn text_is_pasted_after_the_overlay_closes_and_the_api_picks_the_language() {
         let world = run(recorded(), Ok(response("Hola.", None)), PasteResult::Pasted);
         assert_eq!(kinds(&world), vec!["processing", "hidden"]);
         assert_eq!(world.pasted, vec!["Hola."]);
         assert_eq!(world.busy_while_pasting, vec![true]);
-        assert_eq!(world.sent[0].locale, "es-CL");
+        assert_eq!(world.keystrokes, vec![PasteKeystroke::ShiftInsert]);
+        assert_eq!(world.sent[0].locale, None);
         assert_eq!(world.sent[0].app_id.as_deref(), Some("notepad.exe"));
         assert_eq!(world.notices, 0);
     }
@@ -293,43 +312,43 @@ mod tests {
     #[test]
     fn api_failures_show_their_message_and_paste_nothing() {
         type Failure = fn() -> ApiFailure;
-        let failures: [(Failure, &str); 7] = [
+        let failures: [(Failure, Message); 7] = [
             (
                 || ApiFailure::Network("refused".into()),
-                "Can't reach Take My Word. Check your connection.",
+                Message::DictationUnreachable,
             ),
-            (|| ApiFailure::SignedOut, SIGN_IN_TO_DICTATE),
+            (|| ApiFailure::SignedOut, Message::SignInToDictate),
             (
                 || ApiFailure::Rejected {
                     status: 429,
                     code: Some(ApiErrorCode::QuotaExceeded),
                 },
-                "You've reached today's dictation limit.",
+                Message::QuotaReached,
             ),
             (
                 || ApiFailure::Rejected {
                     status: 413,
                     code: None,
                 },
-                "That dictation was too long.",
+                Message::TooLong,
             ),
             (
                 || ApiFailure::Rejected {
                     status: 415,
                     code: Some(ApiErrorCode::UnsupportedMediaType),
                 },
-                "That recording format isn't supported.",
+                Message::UnsupportedFormat,
             ),
             (
                 || ApiFailure::Rejected {
                     status: 429,
                     code: None,
                 },
-                GENERIC_FAILURE,
+                Message::Generic,
             ),
             (
                 || ApiFailure::InvalidResponse("garbage".into()),
-                GENERIC_FAILURE,
+                Message::Generic,
             ),
         ];
         for (failure, message) in failures {

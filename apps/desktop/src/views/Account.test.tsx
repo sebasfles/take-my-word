@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setLanguage } from "../i18n.ts";
 import { fakeBridge } from "../testing/bridge.ts";
 import { Account } from "./Account.tsx";
 
@@ -7,6 +8,8 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../bridge.ts")>()),
   bridge: fakeBridge,
 }));
+
+setLanguage("en");
 
 function type(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -35,13 +38,17 @@ describe("Account", () => {
     const plain = await screen.findByRole("radio", { name: "Plain" });
     expect((plain as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: "Casual" }));
+    const spanish = screen.getByRole("checkbox", { name: "Español" });
+    expect((spanish as HTMLInputElement).checked).toBe(true);
+    expect((spanish as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "English" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(fakeBridge.saveDefaultStyle).toHaveBeenCalledWith("casual");
+    expect(fakeBridge.saveOnboarding).toHaveBeenCalledWith("casual", ["es", "en"]);
   });
 
   it("shows wrong credentials and stays on sign-in", async () => {
     fakeBridge.signIn.mockRejectedValueOnce({
-      message: "Wrong username or password.",
+      message: "account.wrongCredentials",
       backToSignIn: false,
     });
     render(<Account />);
@@ -63,13 +70,13 @@ describe("Account", () => {
     type("Repeat the password", "Chosen password 123");
     fireEvent.click(screen.getByRole("button", { name: "Save and sign in" }));
     expect(fakeBridge.choosePassword).toHaveBeenCalledWith("Chosen password 123");
-    await screen.findByRole("heading", { name: "Pick your style" });
+    await screen.findByRole("heading", { name: "Set up your dictation" });
   });
 
   it("returns to sign-in with the reason when the challenge expired", async () => {
     fakeBridge.signIn.mockResolvedValueOnce("choosePassword");
     fakeBridge.choosePassword.mockRejectedValueOnce({
-      message: "The sign-in expired. Sign in again with your temporary password.",
+      message: "account.expired",
       backToSignIn: true,
     });
     render(<Account />);
@@ -85,12 +92,23 @@ describe("Account", () => {
   it("opens straight on onboarding and retries when the styles do not load", async () => {
     window.history.replaceState(null, "", "/?view=account&step=onboarding");
     fakeBridge.onboarding.mockRejectedValueOnce({
-      message: "We could not reach the service. Try again in a few minutes.",
+      message: "account.unreachable",
       backToSignIn: false,
     });
     render(<Account />);
-    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("We could not reach");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await screen.findByRole("radio", { name: "Formal" });
     expect(fakeBridge.onboarding).toHaveBeenCalledTimes(2);
+  });
+
+  it("names built-in styles in the app's language and custom styles by their own name", async () => {
+    setLanguage("es");
+    window.history.replaceState(null, "", "/?view=account&step=onboarding");
+    render(<Account />);
+    await screen.findByRole("radio", { name: "Neutro" });
+    expect(screen.getByRole("radio", { name: "Client emails" })).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "Plain" })).toBeNull();
+    setLanguage("en");
   });
 });

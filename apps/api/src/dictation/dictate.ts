@@ -1,9 +1,9 @@
 import {
+  defaultDictationLanguages,
   defaultRefiner,
   defaultTranscriber,
   minAudioSeconds,
   type DictationResponse,
-  type Language,
 } from "@take-my-word/shared";
 import { HttpError } from "../lib/http-error.ts";
 import type { Logger } from "../lib/log.ts";
@@ -15,6 +15,7 @@ import type { DictationStore } from "./dictation-store.ts";
 import { ProviderError } from "./ports/provider-error.ts";
 import { transcriberPrompt } from "./dictionary-projection.ts";
 import { refinerInstructions } from "./instructions.ts";
+import { transcribeIn } from "./language-selection.ts";
 import type { ProfileStore } from "./profile.ts";
 import type { ProviderRegistry } from "./providers/registry.ts";
 import { quotaExceededMessage, quotaWindow, type QuotaStore } from "./quota.ts";
@@ -42,10 +43,6 @@ export interface DictateRequest {
   userId: string;
   requestId: string;
   upload: DictationUpload;
-}
-
-function languageOf(locale: string): Language {
-  return locale.startsWith("en") ? "en" : "es";
 }
 
 async function timed<T>(deps: DictateDeps, work: () => Promise<T>): Promise<[T, number]> {
@@ -84,7 +81,6 @@ export async function dictate(
   const startedAt = deps.elapsed();
   const createdAt = deps.now();
   const { meta, audio } = upload;
-  const language = languageOf(meta.locale);
 
   let probe: AudioProbe;
   try {
@@ -169,16 +165,25 @@ export async function dictate(
     });
   }
 
-  const [transcript, transcribeMs] = await callProvider(deps, transcriber.label, () =>
-    transcriber.transcribe({
-      audio: audio.bytes,
-      container: audio.container,
-      language,
-      ...(prompt.prompt !== "" && { prompt: prompt.prompt }),
-    }),
+  let transcribeMs = 0;
+  const transcriptions: string[] = [];
+  const { text: raw, language } = await transcribeIn(
+    settings?.dictationLanguages ?? defaultDictationLanguages,
+    async (requested) => {
+      const [transcript, ms] = await callProvider(deps, transcriber.label, () =>
+        transcriber.transcribe({
+          audio: audio.bytes,
+          container: audio.container,
+          ...(requested && { language: requested }),
+          ...(prompt.prompt !== "" && { prompt: prompt.prompt }),
+        }),
+      );
+      transcribeMs += ms;
+      transcriptions.push(requested ?? "detect");
+      return transcript;
+    },
   );
 
-  const raw = transcript.text;
   if (deps.isSilence({ text: raw, quiet })) {
     const totalMs = Math.round(deps.elapsed() - startedAt);
     deps.log.info("dictation skipped", {
@@ -220,7 +225,7 @@ export async function dictate(
       userId,
       requestId,
       createdAt,
-      locale: meta.locale,
+      locale: language,
       audioSeconds,
       raw,
       text: refined.text,
@@ -238,6 +243,8 @@ export async function dictate(
     transcriber: providers.transcriber,
     refiner: providers.refiner,
     styleId: style.id,
+    language,
+    transcriptions: transcriptions.join(","),
     promptTerms: prompt.terms,
     dictionaryTerms: profile.terms.length,
     inputTokens: refined.usage.inputTokens,

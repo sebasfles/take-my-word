@@ -50,6 +50,25 @@ describe("groq-whisper transcriber", () => {
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe("RIFF");
   });
 
+  it("asks for detection without a language and reports the detected one", async () => {
+    const { fetch, captured } = fakeFetch(200, { text: "Hello.", language: "English" });
+    const transcriber = groqWhisper({ apiKey, fetch });
+    const result = await transcriber.transcribe({ audio: Buffer.from("RIFF"), container: "wav" });
+    expect(result).toEqual({ text: "Hello.", language: "en" });
+    const form = captured[0]?.body as FormData;
+    expect(form.get("language")).toBeNull();
+    expect(form.get("response_format")).toBe("verbose_json");
+  });
+
+  it("reports no language when the detected one is neither Spanish nor English", async () => {
+    const { fetch } = fakeFetch(200, { text: "Bonjour.", language: "french" });
+    const result = await groqWhisper({ apiKey, fetch }).transcribe({
+      audio: Buffer.from("RIFF"),
+      container: "wav",
+    });
+    expect(result).toEqual({ text: "Bonjour." });
+  });
+
   it("fails with the status and without the provider's body", async () => {
     const { fetch } = fakeFetch(429, { error: { message: "rate limited for key secret-key" } });
     const failure = groqWhisper({ apiKey, fetch }).transcribe({

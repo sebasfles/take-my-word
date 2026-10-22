@@ -7,6 +7,7 @@ const apiUrl = "https://api.dev.takemyword.fless.dev";
 const settings = {
   defaultStyleId: "formal",
   locale: "es",
+  dictationLanguages: ["es"],
   providers: { transcriber: "groq-whisper", refiner: "openai" },
 };
 

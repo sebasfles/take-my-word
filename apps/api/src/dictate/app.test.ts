@@ -10,7 +10,7 @@ import type { DictationRecord } from "../dictation/dictation-store.ts";
 import type { DictationProfile } from "../dictation/profile.ts";
 import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { RefineInput } from "../dictation/ports/refiner.ts";
-import type { TranscribeInput } from "../dictation/ports/transcriber.ts";
+import type { TranscribeInput, Transcript } from "../dictation/ports/transcriber.ts";
 import type { QuotaCharge } from "../dictation/quota.ts";
 import { createSilenceGuard, defaultSilenceLevels } from "../dictation/silence.ts";
 import { createLogger } from "../lib/log.ts";
@@ -46,7 +46,7 @@ class Rendezvous {
 class World {
   now = new Date("2026-10-20T15:00:00.000Z");
   clock = 0;
-  transcript = { text: rawTranscript };
+  transcript: Transcript = { text: rawTranscript };
   transcribeError: Error | undefined;
   transcribed: TranscribeInput[] = [];
   refined: RefineInput[] = [];
@@ -160,7 +160,7 @@ describe("POST /dictations", () => {
       latencyMs: { transcribe: 300, refine: 400, total: 700 },
     });
     expect(body.skipped).toBeUndefined();
-    expect(world.transcribed[0]).toMatchObject({ container: "wav", language: "es" });
+    expect(world.transcribed[0]).toMatchObject({ container: "wav", language: "en" });
     expect(world.refined[0]?.raw).toBe(rawTranscript);
     expect(world.saved).toHaveLength(1);
     expect(world.saved[0]).toMatchObject({
@@ -172,11 +172,11 @@ describe("POST /dictations", () => {
     });
   });
 
-  it("passes m4a to the transcriber as m4a and English locales as English", async () => {
+  it("passes m4a to the transcriber as m4a and ignores the old meta locale", async () => {
     const body = dictationBody({
       audio: m4a({ seconds: 5 }),
       audioType: "audio/mp4",
-      meta: { locale: "en-US" },
+      meta: { locale: "es-CL" },
     });
     const { status } = await world.post(body);
     expect(status).toBe(200);
@@ -367,9 +367,10 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
     lastUsedAt,
     createdAt: "2026-01-01T00:00:00.000Z",
   });
-  const settings = (defaultStyleId: string) => ({
+  const settings = (defaultStyleId: string, dictationLanguages: ("es" | "en")[] = ["es"]) => ({
     defaultStyleId,
-    locale: "es",
+    locale: dictationLanguages[0] ?? "en",
+    dictationLanguages,
     providers: { transcriber: "groq-whisper" as const, refiner: "openai" as const },
   });
   const post = (meta: Record<string, unknown>) =>
@@ -410,6 +411,35 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
     expect(ok((await post({ appId: "notepad.exe" })).json).styleId).toBe("mine");
     expect(world.refined[2]?.instructions).toContain("Write like a pirate.");
     expect(world.saved.map((record) => record.styleId)).toEqual(["casual", "formal", "mine"]);
+  });
+
+  it("transcribes in the one dictation language and refines and saves in it", async () => {
+    world.profile = { settings: settings("plain", ["es"]), styles: [], terms: [] };
+    await post({ locale: "en-US" });
+    expect(world.transcribed.map((input) => input.language)).toEqual(["es"]);
+    expect(world.refined[0]?.language).toBe("es");
+    expect(world.saved[0]?.locale).toBe("es");
+  });
+
+  it("lets Whisper detect among several languages and keeps a detected one", async () => {
+    world.profile = { settings: settings("plain", ["en", "es"]), styles: [], terms: [] };
+    world.transcript = { text: rawTranscript, language: "es" };
+    await post({});
+    expect(world.transcribed.map((input) => input.language)).toEqual([undefined]);
+    expect(world.refined[0]?.language).toBe("es");
+    expect(world.saved[0]?.locale).toBe("es");
+  });
+
+  it("transcribes again in the first language when detection finds neither, charging once", async () => {
+    world.profile = { settings: settings("plain", ["en", "es"]), styles: [], terms: [] };
+    world.transcript = { text: rawTranscript };
+    const { status, json } = await post({});
+    expect(status).toBe(200);
+    expect(world.transcribed.map((input) => input.language)).toEqual([undefined, "en"]);
+    expect(world.charges).toHaveLength(1);
+    expect(ok(json).latencyMs.transcribe).toBe(600);
+    expect(world.refined[0]?.language).toBe("en");
+    expect(world.saved[0]?.locale).toBe("en");
   });
 
   it("never fails a dictation over a deleted style id", async () => {

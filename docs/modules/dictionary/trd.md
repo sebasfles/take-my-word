@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0009_web_account
+source: 0008_desktop_features
 ---
 
 # Dictionary: technical
@@ -14,7 +14,8 @@ source: 0009_web_account
 | `apps/api/src/dictionary-usage` | The `dictionary-usage` Lambda, consumer of the table stream. |
 | `packages/shared/src/dictionary.ts` | Contracts, limits, `normalizeTerm` and the ranking (`decayedScore`, `rankTerms`, half-life 30), so the web orders terms exactly as `dictate` does. |
 | `apps/web` | Read-only view, by relevance or by name. |
-| `apps/desktop`, `apps/mobile` | Editors (0008, phase 4). |
+| `apps/desktop` | Dictionary section and the tray's "Add a word". |
+| `apps/mobile` | Editor (phase 4). |
 
 ## Endpoints owned
 

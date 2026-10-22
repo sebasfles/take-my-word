@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0009_web_account
+source: 0008_desktop_features
 ---
 
 # Styles: technical
@@ -15,7 +15,8 @@ source: 0009_web_account
 | `apps/api/src/dictation/style-resolution.ts` | Which style a dictation uses (owned here, called by `dictate`). |
 | `packages/shared/src/styles.ts`, `app-rules.ts` | Contracts, limits, built-in ids and the paste keystroke enum. |
 | `apps/web` | Read-only styles and rules pages; built-ins named by id in the page's language. |
-| `apps/desktop`, `apps/mobile` | Settings screens, app matching and paste (0008, phase 4). |
+| `apps/desktop` | Styles, default style and app rules sections; the rules cached in memory pick the paste keystroke. |
+| `apps/mobile` | Style picker (phase 4). |
 
 ## Endpoints owned
 
@@ -46,7 +47,7 @@ The refiner gets the editing contract first, then the style's directions under a
 ## Depended on by
 
 - dictation: resolves the style of every dictation.
-- desktop: matches the focused app to a rule and pastes with its keystroke (0008).
+- desktop: edits styles and rules, and pastes with the focused app's rule keystroke.
 - mobile: lists the styles in its picker (phase 4).
 
 ## Configuration

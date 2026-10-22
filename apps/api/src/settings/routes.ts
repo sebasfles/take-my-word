@@ -1,4 +1,4 @@
-import { settingsSchema, type Settings } from "@take-my-word/shared";
+import { localeFor, settingsUpdateSchema, type Settings } from "@take-my-word/shared";
 import { Hono } from "hono";
 import { readJson, type ApiEnv } from "../api/context.ts";
 import { requireStyle } from "../styles/exists.ts";
@@ -21,9 +21,17 @@ export function settingsRoutes({ settings, styles }: SettingsRoutesDeps) {
     })
     .put("/", async (c) => {
       const userId = c.var.userId;
-      const input = await readJson(c, settingsSchema);
+      const input = await readJson(c, settingsUpdateSchema);
       await requireStyle(styles, userId, input.defaultStyleId);
-      await settings.put(userId, input);
-      return c.json(input);
+      const current = (await settings.get(userId)) ?? defaultSettings;
+      const dictationLanguages = input.dictationLanguages ?? current.dictationLanguages;
+      const next: Settings = {
+        defaultStyleId: input.defaultStyleId,
+        locale: localeFor(dictationLanguages, current.locale),
+        dictationLanguages,
+        providers: input.providers,
+      };
+      await settings.put(userId, next);
+      return c.json(next);
     });
 }

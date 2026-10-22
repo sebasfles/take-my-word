@@ -1,3 +1,4 @@
+import type { Language } from "@take-my-word/shared";
 import { z } from "zod";
 import { ProviderError } from "../ports/provider-error.ts";
 import type { TranscribeInput, Transcriber } from "../ports/transcriber.ts";
@@ -8,7 +9,18 @@ export const defaultGroqWhisperModel = "whisper-large-v3-turbo";
 const defaultTimeoutMs = 10_000;
 
 const endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
-const responseSchema = z.object({ text: z.string() });
+const responseSchema = z.object({ text: z.string(), language: z.string().optional() });
+const detectedLanguages: Readonly<Record<string, Language>> = {
+  en: "en",
+  english: "en",
+  es: "es",
+  spanish: "es",
+  castilian: "es",
+};
+
+export function detectedLanguage(name: string | undefined): Language | undefined {
+  return name === undefined ? undefined : detectedLanguages[name.trim().toLowerCase()];
+}
 const mimeTypes = { wav: "audio/wav", m4a: "audio/mp4" } as const;
 
 export interface GroqWhisperOptions extends HttpOptions {
@@ -32,8 +44,11 @@ export function groqWhisper({
         `audio.${container}`,
       );
       form.append("model", model);
-      form.append("language", language);
-      form.append("response_format", "json");
+      if (language === undefined) form.append("response_format", "verbose_json");
+      else {
+        form.append("language", language);
+        form.append("response_format", "json");
+      }
       form.append("temperature", "0");
       if (prompt) form.append("prompt", prompt);
       const body = await postForJson(
@@ -44,7 +59,8 @@ export function groqWhisper({
       );
       const parsed = responseSchema.safeParse(body);
       if (!parsed.success) throw new ProviderError(label, `${label} answered an unexpected shape`);
-      return { text: parsed.data.text.trim() };
+      const detected = language === undefined ? detectedLanguage(parsed.data.language) : undefined;
+      return { text: parsed.data.text.trim(), ...(detected && { language: detected }) };
     },
   };
 }

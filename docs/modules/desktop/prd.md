@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0005_desktop_release
+source: 0008_desktop_features
 ---
 
 # Desktop: product
@@ -17,7 +17,7 @@ It must feel like typing got faster: no window to open, no copy and paste, the u
 
 1. The user downloads the installer from the landing, installs it, and the app lives in the system tray, starting with Windows unless turned off.
 2. The app asks for username and password; a temporary password must be replaced by the user's own before going on.
-3. The first time a user signs in on this machine, the app asks for a default style, with the current one preselected; dictating already works while the choice is pending.
+3. The first time a user signs in on this machine, the app asks for the dictation languages, with Windows' language preselected, and for a default style, with the current one preselected; dictating already works while the choice is pending.
 4. The app explains which keys to hold (Ctrl+Win on Windows, Fn on macOS, Ctrl+Super on Linux) and that the microphone listens only during the hold.
 5. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
 
@@ -26,19 +26,20 @@ Errors and empty states: Windows SmartScreen warns on the first install because 
 ### Dictate
 
 1. The user places the cursor where the text should go, in any app.
-2. The user holds the hotkey; a small overlay shows that the app is listening.
+2. The user holds the hotkey; a small overlay shows that the app is listening, with bars that follow the voice and stay flat in silence.
 3. The user speaks and releases the key; the overlay shows that the text is being processed.
 4. The clean text is pasted at the cursor and the overlay disappears.
 5. Whatever the user had in the clipboard before is back in the clipboard.
 
 Errors and empty states: a press shorter than half a second does nothing; silence pastes nothing; a network, daily limit, too long, unsupported format or microphone failure shows a short message in the overlay, which closes after 4 s or on click, and pastes nothing; an ended session says "sign in" and opens the sign-in window.
 
-### Per-app style
+### Settings
 
-1. In settings, the user maps an app (for example the mail client or a terminal) to a style and a paste keystroke.
-2. From then on, dictating into that app uses that style and keystroke without the user choosing anything.
+1. Settings has sections for General (shortcut, autostart, dictation languages, app language), Dictionary, Styles (default and custom), App rules, History and Account; the tray's "Add a word" opens Dictionary with the term field ready.
+2. An app rule maps an app, picked from the open windows or typed as its executable, to a style and a paste keystroke (Ctrl+V, Ctrl+Shift+V or Shift+Insert); dictating into that app then uses both without the user choosing anything.
+3. History shows the last dictations with "load more", the raw transcript collapsed, copy and delete.
 
-Errors and empty states: an app with no rule uses the user's default style and the OS's normal paste keystroke.
+Errors and empty states: an app with no rule uses the user's default style and Ctrl+V; limits and duplicates are explained next to the form; every delete asks first; an empty section says what it is for.
 
 ### Change the hotkey
 
@@ -55,7 +56,7 @@ Errors and empty states: a rejected combination is explained and the old hotkey 
 ### Update
 
 1. At start and every 6 hours the app looks for a new version.
-2. When there is one, a small window shows the version and its notes, in Spanish or English like Windows, without taking focus from the app the user is typing in.
+2. When there is one, a small window shows the version and its notes, without taking focus from the app the user is typing in.
 3. "Install and restart" downloads it, installs it once no dictation is in progress, and the app comes back on the new version; "Later" hides it until the next check.
 
 Errors and empty states: a failed download or install says so and offers to try again; the current version keeps running.
@@ -71,8 +72,8 @@ Errors and empty states: a failed download or install says so and offers to try 
 - The paste goes only to the window that had focus when the hold began.
 - When the paste cannot land (an administrator window, the window changed, the target never read it), the text stays in the clipboard and a notification says so; when the earlier clipboard cannot be put back, a notification says that too.
 - Audio leaves the machine only to be transcribed and is never stored.
-- The dictated text stays out of Windows clipboard history and the cloud clipboard.
-- History, dictionary, styles and app rules are all editable from the app settings.
+- The dictated text stays out of Windows clipboard history and the cloud clipboard, and only the target app is given it.
+- The app speaks Spanish when Windows does, English otherwise; a choice in General overrides it at once and is kept.
 - Windows comes first; macOS and Linux follow in phase 5.
 
 ## Out of scope

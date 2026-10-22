@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0007_desktop_integration
+source: 0008_desktop_features
 ---
 
 # Desktop: database
@@ -16,14 +16,16 @@ On the machine it keeps the refresh token, `DeviceKey` and `DeviceGroupKey` in W
 
 | Table | Owner module | Relationship |
 |---|---|---|
-| `take-my-word-{env}`, `APPRULE#appId` | styles | Read to map the focused app to a style and a paste keystroke. |
-| `take-my-word-{env}`, `STYLE#id` | styles | Listed in settings to pick a style for an app rule. |
-| `take-my-word-{env}`, `SETTINGS` | dictation | Settings read and written through `/me/settings`. |
-| `take-my-word-{env}`, `DICTATION#ts` | dictation | Created on the server by each dictation the app sends. |
+| `take-my-word-{env}`, `APPRULE#appId` | styles | Edited in settings; read to map the focused app to a paste keystroke. |
+| `take-my-word-{env}`, `STYLE#id` | styles | Custom styles edited in settings. |
+| `take-my-word-{env}`, `DICT#term` | dictionary | Terms edited in settings. |
+| `take-my-word-{env}`, `SETTINGS` | dictation | Default style and dictation languages, read and replaced whole through `/me/settings`. |
+| `take-my-word-{env}`, `DICTATION#ts` | dictation | Created by each dictation; paged and deleted from History. |
 
 ## Invariants kept in code
 
-- The `appId` desktop sends is the same identifier it stores in app rules, so the server can resolve the rule.
+- The `appId` desktop sends is the same identifier it stores in app rules and lists as a running app, so the server can resolve the rule.
+- The in-memory rules never take a load that started before the rules already applied or before the last sign-out.
 - The refresh token in the keychain is overwritten on every renewal, before the new access token is used, never kept beside the old one.
 - The three keychain entries live or die together: a partial set reads as signed out and is removed.
 - Tokens, device keys and passwords never reach `settings.json`, the logs or the WebView.

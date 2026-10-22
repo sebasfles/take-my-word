@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0008_desktop_features
 ---
 
 # Styles: product
@@ -17,9 +17,9 @@ On desktop, app rules pick the style automatically from the app that has focus, 
 
 1. The user holds the hotkey in some app, speaks and releases.
 2. Take My Word recognizes the focused app, finds its app rule and cleans the text with that rule's style.
-3. The text is pasted with the rule's paste keystroke (Ctrl+V, Cmd+V on macOS, Ctrl+Shift+V in terminals).
+3. The text is pasted with the rule's paste keystroke (Ctrl+V, Ctrl+Shift+V or Shift+Insert; Cmd+V on macOS).
 
-Errors and empty states: an app without a rule uses the user's default style and the platform's normal paste keystroke.
+Errors and empty states: an app without a rule uses the user's default style and Ctrl+V; a rule whose style was deleted uses the default style.
 
 ### Pick a style on mobile
 
@@ -36,7 +36,7 @@ Errors and empty states: mobile cannot see other apps, so there are no app rules
 4. The user edits or deletes custom styles and app rules at any time.
 
 Errors and empty states: a new user sees only the built-in styles and no app rules.
-Whether app rules can also be created from the desktop app (for example "use this style for the current app") is not decided.
+On desktop a rule's app is picked from the apps with an open window or typed as its executable.
 
 ## Rules
 

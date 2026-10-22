@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0008_desktop_features
 ---
 
 # Dictionary: product
@@ -16,7 +16,7 @@ The user writes a term once and stops fixing it by hand.
 
 ### Add a term
 
-1. The user opens the dictionary in the desktop or mobile app; the web shows it read-only.
+1. The user opens the dictionary in the desktop or mobile app, or picks "Add a word" in the desktop tray; the web shows it read-only.
 2. They type the term exactly as it must be written, and optionally one or more "sounds like" aliases.
 3. The term appears in the list and applies from the next dictation.
 

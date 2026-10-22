@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Route } from "./api.ts";
+import { isMessageId, type Language, type MessageId } from "./i18n.ts";
 
 export type MicStatus = "unknown" | "ready" | "denied" | "missing" | "failing";
 
@@ -13,7 +15,7 @@ export type OverlayState =
   | { state: "hidden" }
   | { state: "listening" }
   | { state: "processing" }
-  | { state: "error"; message: string; action: "microphoneSettings" | null };
+  | { state: "error"; message: MessageId; action: "microphoneSettings" | null };
 
 export interface AccountView {
   signedIn: boolean;
@@ -23,26 +25,33 @@ export interface AccountView {
 export type AccountStep = "choosePassword" | "onboarding" | "done";
 
 export interface Problem {
-  message: string;
+  message: MessageId;
   backToSignIn: boolean;
 }
 
 export interface StyleOption {
   id: string;
   name: string;
+  builtin: boolean;
 }
 
 export interface Onboarding {
   styles: StyleOption[];
   selected: string;
+  dictationLanguages: Language[];
+}
+
+export interface UiLanguage {
+  choice: Language | null;
+  windows: Language;
 }
 
 export function problemOf(reason: unknown): Problem {
   if (typeof reason === "object" && reason !== null && "message" in reason) {
-    const { message, backToSignIn } = reason as Partial<Problem>;
-    if (typeof message === "string") return { message, backToSignIn: backToSignIn === true };
+    const { message, backToSignIn } = reason as { message: unknown; backToSignIn?: unknown };
+    if (isMessageId(message)) return { message, backToSignIn: backToSignIn === true };
   }
-  return { message: "Something went wrong. Try again.", backToSignIn: false };
+  return { message: "error.generic", backToSignIn: false };
 }
 
 export type UpdatePhase =
@@ -52,7 +61,6 @@ export type UpdatePhase =
   | { phase: "failed" };
 
 export type UpdateView = {
-  language: "es" | "en";
   version: string;
   notes: string;
 } & UpdatePhase;
@@ -72,9 +80,15 @@ export const bridge = {
     invoke<AccountStep>("sign_in", { username, password }),
   choosePassword: (password: string) => invoke<AccountStep>("choose_password", { password }),
   onboarding: () => invoke<Onboarding>("onboarding"),
-  saveDefaultStyle: (styleId: string) => invoke<undefined>("save_default_style", { styleId }),
+  saveOnboarding: (styleId: string, dictationLanguages: Language[]) =>
+    invoke<undefined>("save_onboarding", { styleId, dictationLanguages }),
+  uiLanguage: () => invoke<UiLanguage>("ui_language"),
+  setUiLanguage: (choice: Language | null) => invoke<UiLanguage>("set_ui_language", { choice }),
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
+  apiRequest: (route: Route) => invoke<unknown>("api_request", { route }),
+  runningApps: () => invoke<string[]>("running_apps"),
+  copyText: (text: string) => invoke<undefined>("copy_text", { text }),
   quit: () => invoke<undefined>("quit"),
   updateView: () => invoke<UpdateView | null>("update_view"),
   installUpdate: () => invoke<undefined>("install_update"),
@@ -87,8 +101,20 @@ export const bridge = {
     listen<OverlayState>("overlay", (event) => {
       handler(event.payload);
     }),
+  onOverlayLevel: (handler: (level: number) => void): Promise<UnlistenFn> =>
+    listen<number>("overlay-level", (event) => {
+      handler(event.payload);
+    }),
+  onUiLanguage: (handler: (language: Language) => void): Promise<UnlistenFn> =>
+    listen<Language>("ui-language", (event) => {
+      handler(event.payload);
+    }),
   onAccountChanged: (handler: (signedIn: boolean) => void): Promise<UnlistenFn> =>
     listen<boolean>("account-changed", (event) => {
+      handler(event.payload);
+    }),
+  onSettingsNavigate: (handler: (query: string) => void): Promise<UnlistenFn> =>
+    listen<string>("settings-navigate", (event) => {
       handler(event.payload);
     }),
   onHotkeyCaptureCancelled: (handler: () => void): Promise<UnlistenFn> =>

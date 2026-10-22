@@ -2,10 +2,13 @@ mod authed;
 #[cfg(test)]
 mod contract;
 mod http;
+pub mod routes;
 #[cfg(debug_assertions)]
 mod stub;
 
 use serde::{Deserialize, Serialize};
+
+use crate::locale::Language;
 
 pub use authed::AuthedApi;
 pub use http::HttpApi;
@@ -35,7 +38,8 @@ pub enum RefinerId {
 #[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct DictationMeta {
-    pub locale: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stt_provider: Option<TranscriberId>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -154,6 +158,7 @@ pub struct SettingsProviders {
 pub struct UserSettings {
     pub default_style_id: String,
     pub locale: String,
+    pub dictation_languages: Vec<Language>,
     pub providers: SettingsProviders,
 }
 
@@ -174,6 +179,37 @@ pub struct StyleList {
     pub styles: Vec<Style>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+pub enum PasteKeystroke {
+    #[default]
+    #[serde(rename = "ctrl+v")]
+    CtrlV,
+    #[serde(rename = "ctrl+shift+v")]
+    CtrlShiftV,
+    #[serde(rename = "shift+insert")]
+    ShiftInsert,
+    #[serde(rename = "cmd+v")]
+    CmdV,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct AppRule {
+    pub id: String,
+    pub app_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style_id: Option<String>,
+    pub keystroke: PasteKeystroke,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+pub struct AppRuleList {
+    pub rules: Vec<AppRule>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ApiFailure {
     #[error("the API could not be reached: {0}")]
@@ -183,6 +219,8 @@ pub enum ApiFailure {
         status: u16,
         code: Option<ApiErrorCode>,
     },
+    #[error("the request was refused before sending")]
+    InvalidRequest,
     #[error("the API answered something unexpected: {0}")]
     InvalidResponse(String),
     #[error("signed out")]
@@ -200,13 +238,12 @@ mod tests {
     #[test]
     fn meta_serializes_like_the_shared_schema() {
         let meta = DictationMeta {
-            locale: "es-CL".into(),
             app_id: Some("notepad.exe".into()),
             ..DictationMeta::default()
         };
         assert_eq!(
             serde_json::to_string(&meta).unwrap(),
-            r#"{"locale":"es-CL","appId":"notepad.exe"}"#
+            r#"{"appId":"notepad.exe"}"#
         );
     }
 

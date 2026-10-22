@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use schemars::{JsonSchema, schema_for};
 use serde_json::Value;
 
-use super::{ApiErrorBody, DictationMeta, DictationResponse, StyleList, UserSettings};
+use super::{ApiErrorBody, AppRuleList, DictationMeta, DictationResponse, StyleList, UserSettings};
 
 #[derive(Debug, PartialEq, Eq)]
 enum Shape {
@@ -134,6 +134,7 @@ fn the_rust_mirror_matches_the_shared_contract() {
         ("apiError", rust::<ApiErrorBody>()),
         ("settings", rust::<UserSettings>()),
         ("styleList", rust::<StyleList>()),
+        ("appRuleList", rust::<AppRuleList>()),
     ]);
     let drifted = contract
         .as_object()

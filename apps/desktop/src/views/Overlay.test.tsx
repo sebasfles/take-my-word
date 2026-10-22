@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setLanguage } from "../i18n.ts";
 import { fakeBridge, listeners } from "../testing/bridge.ts";
 import { Overlay } from "./Overlay.tsx";
 
@@ -7,6 +8,8 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../bridge.ts")>()),
   bridge: fakeBridge,
 }));
+
+setLanguage("en");
 
 async function showing(state: Parameters<NonNullable<typeof listeners.overlay>>[0]) {
   render(<Overlay />);
@@ -35,8 +38,32 @@ describe("Overlay", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("shows the shell's message ids in the chosen language", async () => {
+    setLanguage("es");
+    await showing({ state: "error", message: "overlay.quota", action: null });
+    expect(screen.getByRole("alert").textContent).toBe("!Llegaste al límite de dictados de hoy.");
+    setLanguage("en");
+  });
+
+  it("draws the voice level while listening and stays flat on silence", async () => {
+    await showing({ state: "listening" });
+    const bars = () =>
+      Array.from(document.querySelectorAll<HTMLElement>(".wave-bar"), (bar) => bar.style.transform);
+    expect(new Set(bars())).toEqual(new Set(["scaleY(0.15)"]));
+    act(() => {
+      listeners.overlayLevel?.(1);
+      listeners.overlayLevel?.(0);
+    });
+    expect(bars().slice(-2)).toEqual(["scaleY(1)", "scaleY(0.15)"]);
+    act(() => {
+      listeners.overlay?.({ state: "processing" });
+    });
+    expect(document.querySelector(".wave")).toBeNull();
+  });
+
   it("dismisses an error on click", async () => {
-    await showing({ state: "error", message: "Can't reach Take My Word.", action: null });
+    await showing({ state: "error", message: "overlay.unreachable", action: null });
+    expect(screen.getByRole("alert").textContent).toContain("Can't reach Take My Word.");
     fireEvent.click(screen.getByRole("alert"));
     expect(fakeBridge.dismissOverlay).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button")).toBeNull();
@@ -45,7 +72,7 @@ describe("Overlay", () => {
   it("links a blocked microphone to the privacy settings without dismissing", async () => {
     await showing({
       state: "error",
-      message: "Windows blocks the microphone.",
+      message: "overlay.microphoneBlocked",
       action: "microphoneSettings",
     });
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));

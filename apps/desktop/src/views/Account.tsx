@@ -1,19 +1,22 @@
 import { type SubmitEvent, useCallback, useEffect, useState } from "react";
 import { type AccountStep, bridge, type Onboarding, problemOf } from "../bridge.ts";
+import { type Language, type MessageId, t } from "../i18n.ts";
+import { LanguageChoices } from "../LanguageChoices.tsx";
+import { StyleChoices } from "../StyleChoices.tsx";
 import { type AccountScreen, accountScreenFromSearch } from "../view.ts";
 
 export function Account() {
   const [screen, setScreen] = useState<AccountScreen>(() =>
     accountScreenFromSearch(window.location.search),
   );
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<MessageId | null>(null);
 
   const advance = (step: AccountStep) => {
     setNotice(null);
     if (step === "choosePassword") setScreen("choose-password");
     if (step === "onboarding") setScreen("onboarding");
   };
-  const backToSignIn = useCallback((message: string) => {
+  const backToSignIn = useCallback((message: MessageId) => {
     setNotice(message);
     setScreen("sign-in");
   }, []);
@@ -29,13 +32,13 @@ function SignIn({
   notice,
   onStep,
 }: {
-  notice: string | null;
+  notice: MessageId | null;
   onStep: (step: AccountStep) => void;
 }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(notice);
+  const [error, setError] = useState<MessageId | null>(notice);
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -58,12 +61,12 @@ function SignIn({
   return (
     <main className="page">
       <header className="page-header">
-        <h1>Sign in</h1>
-        <p className="muted">Use the username and password that came with your invitation.</p>
+        <h1>{t("signIn.title")}</h1>
+        <p className="muted">{t("signIn.intro")}</p>
       </header>
       <form className="form" onSubmit={submit}>
         <label className="field">
-          <span>Username</span>
+          <span>{t("signIn.username")}</span>
           <input
             className="input"
             name="username"
@@ -77,7 +80,7 @@ function SignIn({
           />
         </label>
         <label className="field">
-          <span>Password</span>
+          <span>{t("signIn.password")}</span>
           <input
             className="input"
             name="password"
@@ -92,12 +95,12 @@ function SignIn({
         </label>
         {error && (
           <p className="error" role="alert">
-            {error}
+            {t(error)}
           </p>
         )}
         <div className="form-actions">
           <button type="submit" className="button button-primary" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
+            {t(busy ? "signIn.submitting" : "signIn.submit")}
           </button>
         </div>
       </form>
@@ -110,17 +113,17 @@ function ChoosePassword({
   onBackToSignIn,
 }: {
   onStep: (step: AccountStep) => void;
-  onBackToSignIn: (message: string) => void;
+  onBackToSignIn: (message: MessageId) => void;
 }) {
   const [password, setPassword] = useState("");
   const [repeated, setRepeated] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MessageId | null>(null);
 
   const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (password !== repeated) {
-      setError("The passwords do not match.");
+      setError("choosePassword.mismatch");
       return;
     }
     setBusy(true);
@@ -141,14 +144,12 @@ function ChoosePassword({
   return (
     <main className="page">
       <header className="page-header">
-        <h1>Choose your password</h1>
-        <p className="muted">
-          This is your first sign-in: replace the temporary password with your own.
-        </p>
+        <h1>{t("choosePassword.title")}</h1>
+        <p className="muted">{t("choosePassword.intro")}</p>
       </header>
       <form className="form" onSubmit={submit}>
         <label className="field">
-          <span>New password</span>
+          <span>{t("choosePassword.new")}</span>
           <input
             className="input"
             name="new-password"
@@ -163,7 +164,7 @@ function ChoosePassword({
           />
         </label>
         <label className="field">
-          <span>Repeat the password</span>
+          <span>{t("choosePassword.repeat")}</span>
           <input
             className="input"
             name="repeat-password"
@@ -176,15 +177,15 @@ function ChoosePassword({
             }}
           />
         </label>
-        <p className="muted">At least 12 characters, with uppercase, lowercase and numbers.</p>
+        <p className="muted">{t("choosePassword.rules")}</p>
         {error && (
           <p className="error" role="alert">
-            {error}
+            {t(error)}
           </p>
         )}
         <div className="form-actions">
           <button type="submit" className="button button-primary" disabled={busy}>
-            {busy ? "Saving…" : "Save and sign in"}
+            {t(busy ? "common.saving" : "choosePassword.submit")}
           </button>
         </div>
       </form>
@@ -192,14 +193,15 @@ function ChoosePassword({
   );
 }
 
-type Load = { kind: "loading" } | { kind: "failed"; message: string } | { kind: "ready" };
+type Load = { kind: "loading" } | { kind: "failed"; message: MessageId } | { kind: "ready" };
 
-function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: string) => void }) {
+function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) => void }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [onboarding, setOnboarding] = useState<Onboarding | null>(null);
   const [selected, setSelected] = useState("");
+  const [languages, setLanguages] = useState<Language[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MessageId | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -210,6 +212,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: string) => vo
         if (!current) return;
         setOnboarding(loaded);
         setSelected(loaded.selected);
+        setLanguages(loaded.dictationLanguages);
         setLoad({ kind: "ready" });
       })
       .catch((reason: unknown) => {
@@ -228,7 +231,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: string) => vo
     setBusy(true);
     setError(null);
     bridge
-      .saveDefaultStyle(selected)
+      .saveOnboarding(selected, languages)
       .catch((reason: unknown) => {
         const problem = problemOf(reason);
         if (problem.backToSignIn) onBackToSignIn(problem.message);
@@ -242,19 +245,17 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: string) => vo
   return (
     <main className="page">
       <header className="page-header">
-        <h1>Pick your style</h1>
-        <p className="muted">
-          Every dictation is cleaned up in this style. You can change it later.
-        </p>
+        <h1>{t("onboarding.title")}</h1>
+        <p className="muted">{t("onboarding.intro")}</p>
       </header>
       {load.kind === "loading" && (
         <p className="muted" role="status">
-          Loading styles…
+          {t("onboarding.loading")}
         </p>
       )}
       {load.kind === "failed" && (
         <div className="callout" role="alert">
-          <p>{load.message}</p>
+          <p>{t(load.message)}</p>
           <button
             type="button"
             className="button"
@@ -263,41 +264,33 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: string) => vo
               setAttempt((count) => count + 1);
             }}
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
         </div>
       )}
       {load.kind === "ready" && onboarding && (
         <form className="form" onSubmit={save}>
-          <fieldset className="choices">
-            <legend className="visually-hidden">Default style</legend>
-            {onboarding.styles.map((style) => (
-              <label key={style.id} className="choice">
-                <input
-                  type="radio"
-                  name="style"
-                  value={style.id}
-                  checked={selected === style.id}
-                  onChange={() => {
-                    setSelected(style.id);
-                  }}
-                />
-                <span>{style.name}</span>
-              </label>
-            ))}
-          </fieldset>
+          <section className="form-section">
+            <h2>{t("dictationLanguages")}</h2>
+            <p className="muted">{t("dictationLanguages.note")}</p>
+            <LanguageChoices chosen={languages} onChange={setLanguages} />
+          </section>
+          <section className="form-section">
+            <h2>{t("styles.default")}</h2>
+            <StyleChoices styles={onboarding.styles} selected={selected} onSelect={setSelected} />
+          </section>
           {error && (
             <p className="error" role="alert">
-              {error}
+              {t(error)}
             </p>
           )}
           <div className="form-actions">
             <button
               type="submit"
               className="button button-primary"
-              disabled={busy || selected === ""}
+              disabled={busy || selected === "" || languages.length === 0}
             >
-              {busy ? "Saving…" : "Save"}
+              {t(busy ? "common.saving" : "common.save")}
             </button>
           </div>
         </form>

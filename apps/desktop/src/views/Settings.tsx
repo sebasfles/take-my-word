@@ -1,38 +1,99 @@
-import { useEffect, useState } from "react";
-import { type AccountView, bridge, type Overview, keepListening } from "../bridge.ts";
+import { useEffect, useRef, useState } from "react";
+import { type AccountView, bridge, type Overview, keepListening, problemOf } from "../bridge.ts";
+import { type MessageId, t } from "../i18n.ts";
 import { Keys } from "../Keys.tsx";
+import { focusAddFromSearch, type SettingsSection, settingsSectionFromSearch } from "../view.ts";
+import { AppRules } from "./settings/AppRules.tsx";
+import { Dictionary } from "./settings/Dictionary.tsx";
+import { History } from "./settings/History.tsx";
+import { DictationLanguagesRow, UiLanguageRow } from "./settings/Languages.tsx";
+import { SectionPage } from "./settings/parts.tsx";
+import { Styles } from "./settings/Styles.tsx";
 
 type Capture = { step: "idle" } | { step: "listening" } | { step: "proposed"; keys: string[] };
 
 const CAPTURE_TIMEOUT_MS = 15_000;
 
+const sections: { id: SettingsSection; label: MessageId }[] = [
+  { id: "general", label: "settings.general" },
+  { id: "dictionary", label: "settings.dictionary" },
+  { id: "styles", label: "settings.styles" },
+  { id: "appRules", label: "settings.appRules" },
+  { id: "history", label: "settings.history" },
+  { id: "account", label: "settings.account" },
+];
+
 export function Settings() {
+  const [section, setSection] = useState<SettingsSection>(() =>
+    settingsSectionFromSearch(window.location.search),
+  );
+  const [focusAdd, setFocusAdd] = useState(() =>
+    focusAddFromSearch(window.location.search) ? 1 : 0,
+  );
+
+  useEffect(
+    () =>
+      keepListening(() =>
+        bridge.onSettingsNavigate((query) => {
+          setSection(settingsSectionFromSearch(query));
+          if (focusAddFromSearch(query)) setFocusAdd((count) => count + 1);
+        }),
+      ),
+    [],
+  );
+
+  return (
+    <div className="settings">
+      <nav className="settings-nav" aria-label={t("settings.sections")}>
+        <ul className="settings-nav-list">
+          {sections.map(({ id, label }) => (
+            <li key={id}>
+              <button
+                type="button"
+                className="settings-nav-item"
+                aria-current={section === id ? "page" : undefined}
+                onClick={() => {
+                  setSection(id);
+                }}
+              >
+                {t(label)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      {section === "general" && <General />}
+      {section === "dictionary" && <Dictionary focusAdd={focusAdd} />}
+      {section === "styles" && <Styles />}
+      {section === "appRules" && <AppRules />}
+      {section === "history" && <History />}
+      {section === "account" && <Account />}
+    </div>
+  );
+}
+
+function General() {
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [autostartError, setAutostartError] = useState<string | null>(null);
+  const [autostartError, setAutostartError] = useState(false);
 
   useEffect(() => {
     void bridge.overview().then(setOverview);
   }, []);
 
   const toggleAutostart = (enabled: boolean) => {
-    setAutostartError(null);
+    setAutostartError(false);
     bridge
       .setAutostart(enabled)
       .then((autostart) => {
         setOverview((current) => current && { ...current, autostart });
       })
       .catch(() => {
-        setAutostartError("Windows did not accept the change. Try again.");
+        setAutostartError(true);
       });
   };
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <h1>Take My Word</h1>
-        <p className="muted">Hold the shortcut, speak, release.</p>
-      </header>
-
+    <SectionPage title="settings.general" intro="settings.general.intro">
       <ShortcutRow
         hotkey={overview?.hotkey ?? null}
         onSaved={(hotkey) => {
@@ -42,11 +103,11 @@ export function Settings() {
 
       <section className="row">
         <label className="row-text" htmlFor="autostart">
-          <h2>Start with Windows</h2>
-          <p className="muted">Take My Word waits in the tray, ready when you are.</p>
+          <h2>{t("settings.autostart")}</h2>
+          <p className="muted">{t("settings.autostart.note")}</p>
           {autostartError && (
             <p className="error" role="alert">
-              {autostartError}
+              {t("settings.autostart.failed")}
             </p>
           )}
         </label>
@@ -54,7 +115,7 @@ export function Settings() {
           id="autostart"
           type="checkbox"
           role="switch"
-          aria-label="Start with Windows"
+          aria-label={t("settings.autostart")}
           className="switch"
           checked={overview?.autostart ?? false}
           disabled={!overview}
@@ -64,14 +125,24 @@ export function Settings() {
         />
       </section>
 
-      <AccountRow />
+      <DictationLanguagesRow />
+
+      <UiLanguageRow />
 
       <footer className="page-footer">
         <button type="button" className="button button-quiet" onClick={() => void bridge.quit()}>
-          Quit Take My Word
+          {t("settings.quit")}
         </button>
       </footer>
-    </main>
+    </SectionPage>
+  );
+}
+
+function Account() {
+  return (
+    <SectionPage title="settings.account" intro="settings.account.intro">
+      <AccountRow />
+    </SectionPage>
   );
 }
 
@@ -99,20 +170,20 @@ function AccountRow() {
   return (
     <section className="row">
       <div className="row-text">
-        <h2>Account</h2>
+        <h2>{t("settings.account")}</h2>
         <p className="muted">
           {account === null
             ? "\u00a0"
             : account.signedIn
               ? account.username
-                ? `Signed in as ${account.username}`
-                : "Signed in"
-              : "Signed out. Sign in to dictate."}
+                ? t("settings.account.signedInAs", { username: account.username })
+                : t("settings.account.signedIn")
+              : t("settings.account.signedOut")}
         </p>
       </div>
       {account?.signedIn === true && (
         <button type="button" className="button" disabled={busy} onClick={signOut}>
-          {busy ? "Signing out…" : "Sign out"}
+          {t(busy ? "settings.account.signingOut" : "settings.account.signOut")}
         </button>
       )}
       {account?.signedIn === false && (
@@ -121,7 +192,7 @@ function AccountRow() {
           className="button button-primary"
           onClick={() => void bridge.openSignIn()}
         >
-          Sign in
+          {t("settings.account.signIn")}
         </button>
       )}
     </section>
@@ -136,7 +207,19 @@ function ShortcutRow({
   onSaved: (hotkey: string[]) => void;
 }) {
   const [capture, setCapture] = useState<Capture>({ step: "idle" });
-  const [error, setError] = useState<string | null>(null);
+  const capturing = useRef(false);
+
+  useEffect(() => {
+    capturing.current = capture.step !== "idle";
+  }, [capture.step]);
+
+  useEffect(
+    () => () => {
+      if (capturing.current) void bridge.cancelHotkeyCapture();
+    },
+    [],
+  );
+  const [error, setError] = useState<MessageId | null>(null);
 
   useEffect(
     () =>
@@ -178,7 +261,7 @@ function ShortcutRow({
         })
         .catch((reason: unknown) => {
           setCapture({ step: "idle" });
-          setError(reason instanceof Error ? reason.message : String(reason));
+          setError(problemOf(reason).message);
         });
     };
     const onBlur = () => {
@@ -202,7 +285,7 @@ function ShortcutRow({
         setCapture({ step: "listening" });
       })
       .catch((reason: unknown) => {
-        setError(String(reason));
+        setError(problemOf(reason).message);
       });
   };
 
@@ -220,47 +303,48 @@ function ShortcutRow({
       })
       .catch((reason: unknown) => {
         setCapture({ step: "idle" });
-        setError(String(reason));
+        setError(problemOf(reason).message);
       });
   };
 
   return (
     <section className="row">
       <div className="row-text">
-        <h2>Shortcut</h2>
+        <h2>{t("settings.shortcut")}</h2>
         {capture.step === "listening" && (
           <p className="muted" role="status">
-            Press the new shortcut, then release it.
+            {t("settings.shortcut.listening")}
           </p>
         )}
         {capture.step === "proposed" && (
           <p role="status">
-            Use{" "}
+            {t("settings.shortcut.proposeBefore")}{" "}
             <span className="nowrap">
-              <Keys keys={capture.keys} />?
+              <Keys keys={capture.keys} />
+              {t("settings.shortcut.proposeAfter")}
             </span>
           </p>
         )}
         {capture.step === "idle" && <p>{hotkey && <Keys keys={hotkey} />}</p>}
         {error && (
           <p className="error" role="alert">
-            {error}
+            {t(error)}
           </p>
         )}
       </div>
       <div className="row-actions">
         {capture.step === "proposed" && (
           <button type="button" className="button button-primary" onClick={save}>
-            Save
+            {t("common.save")}
           </button>
         )}
         {capture.step === "idle" ? (
           <button type="button" className="button" onClick={start}>
-            Change
+            {t("settings.shortcut.change")}
           </button>
         ) : (
           <button type="button" className="button" onClick={cancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
         )}
       </div>

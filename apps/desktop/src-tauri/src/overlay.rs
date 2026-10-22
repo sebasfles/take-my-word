@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Duration;
@@ -6,11 +6,14 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition};
 
+use crate::audio::Level;
 use crate::dictation::Notifier;
+use crate::i18n::Message;
 use crate::windows::OVERLAY;
 
 const ERROR_VISIBLE: Duration = Duration::from_secs(4);
 const BOTTOM_MARGIN: f64 = 72.0;
+const LEVEL_EVERY: Duration = Duration::from_millis(50);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,7 +28,7 @@ pub enum OverlayState {
     Listening,
     Processing,
     Error {
-        message: String,
+        message: Message,
         action: Option<OverlayAction>,
     },
 }
@@ -79,8 +82,7 @@ impl<O: Overlay, N: Notifier> Overlay for GatedOverlay<O, N> {
         }
         log::info!("kept the overlay on listening during a hold");
         if let OverlayState::Error { message, .. } = state {
-            self.notifier
-                .notify(&format!("The previous dictation was not pasted. {message}"));
+            self.notifier.notify(&[Message::PreviousNotPasted, message]);
         }
     }
 }
@@ -126,6 +128,52 @@ impl Overlay for WindowOverlay {
                 }
             });
         }
+    }
+}
+
+pub struct Waveform {
+    app: AppHandle,
+    level: Level,
+    running: Option<Arc<AtomicBool>>,
+}
+
+impl Waveform {
+    pub fn new(app: AppHandle, level: Level) -> Self {
+        Self {
+            app,
+            level,
+            running: None,
+        }
+    }
+
+    pub fn start(&mut self) {
+        self.stop();
+        let running = Arc::new(AtomicBool::new(true));
+        self.running = Some(Arc::clone(&running));
+        let (app, level) = (self.app.clone(), self.level.clone());
+        let spawned = thread::Builder::new()
+            .name("waveform".into())
+            .spawn(move || {
+                pump(&level, &running, LEVEL_EVERY, |value| {
+                    let _ = app.emit_to(OVERLAY, "overlay-level", value);
+                });
+            });
+        if let Err(error) = spawned {
+            log::warn!("starting the waveform failed: {error}");
+        }
+    }
+
+    pub fn stop(&mut self) {
+        if let Some(running) = self.running.take() {
+            running.store(false, Ordering::Relaxed);
+        }
+    }
+}
+
+fn pump(level: &Level, running: &AtomicBool, every: Duration, mut emit: impl FnMut(f32)) {
+    while running.load(Ordering::Relaxed) {
+        emit(level.get());
+        thread::sleep(every);
     }
 }
 
@@ -183,7 +231,7 @@ mod tests {
     #[derive(Default)]
     struct Seen {
         overlay: RefCell<Vec<OverlayState>>,
-        notices: RefCell<Vec<String>>,
+        notices: RefCell<Vec<Vec<Message>>>,
     }
 
     impl Overlay for &Seen {
@@ -193,9 +241,27 @@ mod tests {
     }
 
     impl Notifier for &Seen {
-        fn notify(&self, message: &str) {
-            self.notices.borrow_mut().push(message.into());
+        fn notify(&self, sentence: &[Message]) {
+            self.notices.borrow_mut().push(sentence.to_vec());
         }
+    }
+
+    #[test]
+    fn the_waveform_sends_the_latest_level_until_the_hold_ends() {
+        let level = Level::default();
+        let running = AtomicBool::new(true);
+        let mut sent = Vec::new();
+        pump(&level, &running, Duration::ZERO, |value| {
+            sent.push(value);
+            level.set(sent.len() as f32 / 10.0);
+            if sent.len() == 3 {
+                running.store(false, Ordering::Relaxed);
+            }
+        });
+        assert_eq!(sent, vec![0.0, 0.1, 0.2]);
+        pump(&level, &running, Duration::ZERO, |_| {
+            panic!("sent while idle")
+        });
     }
 
     #[test]
@@ -221,11 +287,16 @@ mod tests {
         let overlay = GatedOverlay::new(&seen, &seen);
         overlay.begin_recording();
         overlay.set(OverlayState::Error {
-            message: "Can't reach Take My Word. Check your connection.".into(),
+            message: Message::DictationUnreachable,
             action: None,
         });
         assert_eq!(*seen.overlay.borrow(), vec![OverlayState::Listening]);
-        assert_eq!(seen.notices.borrow().len(), 1);
-        assert!(seen.notices.borrow()[0].contains("Can't reach Take My Word"));
+        assert_eq!(
+            *seen.notices.borrow(),
+            vec![vec![
+                Message::PreviousNotPasted,
+                Message::DictationUnreachable
+            ]]
+        );
     }
 }

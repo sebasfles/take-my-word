@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UpdateView } from "../bridge.ts";
+import { setLanguage } from "../i18n.ts";
 import { fakeBridge, listeners, pendingUpdate } from "../testing/bridge.ts";
 import { Update } from "./Update.tsx";
 
@@ -9,8 +10,9 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
   bridge: fakeBridge,
 }));
 
+setLanguage("es");
+
 const available: UpdateView = {
-  language: "es",
   version: "0.1.1",
   notes: "Pega más rápido en terminales.",
   phase: "available",
@@ -33,6 +35,7 @@ describe("Update", () => {
     cleanup();
     vi.clearAllMocks();
     pendingUpdate.view = null;
+    setLanguage("es");
   });
 
   it("offers the version and its notes, and installs on yes", async () => {
@@ -55,7 +58,8 @@ describe("Update", () => {
   });
 
   it("speaks English when Windows does", async () => {
-    await showing({ ...available, language: "en", notes: "" });
+    setLanguage("en");
+    await showing({ ...available, notes: "" });
     screen.getByRole("heading", { name: "A new version of Take My Word is ready" });
     screen.getByRole("button", { name: "Later" });
     screen.getByRole("button", { name: "Install and restart" });
