@@ -60,6 +60,25 @@ pub struct ReadOrder {
     armed: bool,
     contended: bool,
     counted: bool,
+    failed: bool,
+}
+
+#[cfg(any(windows, test))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadOutcome {
+    Counted,
+    Contended,
+    Failed,
+    Ignored(Ignored),
+}
+
+#[cfg(any(windows, test))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ignored {
+    BeforeTheKeystroke,
+    AfterTheCount,
+    AfterAContention,
+    AfterAFailedRender,
 }
 
 #[cfg(any(windows, test))]
@@ -71,23 +90,38 @@ impl ReadOrder {
         };
     }
 
-    pub fn armed(&self) -> bool {
-        self.armed
-    }
-
-    pub fn may_count(&self) -> bool {
-        self.armed && !self.contended && !self.counted
-    }
-
-    pub fn counted(&self) -> bool {
-        self.counted
-    }
-
-    pub fn record(&mut self, target: bool) {
-        if target {
-            self.counted = true;
-        } else {
+    pub fn read(
+        &mut self,
+        is_target: impl FnOnce() -> bool,
+        render: impl FnOnce() -> bool,
+    ) -> ReadOutcome {
+        if let Some(reason) = self.ignored() {
+            return ReadOutcome::Ignored(reason);
+        }
+        if !is_target() {
             self.contended = true;
+            return ReadOutcome::Contended;
+        }
+        if render() {
+            self.counted = true;
+            ReadOutcome::Counted
+        } else {
+            self.failed = true;
+            ReadOutcome::Failed
+        }
+    }
+
+    fn ignored(&self) -> Option<Ignored> {
+        if !self.armed {
+            Some(Ignored::BeforeTheKeystroke)
+        } else if self.counted {
+            Some(Ignored::AfterTheCount)
+        } else if self.contended {
+            Some(Ignored::AfterAContention)
+        } else if self.failed {
+            Some(Ignored::AfterAFailedRender)
+        } else {
+            None
         }
     }
 }
@@ -96,6 +130,7 @@ impl ReadOrder {
 pub enum ReadWait {
     Counted,
     Contended,
+    Failed,
     Nothing,
 }
 
@@ -378,65 +413,68 @@ mod tests {
         assert_eq!(depth_below(950, &[100], parent_of), None);
     }
 
-    fn reads(order: &mut ReadOrder, readers: &[bool]) -> Vec<bool> {
-        readers
-            .iter()
-            .map(|target| {
-                let counted = order.may_count() && *target;
-                if order.may_count() {
-                    order.record(*target);
-                }
-                counted
-            })
-            .collect()
+    fn never() -> bool {
+        panic!("must not run");
     }
 
     #[test]
     fn no_read_before_the_keystroke_can_count_not_even_the_targets() {
         let mut order = ReadOrder::default();
-        assert_eq!(reads(&mut order, &[false, true]), vec![false, false]);
-        order.arm();
-        assert_eq!(reads(&mut order, &[true]), vec![true]);
-    }
-
-    #[test]
-    fn the_first_read_after_the_keystroke_counts_when_it_is_the_target() {
-        let mut order = ReadOrder::default();
-        order.arm();
-        assert!(order.may_count());
-        assert_eq!(reads(&mut order, &[true]), vec![true]);
-    }
-
-    #[test]
-    fn once_a_read_counted_later_requests_of_the_same_paste_neither_count_nor_contend() {
-        let mut order = ReadOrder::default();
-        order.arm();
         assert_eq!(
-            reads(&mut order, &[true, true, false]),
-            vec![true, false, false]
+            order.read(never, never),
+            ReadOutcome::Ignored(Ignored::BeforeTheKeystroke)
         );
-        assert!(order.counted());
-        assert!(!order.may_count());
+        order.arm();
+        assert_eq!(order.read(|| true, || true), ReadOutcome::Counted);
+    }
+
+    #[test]
+    fn the_first_read_after_the_keystroke_counts_when_it_is_the_target_and_renders() {
+        let mut order = ReadOrder::default();
+        order.arm();
+        assert_eq!(order.read(|| true, || true), ReadOutcome::Counted);
+    }
+
+    #[test]
+    fn once_a_read_counted_later_requests_of_the_same_paste_are_neither_probed_nor_rendered() {
+        let mut order = ReadOrder::default();
+        order.arm();
+        assert_eq!(order.read(|| true, || true), ReadOutcome::Counted);
+        assert_eq!(
+            order.read(never, never),
+            ReadOutcome::Ignored(Ignored::AfterTheCount)
+        );
+    }
+
+    #[test]
+    fn a_target_read_after_another_reader_after_the_keystroke_is_never_probed_or_counted() {
+        let mut order = ReadOrder::default();
+        order.arm();
+        assert_eq!(order.read(|| false, never), ReadOutcome::Contended);
+        assert_eq!(
+            order.read(never, never),
+            ReadOutcome::Ignored(Ignored::AfterAContention)
+        );
+    }
+
+    #[test]
+    fn a_render_that_fails_never_counts_and_ends_the_paste() {
+        let mut order = ReadOrder::default();
+        order.arm();
+        assert_eq!(order.read(|| true, || false), ReadOutcome::Failed);
+        assert_eq!(
+            order.read(never, never),
+            ReadOutcome::Ignored(Ignored::AfterAFailedRender)
+        );
     }
 
     #[test]
     fn a_retry_rearms_the_order_so_its_first_read_can_count_again() {
         let mut order = ReadOrder::default();
         order.arm();
-        assert_eq!(reads(&mut order, &[false, true]), vec![false, false]);
+        assert_eq!(order.read(|| false, never), ReadOutcome::Contended);
         order.arm();
-        assert_eq!(reads(&mut order, &[true]), vec![true]);
-    }
-
-    #[test]
-    fn a_target_read_after_another_reader_after_the_keystroke_never_counts() {
-        let mut order = ReadOrder::default();
-        order.arm();
-        assert_eq!(
-            reads(&mut order, &[false, true, true]),
-            vec![false, false, false]
-        );
-        assert!(!order.may_count());
+        assert_eq!(order.read(|| true, || true), ReadOutcome::Counted);
     }
 
     #[test]

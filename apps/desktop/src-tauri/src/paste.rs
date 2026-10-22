@@ -105,7 +105,9 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
                     );
                     attempt += 1;
                 }
-                ReadWait::Contended | ReadWait::Nothing => return self.keep(Undelivered::NotRead),
+                ReadWait::Contended | ReadWait::Failed | ReadWait::Nothing => {
+                    return self.keep(Undelivered::NotRead);
+                }
             }
         }
         let settle = Settle::after_the_read(self.timing.read_grace);
@@ -509,6 +511,21 @@ mod tests {
         );
         assert_eq!(world.borrow().keystrokes, 2);
         assert_eq!(world.borrow().log.last().map(String::as_str), Some("keep"));
+    }
+
+    #[test]
+    fn a_render_that_failed_keeps_the_text_without_a_retry_or_a_restore() {
+        let world = world(|world| {
+            world.reads = VecDeque::from([ReadWait::Failed, ReadWait::Counted]);
+        });
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::LeftInClipboard(Undelivered::NotRead)
+        );
+        assert_eq!(
+            world.borrow().log,
+            vec!["offer hola", "settle", "arm 1", "ctrl+v", "Failed", "keep"]
+        );
     }
 
     #[test]

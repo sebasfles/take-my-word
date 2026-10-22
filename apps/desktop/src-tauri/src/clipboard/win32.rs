@@ -34,8 +34,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{BOOL, HSTRING, PCWSTR, w};
 
 use super::{
-    Clipboard, ClipboardError, ReadOrder, ReadWait, Reader, Settle, WaitNode, depth_below,
-    probe_order, renders_for, sends_to, settled,
+    Clipboard, ClipboardError, Ignored, ReadOrder, ReadOutcome, ReadWait, Reader, Settle, WaitNode,
+    depth_below, probe_order, renders_for, sends_to, settled,
 };
 
 const WM_COMMANDS: u32 = WM_APP + 1;
@@ -63,7 +63,11 @@ struct Activity {
     last_read: Option<Instant>,
     order: ReadOrder,
     attempt: u32,
+    parents: HashMap<u32, u32>,
+    threads: Vec<(u32, u32)>,
 }
+
+type TargetSnapshot = (HashMap<u32, u32>, Vec<(u32, u32)>);
 
 type SharedActivity = Arc<Mutex<Activity>>;
 
@@ -72,6 +76,7 @@ pub struct SystemClipboard {
     commands: mpsc::Sender<Command>,
     reads: mpsc::Receiver<ReadWait>,
     activity: SharedActivity,
+    targets: Option<thread::JoinHandle<TargetSnapshot>>,
 }
 
 impl SystemClipboard {
@@ -94,6 +99,7 @@ impl SystemClipboard {
             commands,
             reads,
             activity,
+            targets: None,
         })
     }
 
@@ -120,6 +126,15 @@ impl SystemClipboard {
 impl Clipboard for SystemClipboard {
     fn offer(&mut self, text: &str, readers: &[u32]) -> Result<(), ClipboardError> {
         while self.reads.try_recv().is_ok() {}
+        let targets = readers.to_vec();
+        self.targets = thread::Builder::new()
+            .name("clipboard-targets".into())
+            .spawn(move || {
+                let parents = crate::foreground::parent_processes();
+                let threads = target_threads(&targets, &parents);
+                (parents, threads)
+            })
+            .ok();
         self.call(|reply| Command::Offer(utf16_bytes(text), readers.to_vec(), reply))
     }
 
@@ -143,8 +158,21 @@ impl Clipboard for SystemClipboard {
     }
 
     fn arm(&mut self, attempt: u32) {
+        let joining = Instant::now();
+        let snapshot = self.targets.take().and_then(|targets| {
+            let snapshot = targets.join().ok();
+            log::info!(
+                "target snapshot joined after waiting {} ms",
+                joining.elapsed().as_millis()
+            );
+            snapshot
+        });
         if let Ok(mut activity) = self.activity.lock() {
             while self.reads.try_recv().is_ok() {}
+            if let Some((parents, threads)) = snapshot {
+                activity.parents = parents;
+                activity.threads = threads;
+            }
             activity.order.arm();
             activity.attempt = attempt;
         }
@@ -190,8 +218,6 @@ struct State {
     formats: Formats,
     pending: Option<Vec<u8>>,
     readers: Vec<u32>,
-    parents: HashMap<u32, u32>,
-    threads: Vec<(u32, u32)>,
     saved: Vec<(u32, Vec<u8>)>,
 }
 
@@ -232,8 +258,6 @@ fn serve(
             formats,
             pending: None,
             readers: Vec::new(),
-            parents: HashMap::new(),
-            threads: Vec::new(),
             saved: Vec::new(),
         });
     });
@@ -299,18 +323,11 @@ unsafe extern "system" fn window_proc(
             LRESULT(0)
         }
         WM_RENDERFORMAT => {
-            mark_rendering(true);
-            if wparam.0 as u32 == u32::from(CF_UNICODETEXT.0)
-                && !already_counted()
-                && reader_is_target()
-                && let Some(text) = with_state(|state| state.pending.clone()).flatten()
-            {
-                if let Err(error) = set_data(u32::from(CF_UNICODETEXT.0), &text) {
-                    log::warn!("rendering the dictation for the target failed: {error}");
-                }
-                with_state(|state| state.reads.send(ReadWait::Counted));
+            if wparam.0 as u32 == u32::from(CF_UNICODETEXT.0) {
+                mark_rendering(true);
+                answer_render_request();
+                mark_rendering(false);
             }
-            mark_rendering(false);
             LRESULT(0)
         }
         WM_RENDERALLFORMATS => {
@@ -338,40 +355,28 @@ fn mark_rendering(rendering: bool) {
     });
 }
 
-fn already_counted() -> bool {
-    let attempt = with_state(|state| {
-        state
-            .activity
-            .lock()
-            .ok()
-            .filter(|activity| activity.order.counted())
-            .map(|activity| activity.attempt)
-    })
-    .flatten();
-    if let Some(attempt) = attempt {
-        log::info!(
-            "clipboard render request after the counted read of attempt {attempt}: answered without rendering again"
-        );
-    }
-    attempt.is_some()
-}
-
-fn reader_is_target() -> bool {
+fn answer_render_request() {
     let started = Instant::now();
-    let (targets, parents, threads, activity) = with_state(|state| {
+    let Some((targets, pending, activity, reads)) = with_state(|state| {
         (
             state.readers.clone(),
-            state.parents.clone(),
-            state.threads.clone(),
+            state.pending.clone(),
             Arc::clone(&state.activity),
+            state.reads.clone(),
         )
-    })
-    .unwrap_or_default();
-    let (order, attempt) = activity
-        .lock()
-        .map(|activity| (activity.order, activity.attempt))
-        .unwrap_or_default();
-    let may_count = order.may_count();
+    }) else {
+        return;
+    };
+    let Ok((mut order, attempt, parents, threads)) = activity.lock().map(|activity| {
+        (
+            activity.order,
+            activity.attempt,
+            activity.parents.clone(),
+            activity.threads.clone(),
+        )
+    }) else {
+        return;
+    };
     let opener = unsafe { GetOpenClipboardWindow() }
         .ok()
         .filter(|window| !window.is_invalid());
@@ -379,29 +384,42 @@ fn reader_is_target() -> bool {
     if let Some(opener) = opener {
         unsafe { GetWindowThreadProcessId(opener, Some(&mut opener_pid)) };
     }
-    let parent_of = |child: u32| parents.get(&child).copied();
-    let (reader, probe) = if !may_count || targets.is_empty() {
-        (
-            if opener_pid != 0 {
-                Reader::Window(opener_pid)
-            } else {
-                Reader::Unproven
-            },
-            None,
-        )
-    } else if opener_pid != 0 {
-        (Reader::Window(opener_pid), None)
+    let mut reader = if opener_pid != 0 {
+        Reader::Window(opener_pid)
     } else {
-        let probe = probe_sender(&threads);
-        let reader = probe.sender.map_or(Reader::Unproven, Reader::Sender);
-        (reader, Some(probe))
+        Reader::Unproven
     };
-    let target = may_count && renders_for(reader, &targets, parent_of);
-    if may_count && let Ok(mut activity) = activity.lock() {
-        activity.order.record(target);
-        if !target {
-            with_state(|state| state.reads.send(ReadWait::Contended));
-        }
+    let mut probe = None;
+    let outcome = order.read(
+        || {
+            if opener_pid == 0 {
+                let probed = probe_sender(&threads);
+                reader = probed.sender.map_or(Reader::Unproven, Reader::Sender);
+                probe = Some(probed);
+            }
+            renders_for(reader, &targets, |child| parents.get(&child).copied())
+        },
+        || {
+            pending.as_deref().is_some_and(|text| {
+                set_data(u32::from(CF_UNICODETEXT.0), text)
+                    .inspect_err(|error| log::warn!("rendering the dictation failed: {error}"))
+                    .is_ok()
+            })
+        },
+    );
+    if !matches!(outcome, ReadOutcome::Ignored(_))
+        && let Ok(mut activity) = activity.lock()
+    {
+        activity.order = order;
+    }
+    let event = match outcome {
+        ReadOutcome::Counted => Some(ReadWait::Counted),
+        ReadOutcome::Contended => Some(ReadWait::Contended),
+        ReadOutcome::Failed => Some(ReadWait::Failed),
+        ReadOutcome::Ignored(_) => None,
+    };
+    if let Some(event) = event {
+        let _ = reads.send(event);
     }
     let reader_pid = match reader {
         Reader::Window(pid) | Reader::Sender(pid) => pid,
@@ -420,8 +438,23 @@ fn reader_is_target() -> bool {
             }
         )
     });
+    let decision = match outcome {
+        ReadOutcome::Counted => format!("rendered and counted for attempt {attempt}"),
+        ReadOutcome::Contended => format!("withheld, contends attempt {attempt}"),
+        ReadOutcome::Failed => format!("render failed, attempt {attempt} not delivered"),
+        ReadOutcome::Ignored(Ignored::BeforeTheKeystroke) => "withheld before the keystroke".into(),
+        ReadOutcome::Ignored(Ignored::AfterTheCount) => {
+            format!("answered without rendering again after the counted read of attempt {attempt}")
+        }
+        ReadOutcome::Ignored(Ignored::AfterAContention) => {
+            format!("withheld, attempt {attempt} is contended")
+        }
+        ReadOutcome::Ignored(Ignored::AfterAFailedRender) => {
+            format!("withheld, attempt {attempt} failed to render")
+        }
+    };
     log::info!(
-        "clipboard read by {} ({}{proof}): {} in {} ms",
+        "clipboard read by {} ({}{proof}): {decision} in {} ms",
         crate::foreground::executable_of(reader_pid)
             .unwrap_or_else(|| "an unidentified reader".into()),
         if opener.is_some() {
@@ -429,18 +462,8 @@ fn reader_is_target() -> bool {
         } else {
             "without a window"
         },
-        if target {
-            format!("rendered and counted for attempt {attempt}")
-        } else if may_count {
-            format!("withheld, contends attempt {attempt}")
-        } else if order.armed() {
-            format!("withheld, attempt {attempt} is contended")
-        } else {
-            "withheld before the keystroke".into()
-        },
         started.elapsed().as_millis()
     );
-    target
 }
 
 struct Probe {
@@ -612,8 +635,6 @@ fn execute(command: Command) {
 }
 
 fn offer(window: HWND, text: Vec<u8>, readers: Vec<u32>) -> Result<(), ClipboardError> {
-    let parents = crate::foreground::parent_processes();
-    let threads = target_threads(&readers, &parents);
     let saved = with_open_clipboard(window, OPEN_PATIENCE, || {
         let saved = snapshot();
         unsafe { EmptyClipboard() }.map_err(win_error)?;
@@ -625,8 +646,6 @@ fn offer(window: HWND, text: Vec<u8>, readers: Vec<u32>) -> Result<(), Clipboard
         state.saved = saved;
         state.pending = Some(text);
         state.readers = readers;
-        state.parents = parents;
-        state.threads = threads;
         if let Ok(mut activity) = state.activity.lock() {
             *activity = Activity::default();
         }

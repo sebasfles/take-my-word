@@ -174,3 +174,26 @@ Rejected along the way: asynchronous WCT (70 threads in 3049 ms against 806 ms s
 Host notes: Wispr Flow won the race against the target once in run 2's three tries and never in run 5's ten, so attempt 2 has no host evidence yet beyond the real-clipboard test of an unproven reader followed by the retry; offline experiments on the host (no input, no windows) saved and restored the clipboard around each; leftovers to remove at clean: `C:\dev\tmw-0012`, `C:\dev\tmw-0012-base`, `C:\dev\tmw-0012-run`.
 
 Deferred: `tauri-plugin-log` keeps one rotated file (`KeepOne`), so a long session loses older paste lines; the PR evidence was taken from the run outputs instead.
+
+### Round 2
+
+Findings applied, all three:
+
+1. A render that fails no longer counts: `ReadOrder::read` returns counted only after a successful render, a failure sends `ReadWait::Failed`, the paste keeps the text with the notification (no retry, no restore), and every later request of that paste is ignored.
+2. The read decision lives in `ReadOrder::read(is_target, render)`, which returns counted, contended, failed or ignored; `answer_render_request` in `win32.rs` calls it, the tests drive it directly (the probe and render closures panic where they must not run), and the test helper is gone; the order is written back only when a read changed it, so a read before the keystroke racing `arm` cannot undo the arming.
+3. The process and thread snapshots run on a helper thread started at the offer, alongside the clipboard work and the settle; `arm(1)` joins it and installs the result before the keystroke, and logs the wait.
+
+Run 6 (`windows-run-0012-host/run6/`, same machine and WSLg up): real-clipboard tests 5 of 5; scratch with the run's reader 10 of 10 landed and restored; WebView2 5 of 5; Chrome 3 of 3.
+Scratch try 1 is the first host evidence of the retry: a windowless reader (Wispr Flow, per the round 1 investigation; the log names it unidentified) read 2 ms after the keystroke, was probed (2 GUI threads, 24 ms), withheld and contended attempt 1; after a 43 ms settle the scratch window read for attempt 2, it landed, and the previous clipboard came back.
+
+| min / median / max | Before (run 5, n=24) | After (run 6, n=18) |
+|---|---|---|
+| Dictation response to the keystroke | 93 / 105.5 / 128 ms | 55 / 60.5 / 79 ms |
+| Of which before the offer completes (settle excluded) | 45 / 53 / 80 ms | 2 / 8 / 12 ms |
+| Settle before the keystroke | 41 / 42 / 43 ms | 41 / 42 / 53 ms |
+| `arm(1)` waiting on the snapshot join | n/a | 0 / 1.5 / 24 ms |
+
+The join outlasted the settle in a few pastes, by 24 ms at most, and that wait is inside the "after" response times above.
+Probe cost after the keystroke: WebView2 119 / 125 / 188 ms over 9 to 10 GUI threads, Chrome 79 / 83 / 112 ms over 6 to 7; restore wait 150 / 151 / 155 ms with the cap hit 0 times; 8 requests answered without rendering after a count; 0 render failures.
+
+Decision the plan did not record: the target snapshot (process tree and threads) is taken off the paste's path on a helper thread per paste and installed at `arm(1)`; this refines round 1's decision 7, which still holds (the set is fixed before the first keystroke).
