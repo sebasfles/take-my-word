@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@take-my-word/brand";
 import { bridge, keepListening, type UpdateView } from "../bridge.ts";
 import { t } from "../i18n.ts";
@@ -6,6 +6,11 @@ import { WindowPage } from "./WindowPage.tsx";
 
 export function Update() {
   const [view, setView] = useState<UpdateView | null>(null);
+  const fitted = useRef(false);
+  const fitUpdate = useCallback((height: number) => {
+    void bridge.fitUpdate(height, !fitted.current);
+    fitted.current = true;
+  }, []);
 
   useEffect(() => keepListening(() => bridge.onUpdate(setView)), []);
 
@@ -19,7 +24,11 @@ export function Update() {
   const notes = view.notes.trim();
 
   return (
-    <WindowPage title={t("update.title")} intro={t("update.version", { version: view.version })}>
+    <WindowPage
+      onHeight={fitUpdate}
+      title={t("update.title")}
+      intro={<span className="version">{t("update.version", { version: view.version })}</span>}
+    >
       {notes !== "" && (
         <section className="window-section">
           <h2>{t("update.notes")}</h2>

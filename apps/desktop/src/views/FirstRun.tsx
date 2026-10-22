@@ -25,7 +25,7 @@ export function FirstRun() {
         <li>
           <span className="step-number">2</span>
           <span>
-            {t("firstRun.step2Before")} <Keys keys={overview?.hotkey ?? ["Ctrl", "Win"]} />{" "}
+            {t("firstRun.step2Before")} {overview && <Keys keys={overview.hotkey} />}{" "}
             {t("firstRun.step2After")}
           </span>
         </li>

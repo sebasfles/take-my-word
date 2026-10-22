@@ -29,6 +29,7 @@ Every window, icon and notification of the Windows app is redesigned with `packa
 - Overlay: the "Escuchando" or "Listening" pill with the brand waveform driven by the real level, at the size and position 0008 settled.
 - Notifications and tray menu copy follow the brand voice, Spanish and English, UI language from Windows with English fallback and a manual override, as 0008 built it.
 - Light and dark following Windows, with the manual switch the web has.
+- Dev default hotkey: the dev build defaults to Ctrl+Alt+Win and prd keeps Ctrl+Win, so both apps can run side by side without both dictating on the same chord (Sebastian, 2026-10-21); an existing saved hotkey is kept.
 - Release: a new minor version (0.2.0) cut with `pnpm release:desktop` from the task branch after the review is clean, published by `desktop-release`, verified as an update from 0.1.1 on Windows.
 - Screenshots of every window and state at its real size, light and dark, Spanish and English, refreshed every round, in `.workspaces/0011_desktop_rebrand/screenshots/`, plus side-by-side pairs with the matching web pages.
 
@@ -91,6 +92,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Overlay (adjusts Approach): the brand `Waveform` gains a history mode (`levels`, newest last) and `OverlayPill` an optional action slot; the overlay keeps 0008's behavior (scrolling bars, flat on silence, bars only while Listening, click to dismiss, microphone link) in the pill's look; the web's rendering is unchanged.
 - Overlay states (om-reviewer, 2026-10-21, on the om-developer's question): the pill shows bars only while Listening; processing shows a token-built spinner (a generic pill option if added to brand, still under reduced motion), error shows no bars; 0008's "no bars in processing" assertion stays as is.
 - Design answer (om-manager, after round 1): tile tray set and accent app icon approved, glyph set and ink icon dropped; the dev mark is a solid light-blue diagonal of about a third of the tile (legs at least 5 px at 16 px) on tray and app icons, glyph still legible; sign-in and choose password share one window size fitted to their content, no filler; settings, overlay, errors and pairs approved.
+- Dev default hotkey (Sebastian through the om-manager, Scope; details om-reviewer): the default comes from the compiled environment through one function covering both arms, so one test asserts Ctrl+Win for prd and Ctrl+Alt+Win (left Alt) for dev; a saved hotkey is never rewritten. With prd running, Ctrl+Win then Alt starts and cancels a prd hold (chord tracker, nothing sent); Alt before Win triggers only dev. `desktop/prd.md` and `trd.md` name both defaults.
 - Acceptance 7: selectors and copy may change (the voice rewrite needs it); no assertion is dropped or weakened.
 - Acceptance 6: 0008's method (private working set of app plus WebView2 after opening and closing settings; CPU seconds over 5 idle minutes), on dev release builds of the develop head (base) and the final commit in the same session; pass at RAM ≤ base + 10 MB and CPU ≤ base + 1.0 s, on runs that do not follow a sign-in.
 - Design checkpoint: round 1 delivers only the overlay pill, tray and app icon candidates in every state at 16, 20, 24 and 32 px on light and dark taskbar backdrops, and sign-in plus Settings › General in both themes; I send the paths to the om-manager for one design answer before the rest is restyled.
@@ -98,6 +100,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Theme (om-reviewer): system, light or dark in General, saved in `settings.json` like `uiLanguage`, applied at once to every open window and its native title bar; the overlay pill is ink in both themes.
 - Screenshots (om-reviewer): each window at its real inner size (account 440x560, first run 520x470, update 460x400, overlay 480x96 over a light and a dark app backdrop), settings at 380, 880 and 1280 wide; every state, light and dark, es and en, device scale 1; pairs put the desktop window next to the matching web page at 1280, same theme and language.
 - Windows evidence (om-reviewer): the tray is shown from the generated icon frames on taskbar-colored backdrops, never a capture of the real taskbar; PrintWindow captures of the app's own sign-in, settings and a real hold's overlay from the dev build, in both forced themes, to compare WebView2 against Chromium.
+- Smoke user (om-reviewer, round 3): the SSO session expired with Sebastian away, so the smoke signs in as crew-e2e-b from the root `.env` instead of a throwaway user; settings and rules saved before and restored after, the smoke's dictations deleted, signed out; no AWS profile used.
 - Real dictation (om-reviewer, Acceptance 7): 0008's smoke: `--dictate-wav` of the committed speech fixture into `tmw-scratch.exe` the run launched, signed in as a throwaway dev user.
 - Release notes (om-reviewer): short, English then Spanish, in the brand voice, in the tag message.
 
@@ -182,3 +185,30 @@ Decisions not in the plan:
 - Onboarding is content-fitted at run time rather than a fixed size, since its height grows with the user's custom styles.
 - First run grows to 520x536 and update to 460x456 instead of trimming their copy.
 - Tray frames and installer icons are written by a brand script into `apps/desktop/src-tauri/icons`, where Tauri expects them, instead of being referenced across packages.
+
+### Round 3 (round 2 findings and the dev default hotkey)
+
+Screenshots: `.workspaces/0011_desktop_rebrand/screenshots/round-3/` (round 2's set with First run, General and the update window recaptured, plus `first-run-ready-dev` and `settings-idle-dev` showing Ctrl+Alt+Win; 480 shots).
+
+Findings:
+
+1. The tray never blocks a hold: `Indicator` only stores state and hands a job to `run_on_main_thread`; the live reads, the compare-and-set of `shown`, the display scale and `set_icon`/`set_tooltip` all run inside that main-thread job, so no lock is held across a round trip and `set_ui_language` (main thread) only queues.
+   `show_signed_in` queues its menu label too; `relabel` already runs on the main thread and queues a forced repaint.
+   Tested through the indicator's two ports (a fake dispatcher that only queues, a fake painter): a hold's start and end paint nothing until the queued jobs run.
+2. `Indicator` reads the live account flag and the live `MicrophoneStatus` handle each time it paints; the microphone listener only queues a refresh and is registered in `tray::build` before the first paint, so a status recorded during startup is never lost (tested: a change after the indicator exists shows on the next paint).
+3. `fit_account` and the new `fit_update` take `recenter`: the view sends it only on its first fit (and on the step change back to sign-in); later fits resize in place and move the window up only as far as needed to stay inside the work area (`top_inside`, tested).
+4. Version strings use `font-variant-numeric: tabular-nums` (`.version`, on About and the update window); "0.1.1" now reads correctly in the screenshots.
+
+Also: the update window is content-fitted per phase like onboarding (`windows.json` `update` is now a width and a minimum height), since a fixed size left a dead lower third in its available state.
+
+Dev default hotkey:
+
+- Each `Environment` in `env.rs` names its default hotkey: dev Ctrl+Alt+Win (left Alt only, as every Alt in a hotkey), prd Ctrl+Win; `Hotkey::default()` is `Hotkey::for_environment(env::CURRENT)`, so debug builds are dev.
+- `settings.json` loading is unchanged: a saved hotkey is kept, an absent one or an invalid file takes the build's default, and nothing rewrites a saved hotkey.
+- First run shows the keys only once the real hotkey has loaded, instead of a hard-coded Ctrl+Win placeholder.
+- The mocked bridge answers `build=dev` with Ctrl+Alt+Win; two shots use it, nothing else is duplicated.
+
+Tests: both environments' defaults in one test (prd Ctrl+Win, dev Ctrl+Alt+Win matching left Alt and not right Alt, and the compiled default following `CURRENT`); a saved Ctrl+Win survives a dev build while a file without a hotkey takes the build's default.
+Test fixtures that meant Ctrl+Win (`chord.rs`, `keys.rs`, the DOM-code mapping, validation and the JSON round trip) now say `Hotkey::ctrl_win()` instead of the build default; no assertion changed.
+
+Pending (round 4): the Windows evidence, Acceptance 6 and the real-dictation smoke, once the reviewer books the host.

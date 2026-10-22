@@ -1,13 +1,14 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use tauri::image::Image;
 use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, Wry};
 
-use crate::audio::MicStatus;
+use crate::audio::{MicStatus, MicrophoneStatus};
 use crate::i18n::{Message, text};
+use crate::shell::AppAccount;
 use crate::{account, windows};
 
 const TRAY: &str = "main";
@@ -86,82 +87,117 @@ fn frame(state: TrayState, scale: f64) -> &'static [u8] {
     FRAMES[row][frame_index(scale)]
 }
 
-pub struct Indicator {
-    signed_in: AtomicBool,
+pub trait Painter: Send + Sync + 'static {
+    fn paint(&self, status: Status) -> bool;
+}
+
+type Job = Box<dyn FnOnce() + Send>;
+type Dispatch = Box<dyn Fn(Job) + Send + Sync>;
+type Source<T> = Box<dyn Fn() -> T + Send + Sync>;
+
+struct Inner {
     listening: AtomicBool,
-    microphone: Mutex<MicStatus>,
+    signed_in: Source<bool>,
+    microphone: Source<MicStatus>,
     shown: Mutex<Option<Status>>,
+    painter: Box<dyn Painter>,
+}
+
+impl Inner {
+    fn apply(&self, force: bool) {
+        let status = status(
+            (self.signed_in)(),
+            (self.microphone)(),
+            self.listening.load(Ordering::SeqCst),
+        );
+        let mut shown = self.shown.lock().unwrap_or_else(PoisonError::into_inner);
+        if (force || *shown != Some(status)) && self.painter.paint(status) {
+            *shown = Some(status);
+        }
+    }
+}
+
+pub struct Indicator {
+    inner: Arc<Inner>,
+    dispatch: Dispatch,
 }
 
 impl Indicator {
-    pub fn new(signed_in: bool, microphone: MicStatus) -> Self {
+    fn new(
+        signed_in: Source<bool>,
+        microphone: Source<MicStatus>,
+        painter: Box<dyn Painter>,
+        dispatch: Dispatch,
+    ) -> Self {
         Self {
-            signed_in: AtomicBool::new(signed_in),
-            listening: AtomicBool::new(false),
-            microphone: Mutex::new(microphone),
-            shown: Mutex::new(None),
+            inner: Arc::new(Inner {
+                listening: AtomicBool::new(false),
+                signed_in,
+                microphone,
+                shown: Mutex::new(None),
+                painter,
+            }),
+            dispatch,
         }
     }
 
-    fn status(&self) -> Status {
-        status(
-            self.signed_in.load(Ordering::SeqCst),
-            *self
-                .microphone
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner),
-            self.listening.load(Ordering::SeqCst),
-        )
+    pub fn set_listening(&self, listening: bool) {
+        self.inner.listening.store(listening, Ordering::SeqCst);
+        self.refresh(false);
+    }
+
+    pub fn refresh(&self, force: bool) {
+        let inner = Arc::clone(&self.inner);
+        (self.dispatch)(Box::new(move || inner.apply(force)));
     }
 }
 
-fn scale(app: &AppHandle) -> f64 {
-    app.primary_monitor()
-        .ok()
-        .flatten()
-        .map_or(1.0, |monitor| monitor.scale_factor())
-}
+struct TrayPainter(AppHandle);
 
-fn tooltip(app: &AppHandle, status: Status) -> String {
-    format!("{}\n{}", windows::product_name(app), text(status.message))
-}
-
-fn show(app: &AppHandle, force: bool) {
-    let (Some(indicator), Some(tray)) = (app.try_state::<Indicator>(), app.tray_by_id(TRAY)) else {
-        return;
-    };
-    let status = indicator.status();
-    let mut shown = indicator
-        .shown
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
-    if !force && *shown == Some(status) {
-        return;
+impl Painter for TrayPainter {
+    fn paint(&self, status: Status) -> bool {
+        let Some(tray) = self.0.tray_by_id(TRAY) else {
+            return false;
+        };
+        let scale = self
+            .0
+            .primary_monitor()
+            .ok()
+            .flatten()
+            .map_or(1.0, |monitor| monitor.scale_factor());
+        let tooltip = format!(
+            "{}\n{}",
+            windows::product_name(&self.0),
+            text(status.message)
+        );
+        let painted = Image::from_bytes(frame(status.state, scale))
+            .and_then(|icon| tray.set_icon(Some(icon)))
+            .and_then(|()| tray.set_tooltip(Some(tooltip)));
+        painted
+            .inspect_err(|error| log::warn!("updating the tray icon failed: {error}"))
+            .is_ok()
     }
-    let shown_now = Image::from_bytes(frame(status.state, scale(app)))
-        .and_then(|icon| tray.set_icon(Some(icon)))
-        .and_then(|()| tray.set_tooltip(Some(tooltip(app, status))));
-    match shown_now {
-        Ok(()) => *shown = Some(status),
-        Err(error) => log::warn!("updating the tray icon failed: {error}"),
+}
+
+fn on_main_thread(app: &AppHandle) -> Dispatch {
+    let app = app.clone();
+    Box::new(move |job| {
+        if let Err(error) = app.run_on_main_thread(job) {
+            log::warn!("scheduling a tray update failed: {error}");
+        }
+    })
+}
+
+fn refresh(app: &AppHandle, force: bool) {
+    if let Some(indicator) = app.try_state::<Indicator>() {
+        indicator.refresh(force);
     }
 }
 
 pub fn show_listening(app: &AppHandle, listening: bool) {
     if let Some(indicator) = app.try_state::<Indicator>() {
-        indicator.listening.store(listening, Ordering::SeqCst);
+        indicator.set_listening(listening);
     }
-    show(app, false);
-}
-
-pub fn show_microphone(app: &AppHandle, microphone: MicStatus) {
-    if let Some(indicator) = app.try_state::<Indicator>() {
-        *indicator
-            .microphone
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = microphone;
-    }
-    show(app, false);
 }
 
 const SETTINGS: &str = "settings";
@@ -185,15 +221,18 @@ fn account_label(signed_in: bool) -> &'static str {
 }
 
 pub fn show_signed_in(app: &AppHandle, signed_in: bool) {
-    if let Some(indicator) = app.try_state::<Indicator>() {
-        indicator.signed_in.store(signed_in, Ordering::SeqCst);
+    let handle = app.clone();
+    let scheduled = app.run_on_main_thread(move || {
+        if let Some(items) = handle.try_state::<Items>()
+            && let Err(error) = items.account.set_text(account_label(signed_in))
+        {
+            log::warn!("updating the tray failed: {error}");
+        }
+    });
+    if let Err(error) = scheduled {
+        log::warn!("scheduling a tray update failed: {error}");
     }
-    if let Some(items) = app.try_state::<Items>()
-        && let Err(error) = items.account.set_text(account_label(signed_in))
-    {
-        log::warn!("updating the tray failed: {error}");
-    }
-    show(app, false);
+    refresh(app, false);
 }
 
 pub fn relabel(app: &AppHandle, signed_in: bool) {
@@ -209,11 +248,24 @@ pub fn relabel(app: &AppHandle, signed_in: bool) {
     if let Err(error) = relabeled {
         log::warn!("relabeling the tray failed: {error}");
     }
-    show(app, true);
+    refresh(app, true);
 }
 
-pub fn build(app: &AppHandle, signed_in: bool, microphone: MicStatus) -> tauri::Result<()> {
-    app.manage(Indicator::new(signed_in, microphone));
+pub fn build(
+    app: &AppHandle,
+    account: Arc<AppAccount>,
+    microphone: MicrophoneStatus,
+) -> tauri::Result<()> {
+    let signed_in = account.is_signed_in();
+    let live = microphone.clone();
+    app.manage(Indicator::new(
+        Box::new(move || account.is_signed_in()),
+        Box::new(move || live.get()),
+        Box::new(TrayPainter(app.clone())),
+        on_main_thread(app),
+    ));
+    let listener = app.clone();
+    microphone.on_change(move |_| refresh(&listener, false));
     let settings = MenuItem::with_id(
         app,
         SETTINGS,
@@ -259,7 +311,7 @@ pub fn build(app: &AppHandle, signed_in: bool, microphone: MicStatus) -> tauri::
         account: account_item,
         quit,
     });
-    show(app, true);
+    refresh(app, true);
     Ok(())
 }
 
@@ -361,6 +413,73 @@ mod tests {
         assert_eq!(size(1.75), 32);
         assert_eq!(size(2.0), 32);
         assert_eq!(size(3.0), 32);
+    }
+
+    type Jobs = Arc<Mutex<Vec<Job>>>;
+
+    struct Painted(Arc<Mutex<Vec<TrayState>>>);
+
+    impl Painter for Painted {
+        fn paint(&self, status: Status) -> bool {
+            self.0.lock().unwrap().push(status.state);
+            true
+        }
+    }
+
+    fn indicator(
+        microphone: Arc<Mutex<MicStatus>>,
+    ) -> (Indicator, Jobs, Arc<Mutex<Vec<TrayState>>>) {
+        let jobs: Jobs = Arc::default();
+        let painted = Arc::<Mutex<Vec<TrayState>>>::default();
+        let queue = Arc::clone(&jobs);
+        let indicator = Indicator::new(
+            Box::new(|| true),
+            Box::new(move || *microphone.lock().unwrap()),
+            Box::new(Painted(Arc::clone(&painted))),
+            Box::new(move |job| queue.lock().unwrap().push(job)),
+        );
+        (indicator, jobs, painted)
+    }
+
+    fn run(jobs: &Jobs) {
+        let pending = std::mem::take(&mut *jobs.lock().unwrap());
+        for job in pending {
+            job();
+        }
+    }
+
+    #[test]
+    fn a_hold_only_queues_the_tray_update_and_never_waits_for_it() {
+        let (indicator, jobs, painted) = indicator(Arc::new(Mutex::new(MicStatus::Ready)));
+        indicator.set_listening(true);
+        indicator.set_listening(false);
+        assert!(painted.lock().unwrap().is_empty());
+        assert_eq!(jobs.lock().unwrap().len(), 2);
+        run(&jobs);
+        assert_eq!(*painted.lock().unwrap(), vec![TrayState::Idle]);
+    }
+
+    #[test]
+    fn the_microphone_is_read_when_the_tray_paints_not_when_it_was_built() {
+        let microphone = Arc::new(Mutex::new(MicStatus::Unknown));
+        let (indicator, jobs, painted) = indicator(Arc::clone(&microphone));
+        *microphone.lock().unwrap() = MicStatus::Denied;
+        indicator.refresh(true);
+        run(&jobs);
+        assert_eq!(*painted.lock().unwrap(), vec![TrayState::Attention]);
+    }
+
+    #[test]
+    fn an_unchanged_state_is_painted_again_only_when_forced() {
+        let (indicator, jobs, painted) = indicator(Arc::new(Mutex::new(MicStatus::Ready)));
+        indicator.refresh(false);
+        indicator.refresh(false);
+        indicator.refresh(true);
+        run(&jobs);
+        assert_eq!(
+            *painted.lock().unwrap(),
+            vec![TrayState::Idle, TrayState::Idle]
+        );
     }
 
     #[test]

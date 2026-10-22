@@ -154,7 +154,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
   switch (command) {
     case "overview":
       return answer({
-        hotkey: ["Ctrl", "Win"],
+        hotkey: params.get("build") === "dev" ? ["Ctrl", "Alt", "Win"] : ["Ctrl", "Win"],
         autostart: params.get("autostart") !== "off",
         microphone: params.get("mic") ?? "ready",
         version: "0.2.0",

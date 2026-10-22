@@ -209,7 +209,9 @@ function About({ version }: { version: string | null }) {
       <div className="about-identity">
         <Wordmark height={28} />
         <p className="about-tagline">{t("brand.tagline")}</p>
-        <p className="about-version">{version && t("settings.about.version", { version })}</p>
+        <p className="about-version version">
+          {version && t("settings.about.version", { version })}
+        </p>
       </div>
       <Button variant="secondary" size="sm" onClick={() => void bridge.quit()}>
         {t("settings.quit")}

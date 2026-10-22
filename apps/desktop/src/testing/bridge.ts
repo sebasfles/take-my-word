@@ -83,7 +83,10 @@ export const fakeBridge = {
   setUiLanguage: vi.fn((choice: Language | null) => Promise.resolve({ ...uiLanguage, choice })),
   theme: vi.fn((): Promise<Theme | null> => Promise.resolve(null)),
   setTheme: vi.fn((choice: Theme | null) => Promise.resolve(choice)),
-  fitAccount: vi.fn<(onboarding: boolean, contentHeight: number) => Promise<undefined>>(() =>
+  fitAccount: vi.fn<
+    (onboarding: boolean, contentHeight: number, recenter: boolean) => Promise<undefined>
+  >(() => Promise.resolve(undefined)),
+  fitUpdate: vi.fn<(contentHeight: number, recenter: boolean) => Promise<undefined>>(() =>
     Promise.resolve(undefined),
   ),
   openSignIn: vi.fn(() => Promise.resolve(undefined)),

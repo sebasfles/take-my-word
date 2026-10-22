@@ -2,7 +2,8 @@ use std::sync::LazyLock;
 
 use serde::Deserialize;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
+    WindowEvent,
 };
 
 use crate::i18n::{self, Message};
@@ -46,7 +47,7 @@ struct Sizes {
     account: Size,
     onboarding: Fitted,
     first_run: Size,
-    update: Size,
+    update: Fitted,
     overlay: Size,
 }
 
@@ -57,15 +58,20 @@ static SIZES: LazyLock<Sizes> = LazyLock::new(|| {
 
 const SCREEN_MARGIN: f64 = 48.0;
 
-fn account_size(onboarding: bool, content_height: f64, available_height: f64) -> (f64, f64) {
-    if !onboarding {
-        return (SIZES.account.width, SIZES.account.height);
-    }
+fn fitted_size(fitted: &Fitted, content_height: f64, available_height: f64) -> (f64, f64) {
     let height = content_height
         .ceil()
-        .max(SIZES.onboarding.min_height)
+        .max(fitted.min_height)
         .min(available_height - SCREEN_MARGIN);
-    (SIZES.onboarding.width, height)
+    (fitted.width, height)
+}
+
+fn account_size(onboarding: bool, content_height: f64, available_height: f64) -> (f64, f64) {
+    if onboarding {
+        fitted_size(&SIZES.onboarding, content_height, available_height)
+    } else {
+        (SIZES.account.width, SIZES.account.height)
+    }
 }
 
 fn available_height(window: &tauri::WebviewWindow) -> f64 {
@@ -78,15 +84,62 @@ fn available_height(window: &tauri::WebviewWindow) -> f64 {
         })
 }
 
+fn top_inside(top: i32, height: u32, area_top: i32, area_height: u32) -> i32 {
+    let area_bottom = area_top + area_height as i32;
+    top.min(area_bottom - height as i32).max(area_top)
+}
+
+fn keep_inside(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let (Some(monitor), position, size) = (
+        window.current_monitor()?,
+        window.outer_position()?,
+        window.outer_size()?,
+    ) else {
+        return Ok(());
+    };
+    let area = monitor.work_area();
+    let top = top_inside(position.y, size.height, area.position.y, area.size.height);
+    if top != position.y {
+        window.set_position(PhysicalPosition::new(position.x, top))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
-pub fn fit_account(app: AppHandle, onboarding: bool, content_height: f64) {
+pub fn fit_update(app: AppHandle, content_height: f64, recenter: bool) {
+    let Some(window) = app.get_webview_window(UPDATE) else {
+        return;
+    };
+    let (width, height) = fitted_size(&SIZES.update, content_height, available_height(&window));
+    let resized = window
+        .set_size(LogicalSize::new(width, height))
+        .and_then(|()| {
+            if recenter {
+                window.center()
+            } else {
+                keep_inside(&window)
+            }
+        });
+    if let Err(error) = resized {
+        log::warn!("fitting the update window failed: {error}");
+    }
+}
+
+#[tauri::command]
+pub fn fit_account(app: AppHandle, onboarding: bool, content_height: f64, recenter: bool) {
     let Some(window) = app.get_webview_window(ACCOUNT) else {
         return;
     };
     let (width, height) = account_size(onboarding, content_height, available_height(&window));
     let resized = window
         .set_size(LogicalSize::new(width, height))
-        .and_then(|()| window.center());
+        .and_then(|()| {
+            if recenter {
+                window.center()
+            } else {
+                keep_inside(&window)
+            }
+        });
     if let Err(error) = resized {
         log::warn!("fitting the account window failed: {error}");
     }
@@ -189,7 +242,7 @@ pub fn open_update(app: &AppHandle) {
     let built =
         WebviewWindowBuilder::new(app, UPDATE, WebviewUrl::App(view_url(UPDATE, "").into()))
             .title(product_name(app))
-            .inner_size(SIZES.update.width, SIZES.update.height)
+            .inner_size(SIZES.update.width, SIZES.update.min_height)
             .resizable(false)
             .maximizable(false)
             .minimizable(false)
@@ -243,6 +296,25 @@ mod tests {
         let fixed = (SIZES.account.width, SIZES.account.height);
         assert_eq!(account_size(false, 0.0, 1080.0), fixed);
         assert_eq!(account_size(false, 900.0, 1080.0), fixed);
+    }
+
+    #[test]
+    fn the_update_window_fits_each_phase_from_its_minimum() {
+        let width = SIZES.update.width;
+        assert_eq!(
+            fitted_size(&SIZES.update, 0.0, 1080.0),
+            (width, SIZES.update.min_height)
+        );
+        assert_eq!(fitted_size(&SIZES.update, 431.2, 1080.0), (width, 432.0));
+    }
+
+    #[test]
+    fn a_grown_window_moves_up_only_as_far_as_it_must_to_stay_on_screen() {
+        assert_eq!(top_inside(200, 600, 0, 1040), 200);
+        assert_eq!(top_inside(600, 600, 0, 1040), 440);
+        assert_eq!(top_inside(-30, 600, 0, 1040), 0);
+        assert_eq!(top_inside(900, 1200, 0, 1040), 0);
+        assert_eq!(top_inside(1500, 600, 1080, 1040), 1500);
     }
 
     #[test]

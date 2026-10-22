@@ -89,8 +89,10 @@ export const bridge = {
   setUiLanguage: (choice: Language | null) => invoke<UiLanguage>("set_ui_language", { choice }),
   theme: () => invoke<Theme | null>("theme"),
   setTheme: (choice: Theme | null) => invoke<Theme | null>("set_theme", { choice }),
-  fitAccount: (onboarding: boolean, contentHeight: number) =>
-    invoke<undefined>("fit_account", { onboarding, contentHeight }),
+  fitAccount: (onboarding: boolean, contentHeight: number, recenter: boolean) =>
+    invoke<undefined>("fit_account", { onboarding, contentHeight, recenter }),
+  fitUpdate: (contentHeight: number, recenter: boolean) =>
+    invoke<undefined>("fit_update", { contentHeight, recenter }),
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
   apiRequest: (route: Route) => invoke<unknown>("api_request", { route }),

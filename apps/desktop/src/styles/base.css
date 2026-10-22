@@ -84,6 +84,10 @@ kbd {
   white-space: nowrap;
 }
 
+.version {
+  font-variant-numeric: tabular-nums;
+}
+
 .muted {
   color: var(--color-muted);
 }

@@ -110,4 +110,30 @@ describe("Update", () => {
     });
     expect(screen.getByRole("status").textContent).toBe("Descargando la actualización 10%");
   });
+
+  it("fits the window to each phase and centers it only the first time", async () => {
+    const observed: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        changed: () => void;
+        constructor(changed: () => void) {
+          this.changed = changed;
+        }
+        observe() {
+          observed.push(this.changed);
+        }
+        disconnect() {
+          return undefined;
+        }
+      },
+    );
+    await showing(available);
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitUpdate).toHaveBeenLastCalledWith(expect.any(Number), true);
+    shell({ ...available, phase: "failed" });
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitUpdate).toHaveBeenLastCalledWith(expect.any(Number), false);
+    vi.unstubAllGlobals();
+  });
 });

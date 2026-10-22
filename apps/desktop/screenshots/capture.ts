@@ -19,15 +19,16 @@ interface Size {
 }
 
 const sizes = JSON.parse(readFileSync(join(here, "..", "src", "windows.json"), "utf8")) as Record<
-  "settings" | "account" | "firstRun" | "update" | "overlay",
+  "settings" | "account" | "firstRun" | "overlay",
   Size
-> & { onboarding: { width: number; minHeight: number } };
+> &
+  Record<"onboarding" | "update", { width: number; minHeight: number }>;
 
 const windowSizes: Record<string, Size[]> = {
   account: [sizes.account],
   onboarding: [{ width: sizes.onboarding.width, height: sizes.onboarding.minHeight }],
   "first-run": [sizes.firstRun],
-  update: [sizes.update],
+  update: [{ width: sizes.update.width, height: sizes.update.minHeight }],
   overlay: [sizes.overlay],
   settings: [
     { width: 380, height: sizes.settings.height },
@@ -113,6 +114,7 @@ const shots: Shot[] = [
     },
   },
   { name: "first-run-ready", query: "view=first-run" },
+  { name: "first-run-ready-dev", query: "view=first-run&build=dev" },
   { name: "first-run-microphone-blocked", query: "view=first-run&mic=denied" },
   { name: "first-run-microphone-missing", query: "view=first-run&mic=missing" },
   {
@@ -120,6 +122,13 @@ const shots: Shot[] = [
     query: "view=settings",
     act: async (page) => {
       await page.locator("kbd", { hasText: "Win" }).waitFor();
+    },
+  },
+  {
+    name: "settings-idle-dev",
+    query: "view=settings&build=dev",
+    act: async (page) => {
+      await page.locator("kbd", { hasText: "Alt" }).waitFor();
     },
   },
   {
@@ -440,7 +449,7 @@ try {
           await shot.act?.(page, text);
           await page.evaluate(() => document.fonts.ready);
           await page.waitForTimeout(200);
-          if (view === "onboarding") {
+          if (view === "onboarding" || view === "update") {
             const content = await page.evaluate(
               () => document.querySelector("main")?.getBoundingClientRect().height ?? 0,
             );

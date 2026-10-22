@@ -26,6 +26,8 @@ mod tray;
 mod updater;
 mod windows;
 
+use std::sync::Arc;
+
 use tauri::{AppHandle, Manager, RunEvent};
 use tauri_plugin_autostart::ManagerExt;
 
@@ -74,6 +76,7 @@ pub fn run() {
             commands::set_ui_language,
             commands::theme,
             windows::fit_account,
+            windows::fit_update,
             commands::set_theme,
             commands::quit,
             updater::update_view,
@@ -88,16 +91,14 @@ pub fn run() {
             i18n::choose(settings.ui_language);
             commands::apply_theme(handle, settings.theme);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
-            let signed_in = shell.account.is_signed_in();
+            let account = Arc::clone(&shell.account);
             let microphone = shell.microphone.clone();
             app.manage(updater::Updates::new());
             if updates {
                 updater::start(handle, shell.activity.clone());
             }
             app.manage(shell);
-            tray::build(handle, signed_in, microphone.get())?;
-            let tray_app = handle.clone();
-            microphone.on_change(move |status| tray::show_microphone(&tray_app, status));
+            tray::build(handle, account, microphone)?;
             if !settings.first_run_done {
                 turn_on_autostart(handle);
             }

@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_or_invalid_files_fall_back_to_ctrl_win() {
+    fn missing_or_invalid_files_fall_back_to_the_builds_default_hotkey() {
         assert_eq!(load(&scratch("missing", None)), Settings::default());
         assert_eq!(load(&scratch("broken", Some("{"))), Settings::default());
         assert_eq!(
@@ -115,6 +115,17 @@ mod tests {
                 Hotkey::default()
             );
         }
+    }
+
+    #[test]
+    fn a_saved_hotkey_is_kept_even_when_it_differs_from_the_builds_default() {
+        let path = scratch(
+            "saved-ctrl-win",
+            Some(r#"{"hotkey":["ctrl","meta"],"firstRunDone":true}"#),
+        );
+        assert_eq!(load(&path).hotkey, Hotkey::ctrl_win());
+        let missing = scratch("no-hotkey", Some(r#"{"firstRunDone":true}"#));
+        assert_eq!(load(&missing).hotkey, Hotkey::default());
     }
 
     #[test]

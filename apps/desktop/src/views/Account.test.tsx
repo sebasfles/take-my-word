@@ -130,12 +130,14 @@ describe("Account", () => {
       },
     );
     render(<Account />);
-    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(false, 0);
+    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(false, 0, true);
     signIn();
     await screen.findByRole("heading", { name: "Set up your dictation" });
     await screen.findByRole("radio", { name: "Plain" });
     for (const changed of observed) changed();
-    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(true, expect.any(Number));
+    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(true, expect.any(Number), true);
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(true, expect.any(Number), false);
     vi.unstubAllGlobals();
   });
 });

@@ -8,6 +8,7 @@ mod win32;
 
 use serde::{Deserialize, Serialize};
 
+use crate::env::{self, Environment};
 use crate::i18n::Message;
 
 pub use chord::ChordEvent;
@@ -169,11 +170,21 @@ impl Hotkey {
     }
 }
 
+impl Hotkey {
+    pub fn for_environment(environment: &Environment) -> Self {
+        Self::new(environment.default_hotkey.to_vec())
+            .expect("each environment's default hotkey is a valid shortcut")
+    }
+
+    #[cfg(test)]
+    pub fn ctrl_win() -> Self {
+        Self::new(vec![HotkeyKey::Ctrl, HotkeyKey::Meta]).expect("Ctrl+Win is a valid shortcut")
+    }
+}
+
 impl Default for Hotkey {
     fn default() -> Self {
-        Self {
-            keys: vec![HotkeyKey::Ctrl, HotkeyKey::Meta],
-        }
+        Self::for_environment(env::CURRENT)
     }
 }
 
@@ -217,13 +228,30 @@ mod tests {
             .into_iter()
             .filter_map(Key::from_dom)
             .collect();
-        assert_eq!(Hotkey::from_pressed(&pressed), Ok(Hotkey::default()));
+        assert_eq!(Hotkey::from_pressed(&pressed), Ok(Hotkey::ctrl_win()));
         let altgr: Vec<Key> = ["ControlLeft", "AltRight"]
             .into_iter()
             .filter_map(Key::from_dom)
             .collect();
         assert_eq!(Hotkey::from_pressed(&altgr), Err(HotkeyError::RightAlt));
         assert_eq!(Key::from_dom("Unidentified"), None);
+    }
+
+    #[test]
+    fn prd_defaults_to_ctrl_win_and_dev_adds_left_alt() {
+        assert_eq!(Hotkey::for_environment(&env::PRD), Hotkey::ctrl_win());
+        let dev = Hotkey::for_environment(&env::DEV);
+        assert_eq!(
+            dev.keys(),
+            &[HotkeyKey::Ctrl, HotkeyKey::Alt, HotkeyKey::Meta]
+        );
+        assert!(dev.contains(Key::Alt(Side::Left)));
+        assert!(!dev.contains(Key::Alt(Side::Right)));
+        assert_eq!(
+            dev.labels(),
+            ["Ctrl", "Alt", HotkeyKey::Meta.label().as_str()]
+        );
+        assert_eq!(Hotkey::default(), Hotkey::for_environment(env::CURRENT));
     }
 
     #[test]
@@ -277,17 +305,17 @@ mod tests {
         );
         assert_eq!(
             Hotkey::new(vec![HotkeyKey::Meta, HotkeyKey::Ctrl, HotkeyKey::Ctrl]),
-            Ok(Hotkey::default())
+            Ok(Hotkey::ctrl_win())
         );
     }
 
     #[test]
     fn hotkey_config_round_trips_and_rejects_invalid_lists() {
-        let json = serde_json::to_string(&Hotkey::default()).unwrap();
+        let json = serde_json::to_string(&Hotkey::ctrl_win()).unwrap();
         assert_eq!(json, r#"["ctrl","meta"]"#);
         assert_eq!(
             serde_json::from_str::<Hotkey>(&json).unwrap(),
-            Hotkey::default()
+            Hotkey::ctrl_win()
         );
         assert!(serde_json::from_str::<Hotkey>("[]").is_err());
         let with_code: Hotkey = serde_json::from_str(r#"["shift",{"code":124}]"#).unwrap();

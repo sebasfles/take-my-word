@@ -1,4 +1,4 @@
-import { type SubmitEvent, useCallback, useEffect, useState } from "react";
+import { type SubmitEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Button, Skeleton, TextInput, buttonClass } from "@take-my-word/brand";
 import { type AccountStep, bridge, type Onboarding, problemOf } from "../bridge.ts";
 import { type Language, type MessageId, t } from "../i18n.ts";
@@ -24,7 +24,7 @@ export function Account() {
   }, []);
 
   useEffect(() => {
-    if (screen !== "onboarding") void bridge.fitAccount(false, 0);
+    if (screen !== "onboarding") void bridge.fitAccount(false, 0, true);
   }, [screen]);
 
   if (screen === "choose-password") {
@@ -181,11 +181,14 @@ function ChoosePassword({
   );
 }
 
-const fitOnboarding = (height: number) => void bridge.fitAccount(true, height);
-
 type Load = { kind: "loading" } | { kind: "failed"; message: MessageId } | { kind: "ready" };
 
 function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) => void }) {
+  const fitted = useRef(false);
+  const fit = useCallback((height: number) => {
+    void bridge.fitAccount(true, height, !fitted.current);
+    fitted.current = true;
+  }, []);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [onboarding, setOnboarding] = useState<Onboarding | null>(null);
   const [selected, setSelected] = useState("");
@@ -233,11 +236,7 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
   };
 
   return (
-    <WindowPage
-      title={t("onboarding.title")}
-      intro={t("onboarding.intro")}
-      onHeight={fitOnboarding}
-    >
+    <WindowPage title={t("onboarding.title")} intro={t("onboarding.intro")} onHeight={fit}>
       {load.kind === "loading" && (
         <div className="loading" role="status">
           <span className="visually-hidden">{t("onboarding.loading")}</span>
