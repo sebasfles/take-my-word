@@ -197,3 +197,17 @@ The join outlasted the settle in a few pastes, by 24 ms at most, and that wait i
 Probe cost after the keystroke: WebView2 119 / 125 / 188 ms over 9 to 10 GUI threads, Chrome 79 / 83 / 112 ms over 6 to 7; restore wait 150 / 151 / 155 ms with the cap hit 0 times; 8 requests answered without rendering after a count; 0 render failures.
 
 Decision the plan did not record: the target snapshot (process tree and threads) is taken off the paste's path on a helper thread per paste and installed at `arm(1)`; this refines round 1's decision 7, which still holds (the set is fixed before the first keystroke).
+
+### Round 3
+
+Findings applied, both:
+
+1. The non-Windows build compiles clean without any `allow`: the paste no longer receives a platform enum across the `Clipboard` trait.
+   `wait_for_read` answers whether a read counted and `contended` whether the attempt ended contended; the counted, contended and failed events are a private enum of `win32.rs`, where they are produced, and the unsupported clipboard answers no to both, which is what it is.
+   The settle loop moved from the Windows clipboard into `paste.rs`: the clipboard reports its read activity (a render in progress, the last read's time) and `Paster` applies `settled` with every `Settle` field, on every platform.
+   A first attempt that only scoped the enum's variants with `cfg` left three new errors on Linux (an unused import, an unused parameter, a loop that never loops), which is why the boundary changed instead.
+   Proof: `linux-check` reproduced in Docker (`ubuntu:24.04`, the job's apt packages, rustup stable with clippy, the UI built first), `cargo clippy --all-targets --locked -- -D warnings` in `apps/desktop/src-tauri`, exit 0; the image and script are in `/tmp/tmw0012-linux/`, outside the repo.
+2. `scripts/release.test.ts` gets a 15 s timeout for its suite only, where every test spawns git about ten times plus node.
+   Measured on the `windows` job: three passing runs on 2026-10-22 had every test at 0.7 to 1.8 s (suite 7.4 to 7.9 s); the failing run was two to three times slower across the file, with the slowest passing case at 2541 ms and the timed-out one at 5338 ms; 15 s is about six times the slowest passing case.
+
+The real-clipboard tests changed only their assertions (a read counted, a read contended); they were not rerun on the host, since `desktop-ci`'s `windows` job runs them with `--include-ignored`.

@@ -53,7 +53,7 @@ function setUp(branch: string) {
   git(work, "push", "--quiet", "origin", branch);
 }
 
-describe("pnpm release:desktop", () => {
+describe("pnpm release:desktop", { timeout: 15_000 }, () => {
   beforeEach(() => {
     base = mkdtempSync(join(tmpdir(), "desktop-release-"));
     work = join(base, "work");

@@ -34,8 +34,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{BOOL, HSTRING, PCWSTR, w};
 
 use super::{
-    Clipboard, ClipboardError, Ignored, ReadOrder, ReadOutcome, ReadWait, Reader, Settle, WaitNode,
-    depth_below, probe_order, renders_for, sends_to, settled,
+    Clipboard, ClipboardError, Ignored, ReadActivity, ReadOrder, ReadOutcome, Reader, WaitNode,
+    depth_below, probe_order, renders_for, sends_to,
 };
 
 const WM_COMMANDS: u32 = WM_APP + 1;
@@ -43,7 +43,6 @@ const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
 const OPEN_PATIENCE: Duration = Duration::from_millis(200);
 const RESTORE_PATIENCE: Duration = Duration::from_secs(3);
 const OPEN_RETRY: Duration = Duration::from_millis(10);
-const SETTLE_POLL: Duration = Duration::from_millis(5);
 const PROBE_BUDGET: Duration = Duration::from_millis(200);
 const GDI_HANDLE_FORMATS: [u32; 8] = [2, 3, 9, 14, 0x80, 0x82, 0x83, 0x8E];
 const PRIVATE_HANDLE_FORMATS: std::ops::RangeInclusive<u32> = 0x200..=0x3FF;
@@ -71,10 +70,17 @@ type TargetSnapshot = (HashMap<u32, u32>, Vec<(u32, u32)>);
 
 type SharedActivity = Arc<Mutex<Activity>>;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ReadEvent {
+    Counted,
+    Contended,
+    Failed,
+}
+
 pub struct SystemClipboard {
     window: isize,
     commands: mpsc::Sender<Command>,
-    reads: mpsc::Receiver<ReadWait>,
+    reads: mpsc::Receiver<ReadEvent>,
     activity: SharedActivity,
     targets: Option<thread::JoinHandle<TargetSnapshot>>,
 }
@@ -138,23 +144,14 @@ impl Clipboard for SystemClipboard {
         self.call(|reply| Command::Offer(utf16_bytes(text), readers.to_vec(), reply))
     }
 
-    fn settle(&mut self, settle: Settle) -> Duration {
-        let started = Instant::now();
-        loop {
-            let done = self.activity.lock().map_or(true, |activity| {
-                let since_last_read = activity.last_read.map(|at| at.elapsed());
-                settled(
-                    settle,
-                    started.elapsed(),
-                    activity.rendering,
-                    since_last_read,
-                )
-            });
-            if done {
-                return started.elapsed();
-            }
-            thread::sleep(SETTLE_POLL);
-        }
+    fn activity(&mut self) -> ReadActivity {
+        self.activity
+            .lock()
+            .map(|activity| ReadActivity {
+                rendering: activity.rendering,
+                last_read: activity.last_read,
+            })
+            .unwrap_or_default()
     }
 
     fn arm(&mut self, attempt: u32) {
@@ -178,10 +175,16 @@ impl Clipboard for SystemClipboard {
         }
     }
 
-    fn wait_for_read(&mut self, timeout: Duration) -> ReadWait {
+    fn wait_for_read(&mut self, timeout: Duration) -> bool {
         self.reads
             .recv_timeout(timeout)
-            .unwrap_or(ReadWait::Nothing)
+            .is_ok_and(|event| event == ReadEvent::Counted)
+    }
+
+    fn contended(&mut self) -> bool {
+        self.activity
+            .lock()
+            .is_ok_and(|activity| activity.order.contended())
     }
 
     fn restore(&mut self) -> Result<(), ClipboardError> {
@@ -213,7 +216,7 @@ struct Formats {
 struct State {
     window: HWND,
     inbox: mpsc::Receiver<Command>,
-    reads: mpsc::Sender<ReadWait>,
+    reads: mpsc::Sender<ReadEvent>,
     activity: SharedActivity,
     formats: Formats,
     pending: Option<Vec<u8>>,
@@ -231,7 +234,7 @@ fn with_state<T>(f: impl FnOnce(&mut State) -> T) -> Option<T> {
 
 fn serve(
     inbox: mpsc::Receiver<Command>,
-    reads: mpsc::Sender<ReadWait>,
+    reads: mpsc::Sender<ReadEvent>,
     activity: SharedActivity,
     spawner: u32,
     ready: mpsc::Sender<Result<isize, ClipboardError>>,
@@ -413,9 +416,9 @@ fn answer_render_request() {
         activity.order = order;
     }
     let event = match outcome {
-        ReadOutcome::Counted => Some(ReadWait::Counted),
-        ReadOutcome::Contended => Some(ReadWait::Contended),
-        ReadOutcome::Failed => Some(ReadWait::Failed),
+        ReadOutcome::Counted => Some(ReadEvent::Counted),
+        ReadOutcome::Contended => Some(ReadEvent::Contended),
+        ReadOutcome::Failed => Some(ReadEvent::Failed),
         ReadOutcome::Ignored(_) => None,
     };
     if let Some(event) = event {
@@ -886,12 +889,9 @@ mod tests {
             .offer("dictado de prueba", &[std::process::id()])
             .unwrap();
         clipboard.arm(1);
-        assert_eq!(clipboard.wait_for_read(Duration::ZERO), ReadWait::Nothing);
+        assert!(!clipboard.wait_for_read(Duration::ZERO));
         assert_eq!(read_text().as_deref(), Some("dictado de prueba [private]"));
-        assert_eq!(
-            clipboard.wait_for_read(Duration::from_secs(2)),
-            ReadWait::Counted
-        );
+        assert!(clipboard.wait_for_read(Duration::from_secs(2)));
         clipboard.restore().unwrap();
         assert_eq!(
             read_text().map(|text| text.trim_end_matches(" [private]").to_owned()),
@@ -908,10 +908,8 @@ mod tests {
         clipboard.arm(1);
         let reader = create_window().unwrap();
         assert_eq!(read_text_as(Some(reader)), None);
-        assert_eq!(
-            clipboard.wait_for_read(Duration::from_millis(300)),
-            ReadWait::Contended
-        );
+        assert!(!clipboard.wait_for_read(Duration::from_millis(300)));
+        assert!(clipboard.contended());
         clipboard.restore().unwrap();
     }
 
@@ -923,10 +921,8 @@ mod tests {
             .offer("dictado temprano", &[std::process::id()])
             .unwrap();
         assert_eq!(read_text(), None);
-        assert_eq!(
-            clipboard.wait_for_read(Duration::from_millis(300)),
-            ReadWait::Nothing
-        );
+        assert!(!clipboard.wait_for_read(Duration::from_millis(300)));
+        assert!(!clipboard.contended());
         clipboard.restore().unwrap();
     }
 
@@ -942,19 +938,14 @@ mod tests {
         let unproven = thread::spawn(|| read_text_as(None));
         assert_eq!(unproven.join().unwrap(), None);
         assert_eq!(read_text_as(Some(target)), None);
-        assert_eq!(
-            clipboard.wait_for_read(Duration::from_millis(300)),
-            ReadWait::Contended
-        );
+        assert!(!clipboard.wait_for_read(Duration::from_millis(300)));
+        assert!(clipboard.contended());
         clipboard.arm(2);
         assert_eq!(
             read_text_as(Some(target)).as_deref(),
             Some("dictado disputado [private]")
         );
-        assert_eq!(
-            clipboard.wait_for_read(Duration::from_secs(2)),
-            ReadWait::Counted
-        );
+        assert!(clipboard.wait_for_read(Duration::from_secs(2)));
         clipboard.restore().unwrap();
     }
 
@@ -976,10 +967,7 @@ mod tests {
             reader.join().unwrap().as_deref(),
             Some("dictado sin ventana [private]")
         );
-        assert_eq!(
-            clipboard.wait_for_read(Duration::from_secs(2)),
-            ReadWait::Counted
-        );
+        assert!(clipboard.wait_for_read(Duration::from_secs(2)));
         clipboard.restore().unwrap();
     }
 }

@@ -3,7 +3,7 @@ mod unsupported;
 #[cfg(windows)]
 mod win32;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[cfg(not(windows))]
 use unsupported::SystemClipboard;
@@ -41,7 +41,12 @@ impl Default for Settle {
     }
 }
 
-#[cfg(any(windows, test))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReadActivity {
+    pub rendering: bool,
+    pub last_read: Option<Instant>,
+}
+
 pub fn settled(
     settle: Settle,
     waited: Duration,
@@ -111,6 +116,10 @@ impl ReadOrder {
         }
     }
 
+    pub fn contended(&self) -> bool {
+        self.contended
+    }
+
     fn ignored(&self) -> Option<Ignored> {
         if !self.armed {
             Some(Ignored::BeforeTheKeystroke)
@@ -126,19 +135,12 @@ impl ReadOrder {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReadWait {
-    Counted,
-    Contended,
-    Failed,
-    Nothing,
-}
-
 pub trait Clipboard {
     fn offer(&mut self, text: &str, readers: &[u32]) -> Result<(), ClipboardError>;
-    fn settle(&mut self, settle: Settle) -> Duration;
+    fn activity(&mut self) -> ReadActivity;
     fn arm(&mut self, attempt: u32);
-    fn wait_for_read(&mut self, timeout: Duration) -> ReadWait;
+    fn wait_for_read(&mut self, timeout: Duration) -> bool;
+    fn contended(&mut self) -> bool;
     fn restore(&mut self) -> Result<(), ClipboardError>;
     fn keep_text(&mut self) -> Result<(), ClipboardError>;
     fn put_text(&mut self, text: &str) -> Result<(), ClipboardError>;
@@ -247,14 +249,21 @@ impl Clipboard for Unavailable {
         Err(self.error())
     }
 
-    fn settle(&mut self, _settle: Settle) -> Duration {
-        Duration::ZERO
+    fn activity(&mut self) -> ReadActivity {
+        ReadActivity {
+            rendering: false,
+            last_read: None,
+        }
     }
 
     fn arm(&mut self, _attempt: u32) {}
 
-    fn wait_for_read(&mut self, _timeout: Duration) -> ReadWait {
-        ReadWait::Nothing
+    fn wait_for_read(&mut self, _timeout: Duration) -> bool {
+        false
+    }
+
+    fn contended(&mut self) -> bool {
+        false
     }
 
     fn restore(&mut self) -> Result<(), ClipboardError> {
@@ -285,16 +294,20 @@ impl<C: Clipboard + ?Sized> Clipboard for Box<C> {
         (**self).offer(text, readers)
     }
 
-    fn settle(&mut self, settle: Settle) -> Duration {
-        (**self).settle(settle)
+    fn activity(&mut self) -> ReadActivity {
+        (**self).activity()
     }
 
     fn arm(&mut self, attempt: u32) {
         (**self).arm(attempt);
     }
 
-    fn wait_for_read(&mut self, timeout: Duration) -> ReadWait {
+    fn wait_for_read(&mut self, timeout: Duration) -> bool {
         (**self).wait_for_read(timeout)
+    }
+
+    fn contended(&mut self) -> bool {
+        (**self).contended()
     }
 
     fn restore(&mut self) -> Result<(), ClipboardError> {
@@ -451,6 +464,7 @@ mod tests {
         let mut order = ReadOrder::default();
         order.arm();
         assert_eq!(order.read(|| false, never), ReadOutcome::Contended);
+        assert!(order.contended());
         assert_eq!(
             order.read(never, never),
             ReadOutcome::Ignored(Ignored::AfterAContention)
@@ -462,6 +476,7 @@ mod tests {
         let mut order = ReadOrder::default();
         order.arm();
         assert_eq!(order.read(|| true, || false), ReadOutcome::Failed);
+        assert!(!order.contended());
         assert_eq!(
             order.read(never, never),
             ReadOutcome::Ignored(Ignored::AfterAFailedRender)
