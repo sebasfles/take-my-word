@@ -62,6 +62,11 @@ messages! {
     TraySignIn => "tray.signIn",
     TraySignOut => "tray.signOut",
     TrayQuit => "tray.quit",
+    TrayReady => "tray.ready",
+    TrayListening => "tray.listening",
+    TraySignedOut => "tray.signedOut",
+    TrayMicrophoneBlocked => "tray.microphoneBlocked",
+    TrayMicrophoneMissing => "tray.microphoneMissing",
 }
 
 impl Serialize for Message {

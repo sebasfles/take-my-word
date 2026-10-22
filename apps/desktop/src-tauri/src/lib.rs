@@ -21,9 +21,12 @@ mod paste;
 mod rules;
 mod session;
 mod shell;
+mod theme;
 mod tray;
 mod updater;
 mod windows;
+
+use std::sync::Arc;
 
 use tauri::{AppHandle, Manager, RunEvent};
 use tauri_plugin_autostart::ManagerExt;
@@ -71,6 +74,10 @@ pub fn run() {
             editors::copy_text,
             commands::ui_language,
             commands::set_ui_language,
+            commands::theme,
+            windows::fit_account,
+            windows::fit_update,
+            commands::set_theme,
             commands::quit,
             updater::update_view,
             updater::install_update,
@@ -82,14 +89,16 @@ pub fn run() {
             let settings_path = app.path().app_config_dir()?.join(config::FILE_NAME);
             let settings = config::load(&settings_path);
             i18n::choose(settings.ui_language);
+            commands::apply_theme(handle, settings.theme);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
-            let signed_in = shell.account.is_signed_in();
+            let account = Arc::clone(&shell.account);
+            let microphone = shell.microphone.clone();
             app.manage(updater::Updates::new());
             if updates {
                 updater::start(handle, shell.activity.clone());
             }
             app.manage(shell);
-            tray::build(handle, signed_in)?;
+            tray::build(handle, account, microphone)?;
             if !settings.first_run_done {
                 turn_on_autostart(handle);
             }

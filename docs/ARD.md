@@ -90,7 +90,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-21 | SmartScreen warns on the first install of the unsigned installer | The app is offered beyond the invited circle, or SmartScreen blocks installs |
 | desktop | 2026-10-21 | A new CRUD route needs a forwarder variant before the views can use it | The editors need a route the enum lacks |
 | desktop | 2026-10-21 | A rule edited elsewhere reaches this machine's paste keystroke up to 5 min later | A paste uses a stale keystroke after an edit elsewhere |
-| desktop | 2026-10-21 | Window-less or process-0 clipboard readers still get the dictation and count as the target; a reused pid can admit an unrelated process | A paste reported as done does not land again, or a target app's reads are withheld |
+| desktop | 2026-10-21 | Window-less or process-0 clipboard readers still get the dictation and count as the target; a reused pid can admit an unrelated process | Met 2026-10-21 in 0011's Windows run; a bug task follows |
+| desktop | 2026-10-22 | The `image` crate is in the binary to decode the tray frames | Release binary size matters |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |
@@ -99,4 +100,3 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | infra | 2026-10-21 | The web's CSP restricts framing only, no `script-src` | The web renders others' content or adds third-party scripts |
 | infra | 2026-10-21 | Updater key secrets sit outside Terraform and the key has no rotation path | The key leaks or must change, or the repository gains other maintainers |
 | infra | 2026-10-22 | Two font-loading paths for the brand fonts: next/font on the web, @font-face on desktop | The desktop needs preloading, or next/font changes how it resolves outside files |
-| infra | 2026-10-22 | `desktop-ci` does not watch `packages/brand/` | 0011 makes the desktop consume the brand package |

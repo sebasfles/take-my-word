@@ -1,3 +1,4 @@
+import { buttonClass } from "@take-my-word/brand";
 import {
   fallbackStyleId,
   type Settings,
@@ -11,7 +12,7 @@ import { apiProblem, type Note, note } from "../../editing.ts";
 import { t } from "../../i18n.ts";
 import { StyleChoices } from "../../StyleChoices.tsx";
 import { styleDescription, styleName } from "../../styleNames.ts";
-import { ConfirmDelete, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
+import { ConfirmDelete, Empty, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
 
 interface Data {
   styles: Style[];
@@ -93,7 +94,7 @@ export function Styles() {
               }}
             />
             {custom.length === 0 ? (
-              <p className="empty">{t("styles.customEmpty")}</p>
+              <Empty title="styles.customEmptyTitle" body="styles.customEmpty" />
             ) : (
               <ul className="list">
                 {custom.map((style) => (
@@ -165,9 +166,9 @@ function DefaultStyle({
 
   return (
     <form className="form card" onSubmit={save}>
-      <div className="row-text">
-        <h2>{t("styles.default")}</h2>
-        <p className="muted">{t("styles.defaultNote")}</p>
+      <div className="setting-text">
+        <h2 className="setting-title">{t("styles.default")}</h2>
+        <p className="setting-note">{t("styles.defaultNote")}</p>
       </div>
       <StyleChoices
         styles={styles}
@@ -184,11 +185,7 @@ function DefaultStyle({
             {t("common.saved")}
           </p>
         )}
-        <button
-          type="submit"
-          className="button button-primary"
-          disabled={busy || selected === current}
-        >
+        <button type="submit" className={buttonClass()} disabled={busy || selected === current}>
           {t(busy ? "common.saving" : "common.save")}
         </button>
       </div>
@@ -245,7 +242,7 @@ function StyleForm({
       <label className="field">
         <span>{t("styles.name")}</span>
         <input
-          className="input"
+          className="tmw-input"
           name="name"
           autoComplete="off"
           value={name}
@@ -258,7 +255,7 @@ function StyleForm({
         <label htmlFor={`${id}-field`}>{t("styles.prompt")}</label>
         <textarea
           id={`${id}-field`}
-          className="input textarea"
+          className="tmw-input tmw-textarea"
           name="prompt"
           rows={4}
           aria-describedby={`${id}-hint`}
@@ -277,11 +274,15 @@ function StyleForm({
       <ErrorLine message={error} />
       <div className="form-actions">
         {onCancel && (
-          <button type="button" className="button" onClick={onCancel}>
+          <button
+            type="button"
+            className={buttonClass({ variant: "secondary" })}
+            onClick={onCancel}
+          >
             {t("common.cancel")}
           </button>
         )}
-        <button type="submit" className="button button-primary" disabled={busy}>
+        <button type="submit" className={buttonClass()} disabled={busy}>
           {t(submitLabel)}
         </button>
       </div>
@@ -331,7 +332,7 @@ function CustomStyleRow({
       <div className="item-actions">
         <button
           type="button"
-          className="button button-small"
+          className={buttonClass({ variant: "secondary", size: "sm" })}
           onClick={() => {
             setEditing(true);
           }}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OverlayPill } from "@take-my-word/brand";
 import { bridge, type OverlayState, keepListening } from "../bridge.ts";
 import { t } from "../i18n.ts";
 
@@ -24,7 +25,7 @@ export function Overlay() {
     () =>
       keepListening(() =>
         bridge.onOverlayLevel((level) => {
-          setLevels((current) => [...current.slice(1), Math.min(1, Math.max(0, level))]);
+          setLevels((current) => [...current.slice(1), level]);
         }),
       ),
     [],
@@ -34,46 +35,39 @@ export function Overlay() {
 
   if (overlay.state === "error") {
     return (
-      <div className="pill pill-error" role="alert" onClick={() => void bridge.dismissOverlay()}>
-        <span className="pill-icon pill-icon-error" aria-hidden="true">
-          !
-        </span>
-        <span className="pill-text">{t(overlay.message)}</span>
-        {overlay.action === "microphoneSettings" && (
-          <button
-            type="button"
-            className="pill-link"
-            onClick={(event) => {
-              event.stopPropagation();
-              void bridge.openMicrophoneSettings();
-            }}
-          >
-            {t("overlay.openSettings")}
-          </button>
-        )}
+      <div className="overlay overlay-dismissable" onClick={() => void bridge.dismissOverlay()}>
+        <OverlayPill
+          state="error"
+          indicator="state"
+          label={t(overlay.message)}
+          action={
+            overlay.action === "microphoneSettings" && (
+              <button
+                type="button"
+                className="tmw-overlay-action"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void bridge.openMicrophoneSettings();
+                }}
+              >
+                {t("overlay.openSettings")}
+              </button>
+            )
+          }
+        />
       </div>
     );
   }
 
   const listening = overlay.state === "listening";
   return (
-    <div className="pill" role="status">
-      <span
-        className={listening ? "pill-icon pill-icon-listening" : "pill-icon pill-icon-processing"}
-        aria-hidden="true"
+    <div className="overlay">
+      <OverlayPill
+        state={overlay.state}
+        indicator="state"
+        label={t(listening ? "overlay.listening" : "overlay.processing")}
+        {...(listening && { levels })}
       />
-      <span className="pill-text">{t(listening ? "overlay.listening" : "overlay.processing")}</span>
-      {listening && (
-        <span className="wave" aria-hidden="true">
-          {levels.map((level, index) => (
-            <span
-              key={index}
-              className="wave-bar"
-              style={{ transform: `scaleY(${String(0.15 + level * 0.85)})` }}
-            />
-          ))}
-        </span>
-      )}
     </div>
   );
 }

@@ -111,4 +111,33 @@ describe("Account", () => {
     expect(screen.queryByRole("radio", { name: "Plain" })).toBeNull();
     setLanguage("en");
   });
+
+  it("keeps sign-in at its size and fits the window to onboarding once it loads", async () => {
+    const observed: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        changed: () => void;
+        constructor(changed: () => void) {
+          this.changed = changed;
+        }
+        observe() {
+          observed.push(this.changed);
+        }
+        disconnect() {
+          return undefined;
+        }
+      },
+    );
+    render(<Account />);
+    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(false, 0, true);
+    signIn();
+    await screen.findByRole("heading", { name: "Set up your dictation" });
+    await screen.findByRole("radio", { name: "Plain" });
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(true, expect.any(Number), true);
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitAccount).toHaveBeenLastCalledWith(true, expect.any(Number), false);
+    vi.unstubAllGlobals();
+  });
 });

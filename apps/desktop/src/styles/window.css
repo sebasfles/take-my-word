@@ -1,0 +1,114 @@
+.window {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-8);
+}
+
+.window-brand {
+  color: var(--color-text);
+}
+
+.window-heading {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.window-heading h1 {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+}
+
+.window-heading p {
+  color: var(--color-muted);
+}
+
+.window-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.window-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.window-section h2 {
+  font-family: var(--font-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-normal);
+}
+
+.window-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.steps {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.step-number {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.update-notes {
+  max-height: calc(var(--space-24) + var(--space-6));
+  overflow-y: auto;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.update-progress {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.update-progress progress {
+  width: 100%;
+  height: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-sunken);
+  accent-color: var(--color-accent);
+  overflow: hidden;
+}
+
+.update-progress progress::-webkit-progress-bar {
+  background: var(--color-sunken);
+}
+
+.update-progress progress::-webkit-progress-value {
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+.window .choices {
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 2.5), 1fr));
+}

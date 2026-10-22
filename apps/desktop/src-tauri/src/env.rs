@@ -6,12 +6,15 @@ compile_error!(
     "release builds need an environment: pnpm tauri:build:dev or pnpm tauri:build:prd in apps/desktop"
 );
 
+use crate::hotkey::HotkeyKey;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Environment {
     pub identifier: &'static str,
     pub api_url: &'static str,
     pub user_pool_id: &'static str,
     pub client_id: &'static str,
+    pub default_hotkey: &'static [HotkeyKey],
 }
 
 impl Environment {
@@ -27,6 +30,7 @@ pub const DEV: Environment = Environment {
     api_url: "https://api.dev.takemyword.fless.dev",
     user_pool_id: "us-east-1_9g4xiMUfJ",
     client_id: "1tbtl9b2v17ikpo7aklr9829me",
+    default_hotkey: &[HotkeyKey::Ctrl, HotkeyKey::Alt, HotkeyKey::Meta],
 };
 
 pub const PRD: Environment = Environment {
@@ -34,6 +38,7 @@ pub const PRD: Environment = Environment {
     api_url: "https://api.takemyword.fless.dev",
     user_pool_id: "us-east-1_uekLYxWNc",
     client_id: "t8q0rn6p6efuemo46u2uchmgh",
+    default_hotkey: &[HotkeyKey::Ctrl, HotkeyKey::Meta],
 };
 
 pub const CURRENT: &Environment = if cfg!(feature = "prd") { &PRD } else { &DEV };

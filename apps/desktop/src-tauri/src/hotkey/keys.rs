@@ -115,18 +115,18 @@ mod tests {
     #[test]
     fn chords_are_ignored_while_capturing_and_the_old_hotkey_stays_until_saved() {
         let now = Instant::now();
-        let mut keys = Keys::new(Hotkey::default());
+        let mut keys = Keys::new(Hotkey::ctrl_win());
         keys.start_capture(now);
         assert!(keys.is_capturing(now));
         assert!(tap(&mut keys, &[CTRL, WIN]).is_empty());
         assert!(keys.finish_capture(None));
-        assert_eq!(keys.hotkey(), &Hotkey::default());
+        assert_eq!(keys.hotkey(), &Hotkey::ctrl_win());
         assert_eq!(tap(&mut keys, &[CTRL, WIN]).len(), 2);
     }
 
     #[test]
     fn a_saved_hotkey_works_at_once_and_the_old_one_stops() {
-        let mut keys = Keys::new(Hotkey::default());
+        let mut keys = Keys::new(Hotkey::ctrl_win());
         keys.start_capture(Instant::now());
         let ctrl_shift = Hotkey::new(vec![HotkeyKey::Ctrl, HotkeyKey::Shift]).unwrap();
         keys.finish_capture(Some(ctrl_shift.clone()));
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn losing_the_foreground_or_the_deadline_ends_the_capture() {
         let now = Instant::now();
-        let mut keys = Keys::new(Hotkey::default());
+        let mut keys = Keys::new(Hotkey::ctrl_win());
         keys.start_capture(now);
         assert!(!keys.cancel_capture_unless(true));
         assert!(keys.is_capturing(now));
@@ -156,7 +156,7 @@ mod tests {
         type Exit = fn(&mut Keys, Instant) -> bool;
         let exits: [(&str, Exit); 4] = [
             ("save", |keys, _| {
-                keys.finish_capture(Some(Hotkey::default()))
+                keys.finish_capture(Some(Hotkey::ctrl_win()))
             }),
             ("cancel", |keys, _| keys.finish_capture(None)),
             ("blur", |keys, _| keys.cancel_capture_unless(false)),
@@ -165,7 +165,7 @@ mod tests {
             }),
         ];
         for (name, exit) in exits {
-            let mut keys = Keys::new(Hotkey::default());
+            let mut keys = Keys::new(Hotkey::ctrl_win());
             keys.start_capture(now);
             assert!(tap(&mut keys, &[CTRL, WIN]).is_empty(), "{name}");
             assert!(exit(&mut keys, now), "{name}");
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn starting_a_capture_mid_dictation_cancels_it() {
-        let mut keys = Keys::new(Hotkey::default());
+        let mut keys = Keys::new(Hotkey::ctrl_win());
         for key in [CTRL, WIN] {
             keys.on_key(KeyEvent { key, down: true }, &Keyboard);
         }

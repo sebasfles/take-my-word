@@ -137,7 +137,7 @@ mod tests {
 
     fn ctrl_win() -> (ChordTracker, FakeKeyboard) {
         (
-            ChordTracker::new(Hotkey::default()),
+            ChordTracker::new(Hotkey::ctrl_win()),
             FakeKeyboard::default(),
         )
     }

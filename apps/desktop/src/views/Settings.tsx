@@ -1,5 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { type AccountView, bridge, type Overview, keepListening, problemOf } from "../bridge.ts";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  Button,
+  Icon,
+  type IconName,
+  navItemClass,
+  Toggle,
+  Wordmark,
+  buttonClass,
+} from "@take-my-word/brand";
+import {
+  type AccountView,
+  bridge,
+  type Overview,
+  keepListening,
+  problemOf,
+  type Theme,
+} from "../bridge.ts";
 import { type MessageId, t } from "../i18n.ts";
 import { Keys } from "../Keys.tsx";
 import { focusAddFromSearch, type SettingsSection, settingsSectionFromSearch } from "../view.ts";
@@ -14,13 +30,13 @@ type Capture = { step: "idle" } | { step: "listening" } | { step: "proposed"; ke
 
 const CAPTURE_TIMEOUT_MS = 15_000;
 
-const sections: { id: SettingsSection; label: MessageId }[] = [
-  { id: "general", label: "settings.general" },
-  { id: "dictionary", label: "settings.dictionary" },
-  { id: "styles", label: "settings.styles" },
-  { id: "appRules", label: "settings.appRules" },
-  { id: "history", label: "settings.history" },
-  { id: "account", label: "settings.account" },
+const sections: { id: SettingsSection; label: MessageId; icon: IconName }[] = [
+  { id: "general", label: "settings.general", icon: "general" },
+  { id: "dictionary", label: "settings.dictionary", icon: "dictionary" },
+  { id: "styles", label: "settings.styles", icon: "styles" },
+  { id: "appRules", label: "settings.appRules", icon: "rules" },
+  { id: "history", label: "settings.history", icon: "history" },
+  { id: "account", label: "settings.account", icon: "account" },
 ];
 
 export function Settings() {
@@ -45,22 +61,26 @@ export function Settings() {
   return (
     <div className="settings">
       <nav className="settings-nav" aria-label={t("settings.sections")}>
-        <ul className="settings-nav-list">
-          {sections.map(({ id, label }) => (
-            <li key={id}>
-              <button
-                type="button"
-                className="settings-nav-item"
-                aria-current={section === id ? "page" : undefined}
-                onClick={() => {
-                  setSection(id);
-                }}
-              >
-                {t(label)}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="settings-nav-inner">
+          <Wordmark height={22} className="settings-brand" />
+          <ul>
+            {sections.map(({ id, label, icon }) => (
+              <li key={id}>
+                <button
+                  type="button"
+                  className={navItemClass(section === id)}
+                  aria-current={section === id ? "page" : undefined}
+                  onClick={() => {
+                    setSection(id);
+                  }}
+                >
+                  <Icon name={icon} className="line-icon" />
+                  {t(label)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </nav>
       {section === "general" && <General />}
       {section === "dictionary" && <Dictionary focusAdd={focusAdd} />}
@@ -94,47 +114,109 @@ function General() {
 
   return (
     <SectionPage title="settings.general" intro="settings.general.intro">
-      <ShortcutRow
-        hotkey={overview?.hotkey ?? null}
-        onSaved={(hotkey) => {
-          setOverview((current) => current && { ...current, hotkey });
-        }}
-      />
-
-      <section className="row">
-        <label className="row-text" htmlFor="autostart">
-          <h2>{t("settings.autostart")}</h2>
-          <p className="muted">{t("settings.autostart.note")}</p>
-          {autostartError && (
-            <p className="error" role="alert">
-              {t("settings.autostart.failed")}
-            </p>
-          )}
-        </label>
-        <input
-          id="autostart"
-          type="checkbox"
-          role="switch"
-          aria-label={t("settings.autostart")}
-          className="switch"
-          checked={overview?.autostart ?? false}
-          disabled={!overview}
-          onChange={(event) => {
-            toggleAutostart(event.target.checked);
+      <div className="panel">
+        <ShortcutRow
+          hotkey={overview?.hotkey ?? null}
+          onSaved={(hotkey) => {
+            setOverview((current) => current && { ...current, hotkey });
           }}
         />
-      </section>
 
-      <DictationLanguagesRow />
+        <section className="setting">
+          <div className="setting-text">
+            <h2 className="setting-title">{t("settings.autostart")}</h2>
+            <p className="setting-note">{t("settings.autostart.note")}</p>
+            {autostartError && (
+              <p className="tmw-error" role="alert">
+                {t("settings.autostart.failed")}
+              </p>
+            )}
+          </div>
+          <Toggle
+            label={<span className="visually-hidden">{t("settings.autostart")}</span>}
+            checked={overview?.autostart ?? false}
+            disabled={!overview}
+            onChange={toggleAutostart}
+          />
+        </section>
 
-      <UiLanguageRow />
+        <ThemeRow />
 
-      <footer className="page-footer">
-        <button type="button" className="button button-quiet" onClick={() => void bridge.quit()}>
-          {t("settings.quit")}
-        </button>
-      </footer>
+        <UiLanguageRow />
+
+        <DictationLanguagesRow />
+      </div>
+
+      <About version={overview?.version ?? null} />
     </SectionPage>
+  );
+}
+
+const themeChoices: { value: Theme | null; label: MessageId; icon: IconName }[] = [
+  { value: null, label: "settings.theme.windows", icon: "system" },
+  { value: "light", label: "settings.theme.light", icon: "light" },
+  { value: "dark", label: "settings.theme.dark", icon: "dark" },
+];
+
+function ThemeRow() {
+  const [choice, setChoice] = useState<Theme | null | undefined>(undefined);
+  const name = useId();
+
+  useEffect(() => {
+    void bridge.theme().then(setChoice);
+  }, []);
+
+  const choose = (next: Theme | null) => {
+    setChoice(next);
+    void bridge.setTheme(next).then(setChoice);
+  };
+
+  return (
+    <section className="setting">
+      <div className="setting-text">
+        <h2 className="setting-title" id={`${name}-title`}>
+          {t("settings.theme")}
+        </h2>
+        <p className="setting-note">{t("settings.theme.note")}</p>
+      </div>
+      <fieldset
+        className="segmented"
+        aria-labelledby={`${name}-title`}
+        disabled={choice === undefined}
+      >
+        {themeChoices.map((option) => (
+          <label key={option.icon} className="segmented-option">
+            <input
+              type="radio"
+              name={name}
+              checked={choice === option.value}
+              onChange={() => {
+                choose(option.value);
+              }}
+            />
+            <Icon name={option.icon} className="line-icon" />
+            {t(option.label)}
+          </label>
+        ))}
+      </fieldset>
+    </section>
+  );
+}
+
+function About({ version }: { version: string | null }) {
+  return (
+    <section className="panel about" aria-label={t("settings.about")}>
+      <div className="about-identity">
+        <Wordmark height={28} />
+        <p className="about-tagline">{t("brand.tagline")}</p>
+        <p className="about-version version">
+          {version && t("settings.about.version", { version })}
+        </p>
+      </div>
+      <Button variant="secondary" size="sm" onClick={() => void bridge.quit()}>
+        {t("settings.quit")}
+      </Button>
+    </section>
   );
 }
 
@@ -168,10 +250,10 @@ function AccountRow() {
   };
 
   return (
-    <section className="row">
-      <div className="row-text">
-        <h2>{t("settings.account")}</h2>
-        <p className="muted">
+    <section className="panel setting">
+      <div className="setting-text">
+        <h2 className="setting-title">{t("settings.account")}</h2>
+        <p className="setting-note">
           {account === null
             ? "\u00a0"
             : account.signedIn
@@ -182,16 +264,17 @@ function AccountRow() {
         </p>
       </div>
       {account?.signedIn === true && (
-        <button type="button" className="button" disabled={busy} onClick={signOut}>
+        <button
+          type="button"
+          className={buttonClass({ variant: "secondary" })}
+          disabled={busy}
+          onClick={signOut}
+        >
           {t(busy ? "settings.account.signingOut" : "settings.account.signOut")}
         </button>
       )}
       {account?.signedIn === false && (
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={() => void bridge.openSignIn()}
-        >
+        <button type="button" className={buttonClass()} onClick={() => void bridge.openSignIn()}>
           {t("settings.account.signIn")}
         </button>
       )}
@@ -308,11 +391,11 @@ function ShortcutRow({
   };
 
   return (
-    <section className="row">
-      <div className="row-text">
-        <h2>{t("settings.shortcut")}</h2>
+    <section className="setting">
+      <div className="setting-text">
+        <h2 className="setting-title">{t("settings.shortcut")}</h2>
         {capture.step === "listening" && (
-          <p className="muted" role="status">
+          <p className="setting-note" role="status">
             {t("settings.shortcut.listening")}
           </p>
         )}
@@ -327,25 +410,25 @@ function ShortcutRow({
         )}
         {capture.step === "idle" && <p>{hotkey && <Keys keys={hotkey} />}</p>}
         {error && (
-          <p className="error" role="alert">
+          <p className="tmw-error" role="alert">
             {t(error)}
           </p>
         )}
       </div>
-      <div className="row-actions">
+      <div className="setting-control">
         {capture.step === "proposed" && (
-          <button type="button" className="button button-primary" onClick={save}>
+          <Button size="sm" onClick={save}>
             {t("common.save")}
-          </button>
+          </Button>
         )}
         {capture.step === "idle" ? (
-          <button type="button" className="button" onClick={start}>
+          <Button variant="secondary" size="sm" onClick={start}>
             {t("settings.shortcut.change")}
-          </button>
+          </Button>
         ) : (
-          <button type="button" className="button" onClick={cancel}>
+          <Button variant="secondary" size="sm" onClick={cancel}>
             {t("common.cancel")}
-          </button>
+          </Button>
         )}
       </div>
     </section>

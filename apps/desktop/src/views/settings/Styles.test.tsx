@@ -52,7 +52,7 @@ describe("Styles", () => {
       createStyle: () => mail,
     });
     render(<Styles />);
-    await screen.findByText("You have no styles of your own yet.");
+    await screen.findByText("No styles of your own yet");
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Client email" } });
     fireEvent.click(screen.getByRole("button", { name: "Create style" }));
     expect(screen.getByRole("alert").textContent).toBe("Type the instructions.");
@@ -84,7 +84,7 @@ describe("Styles", () => {
       },
     });
     render(<Styles />);
-    await screen.findByText("You have no styles of your own yet.");
+    await screen.findByText("No styles of your own yet");
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Mail" } });
     fireEvent.change(screen.getByLabelText("Instructions"), { target: { value: "Short." } });
     fireEvent.click(screen.getByRole("button", { name: "Create style" }));

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@take-my-word/brand";
 import { api } from "../../api.ts";
 import { bridge, type UiLanguage } from "../../bridge.ts";
 import { apiProblem, type Note } from "../../editing.ts";
@@ -22,30 +23,31 @@ export function UiLanguageRow() {
   };
 
   return (
-    <section className="row">
-      <div className="row-text">
-        <label htmlFor={id}>
-          <h2>{t("settings.uiLanguage")}</h2>
-        </label>
-        <p className="muted">{t("settings.uiLanguage.note")}</p>
+    <section className="setting">
+      <div className="setting-text">
+        <h2 className="setting-title" id={`${id}-title`}>
+          {t("settings.uiLanguage")}
+        </h2>
+        <p className="setting-note">{t("settings.uiLanguage.note")}</p>
       </div>
-      <select
-        id={id}
-        className="input input-compact"
-        disabled={!state}
-        value={state?.choice ?? windowsChoice}
-        onChange={(event) => {
-          choose(event.target.value);
-        }}
-      >
-        <option value={windowsChoice}>
-          {t("settings.uiLanguage.windows", {
-            language: t(`language.${state?.windows ?? "en"}`),
-          })}
-        </option>
-        <option value="en">{t("language.en")}</option>
-        <option value="es">{t("language.es")}</option>
-      </select>
+      <div className="setting-control">
+        <Select
+          label={<span className="visually-hidden">{t("settings.uiLanguage")}</span>}
+          disabled={!state}
+          value={state?.choice ?? windowsChoice}
+          onChange={(event) => {
+            choose(event.target.value);
+          }}
+        >
+          <option value={windowsChoice}>
+            {t("settings.uiLanguage.windows", {
+              language: t(`language.${state?.windows ?? "en"}`),
+            })}
+          </option>
+          <option value="en">{t("language.en")}</option>
+          <option value="es">{t("language.es")}</option>
+        </Select>
+      </div>
     </section>
   );
 }
@@ -90,12 +92,12 @@ export function DictationLanguagesRow() {
   };
 
   return (
-    <section className="row row-stacked">
-      <div className="row-text">
-        <h2>{t("dictationLanguages")}</h2>
-        <p className="muted">{t("dictationLanguages.note")}</p>
+    <section className="setting setting-stacked">
+      <div className="setting-text">
+        <h2 className="setting-title">{t("dictationLanguages")}</h2>
+        <p className="setting-note">{t("dictationLanguages.note")}</p>
         {saved && (
-          <p className="muted" role="status">
+          <p className="setting-note" role="status">
             {t("common.saved")}
           </p>
         )}
