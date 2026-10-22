@@ -31,7 +31,7 @@ describe("Overlay", () => {
     act(() => {
       listeners.overlay?.({ state: "processing" });
     });
-    expect(screen.getByRole("status").textContent).toBe("Processing");
+    expect(screen.getByRole("status").textContent).toBe("Cleaning up");
     act(() => {
       listeners.overlay?.({ state: "hidden" });
     });
@@ -41,29 +41,32 @@ describe("Overlay", () => {
   it("shows the shell's message ids in the chosen language", async () => {
     setLanguage("es");
     await showing({ state: "error", message: "overlay.quota", action: null });
-    expect(screen.getByRole("alert").textContent).toBe("!Llegaste al límite de dictados de hoy.");
+    expect(screen.getByRole("alert").textContent).toBe("Llegaste al límite de dictados de hoy.");
     setLanguage("en");
   });
 
   it("draws the voice level while listening and stays flat on silence", async () => {
     await showing({ state: "listening" });
     const bars = () =>
-      Array.from(document.querySelectorAll<HTMLElement>(".wave-bar"), (bar) => bar.style.transform);
-    expect(new Set(bars())).toEqual(new Set(["scaleY(0.15)"]));
+      Array.from(document.querySelectorAll<HTMLElement>(".waveform-bar"), (bar) =>
+        bar.style.getPropertyValue("--level"),
+      );
+    expect(bars()).toHaveLength(9);
+    expect(new Set(bars())).toEqual(new Set(["0"]));
     act(() => {
       listeners.overlayLevel?.(1);
       listeners.overlayLevel?.(0);
     });
-    expect(bars().slice(-2)).toEqual(["scaleY(1)", "scaleY(0.15)"]);
+    expect(bars().slice(-3)).toEqual(["0", "1", "0"]);
     act(() => {
       listeners.overlay?.({ state: "processing" });
     });
-    expect(document.querySelector(".wave")).toBeNull();
+    expect(document.querySelector(".waveform")).toBeNull();
   });
 
   it("dismisses an error on click", async () => {
     await showing({ state: "error", message: "overlay.unreachable", action: null });
-    expect(screen.getByRole("alert").textContent).toContain("Can't reach Take My Word.");
+    expect(screen.getByRole("alert").textContent).toContain("We could not reach the service.");
     fireEvent.click(screen.getByRole("alert"));
     expect(fakeBridge.dismissOverlay).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button")).toBeNull();

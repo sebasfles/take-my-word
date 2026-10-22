@@ -9,7 +9,10 @@ export interface Overview {
   hotkey: string[];
   autostart: boolean;
   microphone: MicStatus;
+  version: string;
 }
+
+export type Theme = "light" | "dark";
 
 export type OverlayState =
   | { state: "hidden" }
@@ -84,6 +87,12 @@ export const bridge = {
     invoke<undefined>("save_onboarding", { styleId, dictationLanguages }),
   uiLanguage: () => invoke<UiLanguage>("ui_language"),
   setUiLanguage: (choice: Language | null) => invoke<UiLanguage>("set_ui_language", { choice }),
+  theme: () => invoke<Theme | null>("theme"),
+  setTheme: (choice: Theme | null) => invoke<Theme | null>("set_theme", { choice }),
+  fitAccount: (onboarding: boolean, contentHeight: number, recenter: boolean) =>
+    invoke<undefined>("fit_account", { onboarding, contentHeight, recenter }),
+  fitUpdate: (contentHeight: number, recenter: boolean) =>
+    invoke<undefined>("fit_update", { contentHeight, recenter }),
   openSignIn: () => invoke<undefined>("open_sign_in"),
   signOut: () => invoke<undefined>("sign_out"),
   apiRequest: (route: Route) => invoke<unknown>("api_request", { route }),
@@ -107,6 +116,10 @@ export const bridge = {
     }),
   onUiLanguage: (handler: (language: Language) => void): Promise<UnlistenFn> =>
     listen<Language>("ui-language", (event) => {
+      handler(event.payload);
+    }),
+  onTheme: (handler: (theme: Theme | null) => void): Promise<UnlistenFn> =>
+    listen<Theme | null>("theme", (event) => {
       handler(event.payload);
     }),
   onAccountChanged: (handler: (signedIn: boolean) => void): Promise<UnlistenFn> =>

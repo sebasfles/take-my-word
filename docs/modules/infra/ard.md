@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-22
-source: 0010_brand_web
+source: 0011_desktop_rebrand
 ---
 
 # Infra: architecture and debt
@@ -137,6 +137,7 @@ source: 0010_brand_web
 - Alternatives rejected: generating them inside the web build; serving them from `/_next/static`, whose hashed URLs cannot back favicons and social cards.
 - Reason: these files need fixed URLs, and the brand stays their only source.
 - Debt created: `desktop-ci` does not watch `packages/brand/` yet.
+- Resolved by: 0011_desktop_rebrand, 2026-10-22
 - Revisit when: 0011 makes the desktop consume the brand package.
 - Source: 0010_brand_web
 

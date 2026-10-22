@@ -10,6 +10,7 @@ use crate::i18n::{self, Message};
 use crate::locale::{self, Language};
 use crate::overlay::{Overlay, OverlayState};
 use crate::shell::Shell;
+use crate::theme::{self, Theme};
 use crate::{tray, windows};
 
 const MICROPHONE_SETTINGS: &str = "ms-settings:privacy-microphone";
@@ -29,6 +30,7 @@ pub struct Overview {
     hotkey: Vec<String>,
     autostart: bool,
     microphone: MicStatus,
+    version: String,
 }
 
 #[tauri::command]
@@ -37,6 +39,7 @@ pub fn overview(app: AppHandle, shell: State<'_, Shell>) -> Overview {
         hotkey: shell.hotkey().labels(),
         autostart: app.autolaunch().is_enabled().unwrap_or(false),
         microphone: shell.microphone.get(),
+        version: app.package_info().version.to_string(),
     }
 }
 
@@ -147,4 +150,25 @@ pub fn set_ui_language(
         choice,
         windows: locale::system_language(),
     }
+}
+
+#[tauri::command]
+pub fn theme() -> Option<Theme> {
+    theme::choice()
+}
+
+#[tauri::command]
+pub fn set_theme(app: AppHandle, shell: State<'_, Shell>, choice: Option<Theme>) -> Option<Theme> {
+    shell.update_settings(|settings| settings.theme = choice);
+    apply_theme(&app, choice);
+    log::info!("theme: {}", choice.map_or("windows", Theme::code));
+    if let Err(error) = app.emit("theme", choice) {
+        log::warn!("announcing the theme failed: {error}");
+    }
+    choice
+}
+
+pub fn apply_theme(app: &AppHandle, choice: Option<Theme>) {
+    theme::choose(choice);
+    app.set_theme(Theme::native(choice));
 }

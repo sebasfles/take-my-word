@@ -1,0 +1,28 @@
+{
+  "settings": {
+    "width": 880,
+    "height": 640,
+    "minWidth": 380,
+    "minHeight": 480
+  },
+  "account": {
+    "width": 440,
+    "height": 544
+  },
+  "onboarding": {
+    "width": 600,
+    "minHeight": 320
+  },
+  "firstRun": {
+    "width": 520,
+    "height": 536
+  },
+  "update": {
+    "width": 460,
+    "minHeight": 240
+  },
+  "overlay": {
+    "width": 480,
+    "height": 96
+  }
+}

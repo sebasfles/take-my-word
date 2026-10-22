@@ -96,6 +96,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@take-my-word/brand':
+        specifier: workspace:*
+        version: link:../../packages/brand
       '@take-my-word/shared':
         specifier: workspace:*
         version: link:../../packages/shared

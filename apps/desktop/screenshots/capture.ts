@@ -6,16 +6,44 @@ import type { Language, MessageId } from "../src/i18n.ts";
 
 const out = process.argv[2];
 if (!out) {
-  console.error("usage: node screenshots/capture.ts <output-dir>");
+  console.error("usage: node screenshots/capture.ts <output-dir> [name-prefix,...]");
   process.exit(2);
 }
+const only = process.argv[3]?.split(",") ?? [];
 
 const here = import.meta.dirname;
-const widths = [
-  { width: 390, height: 844 },
-  { width: 768, height: 1024 },
-  { width: 1280, height: 800 },
-];
+
+interface Size {
+  width: number;
+  height: number;
+}
+
+const sizes = JSON.parse(readFileSync(join(here, "..", "src", "windows.json"), "utf8")) as Record<
+  "settings" | "account" | "firstRun" | "overlay",
+  Size
+> &
+  Record<"onboarding" | "update", { width: number; minHeight: number }>;
+
+const windowSizes: Record<string, Size[]> = {
+  account: [sizes.account],
+  onboarding: [{ width: sizes.onboarding.width, height: sizes.onboarding.minHeight }],
+  "first-run": [sizes.firstRun],
+  update: [{ width: sizes.update.width, height: sizes.update.minHeight }],
+  overlay: [sizes.overlay],
+  settings: [
+    { width: 380, height: sizes.settings.height },
+    { width: sizes.settings.width, height: sizes.settings.height },
+    { width: 1280, height: 800 },
+  ],
+};
+
+const appBackdrops = { light: "#ffffff", dark: "#1f1f1f" };
+
+const viewOf = (query: string) => {
+  const params = new URLSearchParams(query);
+  if (params.get("step") === "onboarding") return "onboarding";
+  return params.get("view") ?? "settings";
+};
 
 type Text = (id: MessageId, values?: Record<string, string>) => string;
 
@@ -86,6 +114,7 @@ const shots: Shot[] = [
     },
   },
   { name: "first-run-ready", query: "view=first-run" },
+  { name: "first-run-ready-dev", query: "view=first-run&build=dev" },
   { name: "first-run-microphone-blocked", query: "view=first-run&mic=denied" },
   { name: "first-run-microphone-missing", query: "view=first-run&mic=missing" },
   {
@@ -93,6 +122,13 @@ const shots: Shot[] = [
     query: "view=settings",
     act: async (page) => {
       await page.locator("kbd", { hasText: "Win" }).waitFor();
+    },
+  },
+  {
+    name: "settings-idle-dev",
+    query: "view=settings&build=dev",
+    act: async (page) => {
+      await page.locator("kbd", { hasText: "Alt" }).waitFor();
     },
   },
   {
@@ -204,6 +240,18 @@ const shots: Shot[] = [
         .click();
       await page.getByText(text("common.confirmDelete")).waitFor();
     },
+  },
+  {
+    name: "settings-dictionary-loading",
+    query: "view=settings&section=dictionary&pending=listTerms",
+  },
+  {
+    name: "settings-history-loading",
+    query: "view=settings&section=history&pending=listDictations",
+  },
+  {
+    name: "account-onboarding-loading",
+    query: "view=account&step=onboarding&styles=pending",
   },
   {
     name: "settings-dictionary-failed",
@@ -382,32 +430,50 @@ try {
     const text: Text = (id, values = {}) =>
       messages[id].replace(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match);
     for (const colorScheme of ["dark", "light"] as const) {
-      for (const size of widths) {
-        if (colorScheme === "light" && size.width !== 1280) continue;
-        const context = await browser.newContext({ viewport: size, colorScheme });
-        for (const shot of shots) {
+      const context = await browser.newContext({ colorScheme, deviceScaleFactor: 1 });
+      for (const shot of shots) {
+        if (only.length > 0 && !only.some((prefix) => shot.name.startsWith(prefix))) continue;
+        const view = viewOf(shot.query);
+        for (const size of windowSizes[view] ?? []) {
           const page = await context.newPage();
+          await page.setViewportSize(size);
           await page.goto(`${base}?${shot.query}&lang=${language}`);
-          if (shot.query.includes("view=overlay")) {
-            await page.addStyleTag({ content: "html, body { background: #52525b !important; }" });
-            await page.locator(".pill").waitFor();
+          if (view === "overlay") {
+            await page.addStyleTag({
+              content: `html, body { background: ${appBackdrops[colorScheme]} !important; }`,
+            });
+            await page.locator(".tmw-overlay").waitFor();
           } else {
             await page.getByRole("heading").first().waitFor();
           }
           await shot.act?.(page, text);
+          await page.evaluate(() => document.fonts.ready);
           await page.waitForTimeout(200);
-          const overflow = await page.evaluate(
-            () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-          );
-          if (overflow)
+          if (view === "onboarding" || view === "update") {
+            const content = await page.evaluate(
+              () => document.querySelector("main")?.getBoundingClientRect().height ?? 0,
+            );
+            await page.setViewportSize({
+              width: size.width,
+              height: Math.max(size.height, Math.ceil(content)),
+            });
+          }
+          const overflow = await page.evaluate(() => ({
+            sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            down: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+          }));
+          if (overflow.sideways) {
             throw new Error(`${shot.name} scrolls sideways at ${String(size.width)} px`);
-          const light = colorScheme === "light" ? "-light" : "";
-          const file = `${shot.name}-${language}-${String(size.width)}${light}.png`;
-          await page.screenshot({ path: join(out, file), fullPage: true });
+          }
+          if (overflow.down && view !== "settings") {
+            throw new Error(`${shot.name} does not fit its ${String(size.height)} px window`);
+          }
+          const file = `${shot.name}-${language}-${String(size.width)}-${colorScheme}.png`;
+          await page.screenshot({ path: join(out, file), fullPage: view === "settings" });
           await page.close();
         }
-        await context.close();
       }
+      await context.close();
     }
   }
 } finally {

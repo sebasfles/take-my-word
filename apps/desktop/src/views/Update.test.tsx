@@ -41,7 +41,7 @@ describe("Update", () => {
   it("offers the version and its notes, and installs on yes", async () => {
     await showing(available);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "Hay una nueva versión de Take My Word",
+      "Hay una actualización lista",
     );
     screen.getByText("Versión 0.1.1");
     screen.getByText("Pega más rápido en terminales.");
@@ -60,7 +60,7 @@ describe("Update", () => {
   it("speaks English when Windows does", async () => {
     setLanguage("en");
     await showing({ ...available, notes: "" });
-    screen.getByRole("heading", { name: "A new version of Take My Word is ready" });
+    screen.getByRole("heading", { name: "An update is ready" });
     screen.getByRole("button", { name: "Later" });
     screen.getByRole("button", { name: "Install and restart" });
     expect(screen.queryByRole("heading", { name: "What's new" })).toBeNull();
@@ -109,5 +109,31 @@ describe("Update", () => {
       await Promise.resolve();
     });
     expect(screen.getByRole("status").textContent).toBe("Descargando la actualización 10%");
+  });
+
+  it("fits the window to each phase and centers it only the first time", async () => {
+    const observed: (() => void)[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        changed: () => void;
+        constructor(changed: () => void) {
+          this.changed = changed;
+        }
+        observe() {
+          observed.push(this.changed);
+        }
+        disconnect() {
+          return undefined;
+        }
+      },
+    );
+    await showing(available);
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitUpdate).toHaveBeenLastCalledWith(expect.any(Number), true);
+    shell({ ...available, phase: "failed" });
+    for (const changed of observed) changed();
+    expect(fakeBridge.fitUpdate).toHaveBeenLastCalledWith(expect.any(Number), false);
+    vi.unstubAllGlobals();
   });
 });

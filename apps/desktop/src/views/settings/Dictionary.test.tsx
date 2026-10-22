@@ -74,7 +74,7 @@ describe("Dictionary", () => {
   it("refuses terms past the shared limits before calling the API", async () => {
     const seen = serve({ listTerms: () => ({ terms: [] }) });
     render(<Dictionary focusAdd={0} />);
-    await screen.findByText(/dictionary is empty/);
+    await screen.findByText("No terms yet");
     type("Term", "x".repeat(65));
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(screen.getByRole("alert").textContent).toBe(
@@ -95,7 +95,7 @@ describe("Dictionary", () => {
       },
     });
     render(<Dictionary focusAdd={0} />);
-    await screen.findByText(/dictionary is empty/);
+    await screen.findByText("No terms yet");
     type("Term", "Kubernetes");
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect((await screen.findByRole("alert")).textContent).toBe(

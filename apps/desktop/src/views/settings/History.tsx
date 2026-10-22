@@ -1,11 +1,12 @@
 import type { HistoryItem, Style } from "@take-my-word/shared";
+import { buttonClass } from "@take-my-word/brand";
 import { useState } from "react";
 import { api } from "../../api.ts";
 import { bridge, problemOf } from "../../bridge.ts";
 import { apiProblem, formatDate, type Note, note } from "../../editing.ts";
 import { t } from "../../i18n.ts";
 import { styleLabel } from "../../styleNames.ts";
-import { ConfirmDelete, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
+import { ConfirmDelete, Empty, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
 
 interface Data {
   items: HistoryItem[];
@@ -49,7 +50,7 @@ export function History() {
       <LoadState state={state} onRetry={retry} />
       {data &&
         (data.items.length === 0 ? (
-          <p className="empty">{t("history.empty")}</p>
+          <Empty title="history.emptyTitle" body="history.empty" />
         ) : (
           <section className="list-section">
             <ul className="list">
@@ -72,7 +73,7 @@ export function History() {
               <div className="form-actions form-actions-center">
                 <button
                   type="button"
-                  className="button"
+                  className={buttonClass({ variant: "secondary" })}
                   disabled={loadingMore}
                   onClick={() => {
                     if (data.cursor !== undefined) loadMore(data.cursor);
@@ -127,7 +128,11 @@ function DictationRow({
           {t("history.audio", { seconds: Math.round(item.audioSeconds) })}
         </p>
         <div className="item-actions">
-          <button type="button" className="button button-small" onClick={copy}>
+          <button
+            type="button"
+            className={buttonClass({ variant: "secondary", size: "sm" })}
+            onClick={copy}
+          >
             {t(copied ? "history.copied" : "history.copy")}
           </button>
           <ConfirmDelete

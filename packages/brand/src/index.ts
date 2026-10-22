@@ -2,6 +2,7 @@ export { contrast } from "./color.ts";
 export { pairs } from "./contrast.ts";
 export { AppIcon, Mark, Wordmark, type MarkProps } from "./mark.tsx";
 export { tokens, type Tokens, type ThemeColors } from "./tokens.ts";
+export { Icon, icons, type IconName } from "./icons.tsx";
 export { Waveform, type WaveformProps } from "./waveform.tsx";
 export { Button, buttonClass, type ButtonSize, type ButtonVariant } from "./ui/button.tsx";
 export { Badge, EmptyState, Skeleton, type BadgeTone } from "./ui/display.tsx";

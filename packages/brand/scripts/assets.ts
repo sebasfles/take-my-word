@@ -4,6 +4,7 @@ import { Resvg } from "@resvg/resvg-js";
 import type * as fontkit from "fontkit";
 import { glyph, glyphInTile, glyphSmall, tile } from "../src/mark-geometry.ts";
 import { tokens } from "../src/tokens.ts";
+import { ico } from "./desktop-icons.ts";
 import { faces, staticInstance } from "./font-sources.ts";
 
 const src = join(import.meta.dirname, "..", "src");
@@ -116,25 +117,6 @@ function iconSvg(small: boolean, { rounded = true, inset = 0 } = {}) {
 
 const png = (svg: string, px: number) =>
   new Resvg(svg, { fitTo: { mode: "width", value: px } }).render().asPng();
-
-function ico(images: { size: number; data: Buffer }[]): Buffer {
-  const header = Buffer.alloc(6 + 16 * images.length);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
-  header.writeUInt16LE(images.length, 4);
-  let offset = header.length;
-  images.forEach(({ size: px, data }, index) => {
-    const entry = 6 + index * 16;
-    header.writeUInt8(px >= 256 ? 0 : px, entry);
-    header.writeUInt8(px >= 256 ? 0 : px, entry + 1);
-    header.writeUInt16LE(1, entry + 4);
-    header.writeUInt16LE(32, entry + 6);
-    header.writeUInt32LE(data.length, entry + 8);
-    header.writeUInt32LE(offset, entry + 12);
-    offset += data.length;
-  });
-  return Buffer.concat([header, ...images.map((image) => image.data)]);
-}
 
 const iconFor = (px: number) => png(iconSvg(px <= 48), px);
 

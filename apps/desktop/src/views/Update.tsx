@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@take-my-word/brand";
 import { bridge, keepListening, type UpdateView } from "../bridge.ts";
 import { t } from "../i18n.ts";
+import { WindowPage } from "./WindowPage.tsx";
 
 export function Update() {
   const [view, setView] = useState<UpdateView | null>(null);
+  const fitted = useRef(false);
+  const fitUpdate = useCallback((height: number) => {
+    void bridge.fitUpdate(height, !fitted.current);
+    fitted.current = true;
+  }, []);
 
   useEffect(() => keepListening(() => bridge.onUpdate(setView)), []);
 
@@ -17,14 +24,13 @@ export function Update() {
   const notes = view.notes.trim();
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <h1>{t("update.title")}</h1>
-        <p className="muted">{t("update.version", { version: view.version })}</p>
-      </header>
-
+    <WindowPage
+      onHeight={fitUpdate}
+      title={t("update.title")}
+      intro={<span className="version">{t("update.version", { version: view.version })}</span>}
+    >
       {notes !== "" && (
-        <section className="note">
+        <section className="window-section">
           <h2>{t("update.notes")}</h2>
           <p className="update-notes">{notes}</p>
         </section>
@@ -45,34 +51,26 @@ export function Update() {
         </div>
       )}
       {view.phase === "installing" && (
-        <p className="muted" role="status">
+        <p className="setting-note" role="status">
           {t("update.installing")}
         </p>
       )}
       {view.phase === "failed" && (
-        <p className="error" role="alert">
+        <p className="form-error" role="alert">
           {t("update.failed")}
         </p>
       )}
 
       {(view.phase === "available" || view.phase === "failed") && (
-        <footer className="page-footer row-actions">
-          <button
-            type="button"
-            className="button button-quiet"
-            onClick={() => void bridge.postponeUpdate()}
-          >
+        <footer className="window-footer">
+          <Button variant="ghost" onClick={() => void bridge.postponeUpdate()}>
             {t("update.later")}
-          </button>
-          <button
-            type="button"
-            className="button button-primary"
-            onClick={() => void bridge.installUpdate()}
-          >
+          </Button>
+          <Button onClick={() => void bridge.installUpdate()}>
             {t(view.phase === "failed" ? "common.tryAgain" : "update.install")}
-          </button>
+          </Button>
         </footer>
       )}
-    </main>
+    </WindowPage>
   );
 }

@@ -3,7 +3,7 @@ mod level;
 mod microphone;
 mod wav;
 
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -54,20 +54,71 @@ impl MicStatus {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct MicrophoneStatus(Arc<Mutex<MicStatus>>);
+type StatusListener = Box<dyn Fn(MicStatus) + Send + Sync>;
+
+#[derive(Clone, Default)]
+pub struct MicrophoneStatus {
+    current: Arc<Mutex<MicStatus>>,
+    listener: Arc<OnceLock<StatusListener>>,
+}
 
 impl MicrophoneStatus {
     pub fn get(&self) -> MicStatus {
-        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
+        *self.current.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn on_change(&self, listener: impl Fn(MicStatus) + Send + Sync + 'static) {
+        if self.listener.set(Box::new(listener)).is_err() {
+            log::warn!("the microphone status already has a listener");
+        }
     }
 
     fn record(&self, result: &Result<impl Sized, AudioError>) {
-        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = MicStatus::of(result);
+        self.set(MicStatus::of(result));
+    }
+
+    fn set(&self, status: MicStatus) {
+        let previous = std::mem::replace(
+            &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
+            status,
+        );
+        if previous != status
+            && let Some(listener) = self.listener.get()
+        {
+            listener(status);
+        }
     }
 }
 
 pub trait Capture {
     fn start(&mut self);
     fn stop(&mut self) -> Result<Captured, AudioError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_microphone_status_reports_each_change_once() {
+        let status = MicrophoneStatus::default();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let heard = Arc::clone(&seen);
+        status.on_change(move |change| heard.lock().unwrap().push(change));
+        status.record(&Ok::<(), AudioError>(()));
+        status.record(&Ok::<(), AudioError>(()));
+        status.record(&Err::<(), _>(AudioError::PermissionDenied));
+        status.record(&Err::<(), _>(AudioError::NoDevice));
+        status.record(&Ok::<(), AudioError>(()));
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![
+                MicStatus::Ready,
+                MicStatus::Denied,
+                MicStatus::Missing,
+                MicStatus::Ready
+            ]
+        );
+        assert_eq!(status.get(), MicStatus::Ready);
+    }
 }

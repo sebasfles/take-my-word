@@ -1,0 +1,19 @@
+.overlay {
+  position: fixed;
+  inset: auto 0 var(--space-2);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.overlay .tmw-overlay {
+  max-width: calc(100vw - var(--space-4));
+  outline: var(--border-thin) solid var(--neutral-800);
+  outline-offset: calc(var(--border-thin) * -1);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.overlay-dismissable .tmw-overlay {
+  cursor: pointer;
+}

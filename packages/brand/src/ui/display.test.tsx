@@ -27,6 +27,53 @@ describe("OverlayPill", () => {
     rerender(<OverlayPill state="done" label="Done" level={0.9} />);
     expect(levelOf(wave())).toBe("0");
   });
+
+  it("draws a level history while listening and drops it once the voice stops", () => {
+    const { container, rerender } = render(
+      <OverlayPill state="listening" label="Listening" levels={[0, 0.5, 2]} />,
+    );
+    const bars = () => [...container.querySelectorAll(".waveform-bar")].map(levelOf);
+    expect(container.querySelector(".waveform")?.getAttribute("data-mode")).toBe("history");
+    expect(bars()).toEqual(["0", "0.5", "1"]);
+    rerender(<OverlayPill state="processing" label="Processing" levels={[1, 1, 1]} />);
+    expect(container.querySelector(".waveform")?.getAttribute("data-mode")).toBe("level");
+    expect(bars()).toEqual(["", "", "", "", ""]);
+  });
+
+  it("can trade the bars for a spinner, a check or an alert outside listening", () => {
+    const { container, rerender } = render(
+      <OverlayPill state="listening" indicator="state" label="Listening" levels={[0.2, 0.4]} />,
+    );
+    const marks = () => ({
+      wave: container.querySelector(".waveform") !== null,
+      spinner: container.querySelector(".tmw-spinner") !== null,
+      glyph: container.querySelector(".tmw-overlay-glyph") !== null,
+    });
+    expect(marks()).toEqual({ wave: true, spinner: false, glyph: false });
+    rerender(<OverlayPill state="processing" indicator="state" label="Processing" />);
+    expect(marks()).toEqual({ wave: false, spinner: true, glyph: false });
+    expect(screen.getByRole("status").textContent).toBe("Processing");
+    rerender(<OverlayPill state="error" indicator="state" label="No microphone" />);
+    expect(marks()).toEqual({ wave: false, spinner: false, glyph: true });
+    rerender(<OverlayPill state="processing" label="Processing" />);
+    expect(marks()).toEqual({ wave: true, spinner: false, glyph: false });
+  });
+
+  it("alerts on an error and keeps an action inside the pill", () => {
+    render(
+      <OverlayPill
+        state="error"
+        label="Microphone blocked."
+        action={<button type="button">Open settings</button>}
+      />,
+    );
+    const pill = screen.getByRole("alert");
+    expect(pill.textContent).toBe("Microphone blocked.Open settings");
+    expect(screen.getByRole("button", { name: "Open settings" }).closest(".tmw-overlay")).toBe(
+      pill,
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+  });
 });
 
 describe("Waveform", () => {

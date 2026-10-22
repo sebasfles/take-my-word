@@ -1,3 +1,4 @@
+import { Checkbox } from "@take-my-word/brand";
 import { type Language, t } from "./i18n.ts";
 
 const offered: Language[] = ["en", "es"];
@@ -18,26 +19,21 @@ export function LanguageChoices({
   disabled?: boolean;
 }) {
   return (
-    <div className="choices choices-inline" role="group" aria-label={t("dictationLanguages")}>
+    <div className="choice-row" role="group" aria-label={t("dictationLanguages")}>
       {offered.map((language) => {
         const checked = chosen.includes(language);
         const last = checked && chosen.length === 1;
         return (
-          <label
+          <Checkbox
             key={language}
-            className="choice"
+            label={<span lang={language}>{t(`language.${language}`)}</span>}
             title={last ? t("dictationLanguages.lastOne") : undefined}
-          >
-            <input
-              type="checkbox"
-              checked={checked}
-              disabled={disabled || last}
-              onChange={() => {
-                onChange(toggled(chosen, language));
-              }}
-            />
-            <span lang={language}>{t(`language.${language}`)}</span>
-          </label>
+            checked={checked}
+            disabled={disabled || last}
+            onChange={() => {
+              onChange(toggled(chosen, language));
+            }}
+          />
         );
       })}
     </div>

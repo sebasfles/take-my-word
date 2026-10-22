@@ -1,0 +1,143 @@
+## 2026-10-22T02:54:07Z by om-developer target brand on 2a25ba8
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T02:54:07Z by om-developer target web on 2a25ba8
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (pnpm integration and pnpm e2e not run: they create throwaway dev users beyond this task's clearance and test the deployed dev web, not this diff)
+
+## 2026-10-22T02:54:07Z by om-developer target desktop on 2a25ba8
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (130 vitest and 142 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T02:54:07Z by om-developer target workflows on 2a25ba8
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-22T02:58:50Z by om-developer target brand on 0eefd42
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T02:58:50Z by om-developer target web on 0eefd42
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (integration and e2e need a dev web deploy and dev users beyond the clearance; recorded by the om-reviewer)
+
+## 2026-10-22T02:58:50Z by om-developer target desktop on 0eefd42
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011; mirror marked -dirty only by the om-reviewer's task.md edit during the run)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (130 vitest and 142 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T02:58:50Z by om-developer target workflows on 0eefd42
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-22T03:24:52Z by om-developer target brand on e4bda22
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T03:24:52Z by om-developer target web on e4bda22
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (integration and e2e need a dev web deploy and dev users beyond the clearance; recorded by the om-reviewer)
+
+## 2026-10-22T03:24:52Z by om-developer target desktop on e4bda22
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011, mirror at e4bda22 clean)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (133 vitest and 149 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T03:24:52Z by om-developer target workflows on e4bda22
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-22T03:41:49Z by om-developer target brand on afd37cc
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T03:41:49Z by om-developer target web on afd37cc
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (integration and e2e need a dev web deploy and dev users beyond the clearance; recorded by the om-reviewer)
+
+## 2026-10-22T03:41:49Z by om-developer target desktop on afd37cc
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011, mirror at afd37cc clean)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 vitest and 156 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T03:41:49Z by om-developer target workflows on afd37cc
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-22T04:40:35Z by om-developer target brand on ee3dc43
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T04:40:35Z by om-developer target web on ee3dc43
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (integration and e2e need a dev web deploy and dev users beyond the clearance; recorded by the om-reviewer)
+
+## 2026-10-22T04:40:35Z by om-developer target desktop on ee3dc43
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011, mirror at ee3dc43 clean)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 vitest and 156 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T04:40:35Z by om-developer target workflows on ee3dc43
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-22T04:44:19Z by om-developer target brand on 4515a5f
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T04:44:19Z by om-developer target web on 4515a5f
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (integration and e2e need a dev web deploy and dev users beyond the clearance; recorded by the om-reviewer)
+
+## 2026-10-22T04:44:19Z by om-developer target desktop on 4515a5f
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011, mirror at 4515a5f clean)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 vitest and 156 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T04:44:19Z by om-developer target workflows on 4515a5f
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

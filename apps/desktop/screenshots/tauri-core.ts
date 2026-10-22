@@ -117,6 +117,7 @@ const rejected = (status: number, code: string) => failure("rejected", status, c
 function route(request: Record<string, unknown>): Promise<unknown> {
   const name = String(request.route);
   if (params.get("fail") === name) return failure("network", null, null);
+  if (params.get("pending") === name) return new Promise(() => undefined);
   switch (name) {
     case "listTerms":
       return Promise.resolve({ terms });
@@ -153,10 +154,15 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
   switch (command) {
     case "overview":
       return answer({
-        hotkey: ["Ctrl", "Win"],
+        hotkey: params.get("build") === "dev" ? ["Ctrl", "Alt", "Win"] : ["Ctrl", "Win"],
         autostart: params.get("autostart") !== "off",
         microphone: params.get("mic") ?? "ready",
+        version: "0.2.0",
       });
+    case "theme":
+      return answer(null);
+    case "set_theme":
+      return answer(args?.choice ?? null);
     case "propose_hotkey":
       return params.get("propose") === "altgr"
         ? problem("hotkey.rightAlt")
@@ -177,6 +183,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
         ? problem("account.invalidPassword")
         : answer("onboarding");
     case "onboarding":
+      if (params.get("styles") === "pending") return new Promise(() => undefined);
       return params.get("styles") === "fail"
         ? problem("account.unreachable")
         : answer({

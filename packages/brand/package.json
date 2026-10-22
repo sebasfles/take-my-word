@@ -11,6 +11,8 @@
     "generate": "node scripts/generate.ts",
     "fonts": "node scripts/fonts.ts",
     "assets": "node scripts/assets.ts",
+    "desktop-assets": "node scripts/desktop-assets.ts",
+    "icon-sheet": "node scripts/icon-sheet.ts",
     "lint": "eslint . && prettier --check --ignore-path ../../.gitignore --ignore-path ../../.prettierignore .",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --no-file-parallelism"

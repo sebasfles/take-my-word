@@ -27,7 +27,8 @@
 .tmw-tab:focus-visible,
 .tmw-tabpanel:focus-visible,
 .tmw-nav-item:focus-visible,
-.tmw-toast-dismiss:focus-visible {
+.tmw-toast-dismiss:focus-visible,
+.tmw-overlay-action:focus-visible {
   outline: var(--border-focus) solid var(--color-focus);
   outline-offset: var(--border-focus);
 }
@@ -611,6 +612,36 @@
 
 .tmw-overlay[data-state="error"] .waveform {
   color: var(--color-on-overlay);
+}
+
+.tmw-overlay .tmw-spinner,
+.tmw-overlay-glyph {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+  color: var(--color-overlay-accent);
+}
+
+.tmw-overlay-glyph {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tmw-overlay-action {
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-on-overlay);
+  font: inherit;
+  font-weight: var(--weight-bold);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {

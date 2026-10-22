@@ -29,6 +29,7 @@ Every window, icon and notification of the Windows app is redesigned with `packa
 - Overlay: the "Escuchando" or "Listening" pill with the brand waveform driven by the real level, at the size and position 0008 settled.
 - Notifications and tray menu copy follow the brand voice, Spanish and English, UI language from Windows with English fallback and a manual override, as 0008 built it.
 - Light and dark following Windows, with the manual switch the web has.
+- Dev default hotkey: the dev build defaults to Ctrl+Alt+Win and prd keeps Ctrl+Win, so both apps can run side by side without both dictating on the same chord (Sebastian, 2026-10-21); an existing saved hotkey is kept.
 - Release: a new minor version (0.2.0) cut with `pnpm release:desktop` from the task branch after the review is clean, published by `desktop-release`, verified as an update from 0.1.1 on Windows.
 - Screenshots of every window and state at its real size, light and dark, Spanish and English, refreshed every round, in `.workspaces/0011_desktop_rebrand/screenshots/`, plus side-by-side pairs with the matching web pages.
 
@@ -82,13 +83,16 @@ Direction A "Tinta" from 0010 (Fraunces and Instrument Sans, terracotta on paper
 Consolidated 2026-10-21; the om-manager decides (design and merges delegated by Sebastian); details marked (om-reviewer) are mine.
 These override Scope, Acceptance and Approach above where they differ.
 
-- Release order (adjusts Scope "Release"): `origin/main` lacks 0008 and 0010, and prd's `dictationMetaSchema` requires `locale` while this desktop needs `dictationLanguages` (`src-tauri/src/api/mod.rs`), so no `desktop-v0.2.0` tag until #15 is merged and `deploy-prd` is green; the om-manager says when.
+- Release order (adjusts Scope "Release"): `origin/main` lacks 0008 and 0010, and prd's `dictationMetaSchema` requires `locale` while this desktop needs `dictationLanguages` (`src-tauri/src/api/mod.rs`), so no `desktop-v0.2.0` tag until #15 is merged and `deploy-prd` is green; the om-manager says when. Met 2026-10-21: #15 merged as `be4d148`, `deploy-prd` green (om-manager).
 - Release timing: clean review, PR with screenshots and the `desktop-ci` dev installer, then "PR ready, awaiting release go" to the om-manager; on "release go" the om-developer rebases, runs `pnpm release:desktop 0.2.0` only on my hand-off, and adds the update and landing evidence to the PR. The PR merges with a merge commit; never rebase or force-push at or below the tag.
 - Update check (Acceptance 5): prd is not installed on the Windows host; the run installs 0.1.1 from its release, updates to 0.2.0 through the updater, verifies, and uninstalls, as 0005 did. The new update window is proven by screenshots only, since 0.1.1 shows its own.
 - About (adjusts Scope): an About block at the foot of Settings › General: mark, wordmark, version, tagline, no links.
 - Tray states (adjusts Scope): idle; recording only while Listening; attention while signed out or the microphone is blocked or missing. Transient errors stay in the overlay and notifications. Tooltips name the state in es and en. One glyph per state that reads on light and dark taskbars, no taskbar-theme tracking.
 - Dev icons (adjusts Scope): the dev build gets a marked variant of the app and tray icons; prd stays as designed.
 - Overlay (adjusts Approach): the brand `Waveform` gains a history mode (`levels`, newest last) and `OverlayPill` an optional action slot; the overlay keeps 0008's behavior (scrolling bars, flat on silence, bars only while Listening, click to dismiss, microphone link) in the pill's look; the web's rendering is unchanged.
+- Overlay states (om-reviewer, 2026-10-21, on the om-developer's question): the pill shows bars only while Listening; processing shows a token-built spinner (a generic pill option if added to brand, still under reduced motion), error shows no bars; 0008's "no bars in processing" assertion stays as is.
+- Design answer (om-manager, after round 1): tile tray set and accent app icon approved, glyph set and ink icon dropped; the dev mark is a solid light-blue diagonal of about a third of the tile (legs at least 5 px at 16 px) on tray and app icons, glyph still legible; sign-in and choose password share one window size fitted to their content, no filler; settings, overlay, errors and pairs approved.
+- Dev default hotkey (Sebastian through the om-manager, Scope; details om-reviewer): the default comes from the compiled environment through one function covering both arms, so one test asserts Ctrl+Win for prd and Ctrl+Alt+Win (left Alt) for dev; a saved hotkey is never rewritten. With prd running, Ctrl+Win then Alt starts and cancels a prd hold (chord tracker, nothing sent); Alt before Win triggers only dev. `desktop/prd.md` and `trd.md` name both defaults.
 - Acceptance 7: selectors and copy may change (the voice rewrite needs it); no assertion is dropped or weakened.
 - Acceptance 6: 0008's method (private working set of app plus WebView2 after opening and closing settings; CPU seconds over 5 idle minutes), on dev release builds of the develop head (base) and the final commit in the same session; pass at RAM ≤ base + 10 MB and CPU ≤ base + 1.0 s, on runs that do not follow a sign-in.
 - Design checkpoint: round 1 delivers only the overlay pill, tray and app icon candidates in every state at 16, 20, 24 and 32 px on light and dark taskbar backdrops, and sign-in plus Settings › General in both themes; I send the paths to the om-manager for one design answer before the rest is restyled.
@@ -96,6 +100,8 @@ These override Scope, Acceptance and Approach above where they differ.
 - Theme (om-reviewer): system, light or dark in General, saved in `settings.json` like `uiLanguage`, applied at once to every open window and its native title bar; the overlay pill is ink in both themes.
 - Screenshots (om-reviewer): each window at its real inner size (account 440x560, first run 520x470, update 460x400, overlay 480x96 over a light and a dark app backdrop), settings at 380, 880 and 1280 wide; every state, light and dark, es and en, device scale 1; pairs put the desktop window next to the matching web page at 1280, same theme and language.
 - Windows evidence (om-reviewer): the tray is shown from the generated icon frames on taskbar-colored backdrops, never a capture of the real taskbar; PrintWindow captures of the app's own sign-in, settings and a real hold's overlay from the dev build, in both forced themes, to compare WebView2 against Chromium.
+- Smoke user (om-reviewer, round 3): the SSO session expired with Sebastian away, so the smoke signs in as crew-e2e-b from the root `.env` instead of a throwaway user; settings and rules saved before and restored after, the smoke's dictations deleted, signed out; no AWS profile used.
+- Machine rule (om-manager, after the round 4 run, where the debug console opened as tabs in Sebastian's Windows Terminal and took the foreground twice): debug builds launch detached (`CREATE_NO_WINDOW` or `DETACHED_PROCESS`, never through `wt`, `cmd` or a console host), output redirected to a log file in the scratch folder; before each run the script checks that no window it did not open can be brought to the foreground by the launch.
 - Real dictation (om-reviewer, Acceptance 7): 0008's smoke: `--dictate-wav` of the committed speech fixture into `tmw-scratch.exe` the run launched, signed in as a throwaway dev user.
 - Release notes (om-reviewer): short, English then Spanish, in the brand voice, in the tag message.
 
@@ -106,3 +112,177 @@ Review focus beyond the Pipeline: literal styles left in `apps/desktop`, keyboar
 clearance: full: GitHub as sebasfles (PR, the `desktop-v0.2.0` tag on my hand-off, the release), the Windows host under the machine rules, `fless-takemyword` on dev for one throwaway Cognito user created and deleted; no Terraform, no deploys, nothing in prd except the published release.
 
 ## om-developer notes
+
+### Round 1 (design checkpoint)
+
+Screenshots: `.workspaces/0011_desktop_rebrand/screenshots/round-1/` with `windows/` (each window at its real size, es and en, light and dark, device scale 1), `icons/` (tray sheets per candidate and the app icon sheet) and `pairs/` (desktop next to the web at 1280).
+
+Did:
+
+- `packages/brand`: `token-lint.ts` moved from `apps/web` with its generic tests, plus `sourceFiles` and `missingCustomProperties`, so both apps' lint tests share one rule set; the web test keeps every assertion.
+- `Waveform` history mode (`levels`, newest last, one bar per level, flat at the floor on silence); `OverlayPill` gains `levels`, an `action` slot, `role="alert"` on error, and `indicator: "waveform" | "state"` (default `waveform`, the web's look): with `state` the bars show only while listening, processing shows the existing `.tmw-spinner` (still under reduced motion), error an alert glyph, done a check, per the reviewer's answer.
+- A shared brand `icons` set (nav, theme, alert, check) and an `Icon` component; `apps/web` `account-nav.tsx` and `theme-switch.tsx` only swap their local paths for it.
+- Icon candidates: `scripts/desktop-icons.ts` builds tray and app icons from the mark geometry and tokens, `pnpm icon-sheet <dir>` renders every frame and the comparison sheets; nothing committed as an app or tray asset until the design answer.
+  Tray "tile" (recommended): accent tile with the paper glyph (the favicon), three paper bars while recording, a quiet neutral tile with an amber badge for attention (its "!" from 24 px up); every tile is at least 3.4:1 against both taskbars.
+  Tray "glyph": the bare mark in accent 500 (3.05:1 on the light taskbar, faint at 16 px).
+  App icon "accent" (the brand icon, recommended) and "ink" (disappears on a dark taskbar). Dev variant: a light-blue corner on every icon.
+- `apps/desktop` imports `@take-my-word/brand/index.css` (fonts bundled by Vite, nothing from the network); styles split into token-only `styles/base.css`, `account.css`, `settings.css`, `overlay.css`.
+- Theme: `theme` in `settings.json` (absent means Windows), `theme` and `set_theme` commands, `AppHandle::set_theme` at start and on change (native title bars and WebView2's color scheme), a `theme` event every view applies through `Root` (was `LanguageRoot`), and `&theme=` in new windows' URLs for the first paint; the overlay is always `data-theme="light"` so the pill stays ink.
+- Restyled: sign-in and choose password (wordmark, Fraunces heading, brand fields and button, fits 440x560 in every state), the Settings shell (wordmark, icon nav, section header like the web's) and General (shortcut, autostart toggle, theme, app language, dictation languages, About with wordmark, tagline, version and Quit); `overview` now returns the version.
+- Overlay on `OverlayPill` with `indicator="state"`, 9-level history, click to dismiss, the microphone link as the action; a hairline `neutral-800` edge (desktop only) keeps the ink pill visible over dark apps.
+- `desktop-ci` now watches `packages/brand/**`.
+- Screenshot script: real window sizes, both themes at every size, an optional name-prefix filter, and a failure when a fixed-size window would need to scroll.
+
+Tests: the desktop token lint (`src/token-lint.test.ts`), Root theme and language, theme and About in Settings, config round trip of `theme`, `theme::query`, brand history mode, action slot and state indicator.
+0008 tests changed only in selectors: the autostart toggle reads `aria-checked` (brand switch is a button), the overlay level bars read `--level` on `.waveform-bar`, and the quota alert lost the "!" character now drawn as a glyph.
+
+Web unchanged: `pnpm screenshots` gallery and pages, before (`origin/develop`) and after, 312 shots each: 282 byte-identical; the other 30 (every history page, the dialog) differ the same way between two runs of the baseline itself (relative times, the dialog's entrance frame), so none comes from this change.
+
+Pending (round 2, after the design answer): the remaining windows (onboarding, first run, update, the editors, history, Account section), `styles/legacy.css` (the old rules mapped to tokens, the only file the desktop token lint still exempts) deleted, the chosen icons generated as committed assets and wired (tray state transitions in Rust with tooltips, dev variants, installer and uninstall icons), voice rewrite of notifications and tray copy, PrintWindow evidence on Windows, Acceptance 6 measurements, the real-dictation smoke.
+
+Deferred:
+
+- The web screenshot script is nondeterministic on history (relative times from `Date.now`) and the dialog (entrance animation); worth pinning the clock and settling the dialog in a web task.
+
+Decisions not in the plan:
+
+- `OverlayPill` error uses `role="alert"` (was `status`); no web test or screenshot depends on it.
+- Theme labels say "Windows" for the system option, like the app-language row, rather than the web's "System".
+- Web `verify` steps `integration` and `e2e` not run: they create throwaway dev users beyond this task's clearance and test the deployed dev web, not this diff.
+
+### Round 1 finding
+
+verify re-run on `0eefd42` after the commit, every artefact newer than it; the blocks went in `6ba36b9`, which touches only `verify.log`.
+From round 2 on, verify runs on the round's commit and its blocks go in a follow-up commit that touches only `verify.log`.
+
+### Round 2
+
+Screenshots: `.workspaces/0011_desktop_rebrand/screenshots/round-2/` with `windows/` (464 shots: every window and state at its real size, es and en, light and dark, now with loading states), `icons/` (`tray-sheet.png`, `app-icon-sheet.png`) and `pairs/` (sign-in, General, dictionary and history next to the web at 1280).
+
+Did:
+
+- Icons per the design answer: only the tile tray set and the accent app icon remain in `packages/brand/scripts/desktop-icons.ts`; the dev mark is a solid light-blue diagonal with 28-unit legs (7 px at 16 px), the largest that clears the glyph's tall bar, on tray and app icons.
+  `pnpm desktop-assets` in `packages/brand` writes them, committed: `apps/desktop/src-tauri/icons/` (prd) and `icons/dev/` (dev), each with `icon.ico` (16 to 256), the bundle PNGs and `tray/{idle,recording,attention}-{16,20,24,32}.png`; `tauri.conf.json` (dev, the base) and `tauri.prd.conf.json` point at their set, so installers and the uninstall entry carry the right icon.
+  The stale `icon.svg` and `icon.icns` (old design, macOS out of scope) are gone.
+- Tray states in Rust (`tray.rs`): `status(signed_in, microphone, listening)` gives recording only while Listening, attention when signed out or the microphone is blocked or missing (in that order), idle otherwise, transient microphone trouble stays idle; the frame matches the display scale (16, 20, 24 or 32 px); the tooltip is the product name and the state in the app language, relabeled on a language switch.
+  The session sink reports Listening, the account change reports sign-in, and `MicrophoneStatus` now reports each change to one listener.
+  `tauri` gains the `image-png` feature for the frames.
+- Account window: sign-in and choose password share 440x544 (fits their tallest state, choose password with an error, in both languages); onboarding is 600 wide with styles in two columns and is fitted to its content through `fit_account` (a `ResizeObserver` in `WindowPage`), clamped to the screen's work area, so it never scrolls on a normal screen; the account view asks for the fixed size whenever it leaves onboarding.
+  Every window size now lives in `src/windows.json`, read by Rust and by the screenshot script; first run is 520x536 and update 460x456 so their blocked-microphone and failed states fit.
+- Restyled the rest: onboarding, first run and update on a shared `WindowPage` (wordmark, display heading), the editors, history and the Account section on brand buttons, inputs and selects, brand `EmptyState` with the waveform for every empty list, `Skeleton` while loading, an error band with its action on failures; `styles/legacy.css` deleted, and the desktop token lint now covers every CSS and TSX file with no exemption.
+- Voice: overlay, notices and tray copy rewritten in both languages (we for the service, what to do next); processing reads "Cleaning up" / "Limpiando" like the web's demo; empty states have a title and an invitation; update title "An update is ready".
+- Screenshot script: loading states (a mocked route can stay pending), onboarding captured at its fitted height, sizes from `windows.json`.
+
+Tests: tray status order, transient microphone, frame per scale, every frame a PNG of its size; microphone status reports each change once; account size for both steps and the screen clamp; the account view fits on screen changes and on onboarding content.
+0008 tests changed only in copy and selectors: empty states read their titles, the update title, processing and unreachable copy.
+
+Web: no file it renders changed this round (`packages/brand` changed only in `scripts/` and `package.json`); its round 1 screenshots still stand and its targets run again.
+
+Pending (round 3): Windows evidence (PrintWindow captures of sign-in, settings and a real hold's overlay in both forced themes, the tray from the dev build), Acceptance 6 measurements, the real-dictation smoke, the release; these need the Windows host under the machine rules, so I will ask for a slot.
+
+Decisions not in the plan:
+
+- Window sizes in one `src/windows.json` shared by Rust and the screenshots, so a screenshot can never show a size the app does not use.
+- Onboarding is content-fitted at run time rather than a fixed size, since its height grows with the user's custom styles.
+- First run grows to 520x536 and update to 460x456 instead of trimming their copy.
+- Tray frames and installer icons are written by a brand script into `apps/desktop/src-tauri/icons`, where Tauri expects them, instead of being referenced across packages.
+
+### Round 3 (round 2 findings and the dev default hotkey)
+
+Screenshots: `.workspaces/0011_desktop_rebrand/screenshots/round-3/` (round 2's set with First run, General and the update window recaptured, plus `first-run-ready-dev` and `settings-idle-dev` showing Ctrl+Alt+Win; 480 shots).
+
+Findings:
+
+1. The tray never blocks a hold: `Indicator` only stores state and hands a job to `run_on_main_thread`; the live reads, the compare-and-set of `shown`, the display scale and `set_icon`/`set_tooltip` all run inside that main-thread job, so no lock is held across a round trip and `set_ui_language` (main thread) only queues.
+   `show_signed_in` queues its menu label too; `relabel` already runs on the main thread and queues a forced repaint.
+   Tested through the indicator's two ports (a fake dispatcher that only queues, a fake painter): a hold's start and end paint nothing until the queued jobs run.
+2. `Indicator` reads the live account flag and the live `MicrophoneStatus` handle each time it paints; the microphone listener only queues a refresh and is registered in `tray::build` before the first paint, so a status recorded during startup is never lost (tested: a change after the indicator exists shows on the next paint).
+3. `fit_account` and the new `fit_update` take `recenter`: the view sends it only on its first fit (and on the step change back to sign-in); later fits resize in place and move the window up only as far as needed to stay inside the work area (`top_inside`, tested).
+4. Version strings use `font-variant-numeric: tabular-nums` (`.version`, on About and the update window); "0.1.1" now reads correctly in the screenshots.
+
+Also: the update window is content-fitted per phase like onboarding (`windows.json` `update` is now a width and a minimum height), since a fixed size left a dead lower third in its available state.
+
+Dev default hotkey:
+
+- Each `Environment` in `env.rs` names its default hotkey: dev Ctrl+Alt+Win (left Alt only, as every Alt in a hotkey), prd Ctrl+Win; `Hotkey::default()` is `Hotkey::for_environment(env::CURRENT)`, so debug builds are dev.
+- `settings.json` loading is unchanged: a saved hotkey is kept, an absent one or an invalid file takes the build's default, and nothing rewrites a saved hotkey.
+- First run shows the keys only once the real hotkey has loaded, instead of a hard-coded Ctrl+Win placeholder.
+- The mocked bridge answers `build=dev` with Ctrl+Alt+Win; two shots use it, nothing else is duplicated.
+
+Tests: both environments' defaults in one test (prd Ctrl+Win, dev Ctrl+Alt+Win matching left Alt and not right Alt, and the compiled default following `CURRENT`); a saved Ctrl+Win survives a dev build while a file without a hotkey takes the build's default.
+Test fixtures that meant Ctrl+Win (`chord.rs`, `keys.rs`, the DOM-code mapping, validation and the JSON round trip) now say `Hotkey::ctrl_win()` instead of the build default; no assertion changed.
+
+Pending (round 4): the Windows evidence, Acceptance 6 and the real-dictation smoke, once the reviewer books the host.
+
+### Round 4 (Windows evidence)
+
+Run on `afd37cc`, Windows 11 at 125% display scale, 2026-10-21 23:05 to 23:34 local, signed in as crew-e2e-b (dev), within the om-manager's slot and go.
+Evidence: `.workspaces/0011_desktop_rebrand/screenshots/round-4/windows-host/` (PrintWindow captures of the dev debug build, `app.log`, `measure.txt`); the mocked set from round 3 is copied beside it.
+
+Guard: a low-level hook watcher logged every input event's kind and injected flag only (no key codes); every step checked it first (no real keyboard event, never more than 3 real events in 30 s). Over the whole run it saw 0 real events and 36 injected key events, all the run's own.
+
+Captures (real WebView2, bundled fonts, native title bar following the theme):
+
+- Light: sign-in, onboarding at its fitted 600 px width with no scroll, first run, Settings › General showing Ctrl + Alt + Win with Claro selected, the overlay during a real hold.
+- Dark: Settings › General (dark title bar and scrollbar), the overlay during a real hold, Settings › Account after signing out, sign-in.
+- Overlay: `overlay-hold-light-session-23-13-31.png` and `overlay-hold-dark-session-23-19-12.png`, each taken 0.7 s into its own hold (holds ended 23:13:33 and 23:19:13 in the app log).
+  The two files are byte-identical because the pill drew the same pixels at that instant: the ink pill (forced light in both sessions), "Escuchando", and flat bars, since no sound had arrived yet.
+  They do not show the sound the dark-session hold picked up later.
+
+Real hold (Acceptance 7): Ctrl + Alt + Win held 2.5 s with `tmw-scratch.exe` in front.
+The light-session hold returned no text and pasted nothing.
+The dark-session hold picked up room sound after the overlay capture and pasted it into `tmw-scratch.exe` with Ctrl+V: `clipboard read by tmw-scratch.exe (with a window): rendered`, then `pasted a dictation`.
+The scratch window kept the foreground both times.
+
+Launches and consoles (machine rule breach, reported by the om-reviewer): the debug build is a console-subsystem exe, so every launch of it that was not started with `CreateNoWindow` created a console, which Windows 11 hosts in Windows Terminal, Sebastian's terminal on this machine.
+Times are local (the app log is UTC, +5 h).
+
+| Time | Launch | Method | Console |
+|---|---|---|---|
+| 23:10 | debug app, light session | `Start-Process` | yes, a Windows Terminal tab while the app ran |
+| 23:12 | second instance, open Settings | `Start-Process` | yes, briefly |
+| 23:13:53 | smoke 1, `--dictate-wav` | `Start-Process` | yes, took the foreground: the app targeted `windowsterminal.exe` and refused the paste (`FocusChanged`), notification 1 |
+| 23:15:04 | smoke 2, `--dictate-wav` | `Start-Process` from a hidden PowerShell | yes, took the foreground: same refusal, notification 2 |
+| 23:15:49, 23:16:30 | smoke 3 and 4 | `CreateNoWindow` | none |
+| 23:18 | debug app, dark session | `Start-Process -WindowStyle Hidden` | a console was created; whether Windows Terminal hosted it is not known |
+| 23:18 | second instance, open Settings | `CreateNoWindow` | none |
+| 23:32 | debug app, sign-out | `Start-Process -WindowStyle Hidden`, second instance `CreateNoWindow` | as at 23:18 |
+
+The helper PowerShells for the smoke and the measurements (`Start-Process powershell -WindowStyle Hidden`) are console processes too and may also have opened Windows Terminal tabs.
+The release builds measured for Acceptance 6 are GUI-subsystem and open no console.
+Every console closed when its process ended; none is open now.
+Smoke 1 and 2 ran while a console had taken the foreground.
+The light-session real hold (23:13) and the dark-session real hold (23:19) each ran with `tmw-scratch.exe` verified in front just before the keys went down.
+
+Acceptance 7 evidence is only the dark-session hold's paste, which landed in `tmw-scratch.exe` (read by `tmw-scratch.exe` with a window, 29 characters added); smoke 1 to 4 do not count.
+
+`--dictate-wav` smoke: the speech fixture went through upload and transcription four times (four history items), but nothing landed in the scratch window.
+The first two launches targeted `windowsterminal.exe`, because the debug build's console opens in Windows Terminal and briefly takes the foreground; the app refused them (`FocusChanged`) and left the text in the clipboard.
+Launched with no console, the next two targeted `tmw-scratch.exe` and the app sent Ctrl+V (watcher: four injected keys), but a windowless reader (pid 0) read the delayed-rendered text first and counted as the target, so the clipboard was restored before the scratch window read it.
+This is the debt already recorded in `desktop/ard.md` ("a reader that opens the clipboard without a window … still gets the text and counts as the target"); the paste code is unchanged by this task, and a control Ctrl+V of my own into the same window landed.
+
+Acceptance 6 (0008's method, dev release builds, same session, signed in on runs that do not follow a sign-in, first run done):
+
+| Build | Private working set 30 s after closing settings | After 5 idle minutes | CPU over 5 idle minutes |
+|---|---|---|---|
+| base `481f2d4` | 25.5 MB | 34.6 MB | 0.11 s |
+| final `afd37cc` | 22.1 MB | 39.6 MB | 0.38 s |
+
+Both readings stay within base + 10 MB, and CPU within base + 1.0 s; app plus WebView2, 7 processes each. The final release binary is 6.31 MB against 6.03 MB (fonts, icons and the PNG decoder).
+
+crew-e2e-b, saved before the first dictation and restored after (API answers):
+
+- Before: `GET /me/settings` 200 with `{defaultStyleId, locale, dictationLanguages(1), providers{transcriber, refiner}}`, `GET /app-rules` 200 with 0 rules, 0 dictations.
+- Restore: five `DELETE /dictations/{id}` 204 (four smoke dictations, one from the dark-session hold); no rule had been created; `PUT /me/settings` 200 with the saved body.
+- After: settings equal, rules equal, dictations equal (0).
+- Signed out from the app (Settings › Account › Cerrar sesión), which forgets the device and revokes the token.
+
+Machine, after: the dev config and data folders the run created removed, no Credential Manager target for the app, no autostart entry, the prd config folder from 0005 untouched, the clipboard empty as before, every window and process the run opened closed.
+
+Also in this round: the WebView2 scrollbar takes `--color-border-strong` on a transparent track (`base.css`), since the real windows showed the default grey one in light.
+
+Deferred: the windowless-reader paste debt now has a reproduction on this machine (a pid-0 reader after `msrdc.exe` on both no-console smoke pastes); counting only reads after the keystroke would avoid it, a paste behavior change outside this task.
+
+### Round 5
+
+Finding 1: the two overlay captures are not a copy. They were written at 23:13:31.862 and 23:19:12.109, each 0.7 s into its own hold, and are byte-identical because the pill drew the same pixels at that moment (flat bars, same label, forced light). They are now named by hold and time, and the round 4 notes say what they show: flat bars at 0.7 s, not the sound the dark-session hold picked up later.
