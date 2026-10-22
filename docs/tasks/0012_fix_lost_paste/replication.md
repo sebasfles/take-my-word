@@ -26,3 +26,12 @@ Windows 11 host of Sebastian, WebView2, dev debug build, 0011 branch at afd37cc.
 ## Evidence
 
 `.workspaces/0012_fix_lost_paste/evidence/app.log` (copied from 0011's Windows run, with that run's scripts in `evidence/windows-run-0011/`); `docs/modules/desktop/ard.md`, entry "The paste gives the text only to the target's processes", revisit trigger marked met.
+
+## om-developer confirmation
+
+2026-10-22, base build `develop` at f6f4acb (debug, dev), Windows 11 host with WSLg up, signed in as crew-e2e-b, launched with no console.
+Reproduced on the first set of tries: 4 of 5 `--dictate-wav` pastes into the run's `tmw-scratch.exe` were reported pasted while nothing landed and the previous clipboard came back.
+Each of the four logged, within the same second: `clipboard read by msrdc.exe (with a window): withheld`, `clipboard read by an unidentified reader (without a window): rendered`, `pasted a dictation`.
+The fifth had no `msrdc.exe` read; the scratch window read with its own window and the text landed.
+The windowless reader is `Wispr Flow.exe` (another dictation app on the host): Wait Chain Traversal found its thread blocked sending the render request to the clipboard owner, and it reads only after a Ctrl+V, never on a clipboard update alone.
+Logs: `.workspaces/0012_fix_lost_paste/evidence/windows-run-0012-host/run1/replicate.out` and `probe1.out`.

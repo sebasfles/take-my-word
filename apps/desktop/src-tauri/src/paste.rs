@@ -4,9 +4,11 @@ use std::time::{Duration, Instant};
 use enigo::{Direction, Enigo, Keyboard, Settings};
 
 use crate::api::PasteKeystroke;
-use crate::clipboard::Clipboard;
+use crate::clipboard::{Clipboard, ReadWait, Settle};
 use crate::foreground::ActiveWindow;
 use crate::hotkey::OWN_INJECTION_TAG;
+
+const ATTEMPTS: u32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PasteResult {
@@ -38,7 +40,7 @@ pub struct Timing {
     pub release_timeout: Duration,
     pub read_timeout: Duration,
     pub read_grace: Duration,
-    pub early_read_wait: Duration,
+    pub settle: Settle,
 }
 
 impl Default for Timing {
@@ -48,7 +50,7 @@ impl Default for Timing {
             release_timeout: Duration::from_secs(30),
             read_timeout: Duration::from_millis(1500),
             read_grace: Duration::from_millis(150),
-            early_read_wait: Duration::from_millis(500),
+            settle: Settle::default(),
         }
     }
 }
@@ -68,31 +70,55 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
         target: Option<isize>,
         keystroke: PasteKeystroke,
     ) -> PasteResult {
-        if !self.wait_for_release() {
-            return self.leave(text, Undelivered::KeysHeld);
-        }
-        let foreground = self.window.foreground();
-        if foreground.window != target {
-            return self.leave(text, Undelivered::FocusChanged);
-        }
-        if foreground.elevated {
-            return self.leave(text, Undelivered::Elevated);
+        if let Some(reason) = self.blocked(target) {
+            return self.leave(text, reason);
         }
         let readers = target.map_or_else(Vec::new, |window| self.window.reader_processes(window));
         if let Err(error) = self.clipboard.offer(text, &readers) {
             log::warn!("{error}");
             return PasteResult::Failed;
         }
-        let sent = Instant::now();
-        if let Err(error) = self.keystroke.paste(keystroke) {
-            log::warn!("the paste keystroke failed: {error}");
-            return self.keep();
+        let settled = self.clipboard.settle(self.timing.settle);
+        log::info!(
+            "offered the dictation to {} target processes, settled {} ms",
+            readers.len(),
+            settled.as_millis()
+        );
+        let mut attempt = 1;
+        loop {
+            self.clipboard.arm(attempt);
+            if let Err(error) = self.keystroke.paste(keystroke) {
+                log::warn!("the paste keystroke failed: {error}");
+                return self.keep(Undelivered::NotRead);
+            }
+            log::info!("sent the paste keystroke, attempt {attempt}");
+            match self.clipboard.wait_for_read(self.timing.read_timeout) {
+                ReadWait::Counted => break,
+                ReadWait::Contended if attempt < ATTEMPTS => {
+                    let settled = self.clipboard.settle(self.timing.settle);
+                    if let Some(reason) = self.blocked(target) {
+                        return self.keep(reason);
+                    }
+                    log::info!(
+                        "attempt {attempt} was contended, settled {} ms before the next",
+                        settled.as_millis()
+                    );
+                    attempt += 1;
+                }
+                ReadWait::Contended | ReadWait::Nothing => return self.keep(Undelivered::NotRead),
+            }
         }
-        match self.clipboard.wait_for_read(self.timing.read_timeout) {
-            Some(read) if read >= sent => thread::sleep(self.timing.read_grace),
-            Some(_) => thread::sleep(self.timing.early_read_wait),
-            None => return self.keep(),
-        }
+        let settle = Settle::after_the_read(self.timing.read_grace);
+        let waited = self.clipboard.settle(settle);
+        log::info!(
+            "restoring {} ms after the counted read, {}",
+            waited.as_millis(),
+            if waited >= settle.at_most {
+                "at the cap with readers still active"
+            } else {
+                "after the readers went quiet"
+            }
+        );
         match self.clipboard.restore() {
             Ok(()) => PasteResult::Pasted,
             Err(error) => {
@@ -100,6 +126,17 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
                 PasteResult::PastedClipboardLost
             }
         }
+    }
+
+    fn blocked(&self, target: Option<isize>) -> Option<Undelivered> {
+        if !self.wait_for_release() {
+            return Some(Undelivered::KeysHeld);
+        }
+        let foreground = self.window.foreground();
+        if foreground.window != target {
+            return Some(Undelivered::FocusChanged);
+        }
+        foreground.elevated.then_some(Undelivered::Elevated)
     }
 
     fn wait_for_release(&self) -> bool {
@@ -123,9 +160,9 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
         }
     }
 
-    fn keep(&mut self) -> PasteResult {
+    fn keep(&mut self, reason: Undelivered) -> PasteResult {
         match self.clipboard.keep_text() {
-            Ok(()) => PasteResult::LeftInClipboard(Undelivered::NotRead),
+            Ok(()) => PasteResult::LeftInClipboard(reason),
             Err(error) => {
                 log::warn!("{error}");
                 PasteResult::Failed
@@ -193,6 +230,7 @@ fn keys(keystroke: PasteKeystroke) -> (&'static [enigo::Key], enigo::Key) {
 #[cfg(test)]
 mod tests {
     use std::cell::{Cell, RefCell};
+    use std::collections::VecDeque;
     use std::rc::Rc;
 
     use super::*;
@@ -202,7 +240,9 @@ mod tests {
     #[derive(Default)]
     struct World {
         log: Vec<String>,
-        read_at: Option<Instant>,
+        reads: VecDeque<ReadWait>,
+        keystrokes: u32,
+        focus_moves_after_keystroke: bool,
         keystroke_fails: bool,
         offer_fails: bool,
         restore_fails: bool,
@@ -226,8 +266,20 @@ mod tests {
             Ok(())
         }
 
-        fn wait_for_read(&mut self, _timeout: Duration) -> Option<Instant> {
-            self.0.borrow().read_at
+        fn settle(&mut self, _settle: Settle) -> Duration {
+            self.0.borrow_mut().log.push("settle".into());
+            Duration::ZERO
+        }
+
+        fn arm(&mut self, attempt: u32) {
+            self.0.borrow_mut().log.push(format!("arm {attempt}"));
+        }
+
+        fn wait_for_read(&mut self, _timeout: Duration) -> ReadWait {
+            let read = self.0.borrow_mut().reads.pop_front();
+            let read = read.unwrap_or(ReadWait::Nothing);
+            self.0.borrow_mut().log.push(format!("{read:?}"));
+            read
         }
 
         fn restore(&mut self) -> Result<(), ClipboardError> {
@@ -259,9 +311,7 @@ mod tests {
             if world.keystroke_fails {
                 return Err("blocked".into());
             }
-            if world.read_at.is_none_or(|read| read > Instant::now()) {
-                world.read_at = world.read_at.map(|_| Instant::now());
-            }
+            world.keystrokes += 1;
             Ok(())
         }
     }
@@ -270,8 +320,11 @@ mod tests {
 
     impl ActiveWindow for FakeWindow {
         fn foreground(&self) -> ForegroundApp {
+            let world = self.0.borrow();
+            let moved =
+                world.focus_moved || (world.focus_moves_after_keystroke && world.keystrokes > 0);
             ForegroundApp {
-                window: Some(if self.0.borrow().focus_moved { 2 } else { 1 }),
+                window: Some(if moved { 2 } else { 1 }),
                 app_id: Some("notepad.exe".into()),
                 elevated: self.0.borrow().elevated,
             }
@@ -309,7 +362,7 @@ mod tests {
                 release_timeout: Duration::from_secs(1),
                 read_timeout: Duration::ZERO,
                 read_grace: Duration::ZERO,
-                early_read_wait: Duration::ZERO,
+                settle: Settle::default(),
             },
         }
     }
@@ -321,7 +374,7 @@ mod tests {
     }
 
     fn will_be_read(world: &mut World) {
-        world.read_at = Some(Instant::now() + Duration::from_secs(3600));
+        world.reads = VecDeque::from([ReadWait::Counted]);
     }
 
     #[test]
@@ -331,7 +384,18 @@ mod tests {
             paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::Pasted
         );
-        assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
+        assert_eq!(
+            world.borrow().log,
+            vec![
+                "offer hola",
+                "settle",
+                "arm 1",
+                "ctrl+v",
+                "Counted",
+                "settle",
+                "restore"
+            ]
+        );
     }
 
     #[test]
@@ -348,7 +412,15 @@ mod tests {
         assert_eq!(pasted, PasteResult::Pasted);
         assert_eq!(
             world.borrow().log,
-            vec!["offer hola", "shift+insert", "restore"]
+            vec![
+                "offer hola",
+                "settle",
+                "arm 1",
+                "shift+insert",
+                "Counted",
+                "settle",
+                "restore"
+            ]
         );
     }
 
@@ -371,18 +443,19 @@ mod tests {
         );
         assert_eq!(
             world.borrow().log,
-            vec!["held", "held", "held", "offer hola", "ctrl+v", "restore"]
+            vec![
+                "held",
+                "held",
+                "held",
+                "offer hola",
+                "settle",
+                "arm 1",
+                "ctrl+v",
+                "Counted",
+                "settle",
+                "restore"
+            ]
         );
-    }
-
-    #[test]
-    fn a_read_before_the_keystroke_still_restores_after_a_safety_wait() {
-        let world = world(|world| world.read_at = Some(Instant::now() - Duration::from_secs(1)));
-        assert_eq!(
-            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
-            PasteResult::Pasted
-        );
-        assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
     }
 
     #[test]
@@ -392,7 +465,64 @@ mod tests {
             paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::LeftInClipboard(Undelivered::NotRead)
         );
-        assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "keep"]);
+        assert_eq!(
+            world.borrow().log,
+            vec!["offer hola", "settle", "arm 1", "ctrl+v", "Nothing", "keep"]
+        );
+    }
+
+    #[test]
+    fn a_contended_first_keystroke_is_retried_once_and_the_second_can_land() {
+        let world = world(|world| {
+            world.reads = VecDeque::from([ReadWait::Contended, ReadWait::Counted]);
+        });
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::Pasted
+        );
+        assert_eq!(
+            world.borrow().log,
+            vec![
+                "offer hola",
+                "settle",
+                "arm 1",
+                "ctrl+v",
+                "Contended",
+                "settle",
+                "arm 2",
+                "ctrl+v",
+                "Counted",
+                "settle",
+                "restore"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_second_contention_leaves_the_text_without_a_third_keystroke() {
+        let world = world(|world| {
+            world.reads = VecDeque::from([ReadWait::Contended, ReadWait::Contended]);
+        });
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::LeftInClipboard(Undelivered::NotRead)
+        );
+        assert_eq!(world.borrow().keystrokes, 2);
+        assert_eq!(world.borrow().log.last().map(String::as_str), Some("keep"));
+    }
+
+    #[test]
+    fn focus_lost_before_the_retry_keeps_the_text_without_a_second_keystroke() {
+        let world = world(|world| {
+            world.reads = VecDeque::from([ReadWait::Contended, ReadWait::Counted]);
+            world.focus_moves_after_keystroke = true;
+        });
+        assert_eq!(
+            paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
+            PasteResult::LeftInClipboard(Undelivered::FocusChanged)
+        );
+        assert_eq!(world.borrow().keystrokes, 1);
+        assert_eq!(world.borrow().log.last().map(String::as_str), Some("keep"));
     }
 
     #[test]
@@ -402,7 +532,10 @@ mod tests {
             paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::LeftInClipboard(Undelivered::NotRead)
         );
-        assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "keep"]);
+        assert_eq!(
+            world.borrow().log,
+            vec!["offer hola", "settle", "arm 1", "ctrl+v", "keep"]
+        );
     }
 
     #[test]
@@ -438,7 +571,18 @@ mod tests {
             paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV),
             PasteResult::PastedClipboardLost
         );
-        assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
+        assert_eq!(
+            world.borrow().log,
+            vec![
+                "offer hola",
+                "settle",
+                "arm 1",
+                "ctrl+v",
+                "Counted",
+                "settle",
+                "restore"
+            ]
+        );
     }
 
     #[test]

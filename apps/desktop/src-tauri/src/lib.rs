@@ -47,6 +47,21 @@ pub fn run() {
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
+                .format(|out, message, record| {
+                    let now = time::OffsetDateTime::now_utc();
+                    out.finish(format_args!(
+                        "[{}-{:02}-{:02}][{:02}:{:02}:{:02}.{:03}][{}][{}] {message}",
+                        now.year(),
+                        u8::from(now.month()),
+                        now.day(),
+                        now.hour(),
+                        now.minute(),
+                        now.second(),
+                        now.millisecond(),
+                        record.target(),
+                        record.level()
+                    ));
+                })
                 .build(),
         )
         .plugin(tauri_plugin_autostart::Builder::new().build())
