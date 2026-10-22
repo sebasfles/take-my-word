@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use tauri::image::Image;
 use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 
 use crate::audio::{MicStatus, MicrophoneStatus};
 use crate::i18n::{Message, text};
@@ -265,7 +265,12 @@ pub fn build(
         on_main_thread(app),
     ));
     let listener = app.clone();
-    microphone.on_change(move |_| refresh(&listener, false));
+    microphone.on_change(move |status| {
+        refresh(&listener, false);
+        if let Err(error) = listener.emit("microphone-status", status) {
+            log::warn!("announcing the microphone status failed: {error}");
+        }
+    });
     let settings = MenuItem::with_id(
         app,
         SETTINGS,
@@ -295,7 +300,7 @@ pub fn build(
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
-            SETTINGS => windows::open_settings(app),
+            SETTINGS => windows::open_main(app, ""),
             ADD_WORD => windows::add_word(app),
             ACCOUNT => account::toggle_from_tray(app),
             QUIT => app.exit(0),

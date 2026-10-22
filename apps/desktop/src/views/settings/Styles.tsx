@@ -10,8 +10,7 @@ import { type SubmitEvent, useId, useState } from "react";
 import { api } from "../../api.ts";
 import { apiProblem, type Note, note } from "../../editing.ts";
 import { t } from "../../i18n.ts";
-import { StyleChoices } from "../../StyleChoices.tsx";
-import { styleDescription, styleName } from "../../styleNames.ts";
+import { StyleExamples } from "../../StyleExamples.tsx";
 import { ConfirmDelete, Empty, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
 
 interface Data {
@@ -60,22 +59,6 @@ export function Styles() {
               update((current) => ({ ...current, settings }));
             }}
           />
-
-          <section className="list-section">
-            <h2>{t("styles.builtin")}</h2>
-            <ul className="list">
-              {data.styles
-                .filter((style) => style.builtin)
-                .map((style) => (
-                  <li key={style.id} className="item">
-                    <div className="item-main">
-                      <p className="item-title">{styleName(style)}</p>
-                      <p className="muted">{styleDescription(style)}</p>
-                    </div>
-                  </li>
-                ))}
-            </ul>
-          </section>
 
           <section className="list-section">
             <div className="list-heading">
@@ -170,7 +153,7 @@ function DefaultStyle({
         <h2 className="setting-title">{t("styles.default")}</h2>
         <p className="setting-note">{t("styles.defaultNote")}</p>
       </div>
-      <StyleChoices
+      <StyleExamples
         styles={styles}
         selected={selected}
         onSelect={(id) => {

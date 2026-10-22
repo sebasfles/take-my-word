@@ -26,6 +26,7 @@ pub enum OverlayAction {
 pub enum OverlayState {
     Hidden,
     Listening,
+    HandsFree,
     Processing,
     Error {
         message: Message,
@@ -62,6 +63,16 @@ impl<O: Overlay, N: Notifier> GatedOverlay<O, N> {
         self.inner.set(OverlayState::Listening);
     }
 
+    pub fn hands_free(&self) {
+        let recording = self
+            .recording
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if *recording {
+            self.inner.set(OverlayState::HandsFree);
+        }
+    }
+
     pub fn end_recording(&self) {
         *self
             .recording
@@ -76,7 +87,7 @@ impl<O: Overlay, N: Notifier> Overlay for GatedOverlay<O, N> {
             .recording
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        if !*recording || state == OverlayState::Listening {
+        if !*recording || matches!(state, OverlayState::Listening | OverlayState::HandsFree) {
             self.inner.set(state);
             return;
         }
@@ -134,14 +145,18 @@ impl Overlay for WindowOverlay {
 pub struct Waveform {
     app: AppHandle,
     level: Level,
+    target: &'static str,
+    event: &'static str,
     running: Option<Arc<AtomicBool>>,
 }
 
 impl Waveform {
-    pub fn new(app: AppHandle, level: Level) -> Self {
+    pub fn new(app: AppHandle, level: Level, target: &'static str, event: &'static str) -> Self {
         Self {
             app,
             level,
+            target,
+            event,
             running: None,
         }
     }
@@ -151,11 +166,12 @@ impl Waveform {
         let running = Arc::new(AtomicBool::new(true));
         self.running = Some(Arc::clone(&running));
         let (app, level) = (self.app.clone(), self.level.clone());
+        let (target, event) = (self.target, self.event);
         let spawned = thread::Builder::new()
             .name("waveform".into())
             .spawn(move || {
                 pump(&level, &running, LEVEL_EVERY, |value| {
-                    let _ = app.emit_to(OVERLAY, "overlay-level", value);
+                    let _ = app.emit_to(target, event, value);
                 });
             });
         if let Err(error) = spawned {
@@ -278,6 +294,22 @@ mod tests {
         assert_eq!(
             *seen.overlay.borrow(),
             vec![OverlayState::Listening, OverlayState::Processing]
+        );
+    }
+
+    #[test]
+    fn hands_free_replaces_listening_only_while_the_recording_is_open() {
+        let seen = Seen::default();
+        let overlay = GatedOverlay::new(&seen, &seen);
+        overlay.hands_free();
+        overlay.begin_recording();
+        overlay.hands_free();
+        overlay.set(OverlayState::Processing);
+        overlay.end_recording();
+        overlay.hands_free();
+        assert_eq!(
+            *seen.overlay.borrow(),
+            vec![OverlayState::Listening, OverlayState::HandsFree]
         );
     }
 

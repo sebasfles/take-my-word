@@ -101,7 +101,7 @@ describe("Styles", () => {
     render(<Styles />);
     const picked = await screen.findByRole("radio", { name: "Client email" });
     expect((picked as HTMLInputElement).checked).toBe(true);
-    const row = screen.getByText("Formal, short.").closest("li") as HTMLElement;
+    const row = within(screen.getByRole("list")).getByRole("listitem");
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
     await vi.waitFor(() => {

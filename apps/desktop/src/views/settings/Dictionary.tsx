@@ -128,38 +128,44 @@ function AddTerm({
 
   return (
     <form className="form card" onSubmit={submit} noValidate>
-      <div className="form-row">
-        <label className="field">
-          <span>{t("dictionary.term")}</span>
-          <input
-            ref={input}
-            className="tmw-input"
-            name="term"
-            autoComplete="off"
-            value={term}
-            onChange={(event) => {
-              setTerm(event.target.value);
-            }}
-          />
-        </label>
+      <div className="field">
+        <label htmlFor={`${id}-term`}>{t("dictionary.term")}</label>
+        <input
+          ref={input}
+          id={`${id}-term`}
+          className="tmw-input"
+          name="term"
+          autoComplete="off"
+          aria-describedby={`${id}-term-hint`}
+          value={term}
+          onChange={(event) => {
+            setTerm(event.target.value);
+          }}
+        />
+        <span id={`${id}-term-hint`} className="hint">
+          {t("dictionary.termHint")}
+        </span>
+      </div>
+      <details className="advanced" open={aliases !== ""}>
+        <summary>{t("dictionary.advanced")}</summary>
         <div className="field">
-          <label htmlFor={`${id}-field`}>{t("dictionary.aliases")}</label>
+          <label htmlFor={`${id}-aliases`}>{t("dictionary.aliases")}</label>
           <input
-            id={`${id}-field`}
+            id={`${id}-aliases`}
             className="tmw-input"
             name="aliases"
             autoComplete="off"
-            aria-describedby={`${id}-hint`}
+            aria-describedby={`${id}-aliases-hint`}
             value={aliases}
             onChange={(event) => {
               setAliases(event.target.value);
             }}
           />
-          <span id={`${id}-hint`} className="hint">
+          <span id={`${id}-aliases-hint`} className="hint">
             {t("dictionary.aliasesHint", { max: dictionaryLimits.aliasesPerTerm })}
           </span>
         </div>
-      </div>
+      </details>
       <ErrorLine message={error} />
       <div className="form-actions">
         <button type="submit" className={buttonClass()} disabled={busy || disabled}>
@@ -214,17 +220,16 @@ function TermRow({
       <div className="item-main">
         <p className="item-title">{term.term}</p>
         {editing === null ? (
-          <p className="chips">
-            {term.aliases.length === 0 ? (
-              <span className="muted">{t("dictionary.noAliases")}</span>
-            ) : (
-              term.aliases.map((alias) => (
+          term.aliases.length > 0 && (
+            <p className="chips">
+              <span className="chips-label">{t("dictionary.soundsLike")}</span>
+              {term.aliases.map((alias) => (
                 <span key={alias} className="chip">
                   {alias}
                 </span>
-              ))
-            )}
-          </p>
+              ))}
+            </p>
+          )
         ) : (
           <form className="inline-form" onSubmit={save} noValidate>
             <input

@@ -4,6 +4,8 @@ import type { Language } from "../i18n.ts";
 import type {
   AccountStep,
   AccountView,
+  AppState,
+  MicStatus,
   Onboarding,
   OverlayState,
   Overview,
@@ -15,7 +17,9 @@ import type {
 export const listeners: {
   overlay?: (state: OverlayState) => void;
   overlayLevel?: (level: number) => void;
-  settingsNavigate?: (query: string) => void;
+  microphoneLevel?: (level: number) => void;
+  microphoneStatus?: (status: MicStatus) => void;
+  mainNavigate?: (query: string) => void;
   uiLanguage?: (language: Language) => void;
   theme?: (theme: Theme | null) => void;
   captureCancelled?: () => void;
@@ -27,12 +31,25 @@ export const pendingUpdate: { view: UpdateView | null } = { view: null };
 
 export const signedIn: AccountView = { signedIn: true, username: "sebastian" };
 
+export const appState: AppState = {
+  signedIn: true,
+  username: "sebastian",
+  firstRunDone: true,
+  onboarded: true,
+  handsFreeNote: false,
+};
+
 export const onboarding: Onboarding = {
   styles: [
-    { id: "plain", name: "Plain", builtin: true },
-    { id: "casual", name: "Casual", builtin: true },
-    { id: "formal", name: "Formal", builtin: true },
-    { id: "c7d1", name: "Client emails", builtin: false },
+    { id: "plain", name: "Plain", prompt: "", builtin: true },
+    { id: "casual", name: "Casual", prompt: "Write casually.", builtin: true },
+    { id: "formal", name: "Formal", prompt: "Write formally.", builtin: true },
+    {
+      id: "c7d1",
+      name: "Client emails",
+      prompt: "Formal address, short sentences and a cordial closing. No emoji.",
+      builtin: false,
+    },
   ],
   selected: "plain",
   dictationLanguages: ["es"],
@@ -67,7 +84,14 @@ export const fakeBridge = {
   setAutostart: vi.fn((enabled: boolean) => Promise.resolve(enabled)),
   openMicrophoneSettings: vi.fn(() => Promise.resolve(undefined)),
   dismissOverlay: vi.fn(() => Promise.resolve(undefined)),
-  finishFirstRun: vi.fn(() => Promise.resolve(undefined)),
+  stopDictation: vi.fn(() => Promise.resolve(undefined)),
+  forwardKey: vi.fn<(code: string, down: boolean) => Promise<undefined>>(() =>
+    Promise.resolve(undefined),
+  ),
+  checkMicrophone: vi.fn<(on: boolean) => Promise<MicStatus>>(() => Promise.resolve("ready")),
+  appState: vi.fn(() => Promise.resolve({ ...appState })),
+  finishOnboarding: vi.fn(() => Promise.resolve(undefined)),
+  dismissHandsFreeNote: vi.fn(() => Promise.resolve(undefined)),
   accountStatus: vi.fn(() => Promise.resolve({ ...signedIn })),
   signIn: vi.fn<(username: string, password: string) => Promise<AccountStep>>(() =>
     Promise.resolve("onboarding"),
@@ -83,9 +107,6 @@ export const fakeBridge = {
   setUiLanguage: vi.fn((choice: Language | null) => Promise.resolve({ ...uiLanguage, choice })),
   theme: vi.fn((): Promise<Theme | null> => Promise.resolve(null)),
   setTheme: vi.fn((choice: Theme | null) => Promise.resolve(choice)),
-  fitAccount: vi.fn<
-    (onboarding: boolean, contentHeight: number, recenter: boolean) => Promise<undefined>
-  >(() => Promise.resolve(undefined)),
   fitUpdate: vi.fn<(contentHeight: number, recenter: boolean) => Promise<undefined>>(() =>
     Promise.resolve(undefined),
   ),
@@ -114,6 +135,14 @@ export const fakeBridge = {
     listeners.overlayLevel = handler;
     return Promise.resolve(() => undefined);
   }),
+  onMicrophoneStatus: vi.fn((handler: (status: MicStatus) => void) => {
+    listeners.microphoneStatus = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onMicrophoneLevel: vi.fn((handler: (level: number) => void) => {
+    listeners.microphoneLevel = handler;
+    return Promise.resolve(() => undefined);
+  }),
   onUiLanguage: vi.fn((handler: (language: Language) => void) => {
     listeners.uiLanguage = handler;
     return Promise.resolve(() => undefined);
@@ -126,8 +155,8 @@ export const fakeBridge = {
     listeners.accountChanged = handler;
     return Promise.resolve(() => undefined);
   }),
-  onSettingsNavigate: vi.fn((handler: (query: string) => void) => {
-    listeners.settingsNavigate = handler;
+  onMainNavigate: vi.fn((handler: (query: string) => void) => {
+    listeners.mainNavigate = handler;
     return Promise.resolve(() => undefined);
   }),
   onHotkeyCaptureCancelled: vi.fn((handler: () => void) => {

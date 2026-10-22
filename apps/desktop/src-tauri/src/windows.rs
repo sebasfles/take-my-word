@@ -2,18 +2,19 @@ use std::sync::LazyLock;
 
 use serde::Deserialize;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
-    WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 
-use crate::i18n::{self, Message};
+use crate::config::Placement;
 use crate::shell::Shell;
 
-pub const SETTINGS: &str = "settings";
-pub const FIRST_RUN: &str = "first-run";
-pub const ACCOUNT: &str = "account";
+pub const MAIN: &str = "main";
 pub const OVERLAY: &str = "overlay";
 pub const UPDATE: &str = "update";
+
+const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection \
+                            --force-prefers-no-reduced-motion";
 
 pub fn product_name(app: &AppHandle) -> String {
     app.config()
@@ -27,10 +28,15 @@ pub fn product_name(app: &AppHandle) -> String {
 struct Size {
     width: f64,
     height: f64,
-    #[serde(default)]
-    min_width: Option<f64>,
-    #[serde(default)]
-    min_height: Option<f64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Resizable {
+    width: f64,
+    height: f64,
+    min_width: f64,
+    min_height: f64,
 }
 
 #[derive(Deserialize)]
@@ -43,10 +49,7 @@ struct Fitted {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Sizes {
-    settings: Size,
-    account: Size,
-    onboarding: Fitted,
-    first_run: Size,
+    main: Resizable,
     update: Fitted,
     overlay: Size,
 }
@@ -66,15 +69,7 @@ fn fitted_size(fitted: &Fitted, content_height: f64, available_height: f64) -> (
     (fitted.width, height)
 }
 
-fn account_size(onboarding: bool, content_height: f64, available_height: f64) -> (f64, f64) {
-    if onboarding {
-        fitted_size(&SIZES.onboarding, content_height, available_height)
-    } else {
-        (SIZES.account.width, SIZES.account.height)
-    }
-}
-
-fn available_height(window: &tauri::WebviewWindow) -> f64 {
+fn available_height(window: &WebviewWindow) -> f64 {
     window
         .current_monitor()
         .ok()
@@ -89,7 +84,7 @@ fn top_inside(top: i32, height: u32, area_top: i32, area_height: u32) -> i32 {
     top.min(area_bottom - height as i32).max(area_top)
 }
 
-fn keep_inside(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+fn keep_inside(window: &WebviewWindow) -> tauri::Result<()> {
     let (Some(monitor), position, size) = (
         window.current_monitor()?,
         window.outer_position()?,
@@ -125,114 +120,152 @@ pub fn fit_update(app: AppHandle, content_height: f64, recenter: bool) {
     }
 }
 
-#[tauri::command]
-pub fn fit_account(app: AppHandle, onboarding: bool, content_height: f64, recenter: bool) {
-    let Some(window) = app.get_webview_window(ACCOUNT) else {
-        return;
-    };
-    let (width, height) = account_size(onboarding, content_height, available_height(&window));
-    let resized = window
-        .set_size(LogicalSize::new(width, height))
-        .and_then(|()| {
-            if recenter {
-                window.center()
-            } else {
-                keep_inside(&window)
-            }
-        });
-    if let Err(error) = resized {
-        log::warn!("fitting the account window failed: {error}");
-    }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Area {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
 }
 
-const ADD_WORD: &str = "&section=dictionary&focus=add";
+const VISIBLE_GRIP: i32 = 64;
+
+fn on_some_screen(placement: &Placement, areas: &[Area]) -> bool {
+    areas.iter().any(|area| {
+        let left = placement.x.max(area.x);
+        let right = (placement.x + placement.width as i32).min(area.x + area.width);
+        let top_visible = placement.y >= area.y && placement.y < area.y + area.height;
+        top_visible && right - left >= VISIBLE_GRIP
+    })
+}
+
+fn logical_areas(app: &AppHandle) -> Vec<Area> {
+    app.available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|monitor| {
+            let scale = monitor.scale_factor();
+            let area = monitor.work_area();
+            let logical = |value: f64| (value / scale).round() as i32;
+            Area {
+                x: logical(f64::from(area.position.x)),
+                y: logical(f64::from(area.position.y)),
+                width: logical(f64::from(area.size.width)),
+                height: logical(f64::from(area.size.height)),
+            }
+        })
+        .collect()
+}
+
+fn placement_of(window: &WebviewWindow) -> Option<Placement> {
+    let scale = window.scale_factor().ok()?;
+    let position = window.outer_position().ok()?.to_logical::<f64>(scale);
+    let size = window.inner_size().ok()?.to_logical::<f64>(scale);
+    Some(Placement {
+        x: position.x.round() as i32,
+        y: position.y.round() as i32,
+        width: size.width.round() as u32,
+        height: size.height.round() as u32,
+        maximized: false,
+    })
+}
+
+fn remember(window: &WebviewWindow, shell: &Shell) {
+    let maximized = window.is_maximized().unwrap_or(false);
+    let minimized = window.is_minimized().unwrap_or(false);
+    if minimized {
+        return;
+    }
+    let normal = if maximized {
+        None
+    } else {
+        placement_of(window)
+    };
+    shell.remember_main_window(normal, maximized);
+}
 
 pub fn add_word(app: &AppHandle) {
-    if app.get_webview_window(SETTINGS).is_some()
-        && let Err(error) = app.emit_to(SETTINGS, "settings-navigate", ADD_WORD)
-    {
-        log::warn!("moving settings to the dictionary failed: {error}");
-    }
-    open_settings_with(app, ADD_WORD);
+    open_main(app, "&section=dictionary&focus=add");
 }
 
-pub fn open_settings(app: &AppHandle) {
-    open_settings_with(app, "");
-}
-
-fn open_settings_with(app: &AppHandle, query: &str) {
-    let Some(window) = open(app, SETTINGS, query, &product_name(app), SIZES.settings) else {
+pub fn open_main(app: &AppHandle, query: &str) {
+    if let Some(window) = app.get_webview_window(MAIN) {
+        if !query.is_empty()
+            && let Err(error) = app.emit_to(MAIN, "main-navigate", query)
+        {
+            log::warn!("moving the main window failed: {error}");
+        }
+        bring_to_front(&window);
         return;
+    }
+    let shell = app.state::<Shell>();
+    let saved = shell
+        .settings()
+        .main_window
+        .filter(|placement| on_some_screen(placement, &logical_areas(app)));
+    let url = WebviewUrl::App(view_url(MAIN, query).into());
+    let main = &SIZES.main;
+    let mut builder = WebviewWindowBuilder::new(app, MAIN, url)
+        .title(product_name(app))
+        .additional_browser_args(BROWSER_ARGS)
+        .min_inner_size(main.min_width, main.min_height)
+        .resizable(true)
+        .maximizable(true);
+    builder = match saved {
+        Some(placement) => builder
+            .inner_size(
+                f64::from(placement.width.max(main.min_width as u32)),
+                f64::from(placement.height.max(main.min_height as u32)),
+            )
+            .position(f64::from(placement.x), f64::from(placement.y))
+            .maximized(placement.maximized),
+        None => builder
+            .inner_size(main.width, main.height)
+            .center()
+            .maximized(true),
     };
+    let window = match builder.build() {
+        Ok(window) => window,
+        Err(error) => {
+            log::error!("opening the main window failed: {error}");
+            return;
+        }
+    };
+    bring_to_front(&window);
     let app = app.clone();
+    let tracked = window.clone();
     window.on_window_event(move |event| {
         let shell = app.state::<Shell>();
-        let cancelled = match event {
-            WindowEvent::Focused(false) => shell.cancel_capture_if_unfocused(),
-            WindowEvent::Destroyed => shell.cancel_capture(),
-            _ => false,
-        };
-        if cancelled {
-            crate::shell::capture_cancelled(&app);
+        match event {
+            WindowEvent::Resized(_) | WindowEvent::Moved(_) => remember(&tracked, &shell),
+            WindowEvent::CloseRequested { .. } => {
+                remember(&tracked, &shell);
+                shell.save_main_window();
+            }
+            WindowEvent::Focused(false) => {
+                if shell.cancel_capture_if_unfocused() {
+                    crate::shell::capture_cancelled(&app);
+                }
+            }
+            WindowEvent::Destroyed => {
+                shell.check_microphone(false);
+                if shell.cancel_capture() {
+                    crate::shell::capture_cancelled(&app);
+                }
+            }
+            _ => {}
         }
     });
 }
 
-pub fn open_first_run(app: &AppHandle) {
-    let _ = open(
-        app,
-        FIRST_RUN,
-        "",
-        i18n::text(Message::FirstRunTitle),
-        SIZES.first_run,
-    );
-}
-
-pub fn retitle(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(FIRST_RUN) {
-        let _ = window.set_title(i18n::text(Message::FirstRunTitle));
+fn bring_to_front(window: &WebviewWindow) {
+    let shown = window
+        .unminimize()
+        .and_then(|()| window.show())
+        .and_then(|()| window.set_focus());
+    if let Err(error) = shown {
+        log::warn!("bringing the main window to the front failed: {error}");
     }
-}
-
-pub fn open_account(app: &AppHandle, onboarding: bool) {
-    let query = if onboarding { "&step=onboarding" } else { "" };
-    let (width, height) = account_size(onboarding, 0.0, f64::MAX);
-    let size = Size {
-        width,
-        height,
-        min_width: None,
-        min_height: None,
-    };
-    let _ = open(app, ACCOUNT, query, &product_name(app), size);
-}
-
-fn open(
-    app: &AppHandle,
-    label: &str,
-    query: &str,
-    title: &str,
-    size: Size,
-) -> Option<tauri::WebviewWindow> {
-    if let Some(window) = app.get_webview_window(label) {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-        return None;
-    }
-    let url = WebviewUrl::App(view_url(label, query).into());
-    let mut builder = WebviewWindowBuilder::new(app, label, url)
-        .title(title)
-        .inner_size(size.width, size.height)
-        .resizable(size.min_width.is_some())
-        .maximizable(size.min_width.is_some())
-        .center();
-    if let (Some(width), Some(height)) = (size.min_width, size.min_height) {
-        builder = builder.min_inner_size(width, height);
-    }
-    let built = builder.build();
-    built
-        .inspect_err(|error| log::error!("opening {label} failed: {error}"))
-        .ok()
 }
 
 pub fn open_update(app: &AppHandle) {
@@ -242,6 +275,7 @@ pub fn open_update(app: &AppHandle) {
     let built =
         WebviewWindowBuilder::new(app, UPDATE, WebviewUrl::App(view_url(UPDATE, "").into()))
             .title(product_name(app))
+            .additional_browser_args(BROWSER_ARGS)
             .inner_size(SIZES.update.width, SIZES.update.min_height)
             .resizable(false)
             .maximizable(false)
@@ -263,7 +297,7 @@ pub fn open_update(app: &AppHandle) {
 }
 
 fn view_url(label: &str, query: &str) -> String {
-    let language = i18n::language().code();
+    let language = crate::i18n::language().code();
     let theme = crate::theme::query();
     format!("index.html?view={label}&lang={language}{theme}{query}")
 }
@@ -271,6 +305,7 @@ fn view_url(label: &str, query: &str) -> String {
 pub fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
     WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App(view_url(OVERLAY, "").into()))
         .title(product_name(app))
+        .additional_browser_args(BROWSER_ARGS)
         .inner_size(SIZES.overlay.width, SIZES.overlay.height)
         .decorations(false)
         .transparent(true)
@@ -292,13 +327,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sign_in_and_choose_password_share_one_size_whatever_their_content() {
-        let fixed = (SIZES.account.width, SIZES.account.height);
-        assert_eq!(account_size(false, 0.0, 1080.0), fixed);
-        assert_eq!(account_size(false, 900.0, 1080.0), fixed);
-    }
-
-    #[test]
     fn the_update_window_fits_each_phase_from_its_minimum() {
         let width = SIZES.update.width;
         assert_eq!(
@@ -318,13 +346,30 @@ mod tests {
     }
 
     #[test]
-    fn onboarding_fits_its_content_within_the_screen() {
-        let width = SIZES.onboarding.width;
-        assert_eq!(account_size(true, 612.3, 1080.0), (width, 613.0));
-        assert_eq!(
-            account_size(true, 10.0, 1080.0),
-            (width, SIZES.onboarding.min_height)
-        );
-        assert_eq!(account_size(true, 2000.0, 1032.0), (width, 984.0));
+    fn a_saved_placement_is_reused_only_while_its_title_bar_is_on_a_screen() {
+        let laptop = Area {
+            x: 0,
+            y: 0,
+            width: 1536,
+            height: 816,
+        };
+        let right = Area {
+            x: 1536,
+            y: 0,
+            width: 1920,
+            height: 1040,
+        };
+        let at = |x, y| Placement {
+            x,
+            y,
+            width: 900,
+            height: 640,
+            maximized: false,
+        };
+        assert!(on_some_screen(&at(100, 80), &[laptop]));
+        assert!(on_some_screen(&at(2000, 80), &[laptop, right]));
+        assert!(!on_some_screen(&at(2000, 80), &[laptop]));
+        assert!(!on_some_screen(&at(100, -200), &[laptop]));
+        assert!(!on_some_screen(&at(1500, 80), &[laptop]));
     }
 }

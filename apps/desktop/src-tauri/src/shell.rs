@@ -14,10 +14,12 @@ use crate::audio::{Microphone, MicrophoneStatus};
 use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
 use crate::clipboard::{self, Clipboard, ClipboardError};
-use crate::config::{self, Settings};
+use crate::config::{self, Placement, Settings};
 use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
-use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
+use crate::hotkey::{
+    self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyEvent, KeyHook, Keys, Side, Source,
+};
 use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverlay};
@@ -45,7 +47,10 @@ pub struct Shell {
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
     keys: Arc<Mutex<Keys>>,
+    keyboard: Arc<dyn KeyHook + Send + Sync>,
     session: mpsc::Sender<Input>,
+    microphone_check: Mutex<Waveform>,
+    main_window: Mutex<Option<Placement>>,
     settings: Mutex<Settings>,
     settings_path: PathBuf,
     proposed: Mutex<Option<Hotkey>>,
@@ -62,7 +67,18 @@ impl Shell {
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
-        let waveform = Waveform::new(app.clone(), microphone.level());
+        let waveform = Waveform::new(
+            app.clone(),
+            microphone.level(),
+            windows::OVERLAY,
+            "overlay-level",
+        );
+        let microphone_check = Waveform::new(
+            app.clone(),
+            microphone.level(),
+            windows::MAIN,
+            "microphone-level",
+        );
         let provider = CognitoProvider {
             cognito: Cognito::for_environment(env::CURRENT)?,
             device_name: device_name(app),
@@ -91,7 +107,7 @@ impl Shell {
             keystroke: EnigoKeystroke,
             window: SystemWindow,
             modifiers: HeldModifiers {
-                keyboard,
+                keyboard: keyboard.clone(),
                 keys: Arc::clone(&keys),
             },
             timing: Timing::default(),
@@ -135,7 +151,10 @@ impl Shell {
             #[cfg(debug_assertions)]
             jobs,
             keys,
+            keyboard: keyboard.unwrap_or_else(|| Arc::new(NoHook)),
             session,
+            microphone_check: Mutex::new(microphone_check),
+            main_window: Mutex::new(settings.main_window),
             settings: Mutex::new(settings),
             settings_path,
             proposed: Mutex::new(None),
@@ -155,6 +174,21 @@ impl Shell {
         }
     }
 
+    pub fn remember_main_window(&self, normal: Option<Placement>, maximized: bool) {
+        let mut remembered = lock(&self.main_window);
+        *remembered = normal.or(*remembered).map(|placement| Placement {
+            maximized,
+            ..placement
+        });
+    }
+
+    pub fn save_main_window(&self) {
+        let placement = *lock(&self.main_window);
+        if placement.is_some() && placement != self.settings().main_window {
+            self.update_settings(|settings| settings.main_window = placement);
+        }
+    }
+
     pub fn copy(&self, text: &str) -> Result<(), ClipboardError> {
         let copies = self.copies.get_or_init(|| Mutex::new(clipboard::system()));
         lock(copies).put_text(text)
@@ -162,6 +196,31 @@ impl Shell {
 
     pub fn reload_rules(&self) {
         self.rules.load(&self.api);
+    }
+
+    pub fn forward_key(&self, code: &str, down: bool) {
+        let Some(key) = Key::from_dom(code) else {
+            return;
+        };
+        let at = Instant::now();
+        let event = KeyEvent { key, down };
+        if let Some(event) = lock(&self.keys).on_key(event, Source::Page, at, &*self.keyboard) {
+            let _ = self.session.send(Input::Chord { event, at });
+        }
+    }
+
+    pub fn stop_dictation(&self) {
+        let _ = self.session.send(Input::Stop { at: Instant::now() });
+    }
+
+    pub fn check_microphone(&self, on: bool) {
+        let mut waveform = lock(&self.microphone_check);
+        if on {
+            waveform.start();
+        } else {
+            waveform.stop();
+        }
+        let _ = self.session.send(Input::MicrophoneCheck(on));
     }
 
     pub fn hotkey(&self) -> Hotkey {
@@ -247,11 +306,9 @@ fn install_hook(
     let keys = Arc::clone(keys);
     let session = session.clone();
     let installed = hotkey::install(Box::new(move |event, keyboard| {
-        if let Some(event) = lock(&keys).on_key(event, keyboard) {
-            let _ = session.send(Input::Chord {
-                event,
-                at: Instant::now(),
-            });
+        let at = Instant::now();
+        if let Some(event) = lock(&keys).on_key(event, Source::Hook, at, keyboard) {
+            let _ = session.send(Input::Chord { event, at });
         }
     }));
     installed.inspect_err(|error| log::error!("{error}")).ok()
@@ -259,7 +316,7 @@ fn install_hook(
 
 pub fn capture_cancelled(app: &AppHandle) {
     log::info!("hotkey capture cancelled");
-    let _ = app.emit_to(windows::SETTINGS, "hotkey-capture-cancelled", ());
+    let _ = app.emit_to(windows::MAIN, "hotkey-capture-cancelled", ());
 }
 
 fn device_name(app: &AppHandle) -> String {
@@ -303,7 +360,7 @@ impl Sink for ShellSink {
             message: Message::SignInToDictate,
             action: None,
         });
-        windows::open_account(&self.app, false);
+        windows::open_main(&self.app, "");
         false
     }
 
@@ -315,7 +372,13 @@ impl Sink for ShellSink {
         self.target = SystemWindow.foreground();
     }
 
+    fn hands_free(&mut self) {
+        hotkey::swallow_escape(true);
+        self.overlay.hands_free();
+    }
+
     fn finished(&mut self, take: Take) {
+        hotkey::swallow_escape(false);
         self.waveform.stop();
         self.overlay.end_recording();
         crate::tray::show_listening(&self.app, false);
@@ -324,6 +387,16 @@ impl Sink for ShellSink {
             target: std::mem::take(&mut self.target),
             busy: self.busy.take().unwrap_or_else(|| self.activity.start()),
         });
+    }
+}
+
+struct NoHook;
+
+impl KeyHook for NoHook {
+    fn guard_start_menu(&self) {}
+
+    fn is_held(&self, _key: Key) -> bool {
+        true
     }
 }
 

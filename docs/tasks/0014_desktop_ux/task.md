@@ -92,11 +92,12 @@ None to start. The release waits for 0013 on `develop`.
 Consolidated 2026-10-22; the om-manager decides (design and merges delegated by Sebastian); details marked (om-reviewer) are mine.
 These override Scope, Acceptance and Approach above where they differ.
 
-- Spinner (om-manager, adjusts Acceptance 2): the host has Windows "Animation effects" off, so WebView2 reports reduced motion and `packages/brand/src/ui/ui.css` stops `.tmw-spinner`; confirm that cause on the host in round 1 before changing code. The processing spinner always rotates, slow and small, no travel or scaling (essential motion); the two-capture check applies with and without reduced motion; the waveform keeps honoring reduced motion as today.
+- Motion (Sebastian through the om-manager, replaces Acceptance 2's reduced-motion clause with "animates even with Windows animations off"): the host has Windows "Animation effects" off, so WebView2 reports reduced motion and `packages/brand/src/ui/ui.css` stops `.tmw-spinner`; confirm that cause on the host in round 1 before changing code. In the desktop app every animation (spinner, waveform, transitions) runs regardless of `prefers-reduced-motion` or the Windows setting, through one desktop-level override; the web's reduced-motion behavior and `packages/brand` defaults stay unchanged; the two-capture check runs with Windows animations off; recorded in `desktop/ard.md` during the task.
 - Esc (om-manager): only while hands-free listens, the hook swallows a physical Esc and cancels; the ARD entry "Native Windows key hook" is amended. Other keys never cancel hands-free; a chord press followed by another key is a shortcut and leaves hands-free running; the stop tap counts at its release.
 - Target (om-manager): the paste goes to the window focused when hands-free starts; if focus changed, the text stays in the clipboard with today's notification.
 - Timing (om-manager): first release to second press within 300 ms, each tap under 0.5 s; a second press held past 0.5 s is a normal hold; tap timings logged at info, never audio; Sebastian tunes from the PR installer.
-- Practice box (om-manager, open): a real dictation pasted into a text box of the main window, skippable; chord logic only in Rust, events from the hook or forwarded by the page behind one interface, since `desktop/ard.md` "Shortcut capture" found no hook sees injected keys with the app's WebView in front. Sebastian's physical check on 0.2.0 picks the path; his physical try from the PR installer is offered, not awaited.
+- Practice box (om-manager): a real dictation pasted into a text box of the main window, skippable; his physical try from the PR installer is offered, not awaited.
+- Keys in the app's own windows (Sebastian through the om-manager, 2026-10-22, adds to Scope): on prd 0.2.0 holding Ctrl+Win with a Take My Word window focused shows no overlay, so the hook does not see it there. While any app window is focused, its page forwards key down and up events to the same Rust chord state machine as the hook; no gesture logic in TS. Hold, hands-free and Esc then work with the app in front (practice box, dictionary editor); forwarding pauses during hotkey capture, as the hook path does, and an event seen by both paths counts once. Recorded in `desktop/ard.md` (amends "Shortcut capture" and "Native Windows key hook").
 - Upgrade (om-manager, adjusts Scope): upgraded 0.2.0 users (`firstRunDone`, their `sub` in `onboardedUsers`) see no onboarding; General shows one dismissible "new: hands-free" note once after the update; release notes and "rerun onboarding" in Settings.
 - Launch (om-manager, adjusts Scope): a user launch, cold or second instance, opens and foregrounds the main window; autostart passes an argument and stays in the tray; the 0.2.0 Run entry is rewritten at start.
 - Hands-free is always on, no toggle; it holds the in-flight guard and the tray's recording state from start to paste (om-reviewer).
@@ -116,3 +117,34 @@ Review focus beyond the Pipeline: chord state machine tests (double tap, stop at
 clearance: full: GitHub as sebasfles (push, PR, the `desktop-v0.3.0` tag on my hand-off, the release), the Windows host under the machine rules, dev sign-in as crew-e2e-b; Sebastian's prd install only read; no AWS profile, no Terraform, no deploys.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+- Hands-free in Rust: `hotkey/gesture.rs` is the state machine (hold, first tap, second press within 300 ms, hands-free, stop tap at its release, shortcut during hands-free, Esc), driven by the session thread with its gap deadline next to the 2-minute cap; the recording starts at the first press and continues through the double tap, so the overlay never flickers and the audio has no gap. Tap timings logged at info.
+- Esc: the tracker reports a fresh Esc outside a hold; the hook holds back Esc (down and its up) only while hands-free listens (`holds_back`, tested); own injections pass.
+- Keys in the app's own windows: every non-overlay window forwards `KeyboardEvent.code` down and up (no repeats) through `forward_key` into the same `Keys`; `Keys` admits each event from either source once (an unmatched twin from the other source within 250 ms is dropped), and ignores both during a capture.
+- Overlay: listening and processing show no visible label (kept for screen readers), the pill keeps one width, hands-free adds a stop button that stops and pastes through the session.
+- Motion: confirmed on the host (`SPI_GETCLIENTAREAANIMATION=False`; headless Edge reports `prefers-reduced-motion: reduce` true, false with `--force-prefers-no-reduced-motion`). The override is that switch in one `BROWSER_ARGS` for every WebView window; brand CSS untouched. The two-capture check in the app is pending the Windows run.
+- One main window (`main`): opens maximized with no saved placement, then restores the last normal placement and the maximized flag from `settings.json` (`mainWindow`), saved on close and exit, reused only while its title bar is on a screen; min 380x480; the account and first-run windows and `fit_account` are gone; closing destroys it.
+- Onboarding in the main window: welcome, sign in (choose password), microphone check (live level from a monitor-only capture that buffers nothing, runs only while the step is shown, a hold during it still dictates), shortcut with both gestures and a practice box, languages, style with examples, ready. The plan is derived from `app_state`; a sign-in that finds the user onboarded skips languages and style; Settings > General reruns it; upgraded 0.2.0 users see none and get a dismissible hands-free note once.
+- Launch: autostart passes `--autostart` and stays in the tray unless sign-in or setup is needed; a 0.2.0 Run entry is rewritten at start; any user launch, cold or second instance, opens and focuses the main window (the plugin already grants foreground to the first instance).
+- Style examples: TTS of one sample per language on the host (SAPI, Sabina es-MX, Zira en-US), three dictations per language through the dev API as crew-e2e-b with `styleId` per style; outputs committed as `src/styleExamples.ts`; settings saved and restored, the 6 dictations deleted. Styles view and onboarding share `StyleExamples`; custom styles show their prompt.
+- Dictionary: the add form leads with the written word and an example; "sounds like" sits under a closed Advanced disclosure with the Kubernetes "cuberneti" example; rows show "Sounds like" only when there are variants.
+- Layout: sections center in the content area; General and History are wide (two columns: settings beside a how-to, setup guide and About aside; History as two columns of cards).
+- Screenshots: `pnpm screenshots` now renders the main window at 380x480, 1280x800, 1920x1080 and 2560x1440, fixed windows at their size; round 1 set in `.workspaces/0014_desktop_ux/screenshots/round-1`.
+
+Decisions not in the plan:
+- During hands-free any clean press and release of the shortcut stops at the release, whatever its length; only the start gesture has the 0.5 s tap rule, so a slow stop tap never leaves the user stuck.
+- A second press held past 0.5 s sends audio from the first press (a few hundred ms of extra lead), since the recording is one.
+- Injected Esc from other processes is held back like a physical one, consistent with how the hook treats other injected input.
+- Autostart opens the main window anyway when signed out, before first run is done, or when the user still needs languages and style.
+- `app_state` treats a signed-in user it cannot look up (offline) as onboarded, so an outage never forces setup.
+- The microphone gained a monitor mode (stream plays, nothing buffered) instead of reusing a recording, so the check never holds up to 120 s of audio.
+
+Pending:
+- Windows run (needs `computer available`): two-capture spinner check with animations off, hands-free and Esc with injected chords (Alt before Win), practice box paste, Acceptance 5 foreground, fresh-install onboarding run, maximized first launch and restore, Acceptance 7 RAM and CPU.
+- Restyling Dictionary, Styles, App rules and Account for wide screens after the design answer; they are centered at prose width for now.
+
+Deferred:
+- With a user's dictation languages set to Spanish only, English speech dictated with casual or formal comes back translated to Spanish while plain keeps English (seen with crew-e2e-b before setting both languages); a dictation or styles task should look at it.

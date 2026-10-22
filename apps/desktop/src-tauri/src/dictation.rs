@@ -282,6 +282,7 @@ mod tests {
             .map(|state| match state {
                 OverlayState::Hidden => "hidden",
                 OverlayState::Listening => "listening",
+                OverlayState::HandsFree => "hands-free",
                 OverlayState::Processing => "processing",
                 OverlayState::Error { .. } => "error",
             })

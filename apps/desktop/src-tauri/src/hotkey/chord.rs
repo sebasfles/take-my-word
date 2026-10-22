@@ -1,10 +1,11 @@
-use super::{Hotkey, Key, KeyEvent, KeyHook};
+use super::{ESCAPE, Hotkey, Key, KeyEvent, KeyHook};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChordEvent {
     Pressed,
     Released,
     Cancelled,
+    Escape,
 }
 
 #[derive(Debug)]
@@ -37,7 +38,15 @@ impl ChordTracker {
                 self.down
                     .retain(|key| *key == event.key || keyboard.is_held(*key));
             }
-            self.on_down(event.key)
+            let escape = event.key == ESCAPE
+                && !self.active
+                && !self.down.contains(&event.key)
+                && !self.hotkey.contains(ESCAPE);
+            let chord = self.on_down(event.key);
+            if escape {
+                return Some(ChordEvent::Escape);
+            }
+            chord
         } else {
             self.on_up(event.key)
         };
@@ -234,6 +243,27 @@ mod tests {
         assert_eq!(
             feed(&mut tracker, &keyboard, &[down(LWIN), down(LCTRL)]),
             vec![ChordEvent::Pressed]
+        );
+    }
+
+    #[test]
+    fn esc_outside_a_hold_is_reported_once_and_inside_a_hold_cancels() {
+        let (mut tracker, keyboard) = ctrl_win();
+        assert_eq!(
+            feed(
+                &mut tracker,
+                &keyboard,
+                &[down(ESCAPE), down(ESCAPE), up(ESCAPE)]
+            ),
+            vec![ChordEvent::Escape]
+        );
+        assert_eq!(
+            feed(
+                &mut tracker,
+                &keyboard,
+                &[down(LCTRL), down(LWIN), down(ESCAPE), up(ESCAPE)]
+            ),
+            vec![ChordEvent::Pressed, ChordEvent::Cancelled]
         );
     }
 

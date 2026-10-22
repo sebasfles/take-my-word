@@ -7,14 +7,16 @@ import { type MessageId, t } from "../../i18n.ts";
 export function SectionPage({
   title,
   intro,
+  wide = false,
   children,
 }: {
   title: MessageId;
   intro: MessageId;
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
-    <main className="section">
+    <main className={wide ? "section section-wide" : "section"}>
       <header className="section-header">
         <h1>{t(title)}</h1>
         <p>{t(intro)}</p>

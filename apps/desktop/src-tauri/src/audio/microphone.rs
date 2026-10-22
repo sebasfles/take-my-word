@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError, mpsc};
 use std::thread;
 
@@ -9,6 +10,7 @@ use super::{AudioError, Capture, CaptureBuffer, Captured, Level, MicrophoneStatu
 
 enum Command {
     Start,
+    Monitor(bool),
     Stop(mpsc::Sender<Result<Captured, AudioError>>),
 }
 
@@ -50,6 +52,10 @@ impl Capture for Microphone {
         let _ = self.commands.send(Command::Start);
     }
 
+    fn monitor(&mut self, on: bool) {
+        let _ = self.commands.send(Command::Monitor(on));
+    }
+
     fn stop(&mut self) -> Result<Captured, AudioError> {
         let gone = || AudioError::Device("the microphone thread stopped".into());
         let (reply, answer) = mpsc::channel();
@@ -67,6 +73,7 @@ struct Armed {
     stream: Stream,
     buffer: SharedBuffer,
     failure: SharedFailure,
+    keep: Arc<AtomicBool>,
 }
 
 impl Armed {
@@ -81,14 +88,21 @@ impl Armed {
             config.sample_rate,
         )));
         let failure = Arc::new(Mutex::new(None));
+        let keep = Arc::new(AtomicBool::new(true));
+        let shared = Shared {
+            buffer: &buffer,
+            failure: &failure,
+            keep: &keep,
+            level,
+        };
         let stream = match supported.sample_format() {
-            SampleFormat::F32 => build::<f32>(&device, config, &buffer, &failure, level),
-            SampleFormat::F64 => build::<f64>(&device, config, &buffer, &failure, level),
-            SampleFormat::I16 => build::<i16>(&device, config, &buffer, &failure, level),
-            SampleFormat::I32 => build::<i32>(&device, config, &buffer, &failure, level),
-            SampleFormat::I8 => build::<i8>(&device, config, &buffer, &failure, level),
-            SampleFormat::U16 => build::<u16>(&device, config, &buffer, &failure, level),
-            SampleFormat::U8 => build::<u8>(&device, config, &buffer, &failure, level),
+            SampleFormat::F32 => build::<f32>(&device, config, &shared),
+            SampleFormat::F64 => build::<f64>(&device, config, &shared),
+            SampleFormat::I16 => build::<i16>(&device, config, &shared),
+            SampleFormat::I32 => build::<i32>(&device, config, &shared),
+            SampleFormat::I8 => build::<i8>(&device, config, &shared),
+            SampleFormat::U16 => build::<u16>(&device, config, &shared),
+            SampleFormat::U8 => build::<u8>(&device, config, &shared),
             other => Err(AudioError::Device(format!(
                 "unsupported sample format {other}"
             ))),
@@ -97,7 +111,19 @@ impl Armed {
             stream,
             buffer,
             failure,
+            keep,
         })
+    }
+
+    fn keeping(self, keep: bool) -> Self {
+        self.keep.store(keep, Ordering::Relaxed);
+        if keep {
+            self.buffer
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
+        }
+        self
     }
 
     fn healthy(&self) -> bool {
@@ -138,20 +164,46 @@ fn arm(status: &MicrophoneStatus, level: &Level) -> Option<Armed> {
         .ok()
 }
 
+fn play(armed: &mut Option<Armed>, level: &Level, keep: bool) -> Result<Armed, AudioError> {
+    level.set(0.0);
+    match armed.take().filter(Armed::healthy) {
+        Some(ready) => ready
+            .keeping(keep)
+            .play()
+            .or_else(|_| Armed::new(level)?.keeping(keep).play()),
+        None => Armed::new(level).and_then(|fresh| fresh.keeping(keep).play()),
+    }
+}
+
 fn serve(inbox: mpsc::Receiver<Command>, status: &MicrophoneStatus, level: &Level) {
     let mut armed = arm(status, level);
     let mut recording: Option<Result<Armed, AudioError>> = None;
+    let mut monitoring: Option<Armed> = None;
     for command in inbox {
         match command {
             Command::Start => {
                 if recording.is_none() {
-                    level.set(0.0);
-                    let started = match armed.take().filter(Armed::healthy) {
-                        Some(ready) => ready.play().or_else(|_| Armed::new(level)?.play()),
-                        None => Armed::new(level).and_then(Armed::play),
+                    let started = match monitoring.take() {
+                        Some(live) if live.healthy() => Ok(live.keeping(true)),
+                        _ => play(&mut armed, level, true),
                     };
                     status.record(&started);
                     recording = Some(started);
+                }
+            }
+            Command::Monitor(true) => {
+                if recording.is_none() && monitoring.is_none() {
+                    let started = play(&mut armed, level, false);
+                    status.record(&started);
+                    monitoring = started
+                        .inspect_err(|error| log::warn!("checking the microphone failed: {error}"))
+                        .ok();
+                }
+            }
+            Command::Monitor(false) => {
+                if monitoring.take().is_some() {
+                    level.set(0.0);
+                    armed = arm(status, level);
                 }
             }
             Command::Stop(reply) => {
@@ -168,35 +220,46 @@ fn serve(inbox: mpsc::Receiver<Command>, status: &MicrophoneStatus, level: &Leve
     }
 }
 
+struct Shared<'a> {
+    buffer: &'a SharedBuffer,
+    failure: &'a SharedFailure,
+    keep: &'a Arc<AtomicBool>,
+    level: &'a Level,
+}
+
 fn build<T>(
     device: &cpal::Device,
     config: StreamConfig,
-    buffer: &SharedBuffer,
-    failure: &SharedFailure,
-    level: &Level,
+    shared: &Shared<'_>,
 ) -> Result<Stream, AudioError>
 where
     T: SizedSample + Send + 'static,
     f32: FromSample<T>,
 {
-    let buffer = Arc::clone(buffer);
-    let failure = Arc::clone(failure);
-    let level = level.clone();
+    let buffer = Arc::clone(shared.buffer);
+    let failure = Arc::clone(shared.failure);
+    let keep = Arc::clone(shared.keep);
+    let level = shared.level.clone();
     let mut meter = Meter::new(config.channels, config.sample_rate);
     device
         .build_input_stream(
             config,
             move |data: &[T], _: &cpal::InputCallbackInfo| {
-                buffer
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .extend(data.iter().map(|sample| {
-                        let sample = sample.to_sample::<f32>();
-                        if let Some(metered) = meter.push(sample) {
-                            level.set(metered);
-                        }
-                        sample
-                    }));
+                let metered = data.iter().map(|sample| {
+                    let sample = sample.to_sample::<f32>();
+                    if let Some(value) = meter.push(sample) {
+                        level.set(value);
+                    }
+                    sample
+                });
+                if keep.load(Ordering::Relaxed) {
+                    buffer
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .extend(metered);
+                } else {
+                    metered.for_each(drop);
+                }
             },
             move |error: cpal::Error| match error.kind() {
                 ErrorKind::Xrun | ErrorKind::DeviceChanged | ErrorKind::RealtimeDenied => {

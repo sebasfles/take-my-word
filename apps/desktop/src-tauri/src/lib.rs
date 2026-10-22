@@ -64,7 +64,11 @@ pub fn run() {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg(AUTOSTART_ARG)
+                .build(),
+        )
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -76,12 +80,17 @@ pub fn run() {
             commands::set_autostart,
             commands::open_microphone_settings,
             commands::dismiss_overlay,
-            commands::finish_first_run,
+            commands::forward_key,
+            commands::stop_dictation,
+            commands::check_microphone,
+            account::app_state,
             account::account_status,
             account::sign_in,
             account::choose_password,
             account::onboarding,
             account::save_onboarding,
+            account::finish_onboarding,
+            account::dismiss_hands_free_note,
             account::open_sign_in,
             account::sign_out,
             editors::api_request,
@@ -90,7 +99,6 @@ pub fn run() {
             commands::ui_language,
             commands::set_ui_language,
             commands::theme,
-            windows::fit_account,
             windows::fit_update,
             commands::set_theme,
             commands::quit,
@@ -114,30 +122,33 @@ pub fn run() {
             }
             app.manage(shell);
             tray::build(handle, account, microphone)?;
-            if !settings.first_run_done {
-                turn_on_autostart(handle);
-            }
-            account::on_startup(handle);
+            refresh_autostart(handle, settings.first_run_done);
+            let autostarted = std::env::args().any(|arg| arg == AUTOSTART_ARG);
+            account::on_startup(handle, !autostarted);
             Ok(())
         })
         .build(context)
         .expect("the Tauri application failed to build");
 
-    app.run(|_app, event| {
-        if let RunEvent::ExitRequested {
+    app.run(|app, event| match event {
+        RunEvent::ExitRequested {
             api, code: None, ..
-        } = event
-        {
-            api.prevent_exit();
-        }
+        } => api.prevent_exit(),
+        RunEvent::Exit => app.state::<Shell>().save_main_window(),
+        _ => {}
     });
 }
 
-fn turn_on_autostart(app: &AppHandle) {
-    if !cfg!(debug_assertions)
-        && let Err(error) = app.autolaunch().enable()
-    {
-        log::warn!("turning on autostart failed: {error}");
+const AUTOSTART_ARG: &str = "--autostart";
+
+fn refresh_autostart(app: &AppHandle, first_run_done: bool) {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    let autolaunch = app.autolaunch();
+    let wanted = !first_run_done || autolaunch.is_enabled().unwrap_or(false);
+    if wanted && let Err(error) = autolaunch.enable() {
+        log::warn!("writing the autostart entry failed: {error}");
     }
 }
 
@@ -147,5 +158,5 @@ fn on_second_launch(app: &AppHandle, args: &[String]) {
         return;
     }
     let _ = args;
-    windows::open_settings(app);
+    windows::open_main(app, "");
 }

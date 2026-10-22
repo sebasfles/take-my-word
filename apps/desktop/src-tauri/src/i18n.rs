@@ -32,7 +32,6 @@ messages! {
     SignInExpired => "account.expired",
     SessionEnded => "account.sessionEnded",
     Unreachable => "account.unreachable",
-    FirstRunTitle => "firstRun.title",
     HotkeyNotInSettings => "hotkey.notInSettings",
     HotkeyNothingToSave => "hotkey.nothingToSave",
     HotkeyCaptureEnded => "hotkey.captureEnded",

@@ -46,14 +46,14 @@ export function History() {
   };
 
   return (
-    <SectionPage title="settings.history" intro="history.intro">
+    <SectionPage title="settings.history" intro="history.intro" wide>
       <LoadState state={state} onRetry={retry} />
       {data &&
         (data.items.length === 0 ? (
           <Empty title="history.emptyTitle" body="history.empty" />
         ) : (
           <section className="list-section">
-            <ul className="list">
+            <ul className="cards">
               {data.items.map((item) => (
                 <DictationRow
                   key={item.id}
@@ -114,7 +114,7 @@ function DictationRow({
   };
 
   return (
-    <li className="item item-stacked">
+    <li className="card dictation">
       <p className="dictation-text">{item.text}</p>
       {item.raw !== "" && (
         <details className="raw">

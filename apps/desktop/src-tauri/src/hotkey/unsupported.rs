@@ -13,3 +13,5 @@ pub fn key_name(code: u32) -> String {
 pub fn key_code_from_dom(_code: &str) -> Option<u32> {
     None
 }
+
+pub fn swallow_escape(_on: bool) {}

@@ -92,6 +92,7 @@ impl MicrophoneStatus {
 
 pub trait Capture {
     fn start(&mut self);
+    fn monitor(&mut self, on: bool);
     fn stop(&mut self) -> Result<Captured, AudioError>;
 }
 
