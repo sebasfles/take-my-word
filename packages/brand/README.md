@@ -13,21 +13,23 @@ import { Button, Mark, OverlayPill, Wordmark, tokens } from "@take-my-word/brand
 `index.css` brings the fonts, the tokens as custom properties on `:root`, the waveform and the primitives.
 A Next app imports `web.css` instead and loads the same woff2 files with `next/font/local`, which preloads them and sets `--font-face-display` and `--font-face-text`; the font tokens read those first.
 The theme follows the system; `data-theme="light"` or `data-theme="dark"` on `<html>` forces one.
-Apps use tokens only: `apps/web` has a test that rejects literal colors, fonts, font sizes, spacing, radii, shadows and durations.
+Apps use tokens only: `src/token-lint.ts` rejects literal colors, fonts, font sizes, spacing, radii, shadows and durations, and both apps' tests run it over every CSS and TSX file.
 
 ## Files and scripts
 
-| Path                                   | What                                                                                                     | Regenerate      |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------- |
-| `src/tokens.ts`                        | Every token, authored once                                                                               |                 |
-| `src/tokens.css`                       | Generated custom properties; a test fails if it drifts                                                   | `pnpm generate` |
-| `src/contrast.ts`                      | The text and control pairs that must meet WCAG AA in both themes                                         |                 |
-| `src/fonts/`, `src/fonts.css`          | Fraunces and Instrument Sans, Latin subset with Spanish, with metric-matched fallbacks; OFL next to them | `pnpm fonts`    |
-| `src/mark-geometry.ts`                 | The mark as paths: a full glyph and a pixel-aligned one for 48 px and below                              |                 |
-| `src/assets/`, `src/wordmark-paths.ts` | SVG masters, outlined wordmark, icons, `.ico` files, the OG card                                         | `pnpm assets`   |
-| `src/ui/`                              | Primitives with keyboard and ARIA tests                                                                  |                 |
+| Path                                   | What                                                                                                     | Regenerate            |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
+| `src/tokens.ts`                        | Every token, authored once                                                                               |                       |
+| `src/tokens.css`                       | Generated custom properties; a test fails if it drifts                                                   | `pnpm generate`       |
+| `src/contrast.ts`                      | The text and control pairs that must meet WCAG AA in both themes                                         |                       |
+| `src/fonts/`, `src/fonts.css`          | Fraunces and Instrument Sans, Latin subset with Spanish, with metric-matched fallbacks; OFL next to them | `pnpm fonts`          |
+| `src/mark-geometry.ts`                 | The mark as paths: a full glyph and a pixel-aligned one for 48 px and below                              |                       |
+| `src/assets/`, `src/wordmark-paths.ts` | SVG masters, outlined wordmark, icons, `.ico` files, the OG card                                         | `pnpm assets`         |
+| `src/ui/`, `src/icons.tsx`             | Primitives with keyboard and ARIA tests; the line icons both apps share                                  |                       |
+| `scripts/desktop-icons.ts`             | Desktop app, installer and tray icons, prd and dev, written into `apps/desktop/src-tauri/icons`          | `pnpm desktop-assets` |
 
 `pnpm fonts` and `pnpm assets` download the pinned Google Fonts sources; outputs are committed.
+`pnpm icon-sheet <dir>` renders the desktop icons at every size on light and dark taskbars for review.
 
 ## Logo
 
@@ -54,7 +56,8 @@ Never set long reading text in Fraunces below `text-lg`, and never use more than
 
 ## Motion
 
-The waveform is the signature: it moves only while someone is speaking.
+The waveform is the signature: it moves only while someone is speaking, from one level or, with `levels`, a history of recent ones.
+`OverlayPill` takes an `action`, and with `indicator="state"` shows bars only while listening, a spinner while processing and a glyph after.
 Durations and easings come from the tokens; under `prefers-reduced-motion` demos rest on a still frame and nothing loops.
 
 ## Voice and tone
