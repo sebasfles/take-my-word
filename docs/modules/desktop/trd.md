@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-22
-source: 0011_desktop_rebrand
+source: 0012_fix_lost_paste
 ---
 
 # Desktop: technical
@@ -14,7 +14,7 @@ Built on Windows by 0002, signed in to the real API by 0007, released and self-u
 | `apps/desktop/src-tauri/src/hotkey` | Native `WH_KEYBOARD_LL` hook behind `KeyHook`, chord tracking, Start-menu guard, hotkey model |
 | `apps/desktop/src-tauri/src/audio` | `cpal` capture with a pre-armed stream, filtered resampling to 16 kHz mono 16-bit WAV, the input level meter |
 | `apps/desktop/src-tauri/src/session.rs`, `dictation.rs` | Hold, cancel, cap and the signed-out gate on the session thread; encode, send, paste and report on a worker |
-| `apps/desktop/src-tauri/src/paste.rs`, `clipboard`, `foreground` | Paste through a delayed-rendered clipboard given only to the target's processes, restore, focus and integrity checks, `appId`, running apps |
+| `apps/desktop/src-tauri/src/paste.rs`, `clipboard`, `foreground` | Paste through a delayed-rendered clipboard counted only for the target's first read after the keystroke (Wait Chain Traversal for readers without a window), one retry, restore after quiet, focus and integrity checks, `appId`, running apps |
 | `apps/desktop/src-tauri/src/rules.rs` | The user's app rules kept in memory for the paste keystroke |
 | `apps/desktop/src-tauri/src/i18n.rs`, `apps/desktop/src/i18n` | Message ids and the `es` and `en` dictionaries shared by Rust and the views |
 | `apps/desktop/src-tauri/src/auth` | SRP port, the six Cognito calls, `Secret`, and `Account`: the session behind one lock |
@@ -75,7 +75,7 @@ Jobs, listeners or scheduled work: the key hook, the microphone thread and the c
 
 ## Testing
 
-- `cargo test`: hook model, session gate, paste and its reader rule, worker and error messages, route forwarding, rule cache ordering, level meter on a speech WAV and silence, dictionaries, stub routing, Cognito request shapes against a local fake, SRP against vectors from `packages/cognito`, the account (renewal, single renewal under concurrency, sign-in, new password, sign-out order), the bearer retry, the keychain on the real Credential Manager, the tray status and frames, window fitting, each environment's default hotkey, and the contract against `contract.schema.json`.
+- `cargo test`: hook model, session gate, paste with its retry, read order and reader rules (the real-clipboard ones ignored locally, run by `desktop-ci`), worker and error messages, route forwarding, rule cache ordering, level meter on a speech WAV and silence, dictionaries, stub routing, Cognito request shapes against a local fake, SRP against vectors from `packages/cognito`, the account (renewal, single renewal under concurrency, sign-in, new password, sign-out order), the bearer retry, the keychain on the real Credential Manager, the tray status and frames, window fitting, each environment's default hotkey, and the contract against `contract.schema.json`.
 - `auth::dev_pool` tests are ignored: with `TMW_DEV_USERNAME` and `TMW_DEV_PASSWORD` they sign in to the dev pool, call the dev API and clean up after themselves.
 - Vitest covers the views with a mocked bridge, both dictionaries for missing keys, the brand token lint over every CSS and TSX file, and fails `ci` when `contract.schema.json` is stale; `pnpm screenshots <dir> [prefix,...]` renders every state in both languages and themes at each window's real size (settings at 380, 880 and 1280) and fails on sideways scroll or a fixed window that would scroll.
-- Physical keyboard, microphone and paste behavior need a manual check from the PR installer; the update path was checked on Windows from 0.1.0 to 0.1.1, the editors, paste keystrokes, languages and a silent hold in 0008, and in 0011 a real hold pasting into a scratch window, with idle RAM and CPU against the base build; Windows runs launch debug builds with no console.
+- Physical keyboard, microphone and paste behavior need a manual check from the PR installer; the update path was checked on Windows from 0.1.0 to 0.1.1, the editors, paste keystrokes, languages and a silent hold in 0008, in 0011 a real hold pasting into a scratch window, with idle RAM and CPU against the base build, and in 0012 pastes into a scratch window, WebView2 and Chrome with a reader without a window racing them; Windows runs launch debug builds with no console.

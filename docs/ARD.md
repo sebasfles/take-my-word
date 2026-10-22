@@ -90,8 +90,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-21 | SmartScreen warns on the first install of the unsigned installer | The app is offered beyond the invited circle, or SmartScreen blocks installs |
 | desktop | 2026-10-21 | A new CRUD route needs a forwarder variant before the views can use it | The editors need a route the enum lacks |
 | desktop | 2026-10-21 | A rule edited elsewhere reaches this machine's paste keystroke up to 5 min later | A paste uses a stale keystroke after an edit elsewhere |
-| desktop | 2026-10-21 | Window-less or process-0 clipboard readers still get the dictation and count as the target; a reused pid can admit an unrelated process | Met 2026-10-21 in 0011's Windows run; a bug task follows |
 | desktop | 2026-10-22 | The `image` crate is in the binary to decode the tray frames | Release binary size matters |
+| desktop | 2026-10-22 | The paste retry can paste twice; reads from threads born after the offer and monitors that win twice leave the text with a notification | A paste lands twice, or a target read logs as unproven |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

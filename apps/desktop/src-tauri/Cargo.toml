@@ -1,6 +1,6 @@
 [package]
 name = "take-my-word"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 publish = false
 
@@ -55,6 +55,7 @@ windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_System_DataExchange",
+  "Win32_System_Diagnostics_Debug",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_LibraryLoader",
   "Win32_System_Memory",

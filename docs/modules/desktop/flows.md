@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-22
+source: 0012_fix_lost_paste
 ---
 
 # Desktop: flows
@@ -44,9 +44,9 @@ sequenceDiagram
   D->>A: WAV, appId, access token
   Note over D,A: 401 or 403 without the error envelope: renew once, retry once
   A-->>D: clean text
-  D->>D: save clipboard, offer text (delayed rendering) to F's processes only
+  D->>D: save clipboard, offer text (delayed rendering), withhold every read until the keystroke
   D->>F: paste keystroke from the cached app rule, else Ctrl+V
-  F-->>D: reads the text
-  D->>D: restore clipboard
+  F-->>D: first read after the keystroke, proven to be F's
+  D->>D: restore clipboard once readers are quiet
   D->>O: hide
 ```

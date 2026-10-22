@@ -1,0 +1,18 @@
+## 2026-10-22T17:06:25Z by om-developer target desktop on 5e06e09
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=C:\dev\tmw-0012)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 vitest and 172 cargo tests, 7 ignored real-clipboard and dev-pool tests; the 5 real-clipboard tests passed on the host in run 5; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T17:20:20Z by om-developer target desktop on 21c0c7c
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=C:\dev\tmw-0012)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 vitest and 174 cargo tests, 7 ignored real-clipboard and dev-pool tests; the 5 real-clipboard tests passed on the host in run 6; pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T17:43:25Z by om-developer target desktop on ce55149
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=C:\dev\tmw-0012), plus linux-check reproduced in Docker (ubuntu:24.04, the job's apt packages, rustup stable): pass exit 0 (cargo clippy --all-targets --locked -- -D warnings)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 vitest and 174 cargo tests, 7 ignored real-clipboard and dev-pool tests; pnpm test && pnpm rust:test)
+- e2e: n/a
+
