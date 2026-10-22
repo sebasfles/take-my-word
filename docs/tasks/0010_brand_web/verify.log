@@ -60,3 +60,27 @@
 account.e2e.ts:105 expect(getByTestId('account-language')).toHaveText("Spanish") received "English".
 take-my-word-dev-api and -dictate were redeployed at 2026-10-21T23:21Z from code not on develop: GET /me/settings returns dictationLanguages and PUT ignores locale (fresh user: {"locale":"en","dictationLanguages":["en"],...}; after PUT locale "es": still "en").
 
+## 2026-10-22T01:51:15Z by om-developer target brand on 1dc7c2e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (30 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T01:51:15Z by om-developer target shared on 1dc7c2e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (27 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T01:51:15Z by om-developer target web on 1dc7c2e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (189 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration); pass exit 0 (13 tests, pnpm e2e against https://dev.takemyword.fless.dev, deployed sha 1dc7c2e, web CodeSha256 zRTmT/BM8LGLYJ39auTxe2L19rTdSOjBpbbumsPLEdg=, api 6uG5v2vOf2Jw+GJHtwOvPjeWE24UobDM7SAN5+HIoHc= and dictate 7PPsk0De4KoXNhxfoSvPDKGfdFmtaAjo3QNBrXfn2Hw= from deploy-dev run 39707543518 on e11dfaa)
+
+## 2026-10-22T01:51:15Z by om-developer target workflows on 1dc7c2e
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+

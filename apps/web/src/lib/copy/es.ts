@@ -170,6 +170,7 @@ export const es: Dictionary = {
     username: "Usuario",
     defaultStyle: "Estilo por defecto",
     language: "Idioma",
+    dictationLanguages: "Idiomas de dictado",
     transcriber: "Transcripción",
     refiner: "Limpieza del texto",
   },

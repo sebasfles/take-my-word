@@ -103,6 +103,7 @@ test("shows the seeded account on every page, without a token reaching the brows
   await expect(page.getByTestId("account-username")).toHaveText(seeded.username);
   await expect(page.getByTestId("default-style")).toHaveText(styleName);
   await expect(page.getByTestId("account-language")).toHaveText("Spanish");
+  await expect(page.getByTestId("account-dictation-languages")).toHaveText("Spanish");
 
   await page.getByRole("link", { name: "Dictionary" }).click();
   await expect(page.getByTestId("term")).toHaveCount(3);
@@ -138,6 +139,7 @@ test("shows the seeded account on every page, without a token reaching the brows
   await expect(page.getByRole("link", { name: "Reglas por app" })).toBeVisible();
   await page.getByRole("link", { name: "Cuenta" }).click();
   await expect(page.getByTestId("account-language")).toHaveText("Español");
+  await expect(page.getByTestId("account-dictation-languages")).toHaveText("Español");
   await page.getByRole("button", { name: "Ver en inglés" }).click();
   await expect(page.getByRole("heading", { name: `Hi, ${seeded.username}` })).toBeVisible();
 

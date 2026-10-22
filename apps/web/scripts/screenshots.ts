@@ -30,6 +30,7 @@ const full = {
   settings: {
     defaultStyleId: "c-slack",
     locale: "es-MX",
+    dictationLanguages: ["es", "en"],
     providers: { transcriber: "groq-whisper", refiner: "openai" },
   },
   styles: [
@@ -100,7 +101,8 @@ const full = {
 const empty = {
   settings: {
     defaultStyleId: "plain",
-    locale: "es",
+    locale: "en",
+    dictationLanguages: ["en"],
     providers: { transcriber: "groq-whisper", refiner: "openai" },
   },
   styles: builtins,

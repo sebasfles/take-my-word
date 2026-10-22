@@ -219,6 +219,7 @@ export const en = {
     username: "Username",
     defaultStyle: "Default style",
     language: "Language",
+    dictationLanguages: "Dictation languages",
     transcriber: "Transcription",
     refiner: "Text cleanup",
   },

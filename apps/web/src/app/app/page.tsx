@@ -1,6 +1,7 @@
 import { AccountSection } from "@/components/account-section.tsx";
 import {
   bothLoaded,
+  languageList,
   languageName,
   refinerNames,
   styleLabel,
@@ -37,6 +38,11 @@ export default async function AccountPage() {
             label: t.account.language,
             value: languageName(settings.locale, locale),
             testId: "account-language",
+          },
+          {
+            label: t.account.dictationLanguages,
+            value: languageList(settings.dictationLanguages, locale),
+            testId: "account-dictation-languages",
           },
           {
             label: t.account.transcriber,

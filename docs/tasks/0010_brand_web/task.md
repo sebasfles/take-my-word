@@ -240,3 +240,28 @@ External actions:
 
 - Deployed 83c5b03 to dev the same way (CodeSha256 `QJykBgsIm2HkrwGJWfDkmziJzQMW7IsPLVPlXQ3y8tM=`, invalidation `I154MF8JU30KG0MRYBBJZ7G9T3`).
 - Created and removed one throwaway Cognito user to read dev's `/me/settings` before and after a `PUT`.
+
+### Between rounds 3 and 4
+
+Dev web restored to `develop` at the om-manager's request (0008 owns the dev web until it merges):
+
+- Built from a temporary detached worktree of `origin/develop` at `8fe11f1` inside `.workspaces/0010_brand_web/`, removed afterwards; `pnpm install --frozen-lockfile`, then `reusable-deploy-web`'s steps.
+- `take-my-word-dev-web` CodeSha256 `9bK84HudywmJKGRuyNrFgWCcHJ/Jx7IF8V8rj55jHpA=`, CloudFront `EMI6CYP83OTMO` invalidation `IBNQW52LICLU15CTW2WCPM7B04`.
+- Checked: `/` and `/sign-in` answer 200 with develop's markup (`lang="es"`, "Tu palabra, nuestra orden.", `/static/icon.svg`, `<h1>Inicia sesión</h1>`, no brand tokens).
+- No web deploy to dev from 0010 until the om-reviewer says 0008 is on `develop`.
+
+### Round 4
+
+Did:
+
+- Rebased on `origin/develop` at `e11dfaa` (0008, PR #14); no conflicts. 0008's settings contract (`dictationLanguages`, `settingsSchema` in `packages/shared`) and its e2e helper (throwaway users on `["es"]`) come from develop; no schema duplicated in `apps/web`.
+- Account shows "Dictation languages" / "Idiomas de dictado" read-only, from `settings.dictationLanguages` parsed by the shared schema, as a localized list in the page's language (`languageList` in `lib/account.ts`: "Spanish and English", "Inglés y español"), with a unit test. The e2e asserts it reads "Spanish" in English and "Español" after the switch, next to the unchanged `account-language` assertion.
+- Screenshot mocks follow the new contract: the seeded user dictates in `["es", "en"]` (the two-language case), the new user in `["en"]`; every page and state refreshed in `screenshots/{en,es}/{light,dark}/`.
+- The landing is unchanged, so Lighthouse was not rerun; the round 3 reports stand.
+
+Checked before the e2e: deploy-dev run 39707543518 for `e11dfaa` succeeded; dev's Lambdas match the hashes it logged: api `6uG5v2vOf2Jw+GJHtwOvPjeWE24UobDM7SAN5+HIoHc=`, dictate `7PPsk0De4KoXNhxfoSvPDKGfdFmtaAjo3QNBrXfn2Hw=`, authorizer `7eAJ/cr1URhZ7QpNeAGhD/ZH8uOchWF5UWvg0yehZdo=`, dictionary-usage `Gww06rIfOuHnNgoywsScrTue8VojbhfHKNSzp/c5bsM=`.
+
+External actions:
+
+- Deployed `1dc7c2e`'s web to dev with `reusable-deploy-web`'s steps after that run (web CodeSha256 `zRTmT/BM8LGLYJ39auTxe2L19rTdSOjBpbbumsPLEdg=`, invalidation `I6SN0Q2NFBJM2MFFLHD7NFBRET`); no api or dictate deploy from 0010.
+- Integration and the 13 web e2e ran green against that deployment.
