@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0007_desktop_integration
+source: 0008_desktop_features
 ---
 
 # Dictation: technical
@@ -10,7 +10,7 @@ source: 0007_desktop_integration
 | Path | What |
 |---|---|
 | `apps/api/src/dictate` | The `dictate` Lambda: plain handler, configuration, wiring |
-| `apps/api/src/dictation` | The pipeline (`dictate.ts`), upload reader, audio probes, quota, silence guard, prompts, the profile read, refiner instructions, stores |
+| `apps/api/src/dictation` | The pipeline (`dictate.ts`), the language choice (`language-selection.ts`), upload reader, audio probes, quota, silence guard, prompts, the profile read, refiner instructions, stores |
 | `apps/api/src/history`, `apps/api/src/settings` | History and settings routes in the `api` Lambda, with their stores |
 | `apps/api/src/dictation/ports`, `providers` | Transcriber and Refiner ports; adapters `groq-whisper` and `openai` |
 | `packages/shared/src/dictations.ts`, `history.ts`, `settings.ts` | Request meta, response, history page, settings and limits shared by every client |
@@ -23,8 +23,8 @@ source: 0007_desktop_integration
 | POST | `/dictations` | Multipart `audio` (WAV 16 kHz mono 16-bit or m4a, at most 4 MiB) plus JSON `meta`; raw and clean text out; served by `dictate` | zod in `packages/shared` |
 | GET | `/dictations` | The user's history, newest first, `limit` and opaque `cursor`; expired items are hidden before TTL removes them; served by `api` | zod in `packages/shared` |
 | DELETE | `/dictations/{id}` | Remove one dictation by its opaque `id`; served by `api` | zod in `packages/shared` |
-| GET | `/me/settings` | The user's settings, created with defaults on the first read; served by `api` | zod in `packages/shared` |
-| PUT | `/me/settings` | Replace the settings; the default style must exist; served by `api` | zod in `packages/shared` |
+| GET | `/me/settings` | The user's settings, created with defaults on the first read, with `locale` derived from the first dictation language; served by `api` | zod in `packages/shared` |
+| PUT | `/me/settings` | Replace the settings; the default style must exist; leaving out `dictationLanguages` keeps the stored ones and `locale` is ignored; served by `api` | zod in `packages/shared` |
 
 Above about 4.7 MB of audio the request no longer fits the 6 MiB Lambda payload once base64-encoded, and API Gateway answers 413 with its own body before `dictate` runs.
 The HTTP API cuts every request at 30 s, so provider calls time out at 10 s (Groq) and 15 s (OpenAI).
@@ -34,10 +34,10 @@ The HTTP API cuts every request at 30 s, so provider calls time out at 10 s (Gro
 1. Probe: the container must parse as declared (else 400); the charged duration comes from the bytes (WAV) or the larger of the header and the payload at 320 kbps (m4a); under 0.5 s answers 400.
 2. Level (WAV only): under `SILENCE_FLOOR_DBFS` the request answers empty text before any charge or provider call.
 3. Quota and profile, concurrently: the duration is charged to the user's UTC day before any provider call (at or over the cap the request answers 429), while one round trip reads settings, the app rule, custom styles and the dictionary.
-4. Transcribe with the request's Transcriber, else the settings', else `groq-whisper`, prompted with the top dictionary terms.
+4. Transcribe with the request's Transcriber, else the settings', else `groq-whisper`, prompted with the top dictionary terms: in the one dictation language, or with detection among several, and again in the first language when the detected one is neither.
 5. Silence guard: empty transcripts and known hallucinations answer empty text; ambiguous phrases ("Gracias.") only when the WAV is under `SPEECH_LEVEL_DBFS`.
-6. Refine with the request's Refiner, else the settings', else `openai`: the `plain` editing rules of the locale's language, the resolved style and the full dictionary (see styles and dictionary).
-7. Save `DICTATION#ts` with the `styleId` used and respond with raw, text, `styleId`, providers and per-stage latency (`profile` included).
+6. Refine with the request's Refiner, else the settings', else `openai`: the `plain` editing rules of the language used, the resolved style and the full dictionary (see styles and dictionary).
+7. Save `DICTATION#ts` with the `styleId` and language used and respond with raw, text, `styleId`, providers and per-stage latency (`profile` included).
 
 Each provider call emits one CloudWatch EMF record in `TakeMyWord/Dictation` per `Provider` (latency, errors, tokens); logs are JSON lines that never carry audio, raw or clean text.
 
@@ -58,6 +58,6 @@ Optional, with code defaults: `GROQ_WHISPER_MODEL` (`whisper-large-v3-turbo`), `
 
 ## Testing
 
-- Unit tests next to the code with fake ports; `pnpm e2e` in `apps/api` runs the deployed path against `API_URL` (see TRD).
-- The desktop's serde mirror of the dictation, error, settings and style contracts is checked against JSON Schema generated from `packages/shared`, so changing a contract fails `ci` until `pnpm contract` in `apps/desktop` and the mirror follow.
+- Unit tests next to the code with fake ports; `pnpm e2e` in `apps/api` runs the deployed path against `API_URL` (see TRD), including English and Spanish recordings under each set of dictation languages.
+- The desktop's serde mirror of the dictation, error, settings, style and app rule contracts is checked against JSON Schema generated from `packages/shared`, so changing a contract fails `ci` until `pnpm contract` in `apps/desktop` and the mirror follow.
 - `apps/web` `pnpm e2e` seeds a throwaway user through the API, pages history with `?limit=1`, and deletes a dictation through CloudFront.

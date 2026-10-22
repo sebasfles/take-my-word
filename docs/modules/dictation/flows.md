@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0003_api_features
+source: 0008_desktop_features
 ---
 
 # Dictation: flows
@@ -32,12 +32,19 @@ sequenceDiagram
   alt day already at the cap
     D-->>C: 429
   end
-  D->>S: audio and top dictionary terms as prompt
-  S-->>D: raw transcript
+  alt one dictation language
+    D->>S: audio, that language, top dictionary terms as prompt
+  else several
+    D->>S: audio and prompt, language detected
+    opt detected language not in the list
+      D->>S: audio again in the first language
+    end
+  end
+  S-->>D: raw transcript in the language used
   alt empty, hallucination, or ambiguous phrase on quiet WAV
     D-->>C: empty text, nothing saved
   end
-  D->>R: raw transcript, editing rules, resolved style, full dictionary, locale
+  D->>R: raw transcript, editing rules, resolved style, full dictionary, language used
   R-->>D: clean text
   D->>T: save DICTATION with styleId and TTL 90 days
   D-->>C: raw and clean text, styleId

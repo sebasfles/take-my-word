@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0005_desktop_release
+source: 0008_desktop_features
 ---
 
 # Desktop: architecture and debt
@@ -86,6 +86,7 @@ source: 0005_desktop_release
 - Alternatives rejected: a fixed wait before restoring.
 - Reason: delayed rendering tells when the target actually read the text, and the missing read doubles as the paste-failure signal.
 - Debt created: any reader after the keystroke counts as the target, and a clipboard monitor that ignores the exclusion format still sees the text.
+- Resolved by: 0008_desktop_features, 2026-10-21
 - Revisit when: a paste reported as done does not land in a real app.
 - Source: 0002_desktop_shell
 
@@ -152,6 +153,7 @@ source: 0005_desktop_release
 - Debt created: none.
 - Revisit when: the settings window gains editors (0008) that would need many more mirrored contracts.
 - Source: 0007_desktop_integration
+- Superseded by 2026-10-21: The editors reach the API through one closed route forwarder (the mirror per route only)
 
 ## 2026-10-21: The session lives in Credential Manager through keyring-core
 
@@ -225,3 +227,58 @@ source: 0005_desktop_release
 - Debt created: Windows SmartScreen warns on the first install.
 - Revisit when: the app is offered beyond the invited circle, or SmartScreen blocks installs.
 - Source: 0005_desktop_release
+
+## 2026-10-21: The editors reach the API through one closed route forwarder
+
+- Decision: one command forwards a closed enum of named routes (dictionary, styles, app rules, settings, history; never `POST /dictations`) with ids and the history cursor as parameters percent-encoded by Rust, attaches the token, renews once like every call, and answers the JSON body or `{kind, status, code}` with no text; the views validate requests and responses with the `packages/shared` schemas, and Rust mirrors only what it reads itself (dictation, error, settings, style list, app rule list), all in the contract test.
+- Alternatives rejected: a mirrored command per route, which would copy most of the API surface into Rust.
+- Reason: the token stays in Rust and no path or URL comes from the WebView, while each contract lives in one place.
+- Debt created: a new CRUD route needs a variant in the enum before the views can use it.
+- Revisit when: the editors need a route the enum lacks, or a second client process needs the API.
+- Source: 0008_desktop_features
+
+## 2026-10-21: Spanish and English through two shared dictionaries
+
+- Decision: `src/i18n/es.json` and `en.json`, keyed by message id, serve the views and are embedded in Rust for the tray, notifications and window titles; Rust sends ids across IPC, never text; the language is Windows' when it is Spanish or English, else English, unless `settings.json` holds a choice; a change saves, switches Rust's language, relabels the tray, retitles open windows and tells every view, which re-renders in place; new windows get it in their URL.
+- Alternatives rejected: an i18n framework; English text from Rust translated in the views; reloading windows on a switch.
+- Reason: two small files tested for matching keys on both sides keep every string in one place, and an id cannot leak English into a Spanish view.
+- Debt created: none.
+- Revisit when: a third language arrives, or plural rules outgrow one variant per count.
+- Source: 0008_desktop_features
+
+## 2026-10-21: App rules cached in memory for the paste keystroke
+
+- Decision: Rust keeps the user's rules in memory, loaded at startup and sign-in, reloaded after every rule change made through the forwarder, refreshed in the background at hotkey down when older than 5 minutes (one refresh at a time, never awaited), and cleared on sign-out; each load is numbered and applies only if it started after the rules already applied and after the last sign-out; the paste uses the target's rule keystroke, Ctrl+V otherwise, and `cmd+v` reads as Ctrl+V on Windows.
+- Alternatives rejected: sending the keystroke in `POST /dictations`, an API change.
+- Reason: the hotkey never waits on the network, and an older load can never undo a newer edit or bring back a signed-out user's rules.
+- Debt created: a rule edited on the web or another machine reaches this one's paste up to 5 minutes later.
+- Revisit when: a paste uses a stale keystroke after an edit elsewhere.
+- Source: 0008_desktop_features
+
+## 2026-10-21: The overlay's level comes from an atomic set in the capture callback
+
+- Decision: the cpal callback meters RMS over 50 ms into one atomic, and an emitter thread that lives only while Listening sends the latest value to the overlay every 50 ms, dropping rather than queueing; the overlay draws nine bars from the last values, flat on silence.
+- Alternatives rejected: streaming samples to the WebView.
+- Reason: no lock or allocation is added to the audio path, and nothing runs while idle; idle RAM and CPU stayed at the base build's.
+- Debt created: none.
+- Revisit when: the overlay lags the voice on a slow machine.
+- Source: 0008_desktop_features
+
+## 2026-10-21: The paste gives the text only to the target's processes
+
+- Decision: the offer carries the target window's process and a hosted app's, and the clipboard window renders the text only when the reader that opened the clipboard is one of them or descends from one (a walk up the parent chain); others get nothing and do not count as the paste; each read is logged with the reader's executable, never the text.
+  WebView2 opens the clipboard without a window, so its paste is served by the rule for unidentifiable readers below, not by the process tree; the tree is covered by unit tests, for hosts that read from a child process that has a window.
+- Alternatives rejected: counting any read after the keystroke, as before.
+- Reason: on Windows a clipboard reader that ignores the exclusion format (WSLg's `msrdc.exe` there) read first, counted as the target, and the clipboard was restored before the target pasted, so a paste reported done landed nothing.
+- Debt created: a reader that opens the clipboard without a window, or whose window reads as process 0, still gets the text and counts as the target, so such a monitor reading first can still end a paste early; a reused process id in the parent chain can admit an unrelated process.
+- Revisit when: a paste reported as done does not land again, or a target app's reads are withheld.
+- Source: 0008_desktop_features
+
+## 2026-10-21: History copy uses its own clipboard owner
+
+- Decision: Copy in History goes through Rust to a second clipboard window, created on the first copy, that puts the text with the paste's exclusion flags and restores nothing; the window class is registered once for both owners.
+- Alternatives rejected: the paste worker's clipboard, which a copy would wait behind and whose restore it could disturb.
+- Reason: the copied text stays out of clipboard history and the cloud clipboard like a dictation, without touching a paste in flight.
+- Debt created: none.
+- Revisit when: a copy fails while a paste is in flight.
+- Source: 0008_desktop_features

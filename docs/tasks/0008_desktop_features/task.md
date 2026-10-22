@@ -294,3 +294,8 @@ Decisions not in the plan, and the debt that remains (for the ARD entry in `docu
 - The reader log line stays at info level, since it names only executables and is the one way to see which reader decided a paste.
 
 Pending: desktop-ci on the PR; docs on "clean, document".
+
+### Docs
+
+- desktop, dictation, dictionary and styles module docs corrected in place; ARD entries for the route forwarder, the two dictionaries, the rule cache, the level meter, the paste to the target's processes, the history copy owner, and dictation languages with their compatibility rule; the paste entry's old debt is resolved and the remaining one lives in the new entry and the debt index.
+- styles/ard.md has no new entry: the per-app keystroke decision from setup now simply holds on desktop, and the built-in naming follows the web's entry.

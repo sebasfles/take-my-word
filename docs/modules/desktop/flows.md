@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-21
-source: 0007_desktop_integration
+source: 0008_desktop_features
 ---
 
 # Desktop: flows
@@ -41,11 +41,11 @@ sequenceDiagram
   U->>D: release hotkey
   D->>O: show processing
   D->>D: access token, renewed under the lock with under 5 min left
-  D->>A: WAV, appId, locale, access token
+  D->>A: WAV, appId, access token
   Note over D,A: 401 or 403 without the error envelope: renew once, retry once
   A-->>D: clean text
-  D->>D: save clipboard, offer text (delayed rendering)
-  D->>F: paste keystroke from app rule
+  D->>D: save clipboard, offer text (delayed rendering) to F's processes only
+  D->>F: paste keystroke from the cached app rule, else Ctrl+V
   F-->>D: reads the text
   D->>D: restore clipboard
   D->>O: hide
