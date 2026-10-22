@@ -225,11 +225,13 @@ Captures (real WebView2, bundled fonts, native title bar following the theme):
 
 - Light: sign-in, onboarding at its fitted 600 px width with no scroll, first run, Settings › General showing Ctrl + Alt + Win with Claro selected, the overlay during a real hold.
 - Dark: Settings › General (dark title bar and scrollbar), the overlay during a real hold, Settings › Account after signing out, sign-in.
-- The overlay is the ink pill with flat bars in both sessions (a silent room), "Escuchando".
+- Overlay: `overlay-hold-light-session-23-13-31.png` and `overlay-hold-dark-session-23-19-12.png`, each taken 0.7 s into its own hold (holds ended 23:13:33 and 23:19:13 in the app log).
+  The two files are byte-identical because the pill drew the same pixels at that instant: the ink pill (forced light in both sessions), "Escuchando", and flat bars, since no sound had arrived yet.
+  They do not show the sound the dark-session hold picked up later.
 
 Real hold (Acceptance 7): Ctrl + Alt + Win held 2.5 s with `tmw-scratch.exe` in front.
-The light-session hold in a silent room returned no text and pasted nothing.
-The dark-session hold picked up room sound and pasted it into `tmw-scratch.exe` with Ctrl+V: `clipboard read by tmw-scratch.exe (with a window): rendered`, then `pasted a dictation`.
+The light-session hold returned no text and pasted nothing.
+The dark-session hold picked up room sound after the overlay capture and pasted it into `tmw-scratch.exe` with Ctrl+V: `clipboard read by tmw-scratch.exe (with a window): rendered`, then `pasted a dictation`.
 The scratch window kept the foreground both times.
 
 Launches and consoles (machine rule breach, reported by the om-reviewer): the debug build is a console-subsystem exe, so every launch of it that was not started with `CreateNoWindow` created a console, which Windows 11 hosts in Windows Terminal, Sebastian's terminal on this machine.
@@ -280,3 +282,7 @@ Machine, after: the dev config and data folders the run created removed, no Cred
 Also in this round: the WebView2 scrollbar takes `--color-border-strong` on a transparent track (`base.css`), since the real windows showed the default grey one in light.
 
 Deferred: the windowless-reader paste debt now has a reproduction on this machine (a pid-0 reader after `msrdc.exe` on both no-console smoke pastes); counting only reads after the keystroke would avoid it, a paste behavior change outside this task.
+
+### Round 5
+
+Finding 1: the two overlay captures are not a copy. They were written at 23:13:31.862 and 23:19:12.109, each 0.7 s into its own hold, and are byte-identical because the pill drew the same pixels at that moment (flat bars, same label, forced light). They are now named by hold and time, and the round 4 notes say what they show: flat bars at 0.7 s, not the sound the dark-session hold picked up later.
