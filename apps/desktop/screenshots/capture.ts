@@ -6,16 +6,33 @@ import type { Language, MessageId } from "../src/i18n.ts";
 
 const out = process.argv[2];
 if (!out) {
-  console.error("usage: node screenshots/capture.ts <output-dir>");
+  console.error("usage: node screenshots/capture.ts <output-dir> [name-prefix,...]");
   process.exit(2);
 }
+const only = process.argv[3]?.split(",") ?? [];
 
 const here = import.meta.dirname;
-const widths = [
-  { width: 390, height: 844 },
-  { width: 768, height: 1024 },
-  { width: 1280, height: 800 },
-];
+
+interface Size {
+  width: number;
+  height: number;
+}
+
+const windowSizes: Record<string, Size[]> = {
+  account: [{ width: 440, height: 560 }],
+  "first-run": [{ width: 520, height: 470 }],
+  update: [{ width: 460, height: 400 }],
+  overlay: [{ width: 480, height: 96 }],
+  settings: [
+    { width: 380, height: 640 },
+    { width: 880, height: 640 },
+    { width: 1280, height: 800 },
+  ],
+};
+
+const appBackdrops = { light: "#ffffff", dark: "#1f1f1f" };
+
+const viewOf = (query: string) => new URLSearchParams(query).get("view") ?? "settings";
 
 type Text = (id: MessageId, values?: Record<string, string>) => string;
 
@@ -382,32 +399,41 @@ try {
     const text: Text = (id, values = {}) =>
       messages[id].replace(/\{(\w+)\}/g, (match, name: string) => values[name] ?? match);
     for (const colorScheme of ["dark", "light"] as const) {
-      for (const size of widths) {
-        if (colorScheme === "light" && size.width !== 1280) continue;
-        const context = await browser.newContext({ viewport: size, colorScheme });
-        for (const shot of shots) {
+      const context = await browser.newContext({ colorScheme, deviceScaleFactor: 1 });
+      for (const shot of shots) {
+        if (only.length > 0 && !only.some((prefix) => shot.name.startsWith(prefix))) continue;
+        const view = viewOf(shot.query);
+        for (const size of windowSizes[view] ?? []) {
           const page = await context.newPage();
+          await page.setViewportSize(size);
           await page.goto(`${base}?${shot.query}&lang=${language}`);
-          if (shot.query.includes("view=overlay")) {
-            await page.addStyleTag({ content: "html, body { background: #52525b !important; }" });
-            await page.locator(".pill").waitFor();
+          if (view === "overlay") {
+            await page.addStyleTag({
+              content: `html, body { background: ${appBackdrops[colorScheme]} !important; }`,
+            });
+            await page.locator(".tmw-overlay").waitFor();
           } else {
             await page.getByRole("heading").first().waitFor();
           }
           await shot.act?.(page, text);
+          await page.evaluate(() => document.fonts.ready);
           await page.waitForTimeout(200);
-          const overflow = await page.evaluate(
-            () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-          );
-          if (overflow)
+          const overflow = await page.evaluate(() => ({
+            sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            down: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+          }));
+          if (overflow.sideways) {
             throw new Error(`${shot.name} scrolls sideways at ${String(size.width)} px`);
-          const light = colorScheme === "light" ? "-light" : "";
-          const file = `${shot.name}-${language}-${String(size.width)}${light}.png`;
-          await page.screenshot({ path: join(out, file), fullPage: true });
+          }
+          if (overflow.down && view !== "settings") {
+            throw new Error(`${shot.name} does not fit its ${String(size.height)} px window`);
+          }
+          const file = `${shot.name}-${language}-${String(size.width)}-${colorScheme}.png`;
+          await page.screenshot({ path: join(out, file), fullPage: view === "settings" });
           await page.close();
         }
-        await context.close();
       }
+      await context.close();
     }
   }
 } finally {

@@ -82,13 +82,14 @@ Direction A "Tinta" from 0010 (Fraunces and Instrument Sans, terracotta on paper
 Consolidated 2026-10-21; the om-manager decides (design and merges delegated by Sebastian); details marked (om-reviewer) are mine.
 These override Scope, Acceptance and Approach above where they differ.
 
-- Release order (adjusts Scope "Release"): `origin/main` lacks 0008 and 0010, and prd's `dictationMetaSchema` requires `locale` while this desktop needs `dictationLanguages` (`src-tauri/src/api/mod.rs`), so no `desktop-v0.2.0` tag until #15 is merged and `deploy-prd` is green; the om-manager says when.
+- Release order (adjusts Scope "Release"): `origin/main` lacks 0008 and 0010, and prd's `dictationMetaSchema` requires `locale` while this desktop needs `dictationLanguages` (`src-tauri/src/api/mod.rs`), so no `desktop-v0.2.0` tag until #15 is merged and `deploy-prd` is green; the om-manager says when. Met 2026-10-21: #15 merged as `be4d148`, `deploy-prd` green (om-manager).
 - Release timing: clean review, PR with screenshots and the `desktop-ci` dev installer, then "PR ready, awaiting release go" to the om-manager; on "release go" the om-developer rebases, runs `pnpm release:desktop 0.2.0` only on my hand-off, and adds the update and landing evidence to the PR. The PR merges with a merge commit; never rebase or force-push at or below the tag.
 - Update check (Acceptance 5): prd is not installed on the Windows host; the run installs 0.1.1 from its release, updates to 0.2.0 through the updater, verifies, and uninstalls, as 0005 did. The new update window is proven by screenshots only, since 0.1.1 shows its own.
 - About (adjusts Scope): an About block at the foot of Settings › General: mark, wordmark, version, tagline, no links.
 - Tray states (adjusts Scope): idle; recording only while Listening; attention while signed out or the microphone is blocked or missing. Transient errors stay in the overlay and notifications. Tooltips name the state in es and en. One glyph per state that reads on light and dark taskbars, no taskbar-theme tracking.
 - Dev icons (adjusts Scope): the dev build gets a marked variant of the app and tray icons; prd stays as designed.
 - Overlay (adjusts Approach): the brand `Waveform` gains a history mode (`levels`, newest last) and `OverlayPill` an optional action slot; the overlay keeps 0008's behavior (scrolling bars, flat on silence, bars only while Listening, click to dismiss, microphone link) in the pill's look; the web's rendering is unchanged.
+- Overlay states (om-reviewer, 2026-10-21, on the om-developer's question): the pill shows bars only while Listening; processing shows a token-built spinner (a generic pill option if added to brand, still under reduced motion), error shows no bars; 0008's "no bars in processing" assertion stays as is.
 - Acceptance 7: selectors and copy may change (the voice rewrite needs it); no assertion is dropped or weakened.
 - Acceptance 6: 0008's method (private working set of app plus WebView2 after opening and closing settings; CPU seconds over 5 idle minutes), on dev release builds of the develop head (base) and the final commit in the same session; pass at RAM ≤ base + 10 MB and CPU ≤ base + 1.0 s, on runs that do not follow a sign-in.
 - Design checkpoint: round 1 delivers only the overlay pill, tray and app icon candidates in every state at 16, 20, 24 and 32 px on light and dark taskbar backdrops, and sign-in plus Settings › General in both themes; I send the paths to the om-manager for one design answer before the rest is restyled.
@@ -106,3 +107,40 @@ Review focus beyond the Pipeline: literal styles left in `apps/desktop`, keyboar
 clearance: full: GitHub as sebasfles (PR, the `desktop-v0.2.0` tag on my hand-off, the release), the Windows host under the machine rules, `fless-takemyword` on dev for one throwaway Cognito user created and deleted; no Terraform, no deploys, nothing in prd except the published release.
 
 ## om-developer notes
+
+### Round 1 (design checkpoint)
+
+Screenshots: `.workspaces/0011_desktop_rebrand/screenshots/round-1/` with `windows/` (each window at its real size, es and en, light and dark, device scale 1), `icons/` (tray sheets per candidate and the app icon sheet) and `pairs/` (desktop next to the web at 1280).
+
+Did:
+
+- `packages/brand`: `token-lint.ts` moved from `apps/web` with its generic tests, plus `sourceFiles` and `missingCustomProperties`, so both apps' lint tests share one rule set; the web test keeps every assertion.
+- `Waveform` history mode (`levels`, newest last, one bar per level, flat at the floor on silence); `OverlayPill` gains `levels`, an `action` slot, `role="alert"` on error, and `indicator: "waveform" | "state"` (default `waveform`, the web's look): with `state` the bars show only while listening, processing shows the existing `.tmw-spinner` (still under reduced motion), error an alert glyph, done a check, per the reviewer's answer.
+- A shared brand `icons` set (nav, theme, alert, check) and an `Icon` component; `apps/web` `account-nav.tsx` and `theme-switch.tsx` only swap their local paths for it.
+- Icon candidates: `scripts/desktop-icons.ts` builds tray and app icons from the mark geometry and tokens, `pnpm icon-sheet <dir>` renders every frame and the comparison sheets; nothing committed as an app or tray asset until the design answer.
+  Tray "tile" (recommended): accent tile with the paper glyph (the favicon), three paper bars while recording, a quiet neutral tile with an amber badge for attention (its "!" from 24 px up); every tile is at least 3.4:1 against both taskbars.
+  Tray "glyph": the bare mark in accent 500 (3.05:1 on the light taskbar, faint at 16 px).
+  App icon "accent" (the brand icon, recommended) and "ink" (disappears on a dark taskbar). Dev variant: a light-blue corner on every icon.
+- `apps/desktop` imports `@take-my-word/brand/index.css` (fonts bundled by Vite, nothing from the network); styles split into token-only `styles/base.css`, `account.css`, `settings.css`, `overlay.css`.
+- Theme: `theme` in `settings.json` (absent means Windows), `theme` and `set_theme` commands, `AppHandle::set_theme` at start and on change (native title bars and WebView2's color scheme), a `theme` event every view applies through `Root` (was `LanguageRoot`), and `&theme=` in new windows' URLs for the first paint; the overlay is always `data-theme="light"` so the pill stays ink.
+- Restyled: sign-in and choose password (wordmark, Fraunces heading, brand fields and button, fits 440x560 in every state), the Settings shell (wordmark, icon nav, section header like the web's) and General (shortcut, autostart toggle, theme, app language, dictation languages, About with wordmark, tagline, version and Quit); `overview` now returns the version.
+- Overlay on `OverlayPill` with `indicator="state"`, 9-level history, click to dismiss, the microphone link as the action; a hairline `neutral-800` edge (desktop only) keeps the ink pill visible over dark apps.
+- `desktop-ci` now watches `packages/brand/**`.
+- Screenshot script: real window sizes, both themes at every size, an optional name-prefix filter, and a failure when a fixed-size window would need to scroll.
+
+Tests: the desktop token lint (`src/token-lint.test.ts`), Root theme and language, theme and About in Settings, config round trip of `theme`, `theme::query`, brand history mode, action slot and state indicator.
+0008 tests changed only in selectors: the autostart toggle reads `aria-checked` (brand switch is a button), the overlay level bars read `--level` on `.waveform-bar`, and the quota alert lost the "!" character now drawn as a glyph.
+
+Web unchanged: `pnpm screenshots` gallery and pages, before (`origin/develop`) and after, 312 shots each: 282 byte-identical; the other 30 (every history page, the dialog) differ the same way between two runs of the baseline itself (relative times, the dialog's entrance frame), so none comes from this change.
+
+Pending (round 2, after the design answer): the remaining windows (onboarding, first run, update, the editors, history, Account section), `styles/legacy.css` (the old rules mapped to tokens, the only file the desktop token lint still exempts) deleted, the chosen icons generated as committed assets and wired (tray state transitions in Rust with tooltips, dev variants, installer and uninstall icons), voice rewrite of notifications and tray copy, PrintWindow evidence on Windows, Acceptance 6 measurements, the real-dictation smoke.
+
+Deferred:
+
+- The web screenshot script is nondeterministic on history (relative times from `Date.now`) and the dialog (entrance animation); worth pinning the clock and settling the dialog in a web task.
+
+Decisions not in the plan:
+
+- `OverlayPill` error uses `role="alert"` (was `status`); no web test or screenshot depends on it.
+- Theme labels say "Windows" for the system option, like the app-language row, rather than the web's "System".
+- Web `verify` steps `integration` and `e2e` not run: they create throwaway dev users beyond this task's clearance and test the deployed dev web, not this diff.

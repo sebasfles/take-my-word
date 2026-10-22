@@ -156,7 +156,12 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
         hotkey: ["Ctrl", "Win"],
         autostart: params.get("autostart") !== "off",
         microphone: params.get("mic") ?? "ready",
+        version: "0.2.0",
       });
+    case "theme":
+      return answer(null);
+    case "set_theme":
+      return answer(args?.choice ?? null);
     case "propose_hotkey":
       return params.get("propose") === "altgr"
         ? problem("hotkey.rightAlt")

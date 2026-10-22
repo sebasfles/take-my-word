@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hotkey::Hotkey;
 use crate::locale::Language;
+use crate::theme::Theme;
 
 pub const FILE_NAME: &str = "settings.json";
 
@@ -17,6 +18,8 @@ pub struct Settings {
     pub onboarded_users: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ui_language: Option<Language>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theme: Option<Theme>,
 }
 
 pub fn load(path: &Path) -> Settings {
@@ -79,6 +82,25 @@ mod tests {
     }
 
     #[test]
+    fn the_theme_is_saved_only_when_chosen() {
+        let path = scratch("theme", None);
+        let chosen = Settings {
+            theme: Some(Theme::Dark),
+            ..Settings::default()
+        };
+        save(&path, &chosen).unwrap();
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains(r#""theme": "dark""#)
+        );
+        assert_eq!(load(&path), chosen);
+        save(&path, &Settings::default()).unwrap();
+        assert!(!fs::read_to_string(&path).unwrap().contains("theme"));
+        assert_eq!(load(&path).theme, None);
+    }
+
+    #[test]
     fn missing_or_invalid_files_fall_back_to_ctrl_win() {
         assert_eq!(load(&scratch("missing", None)), Settings::default());
         assert_eq!(load(&scratch("broken", Some("{"))), Settings::default());
@@ -103,6 +125,7 @@ mod tests {
             first_run_done: true,
             onboarded_users: vec!["2448e4f8-2081-70f1-5c1b-1f2e3d4c5b6a".into()],
             ui_language: Some(Language::En),
+            theme: Some(Theme::Light),
         };
         save(&path, &settings).unwrap();
         assert_eq!(load(&path), settings);

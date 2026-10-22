@@ -1,0 +1,23 @@
+## 2026-10-22T02:54:07Z by om-developer target brand on 2a25ba8
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-22T02:54:07Z by om-developer target web on 2a25ba8
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (165 tests, pnpm test)
+- e2e: n/a (pnpm integration and pnpm e2e not run: they create throwaway dev users beyond this task's clearance and test the deployed dev web, not this diff)
+
+## 2026-10-22T02:54:07Z by om-developer target desktop on 2a25ba8
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0011)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (130 vitest and 142 cargo tests, 4 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-22T02:54:07Z by om-developer target workflows on 2a25ba8
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a

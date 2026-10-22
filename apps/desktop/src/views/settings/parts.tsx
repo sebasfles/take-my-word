@@ -13,10 +13,10 @@ export function SectionPage({
   children: ReactNode;
 }) {
   return (
-    <main className="page settings-page">
-      <header className="page-header">
+    <main className="section">
+      <header className="section-header">
         <h1>{t(title)}</h1>
-        <p className="muted">{t(intro)}</p>
+        <p>{t(intro)}</p>
       </header>
       {children}
     </main>
@@ -141,7 +141,7 @@ export function ConfirmDelete({
 export function ErrorLine({ message }: { message: Note | null }) {
   if (message === null) return null;
   return (
-    <p className="error" role="alert">
+    <p className="tmw-error" role="alert">
       {say(message)}
     </p>
   );

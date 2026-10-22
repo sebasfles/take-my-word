@@ -137,14 +137,14 @@ describe("Settings", () => {
 
   it("turns autostart off and reflects what Windows reports", async () => {
     render(<Settings />);
-    const toggle = await screen.findByRole("switch");
+    const toggle = await screen.findByRole("switch", { name: "Start with Windows" });
     await vi.waitFor(() => {
-      expect((toggle as HTMLInputElement).checked).toBe(true);
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
     });
     fireEvent.click(toggle);
     expect(fakeBridge.setAutostart).toHaveBeenCalledWith(false);
     await vi.waitFor(() => {
-      expect((toggle as HTMLInputElement).checked).toBe(false);
+      expect(toggle.getAttribute("aria-checked")).toBe("false");
     });
   });
 
@@ -214,6 +214,27 @@ describe("Settings", () => {
     expect(fakeBridge.setUiLanguage).toHaveBeenCalledWith("en");
     fireEvent.change(select, { target: { value: "windows" } });
     expect(fakeBridge.setUiLanguage).toHaveBeenLastCalledWith(null);
+  });
+
+  it("saves the theme and offers Windows' choice back", async () => {
+    render(<Settings />);
+    const windows = await screen.findByRole<HTMLInputElement>("radio", { name: "Windows" });
+    await vi.waitFor(() => {
+      expect(windows.checked).toBe(true);
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(fakeBridge.setTheme).toHaveBeenCalledWith("dark");
+    await vi.waitFor(() => {
+      expect(screen.getByRole<HTMLInputElement>("radio", { name: "Dark" }).checked).toBe(true);
+    });
+    fireEvent.click(windows);
+    expect(fakeBridge.setTheme).toHaveBeenLastCalledWith(null);
+  });
+
+  it("shows the installed version in About", async () => {
+    render(<Settings />);
+    await screen.findByText("Version 0.2.0");
+    expect(screen.getByRole("region", { name: "About Take My Word" })).toBeTruthy();
   });
 
   it("follows a session that ends elsewhere", async () => {

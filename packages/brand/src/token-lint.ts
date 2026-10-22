@@ -1,3 +1,8 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { tokensCss } from "./css.ts";
+import { tokens } from "./tokens.ts";
+
 const colorLiteral =
   /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(|\b(?:white|black|gr[ae]y|red|green|blue|orange|yellow|purple|pink|brown|navy|teal)\b/i;
 const lengthLiteral =
@@ -78,4 +83,29 @@ export function tsxViolations(tsx: string): string[] {
     found.push(`font: ${match[1] ?? ""}`);
   }
   return found;
+}
+
+export function sourceFiles(dir: string, extension: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return sourceFiles(path, extension);
+    return entry.name.endsWith(extension) ? [path] : [];
+  });
+}
+
+const brandCss = ["ui/ui.css", "waveform.css"].map((path) =>
+  readFileSync(join(import.meta.dirname, path), "utf8"),
+);
+
+export function missingCustomProperties({ css, tsx }: { css: string[]; tsx: string[] }): string[] {
+  const defined = new Set(
+    [tokensCss(tokens, ":root"), ...brandCss, ...css, ...tsx].flatMap((source) =>
+      [...source.matchAll(/"?--([\w-]+)"?\s*:/g)].map((match) => match[1]),
+    ),
+  );
+  return css.flatMap((source) =>
+    [...source.matchAll(/var\(--([\w-]+)\s*(,)?/g)]
+      .filter((match) => match[2] === undefined && !defined.has(match[1]))
+      .map((match) => match[1] ?? ""),
+  );
 }

@@ -1,4 +1,5 @@
-import { type SubmitEvent, useCallback, useEffect, useState } from "react";
+import { type ReactNode, type SubmitEvent, useCallback, useEffect, useState } from "react";
+import { Button, TextInput, Wordmark } from "@take-my-word/brand";
 import { type AccountStep, bridge, type Onboarding, problemOf } from "../bridge.ts";
 import { type Language, type MessageId, t } from "../i18n.ts";
 import { LanguageChoices } from "../LanguageChoices.tsx";
@@ -59,51 +60,64 @@ function SignIn({
   };
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <h1>{t("signIn.title")}</h1>
-        <p className="muted">{t("signIn.intro")}</p>
-      </header>
-      <form className="form" onSubmit={submit}>
-        <label className="field">
-          <span>{t("signIn.username")}</span>
-          <input
-            className="input"
-            name="username"
-            autoComplete="username"
-            autoFocus
-            required
-            value={username}
-            onChange={(event) => {
-              setUsername(event.target.value);
-            }}
-          />
-        </label>
-        <label className="field">
-          <span>{t("signIn.password")}</span>
-          <input
-            className="input"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-            }}
-          />
-        </label>
+    <AuthPage title="signIn.title" intro="signIn.intro">
+      <form className="auth-form" onSubmit={submit}>
+        <TextInput
+          label={t("signIn.username")}
+          name="username"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          autoFocus
+          required
+          value={username}
+          onChange={(event) => {
+            setUsername(event.target.value);
+          }}
+          aria-describedby={error ? "sign-in-error" : undefined}
+        />
+        <TextInput
+          label={t("signIn.password")}
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(event) => {
+            setPassword(event.target.value);
+          }}
+          aria-describedby={error ? "sign-in-error" : undefined}
+        />
         {error && (
-          <p className="error" role="alert">
+          <p id="sign-in-error" className="form-error" role="alert">
             {t(error)}
           </p>
         )}
-        <div className="form-actions">
-          <button type="submit" className="button button-primary" disabled={busy}>
-            {t(busy ? "signIn.submitting" : "signIn.submit")}
-          </button>
-        </div>
+        <Button type="submit" block loading={busy}>
+          {t(busy ? "signIn.submitting" : "signIn.submit")}
+        </Button>
       </form>
+    </AuthPage>
+  );
+}
+
+function AuthPage({
+  title,
+  intro,
+  children,
+}: {
+  title: MessageId;
+  intro: MessageId;
+  children: ReactNode;
+}) {
+  return (
+    <main className="auth">
+      <Wordmark height={24} className="auth-brand" />
+      <header className="auth-heading">
+        <h1>{t(title)}</h1>
+        <p>{t(intro)}</p>
+      </header>
+      {children}
     </main>
   );
 }
@@ -142,54 +156,44 @@ function ChoosePassword({
   };
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <h1>{t("choosePassword.title")}</h1>
-        <p className="muted">{t("choosePassword.intro")}</p>
-      </header>
-      <form className="form" onSubmit={submit}>
-        <label className="field">
-          <span>{t("choosePassword.new")}</span>
-          <input
-            className="input"
-            name="new-password"
-            type="password"
-            autoComplete="new-password"
-            autoFocus
-            required
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-            }}
-          />
-        </label>
-        <label className="field">
-          <span>{t("choosePassword.repeat")}</span>
-          <input
-            className="input"
-            name="repeat-password"
-            type="password"
-            autoComplete="new-password"
-            required
-            value={repeated}
-            onChange={(event) => {
-              setRepeated(event.target.value);
-            }}
-          />
-        </label>
-        <p className="muted">{t("choosePassword.rules")}</p>
+    <AuthPage title="choosePassword.title" intro="choosePassword.intro">
+      <form className="auth-form" onSubmit={submit}>
+        <TextInput
+          label={t("choosePassword.new")}
+          name="new-password"
+          type="password"
+          autoComplete="new-password"
+          autoFocus
+          required
+          hint={t("choosePassword.rules")}
+          value={password}
+          onChange={(event) => {
+            setPassword(event.target.value);
+          }}
+          aria-describedby={error ? "choose-password-error" : undefined}
+        />
+        <TextInput
+          label={t("choosePassword.repeat")}
+          name="repeat-password"
+          type="password"
+          autoComplete="new-password"
+          required
+          value={repeated}
+          onChange={(event) => {
+            setRepeated(event.target.value);
+          }}
+          aria-describedby={error ? "choose-password-error" : undefined}
+        />
         {error && (
-          <p className="error" role="alert">
+          <p id="choose-password-error" className="form-error" role="alert">
             {t(error)}
           </p>
         )}
-        <div className="form-actions">
-          <button type="submit" className="button button-primary" disabled={busy}>
-            {t(busy ? "common.saving" : "choosePassword.submit")}
-          </button>
-        </div>
+        <Button type="submit" block loading={busy}>
+          {t(busy ? "common.saving" : "choosePassword.submit")}
+        </Button>
       </form>
-    </main>
+    </AuthPage>
   );
 }
 

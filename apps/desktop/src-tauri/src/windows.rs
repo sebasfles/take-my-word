@@ -148,7 +148,8 @@ pub fn open_update(app: &AppHandle) {
 
 fn view_url(label: &str, query: &str) -> String {
     let language = i18n::language().code();
-    format!("index.html?view={label}&lang={language}{query}")
+    let theme = crate::theme::query();
+    format!("index.html?view={label}&lang={language}{theme}{query}")
 }
 
 pub fn create_overlay(app: &AppHandle) -> tauri::Result<()> {

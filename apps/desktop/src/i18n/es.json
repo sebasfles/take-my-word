@@ -175,5 +175,13 @@
   "language.es": "Español",
   "dictationLanguages": "Idiomas de dictado",
   "dictationLanguages.note": "Los idiomas en que hablas. Con los dos, Take My Word reconoce cuál usas en cada dictado.",
-  "dictationLanguages.lastOne": "Elige al menos un idioma."
+  "dictationLanguages.lastOne": "Elige al menos un idioma.",
+  "settings.theme": "Tema",
+  "settings.theme.note": "Sigue a Windows salvo que elijas uno.",
+  "settings.theme.windows": "Windows",
+  "settings.theme.light": "Claro",
+  "settings.theme.dark": "Oscuro",
+  "settings.about": "Acerca de Take My Word",
+  "settings.about.version": "Versión {version}",
+  "brand.tagline": "Tu palabra, nuestra orden."
 }

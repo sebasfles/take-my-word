@@ -7,6 +7,7 @@ import type {
   Onboarding,
   OverlayState,
   Overview,
+  Theme,
   UiLanguage,
   UpdateView,
 } from "../bridge.ts";
@@ -16,6 +17,7 @@ export const listeners: {
   overlayLevel?: (level: number) => void;
   settingsNavigate?: (query: string) => void;
   uiLanguage?: (language: Language) => void;
+  theme?: (theme: Theme | null) => void;
   captureCancelled?: () => void;
   accountChanged?: (signedIn: boolean) => void;
   update?: (view: UpdateView) => void;
@@ -49,6 +51,7 @@ export const overview: Overview = {
   hotkey: ["Ctrl", "Win"],
   autostart: true,
   microphone: "ready",
+  version: "0.2.0",
 };
 
 export const fakeBridge = {
@@ -78,6 +81,8 @@ export const fakeBridge = {
   ),
   uiLanguage: vi.fn(() => Promise.resolve({ ...uiLanguage })),
   setUiLanguage: vi.fn((choice: Language | null) => Promise.resolve({ ...uiLanguage, choice })),
+  theme: vi.fn((): Promise<Theme | null> => Promise.resolve(null)),
+  setTheme: vi.fn((choice: Theme | null) => Promise.resolve(choice)),
   openSignIn: vi.fn(() => Promise.resolve(undefined)),
   signOut: vi.fn(() => Promise.resolve(undefined)),
   apiRequest: vi.fn<(route: Route) => Promise<unknown>>((route) => {
@@ -105,6 +110,10 @@ export const fakeBridge = {
   }),
   onUiLanguage: vi.fn((handler: (language: Language) => void) => {
     listeners.uiLanguage = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onTheme: vi.fn((handler: (theme: Theme | null) => void) => {
+    listeners.theme = handler;
     return Promise.resolve(() => undefined);
   }),
   onAccountChanged: vi.fn((handler: (signedIn: boolean) => void) => {
