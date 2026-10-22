@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0005_desktop_release
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Infra: technical
@@ -16,7 +16,7 @@ source: 0005_desktop_release
 | `infra/stacks/app` | Everything one env runs, plus the per-env deploy role scoped to that env's Actions environment. |
 | `infra/modules/aws/*` | Reusable modules: `lambda` (IAM statements may carry conditions, optional `AWS_IAM` Function URL), `http_api`, `cognito`, `dynamodb`, `acm`, `secrets`, `s3` (private bucket), `cloudfront` (distribution with OAC to a bucket and a Function URL, security headers policy, alias records). |
 | `infra/scripts/tf` | `infra/scripts/tf <env> <terraform args>` (`core`, `dev` or `prd`): feeds `GITHUB_APP_PEM` from `.env` as `TF_VAR_github_app_pem` and uses the `fless-takemyword` profile. |
-| `.github/workflows` | `ci` (no path filter, also runs the OpenNext build); `deploy-dev` and `deploy-prd` run `reusable-changes`, then `reusable-deploy` (api) and `reusable-deploy-web` only for the side the push touched; `desktop-release` builds and publishes the desktop on `desktop-v*` tags with no AWS access (desktop module); mobile release paths live in its module. |
+| `.github/workflows` | `ci` (no path filter, also runs the OpenNext build); `deploy-dev` and `deploy-prd` run `reusable-changes`, then `reusable-deploy` (api) and `reusable-deploy-web` only for the side the push touched (the web side includes `packages/brand/`); `desktop-release` builds and publishes the desktop on `desktop-v*` tags with no AWS access (desktop module); mobile release paths live in its module. |
 
 ## Resources per env
 

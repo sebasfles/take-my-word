@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0004_web_landing
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Auth: architecture and debt
@@ -115,3 +115,13 @@ source: 0004_web_landing
 - Debt created: none.
 - Revisit when: the function's environment is set by anything other than `stacks/app`.
 - Source: 0004_web_landing
+
+## 2026-10-22: The theme preference rides the same Origin-checked route as the language
+
+- Decision: `POST /api/theme` sets `tmw-theme` exactly like `POST /api/locale` sets `tmw-lang` (same `Origin` check, HttpOnly, one year); the switch applies the theme in the page at once and saves it without waiting.
+- Alternatives rejected: `localStorage` plus an inline script before paint, which the plan rules out; waiting for the save before repainting.
+- Reason: the server must know the theme to render `data-theme` and `theme-color` with no flash, and one handler shape keeps every web POST under the same guard.
+- Debt created: a failed save leaves a theme shown that is not remembered after reload.
+- Revisit when: users report the theme not sticking.
+- Source: 0010_brand_web
+

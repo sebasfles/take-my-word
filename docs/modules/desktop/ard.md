@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Desktop: architecture and debt
@@ -282,3 +282,13 @@ source: 0008_desktop_features
 - Debt created: none.
 - Revisit when: a copy fails while a paste is in flight.
 - Source: 0008_desktop_features
+
+## 2026-10-22: The landing reads the desktop version from the release manifest
+
+- Decision: the web reads `version` from the latest release's `latest.json`, parsed with `desktopReleaseManifestSchema` in `packages/shared`, cached 15 minutes with a 2.5 s timeout and streamed in a Suspense boundary; without it the download button shows no version.
+- Alternatives rejected: a version constant in the web, which goes stale on every release; the GitHub API, rate limited without a token.
+- Reason: the manifest the updater already trusts is the single source of the current version, and the landing must never wait on GitHub.
+- Debt created: none.
+- Revisit when: the manifest format changes or macOS joins with its own platform entry.
+- Source: 0010_brand_web
+

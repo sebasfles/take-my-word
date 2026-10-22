@@ -265,3 +265,13 @@ External actions:
 
 - Deployed `1dc7c2e`'s web to dev with `reusable-deploy-web`'s steps after that run (web CodeSha256 `zRTmT/BM8LGLYJ39auTxe2L19rTdSOjBpbbumsPLEdg=`, invalidation `I6SN0Q2NFBJM2MFFLHD7NFBRET`); no api or dictate deploy from 0010.
 - Integration and the 13 web e2e ran green against that deployment.
+
+### Documentation
+
+- `auth`: web language and theme rules (prd, trd), the theme route, and one ARD entry for the theme save.
+- `dictation`: the Account page shows dictation languages (trd).
+- `infra`: the web deploy filter includes `packages/brand/` (trd); ARD entries for next/font and the static brand assets.
+- `desktop`, not in the plan's modules: the landing reads the version through the shared manifest schema (trd, ARD).
+- `dictionary`, `styles`: nothing changed for them beyond the restyle, so their docs stay as they are.
+- Brand-internal decisions (token naming, the two glyphs, `tmw-` classes, font subsetting, the CSS-only demo) live in `packages/brand/README.md`, as Scope asks; there is no brand module folder.
+- Debt index: three rows added (auth theme save, two font-loading paths, `desktop-ci` without `packages/brand/`); none resolved.

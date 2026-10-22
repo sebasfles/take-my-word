@@ -81,3 +81,11 @@ Español:
 - Lema: "Tu palabra, nuestra orden."
 
 Both languages are always complete and say the same thing; neither is a translation of the other's wording.
+
+## Decisions
+
+- Custom properties are unprefixed and grouped by kind (`--color-*`, `--accent-*`, `--space-*`, `--text-*`, `--radius-*`, `--shadow-*`, `--duration-*`); `tokensCss` scopes them to any selector.
+- Success, warning, error and info are generic status colors; only the accent, neutrals and surfaces carry the identity.
+- The mark has a full glyph and a pixel-aligned small one, switched at 48 px, so the favicon stays crisp at 16 px.
+- Primitives use `tmw-` classes in plain CSS so they never collide with an app's own styles.
+- Fonts are subset to Latin with Spanish and pin SOFT, WONK and opsz; the hero demo is CSS keyframes only, with no JavaScript.
