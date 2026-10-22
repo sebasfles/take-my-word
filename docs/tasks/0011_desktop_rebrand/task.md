@@ -101,6 +101,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Screenshots (om-reviewer): each window at its real inner size (account 440x560, first run 520x470, update 460x400, overlay 480x96 over a light and a dark app backdrop), settings at 380, 880 and 1280 wide; every state, light and dark, es and en, device scale 1; pairs put the desktop window next to the matching web page at 1280, same theme and language.
 - Windows evidence (om-reviewer): the tray is shown from the generated icon frames on taskbar-colored backdrops, never a capture of the real taskbar; PrintWindow captures of the app's own sign-in, settings and a real hold's overlay from the dev build, in both forced themes, to compare WebView2 against Chromium.
 - Smoke user (om-reviewer, round 3): the SSO session expired with Sebastian away, so the smoke signs in as crew-e2e-b from the root `.env` instead of a throwaway user; settings and rules saved before and restored after, the smoke's dictations deleted, signed out; no AWS profile used.
+- Machine rule (om-manager, after the round 4 run, where the debug console opened as tabs in Sebastian's Windows Terminal and took the foreground twice): debug builds launch detached (`CREATE_NO_WINDOW` or `DETACHED_PROCESS`, never through `wt`, `cmd` or a console host), output redirected to a log file in the scratch folder; before each run the script checks that no window it did not open can be brought to the foreground by the launch.
 - Real dictation (om-reviewer, Acceptance 7): 0008's smoke: `--dictate-wav` of the committed speech fixture into `tmw-scratch.exe` the run launched, signed in as a throwaway dev user.
 - Release notes (om-reviewer): short, English then Spanish, in the brand voice, in the tag message.
 
@@ -212,3 +213,70 @@ Tests: both environments' defaults in one test (prd Ctrl+Win, dev Ctrl+Alt+Win m
 Test fixtures that meant Ctrl+Win (`chord.rs`, `keys.rs`, the DOM-code mapping, validation and the JSON round trip) now say `Hotkey::ctrl_win()` instead of the build default; no assertion changed.
 
 Pending (round 4): the Windows evidence, Acceptance 6 and the real-dictation smoke, once the reviewer books the host.
+
+### Round 4 (Windows evidence)
+
+Run on `afd37cc`, Windows 11 at 125% display scale, 2026-10-21 23:05 to 23:34 local, signed in as crew-e2e-b (dev), within the om-manager's slot and go.
+Evidence: `.workspaces/0011_desktop_rebrand/screenshots/round-4/windows-host/` (PrintWindow captures of the dev debug build, `app.log`, `measure.txt`); the mocked set from round 3 is copied beside it.
+
+Guard: a low-level hook watcher logged every input event's kind and injected flag only (no key codes); every step checked it first (no real keyboard event, never more than 3 real events in 30 s). Over the whole run it saw 0 real events and 36 injected key events, all the run's own.
+
+Captures (real WebView2, bundled fonts, native title bar following the theme):
+
+- Light: sign-in, onboarding at its fitted 600 px width with no scroll, first run, Settings › General showing Ctrl + Alt + Win with Claro selected, the overlay during a real hold.
+- Dark: Settings › General (dark title bar and scrollbar), the overlay during a real hold, Settings › Account after signing out, sign-in.
+- The overlay is the ink pill with flat bars in both sessions (a silent room), "Escuchando".
+
+Real hold (Acceptance 7): Ctrl + Alt + Win held 2.5 s with `tmw-scratch.exe` in front.
+The light-session hold in a silent room returned no text and pasted nothing.
+The dark-session hold picked up room sound and pasted it into `tmw-scratch.exe` with Ctrl+V: `clipboard read by tmw-scratch.exe (with a window): rendered`, then `pasted a dictation`.
+The scratch window kept the foreground both times.
+
+Launches and consoles (machine rule breach, reported by the om-reviewer): the debug build is a console-subsystem exe, so every launch of it that was not started with `CreateNoWindow` created a console, which Windows 11 hosts in Windows Terminal, Sebastian's terminal on this machine.
+Times are local (the app log is UTC, +5 h).
+
+| Time | Launch | Method | Console |
+|---|---|---|---|
+| 23:10 | debug app, light session | `Start-Process` | yes, a Windows Terminal tab while the app ran |
+| 23:12 | second instance, open Settings | `Start-Process` | yes, briefly |
+| 23:13:53 | smoke 1, `--dictate-wav` | `Start-Process` | yes, took the foreground: the app targeted `windowsterminal.exe` and refused the paste (`FocusChanged`), notification 1 |
+| 23:15:04 | smoke 2, `--dictate-wav` | `Start-Process` from a hidden PowerShell | yes, took the foreground: same refusal, notification 2 |
+| 23:15:49, 23:16:30 | smoke 3 and 4 | `CreateNoWindow` | none |
+| 23:18 | debug app, dark session | `Start-Process -WindowStyle Hidden` | a console was created; whether Windows Terminal hosted it is not known |
+| 23:18 | second instance, open Settings | `CreateNoWindow` | none |
+| 23:32 | debug app, sign-out | `Start-Process -WindowStyle Hidden`, second instance `CreateNoWindow` | as at 23:18 |
+
+The helper PowerShells for the smoke and the measurements (`Start-Process powershell -WindowStyle Hidden`) are console processes too and may also have opened Windows Terminal tabs.
+The release builds measured for Acceptance 6 are GUI-subsystem and open no console.
+Every console closed when its process ended; none is open now.
+Smoke 1 and 2 ran while a console had taken the foreground.
+The light-session real hold (23:13) and the dark-session real hold (23:19) each ran with `tmw-scratch.exe` verified in front just before the keys went down.
+
+Acceptance 7 evidence is only the dark-session hold's paste, which landed in `tmw-scratch.exe` (read by `tmw-scratch.exe` with a window, 29 characters added); smoke 1 to 4 do not count.
+
+`--dictate-wav` smoke: the speech fixture went through upload and transcription four times (four history items), but nothing landed in the scratch window.
+The first two launches targeted `windowsterminal.exe`, because the debug build's console opens in Windows Terminal and briefly takes the foreground; the app refused them (`FocusChanged`) and left the text in the clipboard.
+Launched with no console, the next two targeted `tmw-scratch.exe` and the app sent Ctrl+V (watcher: four injected keys), but a windowless reader (pid 0) read the delayed-rendered text first and counted as the target, so the clipboard was restored before the scratch window read it.
+This is the debt already recorded in `desktop/ard.md` ("a reader that opens the clipboard without a window … still gets the text and counts as the target"); the paste code is unchanged by this task, and a control Ctrl+V of my own into the same window landed.
+
+Acceptance 6 (0008's method, dev release builds, same session, signed in on runs that do not follow a sign-in, first run done):
+
+| Build | Private working set 30 s after closing settings | After 5 idle minutes | CPU over 5 idle minutes |
+|---|---|---|---|
+| base `481f2d4` | 25.5 MB | 34.6 MB | 0.11 s |
+| final `afd37cc` | 22.1 MB | 39.6 MB | 0.38 s |
+
+Both readings stay within base + 10 MB, and CPU within base + 1.0 s; app plus WebView2, 7 processes each. The final release binary is 6.31 MB against 6.03 MB (fonts, icons and the PNG decoder).
+
+crew-e2e-b, saved before the first dictation and restored after (API answers):
+
+- Before: `GET /me/settings` 200 with `{defaultStyleId, locale, dictationLanguages(1), providers{transcriber, refiner}}`, `GET /app-rules` 200 with 0 rules, 0 dictations.
+- Restore: five `DELETE /dictations/{id}` 204 (four smoke dictations, one from the dark-session hold); no rule had been created; `PUT /me/settings` 200 with the saved body.
+- After: settings equal, rules equal, dictations equal (0).
+- Signed out from the app (Settings › Account › Cerrar sesión), which forgets the device and revokes the token.
+
+Machine, after: the dev config and data folders the run created removed, no Credential Manager target for the app, no autostart entry, the prd config folder from 0005 untouched, the clipboard empty as before, every window and process the run opened closed.
+
+Also in this round: the WebView2 scrollbar takes `--color-border-strong` on a transparent track (`base.css`), since the real windows showed the default grey one in light.
+
+Deferred: the windowless-reader paste debt now has a reproduction on this machine (a pid-0 reader after `msrdc.exe` on both no-console smoke pastes); counting only reads after the keystroke would avoid it, a paste behavior change outside this task.
