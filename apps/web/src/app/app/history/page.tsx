@@ -30,7 +30,7 @@ export default async function HistoryPage(props: {
     <AccountSection t={t} title={t.history.title} intro={t.history.intro} data={data}>
       {([history, styles]) =>
         history.items.length === 0 ? (
-          <EmptyState text={t.history.empty} />
+          <EmptyState title={t.history.emptyTitle} text={t.history.empty} />
         ) : (
           <>
             <ol className="dictations" data-testid="dictations">

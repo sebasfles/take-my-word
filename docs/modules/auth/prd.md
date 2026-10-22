@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0007_desktop_integration
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Auth: product
@@ -48,6 +48,7 @@ Errors and empty states: a wrong username or password shows one generic message 
 - Username and password is the only way to sign in in v1.
 - A session lasts until sign-out or revocation, not a fixed number of days; revocation takes effect within about an hour.
 - Each device has its own session, so losing one device is fixed by revoking that device alone; on the web, each browser is a device.
+- The web speaks English unless the browser asks for Spanish or the user switched language; the switch and the theme (system, light or dark) are remembered per browser.
 - Every action in the product (dictating, dictionary, styles, app rules, settings, history) requires a signed-in user and only touches that user's data.
 
 ## Out of scope

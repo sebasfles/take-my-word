@@ -6,6 +6,7 @@ import {
   formatDateTime,
   formatSeconds,
   historyView,
+  languageList,
   languageName,
   nextHistoryHref,
   sortTerms,
@@ -162,5 +163,13 @@ describe("formatting", () => {
     expect(languageName("es", "es")).toBe("Español");
     expect(languageName("en", "es")).toBe("Inglés");
     expect(languageName("es-MX", "en")).toBe("Spanish (Mexico)");
+  });
+});
+
+describe("languageList", () => {
+  it("names every dictation language in order, in the page's language", () => {
+    expect(languageList(["es"], "en")).toBe("Spanish");
+    expect(languageList(["es", "en"], "en")).toBe("Spanish and English");
+    expect(languageList(["en", "es"], "es")).toBe("Inglés y español");
   });
 });

@@ -107,6 +107,14 @@ export function languageName(tag: string, locale: string): string {
   return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
 }
 
+export function languageList(tags: readonly string[], locale: string): string {
+  const names = new Intl.DisplayNames(locale, { type: "language", languageDisplay: "standard" });
+  const list = new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(
+    tags.map((tag) => names.of(tag) ?? tag),
+  );
+  return list.charAt(0).toLocaleUpperCase(locale) + list.slice(1);
+}
+
 export const transcriberNames: Readonly<Record<TranscriberId, string>> = {
   "groq-whisper": "Groq Whisper",
 };

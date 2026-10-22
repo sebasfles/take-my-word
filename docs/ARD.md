@@ -1,5 +1,5 @@
 ---
-updated: 2026-10-21
+updated: 2026-10-22
 source: setup
 ---
 
@@ -61,6 +61,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | auth | 2026-10-21 | Desktop and mobile must confirm their device and send `DeviceKey` on every refresh | Phases 2 and 4 build their logins |
 | auth | 2026-10-21 | Web renewals outside a browser with Web Locks can race and lose the session | A non-browser client uses the web session, or two tabs lose it |
 | auth | 2026-10-21 | A browser-session web login closed without sign-out leaves its refresh token and device in Cognito | Devices pile up, or accounts open beyond invited users |
+| auth | 2026-10-22 | A failed theme save shows a theme the web will not remember after reload | Users report the theme not sticking |
 | dictation | 2026-10-20 | Cold starts of `dictate` paid by the user | MVP works end to end; measure cold vs warm |
 | dictation | 2026-10-21 | Audio part capped at 4 MiB: desktop WAV about 2 min, m4a about 8 | Desktop users hit the cap, or Opus joins |
 | dictation | 2026-10-21 | One daily cap for every user; the per-user override is not built | One user needs a different cap |
@@ -97,3 +98,5 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | infra | 2026-10-21 | Old web chunks stay in the assets bucket forever | The bucket's size shows on the bill |
 | infra | 2026-10-21 | The web's CSP restricts framing only, no `script-src` | The web renders others' content or adds third-party scripts |
 | infra | 2026-10-21 | Updater key secrets sit outside Terraform and the key has no rotation path | The key leaks or must change, or the repository gains other maintainers |
+| infra | 2026-10-22 | Two font-loading paths for the brand fonts: next/font on the web, @font-face on desktop | The desktop needs preloading, or next/font changes how it resolves outside files |
+| infra | 2026-10-22 | `desktop-ci` does not watch `packages/brand/` | 0011 makes the desktop consume the brand package |

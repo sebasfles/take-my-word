@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { Button, OverlayPill } from "@take-my-word/brand";
 import type { Dictionary } from "@/lib/i18n.ts";
 import { renewSession } from "@/lib/renew.ts";
 
@@ -34,18 +35,18 @@ export function RenewSession({ t }: { t: Dictionary["renew"] }) {
   }
 
   return (
-    <div className="card account-card" aria-live="polite">
+    <div className="state-card renew" aria-live="polite">
       {failed ? (
         <div className="renew-failed">
           <p role="alert" className="form-error">
             {t.unavailable}
           </p>
-          <button type="button" className="button button-secondary" onClick={retry}>
+          <Button variant="secondary" onClick={retry}>
             {t.retry}
-          </button>
+          </Button>
         </div>
       ) : (
-        <p className="renewing">{t.renewing}</p>
+        <OverlayPill state="processing" label={t.renewing} />
       )}
     </div>
   );

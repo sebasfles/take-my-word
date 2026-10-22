@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Button, Checkbox, TextInput } from "@take-my-word/brand";
 import { useState, type SubmitEvent } from "react";
 import type { Dictionary } from "@/lib/i18n.ts";
 import { signedFetch } from "@/lib/signed-fetch.ts";
@@ -96,46 +97,38 @@ export function SignInForm({ t }: { t: Strings }) {
           <h1>{t.newPasswordTitle}</h1>
           <p>{t.newPasswordIntro}</p>
         </div>
-        <div className="field">
-          <label htmlFor="new-password">{t.newPassword}</label>
-          <input
-            id="new-password"
-            name="new-password"
-            type="password"
-            autoComplete="new-password"
-            required
-            autoFocus
-            value={newPassword}
-            onChange={(event) => {
-              setNewPassword(event.target.value);
-            }}
-            aria-describedby={
-              describedBy === undefined ? "password-rules" : `password-rules ${describedBy}`
-            }
-          />
-          <p id="password-rules" className="field-hint">
-            {t.passwordRules}
-          </p>
-        </div>
-        <div className="field">
-          <label htmlFor="confirm-password">{t.confirmPassword}</label>
-          <input
-            id="confirm-password"
-            name="confirm-password"
-            type="password"
-            autoComplete="new-password"
-            required
-            value={confirmation}
-            onChange={(event) => {
-              setConfirmation(event.target.value);
-            }}
-            aria-describedby={describedBy}
-          />
-        </div>
+        <TextInput
+          id="new-password"
+          name="new-password"
+          type="password"
+          autoComplete="new-password"
+          required
+          autoFocus
+          label={t.newPassword}
+          hint={t.passwordRules}
+          value={newPassword}
+          onChange={(event) => {
+            setNewPassword(event.target.value);
+          }}
+          aria-describedby={describedBy}
+        />
+        <TextInput
+          id="confirm-password"
+          name="confirm-password"
+          type="password"
+          autoComplete="new-password"
+          required
+          label={t.confirmPassword}
+          value={confirmation}
+          onChange={(event) => {
+            setConfirmation(event.target.value);
+          }}
+          aria-describedby={describedBy}
+        />
         {alert}
-        <button type="submit" className="button button-primary button-block" disabled={pending}>
+        <Button type="submit" size="lg" block loading={pending}>
           {pending ? t.saving : t.save}
-        </button>
+        </Button>
       </form>
     );
   }
@@ -146,54 +139,47 @@ export function SignInForm({ t }: { t: Strings }) {
         <h1>{t.title}</h1>
         <p>{t.intro}</p>
       </div>
-      <div className="field">
-        <label htmlFor="username">{t.username}</label>
-        <input
-          id="username"
-          name="username"
-          type="text"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          required
-          autoFocus
-          value={username}
-          onChange={(event) => {
-            setUsername(event.target.value);
-          }}
-          aria-describedby={describedBy}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="password">{t.password}</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(event) => {
-            setPassword(event.target.value);
-          }}
-          aria-describedby={describedBy}
-        />
-      </div>
-      <label className="checkbox">
-        <input
-          type="checkbox"
-          name="remember"
-          checked={remember}
-          onChange={(event) => {
-            setRemember(event.target.checked);
-          }}
-        />
-        <span>{t.remember}</span>
-      </label>
+      <TextInput
+        id="username"
+        name="username"
+        type="text"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        required
+        autoFocus
+        label={t.username}
+        value={username}
+        onChange={(event) => {
+          setUsername(event.target.value);
+        }}
+        aria-describedby={describedBy}
+      />
+      <TextInput
+        id="password"
+        name="password"
+        type="password"
+        autoComplete="current-password"
+        required
+        label={t.password}
+        value={password}
+        onChange={(event) => {
+          setPassword(event.target.value);
+        }}
+        aria-describedby={describedBy}
+      />
+      <Checkbox
+        name="remember"
+        label={t.remember}
+        checked={remember}
+        onChange={(event) => {
+          setRemember(event.target.checked);
+        }}
+      />
       {alert}
-      <button type="submit" className="button button-primary button-block" disabled={pending}>
+      <Button type="submit" size="lg" block loading={pending}>
         {pending ? t.submitting : t.submit}
-      </button>
+      </Button>
     </form>
   );
 }

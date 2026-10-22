@@ -25,7 +25,7 @@ export default async function DictionaryPage(props: {
     <AccountSection t={t} title={t.dictionary.title} intro={t.dictionary.intro} data={data}>
       {(terms) =>
         terms.length === 0 ? (
-          <EmptyState text={t.dictionary.empty} />
+          <EmptyState title={t.dictionary.emptyTitle} text={t.dictionary.empty} />
         ) : (
           <>
             <nav className="segmented" aria-label={t.dictionary.sortLabel}>

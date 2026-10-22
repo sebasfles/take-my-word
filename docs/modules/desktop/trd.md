@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Desktop: technical
@@ -45,7 +45,7 @@ Jobs, listeners or scheduled work: the key hook, the microphone thread and the c
 - dictation: `POST /dictations` turns the WAV into clean text; settings hold the default style.
 - auth: the pool, the client contract and the authorizer.
 - styles, dictionary: the editors' data; app rules map the focused app to a style and a paste keystroke.
-- GitHub Releases: installers and `latest.json`, downloaded anonymously by the updater and the landing.
+- GitHub Releases: installers and `latest.json`, downloaded anonymously by the updater and the landing; the landing reads the version through `desktopReleaseManifestSchema` in `packages/shared`.
 
 ## Depended on by
 

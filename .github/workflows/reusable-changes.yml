@@ -43,5 +43,5 @@ jobs:
 
           {
             echo "api=$(touches '^apps/api/')"
-            echo "web=$(touches '^(apps/web/|packages/cognito/)')"
+            echo "web=$(touches '^(apps/web/|packages/cognito/|packages/brand/)')"
           } >> "$GITHUB_OUTPUT"

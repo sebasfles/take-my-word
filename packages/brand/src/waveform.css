@@ -1,0 +1,51 @@
+.waveform {
+  --waveform-floor: 0.14;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--waveform-gap, 0.2em);
+  height: var(--waveform-height, 1em);
+  color: inherit;
+}
+
+.waveform-bar {
+  display: block;
+  width: var(--waveform-bar, 0.24em);
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transform: scaleY(
+    calc(var(--waveform-floor) + (1 - var(--waveform-floor)) * var(--level) * var(--weight))
+  );
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.waveform[data-mode="demo"] .waveform-bar {
+  animation: waveform-talk calc(0.82s + var(--i) * 0.11s) var(--ease-standard) infinite alternate;
+  animation-delay: calc(var(--i) * -0.29s);
+}
+
+@keyframes waveform-talk {
+  0% {
+    transform: scaleY(var(--waveform-floor));
+  }
+  35% {
+    transform: scaleY(calc(var(--weight) * 0.95));
+  }
+  60% {
+    transform: scaleY(calc(var(--weight) * 0.45));
+  }
+  100% {
+    transform: scaleY(var(--weight));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveform-bar {
+    transition: none;
+  }
+
+  .waveform[data-mode="demo"] .waveform-bar {
+    animation: none;
+    transform: scaleY(calc(var(--waveform-floor) + (1 - var(--waveform-floor)) * var(--weight)));
+  }
+}

@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-22
+source: 0010_brand_web
 ---
 
 # Dictation: technical
@@ -14,7 +14,7 @@ source: 0008_desktop_features
 | `apps/api/src/history`, `apps/api/src/settings` | History and settings routes in the `api` Lambda, with their stores |
 | `apps/api/src/dictation/ports`, `providers` | Transcriber and Refiner ports; adapters `groq-whisper` and `openai` |
 | `packages/shared/src/dictations.ts`, `history.ts`, `settings.ts` | Request meta, response, history page, settings and limits shared by every client |
-| `apps/web` | Account and history pages; `DELETE /api/dictations/[id]` forwards a delete with the session's token |
+| `apps/web` | Account (settings read-only, dictation languages as a localized list) and history pages; `DELETE /api/dictations/[id]` forwards a delete with the session's token |
 
 ## Endpoints owned
 

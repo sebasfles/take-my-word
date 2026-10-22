@@ -17,7 +17,7 @@ export default async function RulesPage() {
     <AccountSection t={t} title={t.rules.title} intro={t.rules.intro} data={data}>
       {([rules, styles]) =>
         rules.length === 0 ? (
-          <EmptyState text={t.rules.empty} />
+          <EmptyState title={t.rules.emptyTitle} text={t.rules.empty} />
         ) : (
           <table className="card table" data-testid="rules">
             <thead>

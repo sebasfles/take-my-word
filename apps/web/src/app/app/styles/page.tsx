@@ -1,3 +1,4 @@
+import { Badge } from "@take-my-word/brand";
 import { AccountSection, EmptyState } from "@/components/account-section.tsx";
 import { bothLoaded, isBuiltinStyle } from "@/lib/account.ts";
 import { loadAccount } from "@/lib/server/account.ts";
@@ -17,14 +18,12 @@ export default async function StylesPage() {
       {([styles, settings]) => {
         const custom = styles.filter((style) => !style.builtin);
         const defaultBadge = (id: string) =>
-          id === settings.defaultStyleId && (
-            <span className="badge badge-accent">{t.styles.isDefault}</span>
-          );
+          id === settings.defaultStyleId && <Badge tone="accent">{t.styles.isDefault}</Badge>;
         return (
           <>
             <section className="subsection" aria-labelledby="builtin-styles">
               <h2 id="builtin-styles">{t.styles.builtinTitle}</h2>
-              <ul className="card list">
+              <ul className="card list styles-grid">
                 {styles
                   .filter((style) => style.builtin)
                   .map((style) => style.id)
@@ -33,7 +32,7 @@ export default async function StylesPage() {
                     <li key={id} className="list-row style" data-testid="builtin-style">
                       <div className="style-heading">
                         <h3>{t.styles.names[id]}</h3>
-                        <span className="badge">{t.styles.builtin}</span>
+                        <Badge>{t.styles.builtin}</Badge>
                         {defaultBadge(id)}
                       </div>
                       <p className="style-prompt">{t.styles.descriptions[id]}</p>
@@ -44,9 +43,9 @@ export default async function StylesPage() {
             <section className="subsection" aria-labelledby="custom-styles">
               <h2 id="custom-styles">{t.styles.customTitle}</h2>
               {custom.length === 0 ? (
-                <EmptyState text={t.styles.empty} />
+                <EmptyState title={t.styles.emptyTitle} text={t.styles.empty} />
               ) : (
-                <ul className="card list">
+                <ul className="card list styles-grid">
                   {custom.map((style) => (
                     <li key={style.id} className="list-row style" data-testid="custom-style">
                       <div className="style-heading">
