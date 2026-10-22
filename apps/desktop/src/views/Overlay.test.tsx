@@ -45,6 +45,22 @@ describe("Overlay", () => {
     setLanguage("en");
   });
 
+  it("draws the voice level while listening and stays flat on silence", async () => {
+    await showing({ state: "listening" });
+    const bars = () =>
+      Array.from(document.querySelectorAll<HTMLElement>(".wave-bar"), (bar) => bar.style.transform);
+    expect(new Set(bars())).toEqual(new Set(["scaleY(0.15)"]));
+    act(() => {
+      listeners.overlayLevel?.(1);
+      listeners.overlayLevel?.(0);
+    });
+    expect(bars().slice(-2)).toEqual(["scaleY(1)", "scaleY(0.15)"]);
+    act(() => {
+      listeners.overlay?.({ state: "processing" });
+    });
+    expect(document.querySelector(".wave")).toBeNull();
+  });
+
   it("dismisses an error on click", async () => {
     await showing({ state: "error", message: "overlay.unreachable", action: null });
     expect(screen.getByRole("alert").textContent).toContain("Can't reach Take My Word.");

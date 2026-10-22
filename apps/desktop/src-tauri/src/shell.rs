@@ -20,7 +20,7 @@ use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
 use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
-use crate::overlay::{GatedOverlay, Overlay, OverlayState, WindowOverlay};
+use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverlay};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
 use crate::session::{Input, Session, Sink, Take};
@@ -62,6 +62,7 @@ impl Shell {
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
+        let waveform = Waveform::new(app.clone(), microphone.level());
         let provider = CognitoProvider {
             cognito: Cognito::for_environment(env::CURRENT)?,
             device_name: device_name(app),
@@ -114,6 +115,7 @@ impl Shell {
             overlay: overlay.clone(),
             jobs: jobs.clone(),
             target: ForegroundApp::default(),
+            waveform,
             activity: activity.clone(),
             busy: None,
         };
@@ -282,6 +284,7 @@ struct ShellSink {
     overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     jobs: mpsc::Sender<Job>,
     target: ForegroundApp,
+    waveform: Waveform,
     activity: Activity,
     busy: Option<Busy>,
 }
@@ -307,10 +310,12 @@ impl Sink for ShellSink {
     fn listening(&mut self) {
         self.busy = Some(self.activity.start());
         self.overlay.begin_recording();
+        self.waveform.start();
         self.target = SystemWindow.foreground();
     }
 
     fn finished(&mut self, take: Take) {
+        self.waveform.stop();
         self.overlay.end_recording();
         let _ = self.jobs.send(Job {
             take,

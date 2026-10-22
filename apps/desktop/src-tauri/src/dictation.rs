@@ -82,6 +82,10 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A
             return;
         }
         let keystroke = self.keystrokes.for_app(target.app_id.as_deref());
+        log::info!(
+            "pasting into {} with {keystroke:?}",
+            target.app_id.as_deref().unwrap_or("an unknown app")
+        );
         match self.paste.paste(&response.text, target.window, keystroke) {
             PasteResult::Pasted => log::info!("pasted a dictation"),
             PasteResult::PastedClipboardLost => {

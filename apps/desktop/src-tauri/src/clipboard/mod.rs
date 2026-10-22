@@ -15,7 +15,7 @@ use win32::SystemClipboard;
 pub struct ClipboardError(pub String);
 
 pub trait Clipboard {
-    fn offer(&mut self, text: &str) -> Result<(), ClipboardError>;
+    fn offer(&mut self, text: &str, readers: &[u32]) -> Result<(), ClipboardError>;
     fn wait_for_read(&mut self, timeout: Duration) -> Option<Instant>;
     fn restore(&mut self) -> Result<(), ClipboardError>;
     fn keep_text(&mut self) -> Result<(), ClipboardError>;
@@ -31,7 +31,7 @@ impl Unavailable {
 }
 
 impl Clipboard for Unavailable {
-    fn offer(&mut self, _text: &str) -> Result<(), ClipboardError> {
+    fn offer(&mut self, _text: &str, _readers: &[u32]) -> Result<(), ClipboardError> {
         Err(self.error())
     }
 
@@ -63,8 +63,8 @@ pub fn system() -> Box<dyn Clipboard + Send> {
 }
 
 impl<C: Clipboard + ?Sized> Clipboard for Box<C> {
-    fn offer(&mut self, text: &str) -> Result<(), ClipboardError> {
-        (**self).offer(text)
+    fn offer(&mut self, text: &str, readers: &[u32]) -> Result<(), ClipboardError> {
+        (**self).offer(text, readers)
     }
 
     fn wait_for_read(&mut self, timeout: Duration) -> Option<Instant> {

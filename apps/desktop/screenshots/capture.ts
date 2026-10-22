@@ -341,6 +341,7 @@ const shots: Shot[] = [
   { name: "update-installing", query: "view=update&update=installing" },
   { name: "update-failed", query: "view=update&update=failed" },
   { name: "overlay-listening", query: "view=overlay&overlay=listening" },
+  { name: "overlay-listening-silent", query: "view=overlay&overlay=listening-silent" },
   { name: "overlay-processing", query: "view=overlay&overlay=processing" },
   { name: "overlay-error", query: "view=overlay&overlay=error" },
   { name: "overlay-error-microphone", query: "view=overlay&overlay=error-microphone" },

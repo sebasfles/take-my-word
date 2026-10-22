@@ -134,6 +134,8 @@ Scope change decided by Sebastian through the om-manager; details marked (om-rev
   - Paste only into a scratch window the run launches itself, under `C:\dev\tmw-0008-smoke`. It must be a top-level window whose handle did not exist before the run. Windows 11 Notepad can open a file as a tab in an existing window, so if the launch lands in a window that already existed, abort and report it; never type into it.
   - Close only what the run opened.
   - `computer free` names exactly anything of Sebastian's that changed.
+  - No script reads the text of a window the run did not open, or prints clipboard contents; the clipboard is compared by hash only.
+- Acceptance 3 adjusted (om-reviewer): Windows 11 Notepad restores Sebastian's previous-session tabs into any window it opens, so the smoke's target is `C:\dev\tmw-0008-smoke\tmw-scratch.exe`. It is a single-window WinForms app with one multiline TextBox, built and launched by the run and closed by it. The rule is `tmw-scratch.exe` with `shift+insert`, and text is read only from that window. Notepad is not opened by any run.
 
 ## om-developer notes
 
@@ -246,3 +248,30 @@ Did:
 - Finding 4: `pnpm integration` passed (4) against dev with the branch API; `pnpm e2e` failed because dev's web is another branch's build (see verify.log); its rerun waits for develop's web on dev.
 
 Pending and deferred: unchanged from round 5.
+
+### Round 7 (milestone 4)
+
+Did:
+- Waveform back from the parked commit: `audio/level.rs` meters RMS over 50 ms inside the cpal callback into one atomic (`Meter`, `Level`), the overlay's `Waveform` sends the latest level every 50 ms only while Listening (`pump`, a thread per hold, none while idle), and the overlay draws nine bars from it; tests on a Polly speech WAV (`audio/fixtures/speech.wav`) and on silence and a quiet room, the pump stopping with the hold, and the bars in vitest.
+- History copy fix back from the parked commit: the clipboard window class registers once, so the paste and the copy each get their own window; test that two owners spawn.
+- The desktop logs the target appId and the keystroke of each paste ("pasting into tmw-scratch.exe with ShiftInsert"), no text.
+- Paste only to the target app: the first paste of a session reported "pasted" while nothing landed, both in the earlier Notepad attempt and in this run's first scratch paste, because a clipboard reader on the machine that ignores the exclusion format read the delayed-rendered text first; the app counted it as the target and restored the clipboard before the target read.
+  Now the offer carries the target window's process and a hosted app's, and the clipboard window renders the text only when the reader that opened the clipboard belongs to one of them (an unidentifiable reader still gets it); others get nothing and are logged as withheld. After the fix the first paste of a fresh session landed, with one withheld reader logged on every paste.
+  Tests: the paster passes the target's processes, and a real-clipboard test (desktop-ci, `--include-ignored`) shows a reader outside the target gets nothing and does not count as the paste.
+- Dev: after "dev ready" the API was redeployed (SHAs in verify.log), the live web was 8fe11f1 (lang es, no brand fonts), and web integration (4) and e2e (10) passed.
+
+Windows run (announced busy and free, Sebastian idle the whole time, clipboard held in memory by a keeper process and restored with the same hash, D83E2859..., never Notepad, no other window read):
+- Measurements, 0002's method (private working set of the app and WebView2 after opening and closing settings, CPU seconds over 5 idle minutes): base a97a7ed 47.9 and 32.5 MB, 1.64 and 0.20 s; final 476fcb0 34.5 and 34.2 MB, 1.36 and 0.27 s (the first run of each build follows a sign-in; b7163db before the paste fix measured 34.3 and 33.9 MB, 0.22 and 0.30 s). RAM within 10 MB and CPU not higher.
+- Acceptance 2 through the real settings window against dev: term added with aliases, the 409 and the 10-alias limit as inline messages, aliases edited, custom style created, default style changed and back, dictation languages switched; the old base build's onboarding `PUT` (no `dictationLanguages`) left the new user's `["en"]` intact.
+- Acceptance 3 with `tmw-scratch.exe` (new handle checked before the first paste): no rule pasted the plain Spanish text with Ctrl+V; the rule with the uppercase style and Shift+Insert pasted it uppercase; with `["es","en"]` Spanish came back Spanish and English English; the dev API's history shows `locale` es, es, es, en and the custom style id on the ruled ones, and `GET /app-rules` the rule for `tmw-scratch.exe` with `shift+insert`; deleting the style left the rule without `styleId`, shown as "Estilo predeterminado".
+- Acceptance 4: History listed newest first, Copy put the dictation on the clipboard with the exclusion formats (compared by hash), Delete asked first and the dictation was gone from `GET /dictations`.
+- Acceptance 6: a real Ctrl+Win hold in the silent room showed "Escuchando" with a flat row of bars (PrintWindow of the overlay only), pasted nothing ("dictation returned no text") and left the scratch window in front.
+- Search after signing out, app stopped: 288 files, 69.9 MB of config, logs and EBWebView, 0 hits for token-shaped values, the password and the dictation text.
+- Captures of the app's own windows, the scratch window and the overlay are in `C:\dev\tmw-0008-smoke`; mocked screenshots (408) in the workspace.
+
+Decisions not in the plan:
+- The paste renders only to the target app's processes (above); it supersedes the "any reader counts as the target" debt of the delayed-rendered paste entry and also keeps the text from clipboard monitors that ignore the exclusion format.
+- Acceptance 3 runs in `tmw-scratch.exe` instead of Notepad (om-reviewer's ok), and one dictation without a rule proves Ctrl+V.
+
+Pending: desktop-ci on the PR; docs on "clean, document".
+Deferred: none.

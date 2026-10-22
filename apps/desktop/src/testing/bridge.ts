@@ -13,6 +13,7 @@ import type {
 
 export const listeners: {
   overlay?: (state: OverlayState) => void;
+  overlayLevel?: (level: number) => void;
   settingsNavigate?: (query: string) => void;
   uiLanguage?: (language: Language) => void;
   captureCancelled?: () => void;
@@ -96,6 +97,10 @@ export const fakeBridge = {
   }),
   onOverlay: vi.fn((handler: (state: OverlayState) => void) => {
     listeners.overlay = handler;
+    return Promise.resolve(() => undefined);
+  }),
+  onOverlayLevel: vi.fn((handler: (level: number) => void) => {
+    listeners.overlayLevel = handler;
     return Promise.resolve(() => undefined);
   }),
   onUiLanguage: vi.fn((handler: (language: Language) => void) => {

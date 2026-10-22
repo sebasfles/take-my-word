@@ -1,12 +1,12 @@
 use std::cell::RefCell;
-use std::sync::mpsc;
+use std::sync::{OnceLock, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData, GetClipboardOwner,
-    OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
+    GetOpenClipboardWindow, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Memory::{
@@ -14,9 +14,9 @@ use windows::Win32::System::Memory::{
 };
 use windows::Win32::System::Ole::CF_UNICODETEXT;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, HWND_MESSAGE, MSG,
-    PostMessageW, RegisterClassW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_DESTROYCLIPBOARD,
-    WM_RENDERALLFORMATS, WM_RENDERFORMAT, WNDCLASSW,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowThreadProcessId,
+    HWND_MESSAGE, MSG, PostMessageW, RegisterClassW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP,
+    WM_DESTROYCLIPBOARD, WM_RENDERALLFORMATS, WM_RENDERFORMAT, WNDCLASSW,
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
@@ -33,7 +33,7 @@ const PRIVATE_HANDLE_FORMATS: std::ops::RangeInclusive<u32> = 0x200..=0x3FF;
 type Reply = mpsc::Sender<Result<(), ClipboardError>>;
 
 enum Command {
-    Offer(Vec<u8>, Reply),
+    Offer(Vec<u8>, Vec<u32>, Reply),
     Restore(Reply),
     KeepText(Reply),
     PutText(Vec<u8>, Reply),
@@ -85,9 +85,9 @@ impl SystemClipboard {
 }
 
 impl Clipboard for SystemClipboard {
-    fn offer(&mut self, text: &str) -> Result<(), ClipboardError> {
+    fn offer(&mut self, text: &str, readers: &[u32]) -> Result<(), ClipboardError> {
         while self.reads.try_recv().is_ok() {}
-        self.call(|reply| Command::Offer(utf16_bytes(text), reply))
+        self.call(|reply| Command::Offer(utf16_bytes(text), readers.to_vec(), reply))
     }
 
     fn wait_for_read(&mut self, timeout: Duration) -> Option<Instant> {
@@ -126,6 +126,7 @@ struct State {
     reads: mpsc::Sender<Instant>,
     formats: Formats,
     pending: Option<Vec<u8>>,
+    readers: Vec<u32>,
     saved: Vec<(u32, Vec<u8>)>,
 }
 
@@ -162,6 +163,7 @@ fn serve(
             reads,
             formats,
             pending: None,
+            readers: Vec::new(),
             saved: Vec::new(),
         });
     });
@@ -177,13 +179,18 @@ fn create_window() -> Result<HWND, ClipboardError> {
     let error = |error: windows::core::Error| ClipboardError(error.to_string());
     let instance = unsafe { GetModuleHandleW(None) }.map_err(error)?;
     let class_name = w!("TakeMyWordClipboard");
-    let class = WNDCLASSW {
-        lpfnWndProc: Some(window_proc),
-        hInstance: instance.into(),
-        lpszClassName: class_name,
-        ..WNDCLASSW::default()
-    };
-    if unsafe { RegisterClassW(&class) } == 0 {
+    static REGISTERED: OnceLock<bool> = OnceLock::new();
+    let registered = *REGISTERED.get_or_init(|| {
+        let class = WNDCLASSW {
+            lpfnWndProc: Some(window_proc),
+            hInstance: instance.into(),
+            lpszClassName: class_name,
+            ..WNDCLASSW::default()
+        };
+        let atom = unsafe { RegisterClassW(&class) };
+        atom != 0
+    });
+    if !registered {
         return Err(ClipboardError(
             "registering the clipboard window failed".into(),
         ));
@@ -222,6 +229,7 @@ unsafe extern "system" fn window_proc(
         }
         WM_RENDERFORMAT => {
             if wparam.0 as u32 == u32::from(CF_UNICODETEXT.0)
+                && reader_is_target()
                 && let Some(text) = with_state(|state| state.pending.clone()).flatten()
             {
                 if let Err(error) = set_data(u32::from(CF_UNICODETEXT.0), &text) {
@@ -245,12 +253,29 @@ unsafe extern "system" fn window_proc(
     }
 }
 
+fn reader_is_target() -> bool {
+    let readers = with_state(|state| state.readers.clone()).unwrap_or_default();
+    let Ok(opener) = (unsafe { GetOpenClipboardWindow() }) else {
+        return true;
+    };
+    if readers.is_empty() || opener.is_invalid() {
+        return true;
+    }
+    let mut pid = 0;
+    unsafe { GetWindowThreadProcessId(opener, Some(&mut pid)) };
+    let target = pid == 0 || readers.contains(&pid);
+    if !target {
+        log::info!("withheld the dictation from a clipboard reader outside the target app");
+    }
+    target
+}
+
 fn execute(command: Command) {
     let Some(window) = with_state(|state| state.window) else {
         return;
     };
     let (result, reply) = match command {
-        Command::Offer(text, reply) => (offer(window, text), reply),
+        Command::Offer(text, readers, reply) => (offer(window, text, readers), reply),
         Command::Restore(reply) => (restore(window), reply),
         Command::KeepText(reply) => (keep_text(window), reply),
         Command::PutText(text, reply) => (put_text(window, &text), reply),
@@ -258,7 +283,7 @@ fn execute(command: Command) {
     let _ = reply.send(result);
 }
 
-fn offer(window: HWND, text: Vec<u8>) -> Result<(), ClipboardError> {
+fn offer(window: HWND, text: Vec<u8>, readers: Vec<u32>) -> Result<(), ClipboardError> {
     let saved = with_open_clipboard(window, OPEN_PATIENCE, || {
         let saved = snapshot();
         unsafe { EmptyClipboard() }.map_err(win_error)?;
@@ -269,6 +294,7 @@ fn offer(window: HWND, text: Vec<u8>) -> Result<(), ClipboardError> {
     with_state(|state| {
         state.saved = saved;
         state.pending = Some(text);
+        state.readers = readers;
     });
     Ok(())
 }
@@ -424,8 +450,12 @@ mod tests {
     use super::*;
 
     fn read_text() -> Option<String> {
+        read_text_as(None)
+    }
+
+    fn read_text_as(window: Option<HWND>) -> Option<String> {
         let mut attempt = 0;
-        while unsafe { OpenClipboard(None) }.is_err() {
+        while unsafe { OpenClipboard(window) }.is_err() {
             attempt += 1;
             assert!(attempt < 50, "the clipboard stayed busy");
             thread::sleep(OPEN_RETRY);
@@ -460,11 +490,20 @@ mod tests {
     }
 
     #[test]
+    fn the_paste_and_the_history_copy_each_get_their_own_clipboard_window() {
+        let paste = SystemClipboard::spawn();
+        let copy = SystemClipboard::spawn();
+        assert!(paste.is_ok() && copy.is_ok());
+    }
+
+    #[test]
     #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
     fn offered_text_renders_on_first_read_and_the_previous_clipboard_comes_back() {
         let mut clipboard = SystemClipboard::spawn().unwrap();
         let before = read_text();
-        clipboard.offer("dictado de prueba").unwrap();
+        clipboard
+            .offer("dictado de prueba", &[std::process::id()])
+            .unwrap();
         assert_eq!(clipboard.wait_for_read(Duration::ZERO), None);
         let reading = Instant::now();
         assert_eq!(read_text().as_deref(), Some("dictado de prueba [private]"));
@@ -475,5 +514,17 @@ mod tests {
             read_text().map(|text| text.trim_end_matches(" [private]").to_owned()),
             before.map(|text| text.trim_end_matches(" [private]").to_owned())
         );
+    }
+
+    #[test]
+    #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
+    fn a_reader_outside_the_target_app_gets_nothing_and_does_not_count_as_the_paste() {
+        let mut clipboard = SystemClipboard::spawn().unwrap();
+        let elsewhere = std::process::id().wrapping_add(4);
+        clipboard.offer("dictado privado", &[elsewhere]).unwrap();
+        let reader = create_window().unwrap();
+        assert_eq!(read_text_as(Some(reader)), None);
+        assert_eq!(clipboard.wait_for_read(Duration::from_millis(300)), None);
+        clipboard.restore().unwrap();
     }
 }

@@ -2,6 +2,7 @@ export type UnlistenFn = () => void;
 
 const overlayStates: Record<string, unknown> = {
   listening: { state: "listening" },
+  "listening-silent": { state: "listening" },
   processing: { state: "processing" },
   error: {
     state: "error",
@@ -41,6 +42,16 @@ export function listen(
     setTimeout(() => {
       handler({ payload: state });
     }, 0);
+  }
+  if (event === "overlay-level" && requested === "listening") {
+    [0.1, 0.55, 0.8, 0.65, 0.3, 0.7, 0.9, 0.5, 0.2].forEach((level, index) => {
+      setTimeout(
+        () => {
+          handler({ payload: level });
+        },
+        20 + index * 5,
+      );
+    });
   }
   return Promise.resolve(() => undefined);
 }

@@ -28,6 +28,7 @@ pub fn foreground_is_this_process() -> bool {
 
 pub trait ActiveWindow {
     fn foreground(&self) -> ForegroundApp;
+    fn reader_processes(&self, window: isize) -> Vec<u32>;
 }
 
 pub struct SystemWindow;
@@ -35,5 +36,9 @@ pub struct SystemWindow;
 impl ActiveWindow for SystemWindow {
     fn foreground(&self) -> ForegroundApp {
         platform::foreground()
+    }
+
+    fn reader_processes(&self, window: isize) -> Vec<u32> {
+        platform::reader_processes(window)
     }
 }

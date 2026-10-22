@@ -11,3 +11,7 @@ pub fn foreground_is_this_process() -> bool {
 pub fn running_apps() -> Vec<String> {
     Vec::new()
 }
+
+pub fn reader_processes(_window: isize) -> Vec<u32> {
+    Vec::new()
+}

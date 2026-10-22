@@ -87,7 +87,22 @@ fn process_of(window: HWND) -> u32 {
     pid
 }
 
+pub fn reader_processes(window: isize) -> Vec<u32> {
+    let window = HWND(window as *mut _);
+    let pid = process_of(window);
+    if pid == 0 {
+        return Vec::new();
+    }
+    let mut readers = vec![pid];
+    readers.extend(hosted_pid(window, pid));
+    readers
+}
+
 fn hosted_app(frame: HWND, frame_pid: u32) -> Option<String> {
+    Handle::process(hosted_pid(frame, frame_pid)?)?.executable_name()
+}
+
+fn hosted_pid(frame: HWND, frame_pid: u32) -> Option<u32> {
     struct Search {
         frame_pid: u32,
         found: Option<u32>,
@@ -112,7 +127,7 @@ fn hosted_app(frame: HWND, frame_pid: u32) -> Option<String> {
             LPARAM(&mut search as *mut Search as isize),
         )
     };
-    Handle::process(search.found?)?.executable_name()
+    search.found
 }
 
 fn own_integrity() -> Option<u32> {

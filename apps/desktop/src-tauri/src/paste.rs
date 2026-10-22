@@ -78,7 +78,8 @@ impl<C: Clipboard, K: Keystroke, W: ActiveWindow, M: Modifiers> Paster<C, K, W, 
         if foreground.elevated {
             return self.leave(text, Undelivered::Elevated);
         }
-        if let Err(error) = self.clipboard.offer(text) {
+        let readers = target.map_or_else(Vec::new, |window| self.window.reader_processes(window));
+        if let Err(error) = self.clipboard.offer(text, &readers) {
             log::warn!("{error}");
             return PasteResult::Failed;
         }
@@ -208,6 +209,7 @@ mod tests {
         elevated: bool,
         focus_moved: bool,
         held_polls: Cell<u32>,
+        readers: Vec<u32>,
     }
 
     type Shared = Rc<RefCell<World>>;
@@ -215,10 +217,11 @@ mod tests {
     struct FakeClipboard(Shared);
 
     impl Clipboard for FakeClipboard {
-        fn offer(&mut self, text: &str) -> Result<(), ClipboardError> {
+        fn offer(&mut self, text: &str, readers: &[u32]) -> Result<(), ClipboardError> {
             if self.0.borrow().offer_fails {
                 return Err(ClipboardError("busy".into()));
             }
+            self.0.borrow_mut().readers = readers.to_vec();
             self.0.borrow_mut().log.push(format!("offer {text}"));
             Ok(())
         }
@@ -273,6 +276,10 @@ mod tests {
                 elevated: self.0.borrow().elevated,
             }
         }
+
+        fn reader_processes(&self, window: isize) -> Vec<u32> {
+            vec![u32::try_from(window).unwrap() * 100, 7]
+        }
     }
 
     struct FakeModifiers(Shared);
@@ -325,6 +332,13 @@ mod tests {
             PasteResult::Pasted
         );
         assert_eq!(world.borrow().log, vec!["offer hola", "ctrl+v", "restore"]);
+    }
+
+    #[test]
+    fn only_the_target_app_may_read_the_offered_text() {
+        let world = world(will_be_read);
+        paster(&world).paste("hola", Some(1), PasteKeystroke::CtrlV);
+        assert_eq!(world.borrow().readers, vec![100, 7]);
     }
 
     #[test]

@@ -101,6 +101,10 @@ export const bridge = {
     listen<OverlayState>("overlay", (event) => {
       handler(event.payload);
     }),
+  onOverlayLevel: (handler: (level: number) => void): Promise<UnlistenFn> =>
+    listen<number>("overlay-level", (event) => {
+      handler(event.payload);
+    }),
   onUiLanguage: (handler: (language: Language) => void): Promise<UnlistenFn> =>
     listen<Language>("ui-language", (event) => {
       handler(event.payload);
