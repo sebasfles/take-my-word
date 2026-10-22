@@ -80,7 +80,7 @@ describe("History", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
     expect(seen.some((route) => route.route === "deleteDictation")).toBe(false);
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
-    await screen.findByText("You have no dictations yet.");
+    await screen.findByText("No dictations yet");
     expect(seen.at(-1)).toEqual({ route: "deleteDictation", id: "a" });
   });
 

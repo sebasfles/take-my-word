@@ -1,11 +1,12 @@
 import { type AppRule, appRuleLimits, type PasteKeystroke, type Style } from "@take-my-word/shared";
+import { buttonClass } from "@take-my-word/brand";
 import { type SubmitEvent, useEffect, useId, useState } from "react";
 import { api } from "../../api.ts";
 import { bridge } from "../../bridge.ts";
 import { apiProblem, type Note, note } from "../../editing.ts";
 import { type MessageId, t } from "../../i18n.ts";
 import { styleLabel, styleName } from "../../styleNames.ts";
-import { ConfirmDelete, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
+import { ConfirmDelete, Empty, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
 
 const APP_ID_LENGTH = 256;
 
@@ -58,7 +59,7 @@ export function AppRules() {
             {t("common.count", { count: data.rules.length, max: appRuleLimits.rules })}
           </p>
           {data.rules.length === 0 ? (
-            <p className="empty">{t("appRules.empty")}</p>
+            <Empty title="appRules.emptyTitle" body="appRules.empty" />
           ) : (
             <ul className="list">
               {data.rules.map((rule) => (
@@ -100,24 +101,26 @@ function StyleSelect({
   label?: string;
 }) {
   return (
-    <select
-      className="input"
-      aria-label={label}
-      value={value}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-    >
-      <option value="">{t("style.fallback")}</option>
-      {styles.map((style) => (
-        <option key={style.id} value={style.id}>
-          {styleName(style)}
-        </option>
-      ))}
-      {value !== "" && !styles.some((style) => style.id === value) && (
-        <option value={value}>{t("style.deleted")}</option>
-      )}
-    </select>
+    <span className="tmw-select">
+      <select
+        className="tmw-input"
+        aria-label={label}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      >
+        <option value="">{t("style.fallback")}</option>
+        {styles.map((style) => (
+          <option key={style.id} value={style.id}>
+            {styleName(style)}
+          </option>
+        ))}
+        {value !== "" && !styles.some((style) => style.id === value) && (
+          <option value={value}>{t("style.deleted")}</option>
+        )}
+      </select>
+    </span>
   );
 }
 
@@ -131,21 +134,23 @@ function KeystrokeSelect({
   label?: string;
 }) {
   return (
-    <select
-      className="input"
-      aria-label={label}
-      value={value}
-      onChange={(event) => {
-        const picked = keystrokes.find((keystroke) => keystroke === event.target.value);
-        if (picked) onChange(picked);
-      }}
-    >
-      {keystrokes.map((keystroke) => (
-        <option key={keystroke} value={keystroke}>
-          {t(keystrokeLabels[keystroke])}
-        </option>
-      ))}
-    </select>
+    <span className="tmw-select">
+      <select
+        className="tmw-input"
+        aria-label={label}
+        value={value}
+        onChange={(event) => {
+          const picked = keystrokes.find((keystroke) => keystroke === event.target.value);
+          if (picked) onChange(picked);
+        }}
+      >
+        {keystrokes.map((keystroke) => (
+          <option key={keystroke} value={keystroke}>
+            {t(keystrokeLabels[keystroke])}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }
 
@@ -201,7 +206,7 @@ function AddRule({ data, onAdded }: { data: Data; onAdded: (rule: AppRule) => vo
         <label htmlFor={`${id}-field`}>{t("appRules.app")}</label>
         <input
           id={`${id}-field`}
-          className="input"
+          className="tmw-input"
           name="app"
           autoComplete="off"
           list={`${id}-apps`}
@@ -234,7 +239,7 @@ function AddRule({ data, onAdded }: { data: Data; onAdded: (rule: AppRule) => vo
       </div>
       <ErrorLine message={error} />
       <div className="form-actions">
-        <button type="submit" className="button button-primary" disabled={busy}>
+        <button type="submit" className={buttonClass()} disabled={busy}>
           {t("appRules.add")}
         </button>
       </div>
@@ -305,12 +310,12 @@ function RuleRow({
               }}
             />
             <span className="inline-buttons">
-              <button type="submit" className="button button-small button-primary" disabled={busy}>
+              <button type="submit" className={buttonClass({ size: "sm" })} disabled={busy}>
                 {t("common.save")}
               </button>
               <button
                 type="button"
-                className="button button-small"
+                className={buttonClass({ variant: "secondary", size: "sm" })}
                 onClick={() => {
                   setEditing(null);
                 }}
@@ -326,7 +331,7 @@ function RuleRow({
         <div className="item-actions">
           <button
             type="button"
-            className="button button-small"
+            className={buttonClass({ variant: "secondary", size: "sm" })}
             onClick={() => {
               setEditing({ styleId: rule.styleId ?? "", keystroke: chosen(rule.keystroke) });
             }}

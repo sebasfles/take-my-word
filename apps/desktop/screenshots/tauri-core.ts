@@ -117,6 +117,7 @@ const rejected = (status: number, code: string) => failure("rejected", status, c
 function route(request: Record<string, unknown>): Promise<unknown> {
   const name = String(request.route);
   if (params.get("fail") === name) return failure("network", null, null);
+  if (params.get("pending") === name) return new Promise(() => undefined);
   switch (name) {
     case "listTerms":
       return Promise.resolve({ terms });
@@ -182,6 +183,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
         ? problem("account.invalidPassword")
         : answer("onboarding");
     case "onboarding":
+      if (params.get("styles") === "pending") return new Promise(() => undefined);
       return params.get("styles") === "fail"
         ? problem("account.unreachable")
         : answer({

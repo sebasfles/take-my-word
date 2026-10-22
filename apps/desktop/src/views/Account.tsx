@@ -1,10 +1,11 @@
-import { type ReactNode, type SubmitEvent, useCallback, useEffect, useState } from "react";
-import { Button, TextInput, Wordmark } from "@take-my-word/brand";
+import { type SubmitEvent, useCallback, useEffect, useState } from "react";
+import { Button, Skeleton, TextInput, buttonClass } from "@take-my-word/brand";
 import { type AccountStep, bridge, type Onboarding, problemOf } from "../bridge.ts";
 import { type Language, type MessageId, t } from "../i18n.ts";
 import { LanguageChoices } from "../LanguageChoices.tsx";
 import { StyleChoices } from "../StyleChoices.tsx";
 import { type AccountScreen, accountScreenFromSearch } from "../view.ts";
+import { WindowPage } from "./WindowPage.tsx";
 
 export function Account() {
   const [screen, setScreen] = useState<AccountScreen>(() =>
@@ -21,6 +22,10 @@ export function Account() {
     setNotice(message);
     setScreen("sign-in");
   }, []);
+
+  useEffect(() => {
+    if (screen !== "onboarding") void bridge.fitAccount(false, 0);
+  }, [screen]);
 
   if (screen === "choose-password") {
     return <ChoosePassword onStep={advance} onBackToSignIn={backToSignIn} />;
@@ -60,8 +65,8 @@ function SignIn({
   };
 
   return (
-    <AuthPage title="signIn.title" intro="signIn.intro">
-      <form className="auth-form" onSubmit={submit}>
+    <WindowPage title={t("signIn.title")} intro={t("signIn.intro")}>
+      <form className="window-form" onSubmit={submit}>
         <TextInput
           label={t("signIn.username")}
           name="username"
@@ -97,28 +102,7 @@ function SignIn({
           {t(busy ? "signIn.submitting" : "signIn.submit")}
         </Button>
       </form>
-    </AuthPage>
-  );
-}
-
-function AuthPage({
-  title,
-  intro,
-  children,
-}: {
-  title: MessageId;
-  intro: MessageId;
-  children: ReactNode;
-}) {
-  return (
-    <main className="auth">
-      <Wordmark height={24} className="auth-brand" />
-      <header className="auth-heading">
-        <h1>{t(title)}</h1>
-        <p>{t(intro)}</p>
-      </header>
-      {children}
-    </main>
+    </WindowPage>
   );
 }
 
@@ -156,8 +140,8 @@ function ChoosePassword({
   };
 
   return (
-    <AuthPage title="choosePassword.title" intro="choosePassword.intro">
-      <form className="auth-form" onSubmit={submit}>
+    <WindowPage title={t("choosePassword.title")} intro={t("choosePassword.intro")}>
+      <form className="window-form" onSubmit={submit}>
         <TextInput
           label={t("choosePassword.new")}
           name="new-password"
@@ -193,9 +177,11 @@ function ChoosePassword({
           {t(busy ? "common.saving" : "choosePassword.submit")}
         </Button>
       </form>
-    </AuthPage>
+    </WindowPage>
   );
 }
+
+const fitOnboarding = (height: number) => void bridge.fitAccount(true, height);
 
 type Load = { kind: "loading" } | { kind: "failed"; message: MessageId } | { kind: "ready" };
 
@@ -247,22 +233,23 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
   };
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <h1>{t("onboarding.title")}</h1>
-        <p className="muted">{t("onboarding.intro")}</p>
-      </header>
+    <WindowPage
+      title={t("onboarding.title")}
+      intro={t("onboarding.intro")}
+      onHeight={fitOnboarding}
+    >
       {load.kind === "loading" && (
-        <p className="muted" role="status">
-          {t("onboarding.loading")}
-        </p>
+        <div className="loading" role="status">
+          <span className="visually-hidden">{t("onboarding.loading")}</span>
+          <Skeleton lines={4} width="100%" />
+        </div>
       )}
       {load.kind === "failed" && (
-        <div className="callout" role="alert">
+        <div className="failure" role="alert">
           <p>{t(load.message)}</p>
           <button
             type="button"
-            className="button"
+            className={buttonClass({ variant: "secondary", size: "sm" })}
             onClick={() => {
               setLoad({ kind: "loading" });
               setAttempt((count) => count + 1);
@@ -273,32 +260,31 @@ function PickStyle({ onBackToSignIn }: { onBackToSignIn: (message: MessageId) =>
         </div>
       )}
       {load.kind === "ready" && onboarding && (
-        <form className="form" onSubmit={save}>
-          <section className="form-section">
+        <form className="window-form" onSubmit={save}>
+          <section className="window-section">
             <h2>{t("dictationLanguages")}</h2>
-            <p className="muted">{t("dictationLanguages.note")}</p>
+            <p className="setting-note">{t("dictationLanguages.note")}</p>
             <LanguageChoices chosen={languages} onChange={setLanguages} />
           </section>
-          <section className="form-section">
+          <section className="window-section">
             <h2>{t("styles.default")}</h2>
             <StyleChoices styles={onboarding.styles} selected={selected} onSelect={setSelected} />
           </section>
           {error && (
-            <p className="error" role="alert">
+            <p className="form-error" role="alert">
               {t(error)}
             </p>
           )}
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="button button-primary"
-              disabled={busy || selected === "" || languages.length === 0}
-            >
-              {t(busy ? "common.saving" : "common.save")}
-            </button>
-          </div>
+          <Button
+            type="submit"
+            block
+            loading={busy}
+            disabled={selected === "" || languages.length === 0}
+          >
+            {t(busy ? "common.saving" : "common.save")}
+          </Button>
         </form>
       )}
-    </main>
+    </WindowPage>
   );
 }

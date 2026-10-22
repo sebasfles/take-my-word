@@ -90,6 +90,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Dev icons (adjusts Scope): the dev build gets a marked variant of the app and tray icons; prd stays as designed.
 - Overlay (adjusts Approach): the brand `Waveform` gains a history mode (`levels`, newest last) and `OverlayPill` an optional action slot; the overlay keeps 0008's behavior (scrolling bars, flat on silence, bars only while Listening, click to dismiss, microphone link) in the pill's look; the web's rendering is unchanged.
 - Overlay states (om-reviewer, 2026-10-21, on the om-developer's question): the pill shows bars only while Listening; processing shows a token-built spinner (a generic pill option if added to brand, still under reduced motion), error shows no bars; 0008's "no bars in processing" assertion stays as is.
+- Design answer (om-manager, after round 1): tile tray set and accent app icon approved, glyph set and ink icon dropped; the dev mark is a solid light-blue diagonal of about a third of the tile (legs at least 5 px at 16 px) on tray and app icons, glyph still legible; sign-in and choose password share one window size fitted to their content, no filler; settings, overlay, errors and pairs approved.
 - Acceptance 7: selectors and copy may change (the voice rewrite needs it); no assertion is dropped or weakened.
 - Acceptance 6: 0008's method (private working set of app plus WebView2 after opening and closing settings; CPU seconds over 5 idle minutes), on dev release builds of the develop head (base) and the final commit in the same session; pass at RAM ≤ base + 10 MB and CPU ≤ base + 1.0 s, on runs that do not follow a sign-in.
 - Design checkpoint: round 1 delivers only the overlay pill, tray and app icon candidates in every state at 16, 20, 24 and 32 px on light and dark taskbar backdrops, and sign-in plus Settings › General in both themes; I send the paths to the om-manager for one design answer before the rest is restyled.
@@ -144,3 +145,40 @@ Decisions not in the plan:
 - `OverlayPill` error uses `role="alert"` (was `status`); no web test or screenshot depends on it.
 - Theme labels say "Windows" for the system option, like the app-language row, rather than the web's "System".
 - Web `verify` steps `integration` and `e2e` not run: they create throwaway dev users beyond this task's clearance and test the deployed dev web, not this diff.
+
+### Round 1 finding
+
+verify re-run on `0eefd42` after the commit, every artefact newer than it; the blocks went in `6ba36b9`, which touches only `verify.log`.
+From round 2 on, verify runs on the round's commit and its blocks go in a follow-up commit that touches only `verify.log`.
+
+### Round 2
+
+Screenshots: `.workspaces/0011_desktop_rebrand/screenshots/round-2/` with `windows/` (464 shots: every window and state at its real size, es and en, light and dark, now with loading states), `icons/` (`tray-sheet.png`, `app-icon-sheet.png`) and `pairs/` (sign-in, General, dictionary and history next to the web at 1280).
+
+Did:
+
+- Icons per the design answer: only the tile tray set and the accent app icon remain in `packages/brand/scripts/desktop-icons.ts`; the dev mark is a solid light-blue diagonal with 28-unit legs (7 px at 16 px), the largest that clears the glyph's tall bar, on tray and app icons.
+  `pnpm desktop-assets` in `packages/brand` writes them, committed: `apps/desktop/src-tauri/icons/` (prd) and `icons/dev/` (dev), each with `icon.ico` (16 to 256), the bundle PNGs and `tray/{idle,recording,attention}-{16,20,24,32}.png`; `tauri.conf.json` (dev, the base) and `tauri.prd.conf.json` point at their set, so installers and the uninstall entry carry the right icon.
+  The stale `icon.svg` and `icon.icns` (old design, macOS out of scope) are gone.
+- Tray states in Rust (`tray.rs`): `status(signed_in, microphone, listening)` gives recording only while Listening, attention when signed out or the microphone is blocked or missing (in that order), idle otherwise, transient microphone trouble stays idle; the frame matches the display scale (16, 20, 24 or 32 px); the tooltip is the product name and the state in the app language, relabeled on a language switch.
+  The session sink reports Listening, the account change reports sign-in, and `MicrophoneStatus` now reports each change to one listener.
+  `tauri` gains the `image-png` feature for the frames.
+- Account window: sign-in and choose password share 440x544 (fits their tallest state, choose password with an error, in both languages); onboarding is 600 wide with styles in two columns and is fitted to its content through `fit_account` (a `ResizeObserver` in `WindowPage`), clamped to the screen's work area, so it never scrolls on a normal screen; the account view asks for the fixed size whenever it leaves onboarding.
+  Every window size now lives in `src/windows.json`, read by Rust and by the screenshot script; first run is 520x536 and update 460x456 so their blocked-microphone and failed states fit.
+- Restyled the rest: onboarding, first run and update on a shared `WindowPage` (wordmark, display heading), the editors, history and the Account section on brand buttons, inputs and selects, brand `EmptyState` with the waveform for every empty list, `Skeleton` while loading, an error band with its action on failures; `styles/legacy.css` deleted, and the desktop token lint now covers every CSS and TSX file with no exemption.
+- Voice: overlay, notices and tray copy rewritten in both languages (we for the service, what to do next); processing reads "Cleaning up" / "Limpiando" like the web's demo; empty states have a title and an invitation; update title "An update is ready".
+- Screenshot script: loading states (a mocked route can stay pending), onboarding captured at its fitted height, sizes from `windows.json`.
+
+Tests: tray status order, transient microphone, frame per scale, every frame a PNG of its size; microphone status reports each change once; account size for both steps and the screen clamp; the account view fits on screen changes and on onboarding content.
+0008 tests changed only in copy and selectors: empty states read their titles, the update title, processing and unreachable copy.
+
+Web: no file it renders changed this round (`packages/brand` changed only in `scripts/` and `package.json`); its round 1 screenshots still stand and its targets run again.
+
+Pending (round 3): Windows evidence (PrintWindow captures of sign-in, settings and a real hold's overlay in both forced themes, the tray from the dev build), Acceptance 6 measurements, the real-dictation smoke, the release; these need the Windows host under the machine rules, so I will ask for a slot.
+
+Decisions not in the plan:
+
+- Window sizes in one `src/windows.json` shared by Rust and the screenshots, so a screenshot can never show a size the app does not use.
+- Onboarding is content-fitted at run time rather than a fixed size, since its height grows with the user's custom styles.
+- First run grows to 520x536 and update to 460x456 instead of trimming their copy.
+- Tray frames and installer icons are written by a brand script into `apps/desktop/src-tauri/icons`, where Tauri expects them, instead of being referenced across packages.

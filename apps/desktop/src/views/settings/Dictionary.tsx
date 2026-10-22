@@ -1,9 +1,10 @@
 import { type DictionaryTerm, dictionaryLimits, normalizeTerm } from "@take-my-word/shared";
+import { buttonClass } from "@take-my-word/brand";
 import { type SubmitEvent, useEffect, useId, useRef, useState } from "react";
 import { api } from "../../api.ts";
 import { apiProblem, formatDate, type Note, note, splitAliases } from "../../editing.ts";
 import { t } from "../../i18n.ts";
-import { ConfirmDelete, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
+import { ConfirmDelete, Empty, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
 
 const loadTerms = () => api.listTerms().then((list) => list.terms);
 
@@ -55,7 +56,7 @@ export function Dictionary({ focusAdd }: { focusAdd: number }) {
             {t("common.count", { count: terms.length, max: dictionaryLimits.terms })}
           </p>
           {terms.length === 0 ? (
-            <p className="empty">{t("dictionary.empty")}</p>
+            <Empty title="dictionary.emptyTitle" body="dictionary.empty" />
           ) : (
             <ul className="list">
               {terms.map((term) => (
@@ -132,7 +133,7 @@ function AddTerm({
           <span>{t("dictionary.term")}</span>
           <input
             ref={input}
-            className="input"
+            className="tmw-input"
             name="term"
             autoComplete="off"
             value={term}
@@ -145,7 +146,7 @@ function AddTerm({
           <label htmlFor={`${id}-field`}>{t("dictionary.aliases")}</label>
           <input
             id={`${id}-field`}
-            className="input"
+            className="tmw-input"
             name="aliases"
             autoComplete="off"
             aria-describedby={`${id}-hint`}
@@ -161,7 +162,7 @@ function AddTerm({
       </div>
       <ErrorLine message={error} />
       <div className="form-actions">
-        <button type="submit" className="button button-primary" disabled={busy || disabled}>
+        <button type="submit" className={buttonClass()} disabled={busy || disabled}>
           {t("dictionary.add")}
         </button>
       </div>
@@ -227,7 +228,7 @@ function TermRow({
         ) : (
           <form className="inline-form" onSubmit={save} noValidate>
             <input
-              className="input"
+              className="tmw-input"
               aria-label={t("dictionary.aliases")}
               autoFocus
               value={editing}
@@ -236,12 +237,12 @@ function TermRow({
               }}
             />
             <span className="inline-buttons">
-              <button type="submit" className="button button-small button-primary" disabled={busy}>
+              <button type="submit" className={buttonClass({ size: "sm" })} disabled={busy}>
                 {t("common.save")}
               </button>
               <button
                 type="button"
-                className="button button-small"
+                className={buttonClass({ variant: "secondary", size: "sm" })}
                 onClick={() => {
                   setEditing(null);
                   setError(null);
@@ -264,7 +265,7 @@ function TermRow({
         <div className="item-actions">
           <button
             type="button"
-            className="button button-small"
+            className={buttonClass({ variant: "secondary", size: "sm" })}
             onClick={() => {
               setEditing(term.aliases.join(", "));
             }}

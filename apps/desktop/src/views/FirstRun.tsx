@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Button, buttonClass } from "@take-my-word/brand";
 import { bridge, type Overview } from "../bridge.ts";
 import { t } from "../i18n.ts";
 import { Keys } from "../Keys.tsx";
+import { WindowPage } from "./WindowPage.tsx";
 
 export function FirstRun() {
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -14,12 +16,7 @@ export function FirstRun() {
   const missing = overview?.microphone === "missing";
 
   return (
-    <main className="page">
-      <header className="page-header">
-        <h1>{t("firstRun.title")}</h1>
-        <p className="muted">{t("firstRun.tagline")}</p>
-      </header>
-
+    <WindowPage title={t("firstRun.title")} intro={t("firstRun.tagline")}>
       <ol className="steps">
         <li>
           <span className="step-number">1</span>
@@ -38,37 +35,26 @@ export function FirstRun() {
         </li>
       </ol>
 
-      <section className="note">
-        <h2>{t("firstRun.microphone")}</h2>
-        <p className="muted">{t("firstRun.microphoneNote")}</p>
-        {blocked && (
-          <div className="callout" role="alert">
-            <p>{t("firstRun.microphoneBlocked")}</p>
+      {blocked || missing ? (
+        <div className="failure" role="alert">
+          <p>{t(blocked ? "firstRun.microphoneBlocked" : "firstRun.microphoneMissing")}</p>
+          {blocked && (
             <button
               type="button"
-              className="button"
+              className={buttonClass({ variant: "secondary", size: "sm" })}
               onClick={() => void bridge.openMicrophoneSettings()}
             >
               {t("firstRun.openMicrophoneSettings")}
             </button>
-          </div>
-        )}
-        {missing && (
-          <div className="callout" role="alert">
-            <p>{t("firstRun.microphoneMissing")}</p>
-          </div>
-        )}
-      </section>
+          )}
+        </div>
+      ) : (
+        <p className="setting-note">{t("firstRun.microphoneNote")}</p>
+      )}
 
-      <footer className="page-footer">
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={() => void bridge.finishFirstRun()}
-        >
-          {t("firstRun.done")}
-        </button>
+      <footer className="window-footer">
+        <Button onClick={() => void bridge.finishFirstRun()}>{t("firstRun.done")}</Button>
       </footer>
-    </main>
+    </WindowPage>
   );
 }

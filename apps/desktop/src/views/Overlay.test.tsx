@@ -31,7 +31,7 @@ describe("Overlay", () => {
     act(() => {
       listeners.overlay?.({ state: "processing" });
     });
-    expect(screen.getByRole("status").textContent).toBe("Processing");
+    expect(screen.getByRole("status").textContent).toBe("Cleaning up");
     act(() => {
       listeners.overlay?.({ state: "hidden" });
     });
@@ -66,7 +66,7 @@ describe("Overlay", () => {
 
   it("dismisses an error on click", async () => {
     await showing({ state: "error", message: "overlay.unreachable", action: null });
-    expect(screen.getByRole("alert").textContent).toContain("Can't reach Take My Word.");
+    expect(screen.getByRole("alert").textContent).toContain("We could not reach the service.");
     fireEvent.click(screen.getByRole("alert"));
     expect(fakeBridge.dismissOverlay).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button")).toBeNull();

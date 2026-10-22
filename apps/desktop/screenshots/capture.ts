@@ -18,21 +18,31 @@ interface Size {
   height: number;
 }
 
+const sizes = JSON.parse(readFileSync(join(here, "..", "src", "windows.json"), "utf8")) as Record<
+  "settings" | "account" | "firstRun" | "update" | "overlay",
+  Size
+> & { onboarding: { width: number; minHeight: number } };
+
 const windowSizes: Record<string, Size[]> = {
-  account: [{ width: 440, height: 560 }],
-  "first-run": [{ width: 520, height: 470 }],
-  update: [{ width: 460, height: 400 }],
-  overlay: [{ width: 480, height: 96 }],
+  account: [sizes.account],
+  onboarding: [{ width: sizes.onboarding.width, height: sizes.onboarding.minHeight }],
+  "first-run": [sizes.firstRun],
+  update: [sizes.update],
+  overlay: [sizes.overlay],
   settings: [
-    { width: 380, height: 640 },
-    { width: 880, height: 640 },
+    { width: 380, height: sizes.settings.height },
+    { width: sizes.settings.width, height: sizes.settings.height },
     { width: 1280, height: 800 },
   ],
 };
 
 const appBackdrops = { light: "#ffffff", dark: "#1f1f1f" };
 
-const viewOf = (query: string) => new URLSearchParams(query).get("view") ?? "settings";
+const viewOf = (query: string) => {
+  const params = new URLSearchParams(query);
+  if (params.get("step") === "onboarding") return "onboarding";
+  return params.get("view") ?? "settings";
+};
 
 type Text = (id: MessageId, values?: Record<string, string>) => string;
 
@@ -221,6 +231,18 @@ const shots: Shot[] = [
         .click();
       await page.getByText(text("common.confirmDelete")).waitFor();
     },
+  },
+  {
+    name: "settings-dictionary-loading",
+    query: "view=settings&section=dictionary&pending=listTerms",
+  },
+  {
+    name: "settings-history-loading",
+    query: "view=settings&section=history&pending=listDictations",
+  },
+  {
+    name: "account-onboarding-loading",
+    query: "view=account&step=onboarding&styles=pending",
   },
   {
     name: "settings-dictionary-failed",
@@ -418,6 +440,15 @@ try {
           await shot.act?.(page, text);
           await page.evaluate(() => document.fonts.ready);
           await page.waitForTimeout(200);
+          if (view === "onboarding") {
+            const content = await page.evaluate(
+              () => document.querySelector("main")?.getBoundingClientRect().height ?? 0,
+            );
+            await page.setViewportSize({
+              width: size.width,
+              height: Math.max(size.height, Math.ceil(content)),
+            });
+          }
           const overflow = await page.evaluate(() => ({
             sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
             down: document.documentElement.scrollHeight > document.documentElement.clientHeight,

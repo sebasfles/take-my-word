@@ -310,6 +310,7 @@ impl Sink for ShellSink {
     fn listening(&mut self) {
         self.busy = Some(self.activity.start());
         self.overlay.begin_recording();
+        crate::tray::show_listening(&self.app, true);
         self.waveform.start();
         self.target = SystemWindow.foreground();
     }
@@ -317,6 +318,7 @@ impl Sink for ShellSink {
     fn finished(&mut self, take: Take) {
         self.waveform.stop();
         self.overlay.end_recording();
+        crate::tray::show_listening(&self.app, false);
         let _ = self.jobs.send(Job {
             take,
             target: std::mem::take(&mut self.target),

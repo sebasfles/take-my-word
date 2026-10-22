@@ -1,15 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Resvg } from "@resvg/resvg-js";
-import {
-  appDesigns,
-  appIconSvg,
-  png,
-  traySizes,
-  trayStates,
-  traySvg,
-  trayDesigns,
-} from "./desktop-icons.ts";
+import { appIconSvg, png, traySizes, trayStates, traySvg } from "./desktop-icons.ts";
 
 const out = process.argv[2];
 if (out === undefined) {
@@ -96,31 +88,24 @@ const write = (name: string, data: Buffer) => {
   process.stdout.write(`wrote ${name}\n`);
 };
 
-for (const design of trayDesigns) {
-  const rows = [false, true].flatMap((dev) =>
-    trayStates.map((state) => ({
-      name: `${state}${dev ? " · dev" : ""}`,
-      frame: (px: number) => png(traySvg(design, state, px, dev), px),
-    })),
-  );
-  for (const row of rows) {
-    for (const px of traySizes) {
-      write(`tray-${design}-${row.name.replace(" · ", "-")}-${String(px)}.png`, row.frame(px));
-    }
-  }
-  write(
-    `tray-sheet-${design}.png`,
-    sheet(
-      `Tray, ${design}`,
-      traySizes,
-      [
-        [16, 6],
-        [24, 4],
-      ],
-      rows,
-    ),
-  );
-}
+const trayRows = [false, true].flatMap((dev) =>
+  trayStates.map((state) => ({
+    name: `${state}${dev ? " · dev" : ""}`,
+    frame: (px: number) => png(traySvg(state, px, dev), px),
+  })),
+);
+write(
+  "tray-sheet.png",
+  sheet(
+    "Tray",
+    traySizes,
+    [
+      [16, 6],
+      [24, 4],
+    ],
+    trayRows,
+  ),
+);
 
 write(
   "app-icon-sheet.png",
@@ -131,11 +116,9 @@ write(
       [16, 6],
       [96, 1],
     ],
-    appDesigns.flatMap((design) =>
-      [false, true].map((dev) => ({
-        name: `${design}${dev ? " · dev" : ""}`,
-        frame: (px: number) => png(appIconSvg(design, px, dev), px),
-      })),
-    ),
+    [false, true].map((dev) => ({
+      name: dev ? "dev" : "prd",
+      frame: (px: number) => png(appIconSvg(px, dev), px),
+    })),
   ),
 );

@@ -9,9 +9,7 @@ import {
 } from "@take-my-word/brand/token-lint.ts";
 
 const src = import.meta.dirname;
-const pendingRestyle = new Set(["styles/legacy.css"]);
-const files = (extension: string) =>
-  sourceFiles(src, extension).filter((path) => !pendingRestyle.has(relative(src, path)));
+const files = (extension: string) => sourceFiles(src, extension);
 
 describe("apps/desktop", () => {
   it.each(files(".css").map((path) => relative(src, path)))(

@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { buttonClass, EmptyState, Skeleton, Waveform } from "@take-my-word/brand";
 import { bridge } from "../../bridge.ts";
 import { apiProblem, type Note, say } from "../../editing.ts";
 import { type MessageId, t } from "../../i18n.ts";
@@ -61,19 +62,20 @@ export function useLoaded<T>(load: () => Promise<T>) {
 export function LoadState({ state, onRetry }: { state: Loaded<unknown>; onRetry: () => void }) {
   if (state.kind === "loading") {
     return (
-      <p className="muted" role="status">
-        {t("common.loading")}
-      </p>
+      <div className="loading" role="status">
+        <span className="visually-hidden">{t("common.loading")}</span>
+        <Skeleton lines={3} width="100%" />
+      </div>
     );
   }
   if (state.kind === "failed") {
     const signedOut = state.message.id === "account.sessionEnded";
     return (
-      <div className="callout" role="alert">
+      <div className="failure" role="alert">
         <p>{say(state.message)}</p>
         <button
           type="button"
-          className="button"
+          className={buttonClass({ variant: "secondary", size: "sm" })}
           onClick={signedOut ? () => void bridge.openSignIn() : onRetry}
         >
           {t(signedOut ? "settings.account.signIn" : "common.tryAgain")}
@@ -82,6 +84,10 @@ export function LoadState({ state, onRetry }: { state: Loaded<unknown>; onRetry:
     );
   }
   return null;
+}
+
+export function Empty({ title, body }: { title: MessageId; body: MessageId }) {
+  return <EmptyState icon={<Waveform level={0.2} bars={5} />} title={t(title)} body={t(body)} />;
 }
 
 export function ConfirmDelete({
@@ -98,7 +104,7 @@ export function ConfirmDelete({
     return (
       <button
         type="button"
-        className="button button-small"
+        className={buttonClass({ variant: "secondary", size: "sm" })}
         onClick={() => {
           setAsking(true);
         }}
@@ -112,7 +118,7 @@ export function ConfirmDelete({
       <span className="confirm-question">{t(question)}</span>
       <button
         type="button"
-        className="button button-small button-danger"
+        className={buttonClass({ variant: "danger", size: "sm" })}
         disabled={busy}
         onClick={() => {
           setBusy(true);
@@ -126,7 +132,7 @@ export function ConfirmDelete({
       </button>
       <button
         type="button"
-        className="button button-small"
+        className={buttonClass({ variant: "secondary", size: "sm" })}
         disabled={busy}
         onClick={() => {
           setAsking(false);

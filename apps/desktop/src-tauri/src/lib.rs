@@ -73,6 +73,7 @@ pub fn run() {
             commands::ui_language,
             commands::set_ui_language,
             commands::theme,
+            windows::fit_account,
             commands::set_theme,
             commands::quit,
             updater::update_view,
@@ -88,12 +89,15 @@ pub fn run() {
             commands::apply_theme(handle, settings.theme);
             let shell = Shell::start(handle, settings_path, settings.clone())?;
             let signed_in = shell.account.is_signed_in();
+            let microphone = shell.microphone.clone();
             app.manage(updater::Updates::new());
             if updates {
                 updater::start(handle, shell.activity.clone());
             }
             app.manage(shell);
-            tray::build(handle, signed_in)?;
+            tray::build(handle, signed_in, microphone.get())?;
+            let tray_app = handle.clone();
+            microphone.on_change(move |status| tray::show_microphone(&tray_app, status));
             if !settings.first_run_done {
                 turn_on_autostart(handle);
             }

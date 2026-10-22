@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Button, Icon, type IconName, navItemClass, Toggle, Wordmark } from "@take-my-word/brand";
+import {
+  Button,
+  Icon,
+  type IconName,
+  navItemClass,
+  Toggle,
+  Wordmark,
+  buttonClass,
+} from "@take-my-word/brand";
 import {
   type AccountView,
   bridge,
@@ -240,10 +248,10 @@ function AccountRow() {
   };
 
   return (
-    <section className="row">
-      <div className="row-text">
-        <h2>{t("settings.account")}</h2>
-        <p className="muted">
+    <section className="panel setting">
+      <div className="setting-text">
+        <h2 className="setting-title">{t("settings.account")}</h2>
+        <p className="setting-note">
           {account === null
             ? "\u00a0"
             : account.signedIn
@@ -254,16 +262,17 @@ function AccountRow() {
         </p>
       </div>
       {account?.signedIn === true && (
-        <button type="button" className="button" disabled={busy} onClick={signOut}>
+        <button
+          type="button"
+          className={buttonClass({ variant: "secondary" })}
+          disabled={busy}
+          onClick={signOut}
+        >
           {t(busy ? "settings.account.signingOut" : "settings.account.signOut")}
         </button>
       )}
       {account?.signedIn === false && (
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={() => void bridge.openSignIn()}
-        >
+        <button type="button" className={buttonClass()} onClick={() => void bridge.openSignIn()}>
           {t("settings.account.signIn")}
         </button>
       )}
