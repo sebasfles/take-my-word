@@ -212,3 +212,17 @@ Findings applied, both:
    Measured on the `windows` job: three passing runs on 2026-10-22 had every test at 0.7 to 1.8 s (suite 7.4 to 7.9 s); the failing run was two to three times slower across the file, with the slowest passing case at 2541 ms and the timed-out one at 5338 ms; 15 s is about six times the slowest passing case.
 
 The real-clipboard tests changed only their assertions (a read counted, a read contended); they were not rerun on the host, since `desktop-ci`'s `windows` job runs them with `--include-ignored`.
+
+### Round 4 (release evidence)
+
+`desktop-v0.2.0` is on 9d80881 (the release commit the om-reviewer pushed on top of 12315a5), published as latest at 18:25:54 UTC.
+Update from 0.1.1 on Windows (`windows-run-0012-host/run7-update/`), 18:26 to 18:28 UTC under the idle guard, with UI Automation only and no injected input:
+
+- The 0.1.1 installer came from its release, and its sha256 (e50f33...839) matched the published digest; prd was not installed before the run, and 0005's prd folders (294 files) were backed up with a manifest.
+- 0.1.1 installed silently and, started, offered 0.2.0 within 2 s ("update 0.2.0 available"); "Instalar y reiniciar" downloaded, installed and relaunched the app in about 5 s.
+- After it: the registry `DisplayVersion` and the exe file version both read 0.2.0, the relaunched app stayed up 15 s with its window, and it logged "no update available".
+- Then it was uninstalled silently (registry entry and install folder gone); 0005's prd folders were restored with 0 differences across 294 files; no autostart value, shortcut or prd credential is left.
+
+Landing (prd): at 18:26:43 it still showed 0.1.1, inside the 15-minute manifest cache; at 18:43:00 it showed "Versión 0.2.0 para Windows 10 y 11." and "Version 0.2.0 for Windows 10 and 11.", and the fixed-name download returned the 0.2.0 installer (sha256 9701e1...1be0, the same as `Take.My.Word_0.2.0_x64-setup.exe`).
+
+Found on the host and removed: 12 Credential Manager entries named `*.dev.fless.takemyword.test.round-trip.<pid>`, the keychain unit test's scratch entries, left by test processes that died mid-test from the WCT crash fixed in round 1 (the test clears them in `Drop`, which an access violation skips); none were sessions, and none remain.
