@@ -1,9 +1,13 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, LPARAM};
 use windows::Win32::Security::{
     GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, TOKEN_MANDATORY_LABEL,
     TOKEN_QUERY, TokenIntegrityLevel,
+};
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
 };
 use windows::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32,
@@ -74,6 +78,31 @@ pub fn running_apps() -> Vec<String> {
             app_id_of(window, pid, &Handle::process(pid)?)
         })
         .collect()
+}
+
+pub fn executable_of(pid: u32) -> Option<String> {
+    if pid == 0 {
+        return None;
+    }
+    Handle::process(pid)?.executable_name()
+}
+
+pub fn parent_processes() -> HashMap<u32, u32> {
+    let mut parents = HashMap::new();
+    let Ok(snapshot) = (unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }) else {
+        return parents;
+    };
+    let snapshot = Handle(snapshot);
+    let mut entry = PROCESSENTRY32W {
+        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+        ..PROCESSENTRY32W::default()
+    };
+    let mut more = unsafe { Process32FirstW(snapshot.0, &mut entry) }.is_ok();
+    while more {
+        parents.insert(entry.th32ProcessID, entry.th32ParentProcessID);
+        more = unsafe { Process32NextW(snapshot.0, &mut entry) }.is_ok();
+    }
+    parents
 }
 
 pub fn foreground_is_this_process() -> bool {
@@ -208,6 +237,16 @@ mod tests {
             assert_ne!(app, own);
             assert_eq!(app, app.to_lowercase());
         }
+    }
+
+    #[test]
+    fn the_process_snapshot_knows_this_process_and_its_parent() {
+        let parents = parent_processes();
+        assert!(
+            parents
+                .get(&std::process::id())
+                .is_some_and(|parent| *parent != 0)
+        );
     }
 
     #[test]

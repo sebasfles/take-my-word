@@ -64,3 +64,11 @@
 - unit: pass exit 0 (95 tests, round 5 artefact)
 - integration: pass exit 0 (4 tests, pnpm integration against dev, artefact .verify/web-integration.out)
 - e2e: pass exit 0 (10 tests, pnpm e2e --workers=1 against dev, artefact .verify/web-e2e.out)
+## 2026-10-22T01:24:25Z by om-developer target desktop on round 8 commit (same code as 393a188; the round commit adds only task.md and verify.log)
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0008)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (93 vitest + 140 cargo tests, pnpm test && pnpm rust:test)
+- real clipboard: pass exit 0 (scripts/windows.sh cargo test --locked clipboard::win32 -- --include-ignored --test-threads=1, 3 passed, on 393a188 inside an announced run with the clipboard snapshotted and restored by hash, artefact .verify/desktop-real-clipboard.out)
+- linux-check equivalent: pass exit 0 (cargo clippy --all-targets --locked -- -D warnings in rust:latest, rustc 1.99.1, with the job's apt packages, on 393a188, artefact .verify/linux-check.out)
+- e2e: n/a; desktop-ci runs on the PR.
+- correction: the round 7 block's "real clipboard: pass" had no exit code or artefact; it is superseded by this block's step.

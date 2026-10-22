@@ -275,3 +275,22 @@ Decisions not in the plan:
 
 Pending: desktop-ci on the PR; docs on "clean, document".
 Deferred: none.
+
+### Round 8
+
+Did:
+- Finding 1: a reader may receive the dictation when it is the target window's process, a hosted app's process, or any descendant of them: the clipboard window walks the reader's parent chain (Toolhelp snapshot, at most 32 steps, loops end the walk) against the target's processes; unit tests on a fake process tree (descendants allowed, unrelated readers and the target's own parents refused, a parent loop ends) and a test that the snapshot knows this process.
+  Each render request logs the reader's executable, whether it opened the clipboard with a window, and rendered or withheld, never the text.
+- Windows proof in a WebView2 window the run built and launched (`tmw-webview.exe`, WinForms with Microsoft's WebView2 NuGet assemblies, all three Authenticode-valid Microsoft signatures, a textarea page, profile under the scratch folder and deleted after; new handle checked; `msedgewebview2.exe` its child): without a rule, Ctrl+V pasted the Spanish text, also into a freshly launched window; with a `tmw-webview.exe` rule, Shift+Insert pasted it again (81 to 162 characters).
+  The logs show what reads on this machine: `msrdc.exe` (WSLg's clipboard sync, with a window) withheld, and the WebView2 paste reading without a window, rendered.
+  The very first WebView2 dictation, before the reader log existed, pasted nothing; the window had launched 6 s earlier, and every later one, with 12 s for the first page load, landed; I read it as the first page load not having focused the textarea yet, not proven.
+- Finding 2: removed `the_level_crosses_threads_through_one_atomic`.
+- Finding 3: the real-clipboard tests ran on the round's final code inside an announced run, with an artefact ending in EXIT=0 and a verify.log step; the round 7 line is marked superseded.
+- The Linux clippy caught the new helpers as dead code off Windows; `parent_processes`, `executable_of` and `reader_allowed` are now Windows-only (and test) items.
+
+Decisions not in the plan, and the debt that remains (for the ARD entry in `document-task`):
+- The paste renders to the target's process tree; any other reader that opens the clipboard with a window gets nothing.
+- Remaining debt: a reader that opens the clipboard without a window (or whose window's process id reads as 0) cannot be identified, so it still gets the text and still counts as the target; WebView2 reads that way, so a window-less monitor that reads first can still make a paste report done before the target reads. A reused process id in the parent chain could also admit an unrelated process.
+- The reader log line stays at info level, since it names only executables and is the one way to see which reader decided a paste.
+
+Pending: desktop-ci on the PR; docs on "clean, document".

@@ -102,12 +102,4 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(levels(&room, 16_000).iter().all(|level| *level == 0.0));
     }
-
-    #[test]
-    fn the_level_crosses_threads_through_one_atomic() {
-        let level = Level::default();
-        let reader = level.clone();
-        level.set(0.75);
-        assert_eq!(reader.get(), 0.75);
-    }
 }

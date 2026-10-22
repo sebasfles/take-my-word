@@ -22,6 +22,16 @@ pub fn running_apps() -> Vec<String> {
     apps
 }
 
+#[cfg(windows)]
+pub fn executable_of(pid: u32) -> Option<String> {
+    platform::executable_of(pid)
+}
+
+#[cfg(windows)]
+pub fn parent_processes() -> std::collections::HashMap<u32, u32> {
+    platform::parent_processes()
+}
+
 pub fn foreground_is_this_process() -> bool {
     platform::foreground_is_this_process()
 }

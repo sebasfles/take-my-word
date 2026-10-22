@@ -20,7 +20,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
-use super::{Clipboard, ClipboardError};
+use super::{Clipboard, ClipboardError, reader_allowed};
 
 const WM_COMMANDS: u32 = WM_APP + 1;
 const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -255,18 +255,27 @@ unsafe extern "system" fn window_proc(
 
 fn reader_is_target() -> bool {
     let readers = with_state(|state| state.readers.clone()).unwrap_or_default();
-    let Ok(opener) = (unsafe { GetOpenClipboardWindow() }) else {
-        return true;
-    };
-    if readers.is_empty() || opener.is_invalid() {
-        return true;
-    }
+    let opener = unsafe { GetOpenClipboardWindow() }
+        .ok()
+        .filter(|window| !window.is_invalid());
     let mut pid = 0;
-    unsafe { GetWindowThreadProcessId(opener, Some(&mut pid)) };
-    let target = pid == 0 || readers.contains(&pid);
-    if !target {
-        log::info!("withheld the dictation from a clipboard reader outside the target app");
+    if let Some(opener) = opener {
+        unsafe { GetWindowThreadProcessId(opener, Some(&mut pid)) };
     }
+    let target = readers.is_empty() || pid == 0 || readers.contains(&pid) || {
+        let parents = crate::foreground::parent_processes();
+        reader_allowed(pid, &readers, |child| parents.get(&child).copied())
+    };
+    log::info!(
+        "clipboard read by {} ({}): {}",
+        crate::foreground::executable_of(pid).unwrap_or_else(|| "an unidentified reader".into()),
+        if opener.is_some() {
+            "with a window"
+        } else {
+            "without a window"
+        },
+        if target { "rendered" } else { "withheld" }
+    );
     target
 }
 
