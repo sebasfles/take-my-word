@@ -82,6 +82,7 @@ pub fn run() {
             commands::dismiss_overlay,
             commands::forward_key,
             commands::stop_dictation,
+            commands::keep_dictation,
             commands::check_microphone,
             account::app_state,
             account::account_status,

@@ -9,7 +9,8 @@ use crate::foreground;
 use crate::i18n::{self, Message};
 use crate::locale::{self, Language};
 use crate::overlay::{Overlay, OverlayState};
-use crate::shell::Shell;
+use crate::dictation::Notifier;
+use crate::shell::{Shell, TrayNotifier};
 use crate::theme::{self, Theme};
 use crate::{tray, windows};
 
@@ -107,6 +108,15 @@ pub fn dismiss_overlay(shell: State<'_, Shell>) {
 #[tauri::command]
 pub fn forward_key(shell: State<'_, Shell>, code: String, down: bool) {
     shell.forward_key(&code, down);
+}
+
+#[tauri::command]
+pub fn keep_dictation(app: AppHandle, shell: State<'_, Shell>, text: String) {
+    log::info!("left a dictation in the clipboard: no field had focus in the main window");
+    if let Err(error) = shell.copy(&text) {
+        log::warn!("keeping the dictation in the clipboard failed: {error}");
+    }
+    TrayNotifier::new(app).notify(&[Message::NotPasted]);
 }
 
 #[tauri::command]

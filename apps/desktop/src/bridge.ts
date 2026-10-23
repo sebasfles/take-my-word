@@ -88,6 +88,7 @@ export const bridge = {
   openMicrophoneSettings: () => invoke<undefined>("open_microphone_settings"),
   dismissOverlay: () => invoke<undefined>("dismiss_overlay"),
   stopDictation: () => invoke<undefined>("stop_dictation"),
+  keepDictation: (text: string) => invoke<undefined>("keep_dictation", { text }),
   forwardKey: (code: string, down: boolean) => invoke<undefined>("forward_key", { code, down }),
   checkMicrophone: (on: boolean) => invoke<MicStatus>("check_microphone", { on }),
   appState: () => invoke<AppState>("app_state"),
@@ -125,6 +126,10 @@ export const bridge = {
     }),
   onOverlayLevel: (handler: (level: number) => void): Promise<UnlistenFn> =>
     listen<number>("overlay-level", (event) => {
+      handler(event.payload);
+    }),
+  onInsertText: (handler: (text: string) => void): Promise<UnlistenFn> =>
+    listen<string>("insert-text", (event) => {
       handler(event.payload);
     }),
   onMicrophoneStatus: (handler: (status: MicStatus) => void): Promise<UnlistenFn> =>

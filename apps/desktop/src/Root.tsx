@@ -1,6 +1,7 @@
 import { type ComponentType, useEffect, useState } from "react";
 import { bridge, keepListening, type Theme } from "./bridge.ts";
 import { type Language, setLanguage } from "./i18n.ts";
+import { insertDictations } from "./insert.ts";
 import { forwardKeys } from "./keys.ts";
 import { applyTheme } from "./theme.ts";
 
@@ -31,7 +32,13 @@ export function Root({
   }, [language]);
 
   useEffect(() => {
-    if (forwardsKeys) return forwardKeys(window);
+    if (!forwardsKeys) return;
+    const stopKeys = forwardKeys(window);
+    const stopInserts = insertDictations();
+    return () => {
+      stopKeys();
+      stopInserts();
+    };
   }, [forwardsKeys]);
 
   setLanguage(language);

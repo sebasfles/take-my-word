@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::activity::{Activity, Busy};
-use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi};
+use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi, PasteKeystroke};
 #[cfg(debug_assertions)]
 use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
@@ -15,7 +15,7 @@ use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
 use crate::clipboard::{self, Clipboard, ClipboardError};
 use crate::config::{self, Placement, Settings};
-use crate::dictation::{Job, Notifier, Worker};
+use crate::dictation::{Job, Notifier, Paste, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{
     self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyEvent, KeyHook, Keys, Side, Source,
@@ -23,7 +23,7 @@ use crate::hotkey::{
 use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverlay};
-use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
+use crate::paste::{EnigoKeystroke, Modifiers, PasteResult, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
@@ -111,6 +111,10 @@ impl Shell {
                 keys: Arc::clone(&keys),
             },
             timing: Timing::default(),
+        };
+        let paste = OwnWindowFirst {
+            app: app.clone(),
+            others: paste,
         };
         let mut worker = Worker {
             api: dictation_api,
@@ -448,6 +452,37 @@ impl CheckGate {
     }
 }
 
+struct OwnWindowFirst<P> {
+    app: AppHandle,
+    others: P,
+}
+
+impl<P: Paste> Paste for OwnWindowFirst<P> {
+    fn paste(
+        &mut self,
+        text: &str,
+        target: Option<isize>,
+        keystroke: PasteKeystroke,
+    ) -> PasteResult {
+        let main = self.app.get_webview_window(windows::MAIN);
+        let main_handle = main
+            .as_ref()
+            .and_then(|window| window.hwnd().ok())
+            .map(|handle| handle.0 as isize);
+        if target.is_none() || target != main_handle {
+            return self.others.paste(text, target, keystroke);
+        }
+        log::info!("inserting a dictation into the main window");
+        match self.app.emit_to(windows::MAIN, "insert-text", text) {
+            Ok(()) => PasteResult::Pasted,
+            Err(error) => {
+                log::warn!("inserting into the main window failed: {error}");
+                PasteResult::Failed
+            }
+        }
+    }
+}
+
 struct NoHook;
 
 impl KeyHook for NoHook {
@@ -494,6 +529,12 @@ impl Modifiers for HeldModifiers {
 
 #[derive(Clone)]
 pub struct TrayNotifier(AppHandle);
+
+impl TrayNotifier {
+    pub fn new(app: AppHandle) -> Self {
+        Self(app)
+    }
+}
 
 impl Notifier for TrayNotifier {
     fn notify(&self, sentence: &[Message]) {
