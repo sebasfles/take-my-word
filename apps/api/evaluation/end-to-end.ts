@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import { setTimeout as sleep } from "node:timers/promises";
 import { CloudWatchLogsClient, FilterLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
@@ -25,7 +25,12 @@ import {
   missedTerms,
   percentile,
 } from "./harness/metrics.ts";
+import { Pacer, type LedgerEntry } from "./harness/pacing.ts";
+import { billedAudioSeconds, modelFacts } from "./harness/prices.ts";
+import { appendJsonl, readJsonl } from "./harness/store.ts";
+import { pacingKeyOf, pacingKeys } from "./harness/suite.ts";
 import { createThrowawayUser } from "./harness/throwaway-user.ts";
+import { defaultGroqWhisperModel } from "../src/dictation/providers/groq-whisper.ts";
 import {
   evaluationCodePaths,
   fromInvocation,
@@ -193,7 +198,7 @@ function report(
   push("# End-to-end guard", "");
   push(
     `Run ${startedAt} against the dev API with the production pipeline as deployed there, from code commit \`${codeCommit}\` and fixtures sha256 \`${sha256(transcriptionFixturesPath).slice(0, 16)}\`.`,
-    `A throwaway user with the fixture's developer dictionary dictated each case under its own language; ${String(burst)} concurrent requests opened the run to catch cold starts, then ${String(runs)} sequential runs per case.`,
+    `A throwaway user with the fixture's developer dictionary dictated each case under its own language; ${String(burst)} concurrent requests opened the run to catch cold starts, then ${String(runs)} sequential runs per case, paced to half of the production transcriber's free-plan limits.`,
     "Release to text is measured on the client that sent the request, so it includes that client's network to us-east-1.",
     `Reproduce from the repository root: \`pnpm --filter @take-my-word/api eval:e2e --results ${fromRoot(resultsDir)} --report ${fromRoot(reportPath)} --runs ${String(runs)} --burst ${String(burst)}\`.`,
     "",
@@ -267,6 +272,29 @@ const user = await createThrowawayUser(
   "eval-e2e",
 );
 const sent: Sent[] = [];
+const productionTranscriber = modelFacts(defaultGroqWhisperModel);
+const pacingKey = pacingKeyOf(defaultGroqWhisperModel);
+const ledgerPath = join(dirname(resultsDir), "ledger.jsonl");
+const pacer = new Pacer(pacingKeys([defaultGroqWhisperModel]), readJsonl<LedgerEntry>(ledgerPath));
+const useOf = (clip: Clip, requests: number) => ({
+  requests,
+  audioSeconds: billedAudioSeconds(productionTranscriber, clip.seconds) * requests,
+  tokens: 0,
+});
+
+async function pacedFor(clip: Clip, requests: number): Promise<void> {
+  for (;;) {
+    const readiness = pacer.readiness(pacingKey, useOf(clip, requests), Date.now());
+    if (readiness.kind === "now") return;
+    if (readiness.kind === "tomorrow") throw new Error(`paused: ${readiness.reason}`);
+    await sleep(readiness.at - Date.now());
+  }
+}
+
+function recordUse(clip: Clip, requests: number): void {
+  appendJsonl(ledgerPath, pacer.record(pacingKey, useOf(clip, requests), Date.now()));
+}
+
 const windowStart = Date.now() - 5_000;
 try {
   for (const { term, aliases } of fixtures.dictionaries.developer ?? []) {
@@ -276,9 +304,11 @@ try {
   const firstClip = first && clips.get(first.id);
   if (first === undefined || firstClip === undefined) throw new Error("no end-to-end case");
   await settingsWith(user.accessToken, [first.language]);
+  await pacedFor(firstClip, burst);
   const opening = await Promise.all(
     Array.from({ length: burst }, () => dictate(user.accessToken, firstClip)),
   );
+  recordUse(firstClip, burst);
   opening.forEach((entry, index) => {
     sent.push({ caseId: first.id, phase: "burst", run: index + 1, ...entry });
   });
@@ -287,12 +317,14 @@ try {
     if (clip === undefined) continue;
     await settingsWith(user.accessToken, [item.language]);
     for (let run = 1; run <= runs; run += 1) {
+      await pacedFor(clip, 1);
       sent.push({
         caseId: item.id,
         phase: "warm",
         run,
         ...(await dictate(user.accessToken, clip)),
       });
+      recordUse(clip, 1);
       console.log(`${item.id} run ${String(run)} done`);
     }
   }
