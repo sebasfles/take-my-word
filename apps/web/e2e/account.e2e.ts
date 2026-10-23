@@ -104,7 +104,11 @@ test("shows the seeded account on every page, without a token reaching the brows
   await expect(page.getByTestId("default-style")).toHaveText(styleName);
   await expect(page.getByTestId("account-language")).toHaveText("Spanish");
   await expect(page.getByTestId("account-dictation-languages")).toHaveText("Spanish");
-  await expect(page.getByTestId("account-context")).toHaveText("Law, Student. contratos");
+  await expect(page.getByTestId("account-context").locator(".tmw-badge")).toHaveText([
+    "Law",
+    "Student",
+  ]);
+  await expect(page.getByTestId("account-context-detail")).toHaveText("contratos");
   await expect(page.getByTestId("account-usage")).toContainText(/[1-9]\d* of \d+ minutes/);
   await expect(page.getByTestId("account-usage")).toContainText("Resets at");
 
@@ -143,7 +147,10 @@ test("shows the seeded account on every page, without a token reaching the brows
   await page.getByRole("link", { name: "Cuenta" }).click();
   await expect(page.getByTestId("account-language")).toHaveText("Español");
   await expect(page.getByTestId("account-dictation-languages")).toHaveText("Español");
-  await expect(page.getByTestId("account-context")).toHaveText("Derecho, Estudiante. contratos");
+  await expect(page.getByTestId("account-context").locator(".tmw-badge")).toHaveText([
+    "Derecho",
+    "Estudiante",
+  ]);
   await page.getByRole("button", { name: "Ver en inglés" }).click();
   await expect(page.getByRole("heading", { name: `Hi, ${seeded.username}` })).toBeVisible();
 

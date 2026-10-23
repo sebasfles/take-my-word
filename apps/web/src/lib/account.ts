@@ -97,10 +97,8 @@ export function formatTime(iso: string, locale: string, timeZone: string): strin
   return new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone }).format(new Date(iso));
 }
 
-export function contextText(context: UserContext, t: Dictionary["account"]): string {
-  const picks = context.picks.map((pick) => t.contextPicks[pick]).join(", ");
-  const text = [picks, context.detail].filter((part) => part !== "").join(". ");
-  return text === "" ? t.contextEmpty : text;
+export function contextLabels(context: UserContext, t: Dictionary["account"]): string[] {
+  return context.picks.map((pick) => t.contextPicks[pick]);
 }
 
 export function usageMinutes(usage: Usage): { used: string; cap: string } {

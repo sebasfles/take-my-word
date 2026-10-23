@@ -61,7 +61,7 @@ describe("Onboarding", () => {
     next();
     await screen.findByRole("heading", { name: "What do you do?" });
     expect(document.querySelector(".visual-context")?.textContent).toContain(
-      "I opened a PR and the CI is green.",
+      "I opened a PR to fix the CI/CD pipeline.",
     );
     fireEvent.click(screen.getByRole("checkbox", { name: "Software development" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Data and AI" }));

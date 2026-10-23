@@ -97,6 +97,7 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
   - a unit test proving that with empty context the transcriber prompt and the refiner instructions are byte-identical to today (Acceptance 3);
   - the fixture commit precedes the first with-context results;
   - the prd plan output is in the PR before the apply.
+- Round 1 (om-reviewer, 2026-10-23), Scope adjusted: the STT hint is dropped entirely, so Whisper's prompt stays the ranked terms only, whatever the context. Why: on the frozen fixtures, raw term errors were equal with and without the hint wherever it fit. Under both languages, a Spanish hint on English audio lost bio-en-1 whole ("y", 3 of 3 runs) and lost CRISPR-Cas9 and GAPDH. The alternative (hint only on fixed-language passes) keeps a hint with no measured gain that perturbed English spellings. The context reaches the refiner only.
 - clearance: full: dev `infra/scripts/tf dev apply`; prd plan and the additive apply above; `update-function-code` on the four dev Lambdas and the web deploy steps; `pnpm e2e` and `pnpm integration` with throwaway users and Polly; the Windows host. No `pnpm release:desktop`.
 
 ## om-developer notes
@@ -145,6 +146,40 @@ Evaluation, 2026-10-23, 3 runs per sample and condition, domain-term errors in t
 - Full report with every output: `{{workspace}}/evaluation/report.md`, for the PR.
 
 Pending:
-- The STT hint decision (question sent to the om-reviewer) and a second evaluation run after it, which needs dev again.
+- Answered in round 2.
 
 Deferred: none.
+
+### Round 2
+
+Findings applied, all six:
+1. STT hint removed: `withHint`, its tests, the hint cases and `promptHint` are gone; Whisper gets the ranked terms only. New test: the transcriber prompt is identical with and without context, under one language and both. `describeUserContext` remains for the refiner only.
+2. Evaluation re-run on dev at `98e1920`, frozen fixtures, results below.
+3. The report prints raw and text for every run, missed terms per stage, and a JSON of all runs; typographic apostrophes and quotes are normalized before comparing words and terms.
+4. The empty-context test asserts literals of develop's output (plain contract, dictionary heading and table, and the English plain contract), produced by running develop's `instructions.ts` at `origin/develop`.
+5. Web Account: picks as brand badges with their own labels, the detail on its own line as typed; `contextText` replaced by `contextLabels`; e2e asserts badges and detail separately.
+6. Onboarding example now quotes real round 2 pairs, verbatim clean text without and with context: en `dev-en-1` (languages one, run 2 without, run 2 with: "C slash CD" to "CI/CD"); es `bio-es-2` (languages both, run 1 without, run 1 with: "P-Zebra" to "pez cebra"), so the Spanish label names biology.
+
+Evaluation round 2 (`{{workspace}}/evaluation/round-2/report.md` and `report.json`), domain-term errors in the clean text, without / with context; raw errors are identical in every condition because Whisper no longer sees the context:
+
+| Group | one language | both (es, en) |
+|---|---|---|
+| dev-en | 8/48 / 5/48 | 8/48 / 6/48 |
+| dev-es | 12/48 / 12/48 | 11/48 / 12/48 |
+| bio-en | 4/36 / 5/36 | 3/36 / 5/36 |
+| bio-es | 11/36 / 12/36 | 12/36 / 11/36 |
+| total | 35 / 34 | 34 / 34 |
+
+- Acceptance 2 is not met: the totals do not move. Reported as measured; no prompt wording changed after seeing results.
+- Raw transcripts were the same string in all 12 runs of each sample, so every difference comes from the refiner, which varies run to run (for example dev-en-1 without context restored "CI/CD" in 2 of 6 runs).
+- Gains with context: dev-en-1 "CI/CD" 6 of 6 (2 of 6 without); dev-en-3 "Lambo" to "Lambda" once.
+- Regressions with context, all in the text stage with raw equal: bio-en-3 raw "gapey" became "GAPey", "GAPeY" and "GADPH" (without context it lowercased to "gapdh", which matches); dev-es-1 raw "C-CD" became "CD" once (a fragment dropped); bio-es-2 "P-zebra" casing noise.
+- Meaning changes with context, Spanish only: "Corre" became "Corrige" (dev-es-2, bio-es-3) and "Copia" (bio-es-3) in 3 of the 12 with-context runs of those two samples; without context the same verb became "Correr" once. Controls gained no content; one run turned "después de almuerzo" into "después de almorzar".
+- Round 1's dev-en-1 "C-slash-CD" cannot be attributed to a stage, because round 1 did not record raw; in round 2, with the refiner as the only context consumer, dev-en-1 is the clearest gain.
+- dev-es moved from 12 to 7 in round 1 but not in round 2; with the hint gone, that round 1 gain came from the hint path or from refiner variance, not from the background block alone.
+
+Decisions not in the plan:
+- The Spanish onboarding example uses biology (`bio-es-2`), since no Spanish developer sample showed a clean refiner fix.
+
+Pending:
+- Acceptance 2 decision: as measured, user context gives no reliable gain with the current refiner, and it causes occasional meaning changes in Spanish.

@@ -163,17 +163,24 @@ function client(token: string) {
   };
 }
 
-const wordsOf = (text: string) =>
+const typographic = (text: string) =>
   text
-    .toLowerCase()
     .normalize("NFC")
-    .split(/[\s.,;:!?¿¡"“”()]+/)
+    .replace(/[’‘ʼ]/g, "'")
+    .replace(/[“”«»„]/g, '"');
+
+const wordsOf = (text: string) =>
+  typographic(text)
+    .toLowerCase()
+    .split(/[\s.,;:!?¿¡"()]+/)
     .map((word) => word.replace(/^[-']+|[-']+$/g, ""))
     .filter((word) => word !== "");
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 const has = (text: string, term: string) =>
-  new RegExp(`(^|[^\\p{L}\\p{N}])${escape(term)}($|[^\\p{L}\\p{N}])`, "iu").test(text);
+  new RegExp(`(^|[^\\p{L}\\p{N}])${escape(typographic(term))}($|[^\\p{L}\\p{N}])`, "iu").test(
+    typographic(text),
+  );
 
 const missedTerms = (text: string, sample: Sample) =>
   sample.terms.filter((term) => !has(text, term));
@@ -220,7 +227,13 @@ function report(results: Result[]): string {
       );
     }
   }
-  lines.push("", "## Every word not in the expected text", "");
+  lines.push(
+    "",
+    "## Every word not in the expected text",
+    "",
+    "Per condition: words of the clean text not in the expected sentence, missed terms in the raw transcript and in the clean text, and each run as raw then text.",
+    "",
+  );
   for (const sample of fixture.samples) {
     lines.push(`### ${sample.id}`, "", `Expected: ${sample.text}`, "");
     for (const mode of languageModes) {
@@ -230,12 +243,16 @@ function report(results: Result[]): string {
             result.sample === sample && result.mode === mode && result.withContext === withContext,
         );
         const extras = condition.flatMap((result) => extraWords(result.text, sample));
+        const missedRaw = condition.flatMap((result) => missedTerms(result.raw, sample));
         const missed = condition.flatMap((result) => missedTerms(result.text, sample));
         const flipped = condition.filter((result) => result.locale !== sample.language).length;
         lines.push(
-          `- ${mode}, ${withContext ? "with context" : "without"}: extra words [${extras.join(", ")}]; missed terms [${missed.join(", ")}]; flips ${String(flipped)}`,
+          `- ${mode}, ${withContext ? "with context" : "without"}: extra words [${extras.join(", ")}]; missed terms raw [${missedRaw.join(", ")}], text [${missed.join(", ")}]; flips ${String(flipped)}`,
         );
-        for (const result of condition) lines.push(`  - run ${String(result.run)}: ${result.text}`);
+        for (const result of condition) {
+          lines.push(`  - run ${String(result.run)} raw: ${result.raw}`);
+          lines.push(`    text: ${result.text}`);
+        }
       }
     }
     lines.push("");
@@ -279,6 +296,14 @@ try {
     }
   }
   writeFileSync(out, report(results));
+  writeFileSync(
+    out.replace(/\.md$/, "") + ".json",
+    `${JSON.stringify(
+      results.map(({ sample, ...result }) => ({ id: sample.id, ...result })),
+      null,
+      2,
+    )}\n`,
+  );
   console.log(`report written to ${out}`);
 } finally {
   await removeUser(user);

@@ -14,7 +14,7 @@ import { AudioTooShortError, InvalidAudioError } from "./audio/invalid-audio.ts"
 import type { AudioSink } from "./audio-sink.ts";
 import type { DictationStore } from "./dictation-store.ts";
 import { ProviderError } from "./ports/provider-error.ts";
-import { transcriberPrompt, withHint } from "./dictionary-projection.ts";
+import { transcriberPrompt } from "./dictionary-projection.ts";
 import { refinerInstructions } from "./instructions.ts";
 import { transcribeIn } from "./language-selection.ts";
 import type { ProfileStore } from "./profile.ts";
@@ -153,18 +153,12 @@ export async function dictate(
     defaultStyleId: settings?.defaultStyleId,
     custom: profile.styles,
   });
-  const languages = settings?.dictationLanguages ?? defaultDictationLanguages;
   const context = settings?.context ?? emptyUserContext;
-  const ranked = transcriberPrompt(profile.terms, {
+  const prompt = transcriberPrompt(profile.terms, {
     now: createdAt,
     halfLifeDays: deps.dictionary.halfLifeDays,
     tokenBudget: deps.dictionary.promptTokenBudget,
   });
-  const prompt = withHint(
-    ranked.prompt,
-    describeUserContext(context, languages[0] ?? "en"),
-    deps.dictionary.promptTokenBudget,
-  );
 
   if (deps.audioSink) {
     await deps.audioSink.put({ userId, requestId, createdAt, audio }).catch((error: unknown) => {
@@ -176,19 +170,22 @@ export async function dictate(
 
   let transcribeMs = 0;
   const transcriptions: string[] = [];
-  const { text: raw, language } = await transcribeIn(languages, async (requested) => {
-    const [transcript, ms] = await callProvider(deps, transcriber.label, () =>
-      transcriber.transcribe({
-        audio: audio.bytes,
-        container: audio.container,
-        ...(requested && { language: requested }),
-        ...(prompt !== "" && { prompt }),
-      }),
-    );
-    transcribeMs += ms;
-    transcriptions.push(requested ?? "detect");
-    return transcript;
-  });
+  const { text: raw, language } = await transcribeIn(
+    settings?.dictationLanguages ?? defaultDictationLanguages,
+    async (requested) => {
+      const [transcript, ms] = await callProvider(deps, transcriber.label, () =>
+        transcriber.transcribe({
+          audio: audio.bytes,
+          container: audio.container,
+          ...(requested && { language: requested }),
+          ...(prompt.prompt !== "" && { prompt: prompt.prompt }),
+        }),
+      );
+      transcribeMs += ms;
+      transcriptions.push(requested ?? "detect");
+      return transcript;
+    },
+  );
 
   if (deps.isSilence({ text: raw, quiet })) {
     const totalMs = Math.round(deps.elapsed() - startedAt);
@@ -256,8 +253,7 @@ export async function dictate(
     styleId: style.id,
     language,
     transcriptions: transcriptions.join(","),
-    promptTerms: ranked.terms,
-    promptHint: prompt !== ranked.prompt,
+    promptTerms: prompt.terms,
     contextPicks: context.picks.length,
     dictionaryTerms: profile.terms.length,
     inputTokens: refined.usage.inputTokens,

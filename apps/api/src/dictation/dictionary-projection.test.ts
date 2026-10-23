@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  estimateTokens,
-  transcriberPrompt,
-  withHint,
-  type ProjectedTerm,
-} from "./dictionary-projection.ts";
+import { estimateTokens, transcriberPrompt, type ProjectedTerm } from "./dictionary-projection.ts";
 
 const now = new Date("2026-10-21T00:00:00.000Z");
 const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
@@ -44,15 +39,5 @@ describe("transcriberPrompt", () => {
       prompt: "",
       terms: 0,
     });
-  });
-});
-
-describe("withHint", () => {
-  it("adds the hint only when it fits whole in the budget, counting bytes", () => {
-    expect(withHint("Kubernetes", "Diseño", 20)).toBe("Kubernetes. Diseño");
-    expect(estimateTokens("Kubernetes. Diseño")).toBe(19);
-    expect(withHint("Kubernetes", "Diseño", 18)).toBe("Kubernetes");
-    expect(withHint("", "Law", 3)).toBe("Law");
-    expect(withHint("Kubernetes", "", 224)).toBe("Kubernetes");
   });
 });

@@ -1,8 +1,9 @@
+import { Badge } from "@take-my-word/brand";
 import { AccountSection } from "@/components/account-section.tsx";
 import { LocalTime } from "@/components/local-time.tsx";
 import {
   bothLoaded,
-  contextText,
+  contextLabels,
   languageList,
   languageName,
   refinerNames,
@@ -57,7 +58,25 @@ export default async function AccountPage() {
           },
           {
             label: t.account.context,
-            value: contextText(settings.context, t.account),
+            value:
+              settings.context.picks.length === 0 && settings.context.detail === "" ? (
+                t.account.contextEmpty
+              ) : (
+                <>
+                  {settings.context.picks.length > 0 && (
+                    <span className="context-picks">
+                      {contextLabels(settings.context, t.account).map((label) => (
+                        <Badge key={label}>{label}</Badge>
+                      ))}
+                    </span>
+                  )}
+                  {settings.context.detail !== "" && (
+                    <span className="context-detail" data-testid="account-context-detail">
+                      {settings.context.detail}
+                    </span>
+                  )}
+                </>
+              ),
             testId: "account-context",
           },
           ...(usage === null

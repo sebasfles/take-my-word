@@ -34,3 +34,33 @@
 - unit: pass exit 0 (171 tests, pnpm test) and pass exit 0 (207 tests, pnpm rust:test on 9c68e49; no Rust change since)
 - e2e: n/a
 
+## 2026-10-23T12:56:41Z by om-developer target shared on 5b1c202
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (28 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T12:56:41Z by om-developer target api on 5b1c202
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (202 tests, pnpm test)
+- e2e: pass exit 0 (37 tests, pnpm e2e on 98e1920 deployed to dev; api and web code trees identical between 98e1920 and 5b1c202 (the diff is desktop i18n, one desktop test and task notes))
+
+## 2026-10-23T12:56:41Z by om-developer target web on 5b1c202
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (168 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration) then pass exit 0 (13 tests, pnpm e2e), on 98e1920 deployed to dev; api and web code trees identical between 98e1920 and 5b1c202 (the diff is desktop i18n, one desktop test and task notes)
+
+## 2026-10-23T12:56:41Z by om-developer target desktop on 5b1c202
+- lint: pass exit 0 (pnpm lint) and pass exit 0 (pnpm rust:lint on 9c68e49; src-tauri unchanged since: git diff 9c68e49 5b1c202 -- apps/desktop/src-tauri is empty)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (171 tests, pnpm test) and pass exit 0 (207 tests, pnpm rust:test on 9c68e49; src-tauri unchanged since)
+- e2e: n/a
+
+## 2026-10-23T12:56:41Z by om-developer target infra on 5b1c202
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+

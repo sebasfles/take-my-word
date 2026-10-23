@@ -1,8 +1,8 @@
-import type { DictionaryTerm, Style } from "@take-my-word/shared";
+import type { DictionaryTerm, Style, UserContextPick } from "@take-my-word/shared";
 import { describe, expect, it } from "vitest";
 import {
   bothLoaded,
-  contextText,
+  contextLabels,
   formatDate,
   formatDateTime,
   formatSeconds,
@@ -177,15 +177,11 @@ describe("languageList", () => {
 });
 
 describe("the user's context and usage", () => {
-  it("lists the picks in the reader's language, then the detail, or says it is not set", () => {
-    expect(
-      contextText({ picks: ["law", "student"], detail: "contratos" }, dictionary("es").account),
-    ).toBe("Derecho, Estudiante. contratos");
-    expect(contextText({ picks: ["data-ai"], detail: "" }, dictionary("en").account)).toBe(
-      "Data and AI",
-    );
-    expect(contextText({ picks: [], detail: "CRISPR" }, dictionary("en").account)).toBe("CRISPR");
-    expect(contextText({ picks: [], detail: "" }, dictionary("es").account)).toBe("Sin indicar");
+  it("labels the picks in the reader's language, in the order chosen", () => {
+    const context = { picks: ["law", "data-ai"] as UserContextPick[], detail: "contratos" };
+    expect(contextLabels(context, dictionary("es").account)).toEqual(["Derecho", "Datos e IA"]);
+    expect(contextLabels(context, dictionary("en").account)).toEqual(["Law", "Data and AI"]);
+    expect(contextLabels({ picks: [], detail: "x" }, dictionary("en").account)).toEqual([]);
   });
 
   it("counts started minutes and never shows more than the cap", () => {
