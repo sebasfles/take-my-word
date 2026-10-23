@@ -151,7 +151,7 @@ test("shows the seeded account on every page, without a token reaching the brows
     "Derecho",
     "Estudiante",
   ]);
-    await page.getByRole("button", { name: "EN, view in English" }).click();
+  await page.getByRole("button", { name: "EN, view in English" }).click();
   await expect(page.getByRole("heading", { name: `Hi, ${seeded.username}` })).toBeVisible();
 
   await verifyTraffic();
