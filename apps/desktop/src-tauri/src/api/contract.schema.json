@@ -325,5 +325,38 @@
       "rules"
     ],
     "additionalProperties": false
+  },
+  "discovery": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "version": {
+        "type": "number",
+        "const": 1
+      },
+      "apiUrl": {
+        "type": "string"
+      },
+      "region": {
+        "type": "string",
+        "pattern": "^[a-z]{2}(-[a-z]+)+-\\d{1,2}$"
+      },
+      "userPoolId": {
+        "type": "string",
+        "pattern": "^([a-z]{2}(-[a-z]+)+-\\d{1,2})_[A-Za-z0-9]{1,55}$"
+      },
+      "clientId": {
+        "type": "string",
+        "pattern": "^[a-z0-9]{1,128}$"
+      }
+    },
+    "required": [
+      "version",
+      "apiUrl",
+      "region",
+      "userPoolId",
+      "clientId"
+    ],
+    "additionalProperties": false
   }
 }

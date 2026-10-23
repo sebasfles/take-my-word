@@ -1,14 +1,14 @@
 ---
-updated: 2026-10-22
-source: 0011_desktop_rebrand
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Infra: architecture and debt
 
 ## 2026-10-20: Own AWS account, two regions, 5 USD budget
 
-- Decision: the project runs in its own account `takemyword` (115891590483) in the organization, restricted to us-east-1 and us-east-2, with hosted zone `takemyword.fless.dev` and a 5 USD monthly budget alerting at 80% actual and 100% forecast.
-- Alternatives rejected: a 10 USD budget and the names `take-my-word` and `take-my-word.fless.dev`, as the original proposal had them.
+- Decision: the project runs in its own account in the organization, restricted to us-east-1 and us-east-2, with its own hosted zone and a 5 USD monthly budget alerting at 80% actual and 100% forecast.
+- Alternatives rejected: a 10 USD budget and the account and domain names the original proposal had.
 - Reason: one account per project isolates cost, blast radius and credentials; AWS covers hosting, data, identity and secrets, so no third-party vendor is added.
 - Debt created: none.
 - Revisit when: monthly spend approaches the budget, or a provider or service needs a region outside the two allowed.
@@ -16,7 +16,7 @@ source: 0011_desktop_rebrand
 
 ## 2026-10-20: Infra lives in the one public monorepo
 
-- Decision: Terraform sits in `infra/` of the monorepo `sebasfles/take-my-word`, next to `apps/*` and `packages/shared`, with `.github/workflows` path-filtered per app.
+- Decision: Terraform sits in `infra/` of the project's one public monorepo, next to `apps/*` and `packages/shared`, with `.github/workflows` path-filtered per app.
 - Alternatives rejected: four repos (docs, platform with api, web and infra, desktop, mobile) as the original proposal laid out; a separate infra repo.
 - Reason: one PR per task across api, clients and infra; only the backend and web deploy to AWS, so nothing else needs to share infra.
 - Debt created: none.
@@ -70,7 +70,7 @@ source: 0011_desktop_rebrand
 
 ## 2026-10-21: Terraform state in a hand-made S3 bucket, applied through one wrapper
 
-- Decision: every root keeps its state in `takemyword-terraform-state-115891590483` under its own key, locked with the S3 lockfile; the bucket is created by hand outside Terraform; `infra/scripts/tf` passes the GitHub App pem from `.env` and the account profile; a fresh account applies the bucket, `core`, then each env.
+- Decision: every root keeps its state in the account's state bucket under its own key, locked with the S3 lockfile; the bucket is created by hand outside Terraform; `infra/scripts/tf` passes the GitHub App pem from `.env` and the account profile; a fresh account applies the bucket, `core`, then each env.
 - Alternatives rejected: a DynamoDB lock table; a Terraform-managed state bucket; a tfvars copy of the pem.
 - Reason: the state bucket cannot hold its own state, the S3 lockfile needs no extra resource, and the pem never lands on disk outside `.env`.
 - Debt created: none.
@@ -79,7 +79,7 @@ source: 0011_desktop_rebrand
 
 ## 2026-10-21: The API answers on `api.` of each environment's host
 
-- Decision: the HTTP API serves `api.dev.takemyword.fless.dev` and `api.takemyword.fless.dev` with a regional ACM certificate and a Route 53 alias; the execute-api endpoint is disabled; the stage throttles at 10 requests per second with a burst of 20; `core` creates the Actions environments and `stacks/app` writes their variables.
+- Decision: the HTTP API serves `api.` in front of each environment's web host with a regional ACM certificate and a Route 53 alias; the execute-api endpoint is disabled; the stage throttles at 10 requests per second with a burst of 20; `core` creates the Actions environments and `stacks/app` writes their variables.
 - Alternatives rejected: the default execute-api address.
 - Reason: clients bake in a stable address, and a disabled default endpoint leaves one way in.
 - Debt created: none.
@@ -140,4 +140,58 @@ source: 0011_desktop_rebrand
 - Resolved by: 0011_desktop_rebrand, 2026-10-22
 - Revisit when: 0011 makes the desktop consume the brand package.
 - Source: 0010_brand_web
+
+## 2026-10-23: Every per-deployment value comes from one gitignored deployment.json
+
+- Decision: `deployment.json` at the repo root, validated by a zod schema in `packages/deployment`, holds account, region, profile, domain and zone, state bucket, name prefix, environments, releases repository, the optional `github` section, indexing and the desktop's servers and updater key; `deployment.example.json` and the generated `deployment.schema.json` document every key; `pnpm tf` replaces `infra/scripts/tf`, passes the values as `TF_VAR_*` and the backend as a generated `.terraform/deployment.tfbackend`, and refuses a profile of another account; CI gets the same values from Actions variables.
+- Alternatives rejected: tfvars files per deployment; a commented YAML or TOML config, which needs a parser dependency; values left in `.tf` files with overrides.
+- Reason: the repository must hold nothing of the official deployment, and one validated file serves Terraform, the deploy scripts, the setup and the desktop build.
+- Debt created: none.
+- Revisit when: a second official environment or a second cloud appears.
+- Source: 0016_self_hosting
+
+## 2026-10-23: CI is optional, and the official addresses stay put
+
+- Decision: `core`, the deploy roles, the GitHub data sources and the Actions variables exist only with a `github` section; `moved` blocks keep the official deploy role and policy at `[0]`, so the official plans show moves only; the web certificate comes from an `aws.us_east_1` provider alias so any region works.
+- Alternatives rejected: a separate Terraform tree for self-hosting; requiring a GitHub repository and App of every self-hoster.
+- Reason: a self-hoster deploys from their machine with `pnpm selfhost`; the official stack must not plan a single replacement.
+- Debt created: none.
+- Revisit when: self-hosters ask for CI.
+- Source: 0016_self_hosting
+
+## 2026-10-23: Deploy steps are scripts shared by CI and the setup, and build before credentials
+
+- Decision: `pnpm deploy:<api|web> build` makes the bundles with no AWS call and `swap` only uploads, swaps, waits and invalidates; `reusable-deploy*` build before `configure-aws-credentials` and swap after; `pnpm selfhost` runs the same steps.
+- Alternatives rejected: keeping the steps in workflow YAML and copying them into the setup.
+- Reason: one implementation for both paths, and the build (with third-party packages) never runs with the deploy role's credentials.
+- Debt created: none.
+- Revisit when: a deploy needs a step that cannot run outside CI.
+- Source: 0016_self_hosting
+
+## 2026-10-23: pnpm selfhost touches only what it created and redeploys only what changed
+
+- Decision: the setup refuses a config with `github`, accepts a state bucket only when it is new or tagged `Project=<name>` and `ManagedBy=pnpm selfhost`, takes the account from STS once and refuses another later, writes secrets and passwords only through the SDK, and records the commit and the web build inputs (`releases`, `indexed`) in `selfhost/deployed.json` of the assets bucket so a re-run with nothing changed deploys nothing; `remove` sets `removal=true` (no deletion protection, no secret recovery window), destroys, deletes its own bucket and polls for leftovers by tag, name and DNS record.
+- Alternatives rejected: a removal by tag alone; emptying a foreign state bucket; redeploying on every run.
+- Reason: a person runs it against an account that may hold other things, often more than once.
+- Debt created: the leftovers check confirms only user pools against their own service; any other resource the tag index still lists right after deletion is reported until the index catches up.
+- Revisit when: a removal reports a leftover that is already gone.
+- Source: 0016_self_hosting
+
+## 2026-10-23: The web build bakes its links and its indexed origin; one build serves every env
+
+- Decision: `RELEASES_REPOSITORY` and `WEB_INDEXED_ORIGIN` are build-time values inlined by `next.config`; a build without the repository fails; pages are indexed only when the runtime `WEB_ORIGIN` equals the baked origin, so the official prd is indexed and its dev, a copy of its build elsewhere and every self-hosted deployment answer `X-Robots-Tag: noindex` and meta noindex unless `indexed` is set; robots.txt allows crawling everywhere so the noindex is read.
+- Alternatives rejected: Lambda environment variables, which would change the official plans; one build per environment in `pnpm selfhost`; disallowing private pages in robots.txt.
+- Reason: empty official plans, one build for dev and prd, and copies never competing with the official site.
+- Debt created: none.
+- Revisit when: another public page or language joins the site.
+- Source: 0016_self_hosting
+
+## 2026-10-23: Public pages are /en and /es, each its own root layout
+
+- Decision: the landing lives at the static segments `/en` and `/es`, each with a small root layout so `<html lang>` is right; sign-in, account and gallery sit in the `(account)` group with the cookie-chosen language; `/` is a 307 from the proxy by `tmw-lang`, then Accept-Language; a global not-found page serves every unmatched URL.
+- Alternatives rejected: a dynamic `[lang]` root segment, whose 404 Next renders as an empty client shell; one URL per page with the language chosen by cookie, which search engines cannot index twice.
+- Reason: both languages are indexable with canonical and hreflang, and every URL that does not exist answers a real 404 page.
+- Debt created: none.
+- Revisit when: a third language arrives.
+- Source: 0016_self_hosting
 

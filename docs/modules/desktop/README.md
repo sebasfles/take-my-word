@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-23
-source: 0014_desktop_ux
+source: 0016_self_hosting
 ---
 
 # Desktop
@@ -11,7 +11,7 @@ Windows first; macOS and Linux follow.
 
 ## Boundaries
 
-- Owns: the tray, the hotkey hook, recording, the overlay and its level, active window detection, pasting and clipboard restore, the desktop sign-in, session and keychain storage, onboarding, the settings editors and the app's Spanish and English, the dev and prd builds, installers and the updater.
+- Owns: the tray, the hotkey hook, recording, the overlay and its level, active window detection, pasting and clipboard restore, the desktop sign-in, session and keychain storage, the choice of server (official or the user's own, by discovery), onboarding, the settings editors and the app's Spanish and English, the dev and prd builds, installers and the updater.
 - Does not own: transcription and cleanup (dictation), styles and app rules data (styles), terms (dictionary), the user pool and token rules (auth).
 - Code: `apps/desktop`.
 

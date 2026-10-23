@@ -5,6 +5,8 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 6.69"
+
+      configuration_aliases = [aws.us_east_1]
     }
     github = {
       source  = "integrations/github"

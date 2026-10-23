@@ -1,0 +1,225 @@
+## 2026-10-23T09:24:03Z by om-developer target shared on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (45 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target brand on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target deployment on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (26 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target web on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (175 tests, pnpm test --no-file-parallelism)
+- e2e: not run (pnpm integration and pnpm e2e need the dev stack, held by 0015, and the expired SSO session)
+
+## 2026-10-23T09:24:03Z by om-developer target desktop on 472f21e
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint:linux)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (169 tests, pnpm test --no-file-parallelism)
+- rust:lint (Windows) and rust:test: not run, the Windows host is held by 0015; cargo test --locked -- --test-threads=1 in the tmw-linux-check container: 194 passed, 1 ignored
+
+## 2026-10-23T09:24:03Z by om-developer target infra on 472f21e
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (init -backend=false and validate on core, dev, prd)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target workflows on 472f21e
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T09:35:05Z by om-developer target shared on dbaa062
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (45 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:35:05Z by om-developer target brand on dbaa062
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:35:05Z by om-developer target deployment on dbaa062
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (27 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:35:05Z by om-developer target web on dbaa062
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (175 tests, pnpm test --no-file-parallelism)
+- e2e: not run (pnpm integration and pnpm e2e wait for dev, held by 0015)
+
+## 2026-10-23T09:35:05Z by om-developer target desktop on dbaa062
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint:linux)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (170 tests, pnpm test --no-file-parallelism)
+- rust:lint (Windows) and rust:test: not run, the Windows host is held by 0015; cargo test --locked -- --test-threads=1 in the tmw-linux-check container: exit 0, 194 passed, 1 ignored
+
+## 2026-10-23T09:35:05Z by om-developer target infra on dbaa062
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (init -backend=false and validate on core, dev, prd)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T09:35:05Z by om-developer target workflows on dbaa062
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+
+## 2026-10-23T10:12:40Z by om-developer target deployment on ea1bc3b
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (37 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T10:12:40Z by om-developer target desktop on ea1bc3b
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint:linux)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (228 tests, pnpm test --no-file-parallelism)
+- rust: cargo test --locked -- --test-threads=1 in the tmw-linux-check container: exit 0, 204 passed, 1 ignored
+- rust:lint (Windows) and rust:test (Windows): not run on ea1bc3b; the host was returned to 0015. At afe949f (phase 1 code) both passed after the auth/mod.rs fmt fix, which is in ea1bc3b.
+
+## 2026-10-23T10:12:40Z by om-developer target infra on ea1bc3b
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform validate on core, dev and prd after init -backend=false)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T10:12:40Z by om-developer target workflows on ea1bc3b
+- lint: pass exit 0 (pnpm lint:workflows)
+
+## 2026-10-23T10:16:51Z by om-developer target deployment on e892526
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (38 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T10:39:44Z by om-developer target desktop (Windows host) on 5726592 (code identical to e892526)
+- rust:lint: pass exit 0 (pnpm rust:lint: cargo fmt, clippy all targets, clippy release --features dev, then rust:lint:linux)
+- rust:test: pass exit 0 (218 passed, 9 ignored, pnpm rust:test, --test-threads=1)
+- prd build: pass exit 0 (pnpm tauri:build:prd --no-sign, official prd server and updater key from deployment.json); updater signing skipped on purpose, the release key stays with desktop-release; a first run without --no-sign built the same installer and stopped at "A public key has been found, but no private key"
+
+## 2026-10-23T12:10:47Z by om-developer target deployment on d835329
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (39 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T12:10:47Z by om-developer target web on b06fc0f (deployed to dev by hand; web code unchanged since)
+- e2e: pass exit 0 (pnpm integration: 4 tests against dev, --no-file-parallelism; pnpm e2e: 13 passed against WEB_URL=https://dev.<domain>, --workers=1)
+- dev discovery: https://dev.<domain>/.well-known/take-my-word.json 200, valid against discoverySchema
+
+## 2026-10-23T12:10:47Z by om-developer target desktop on b06fc0f
+- scripts/terminal-smoke.sh: bash -n clean; run once with --server and --real against scratch (pastes 1, landed 1); no other change to desktop code since e892526, whose Windows rust:lint and rust:test are green
+
+## 2026-10-23T12:11:57Z by om-developer target deployment on 8df450d
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (39 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T12:42:35Z by om-developer target web on 8f3a3c4
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (248 tests, pnpm test)
+- e2e: n/a (pnpm integration and pnpm e2e need dev, held by 0015; run when the om-reviewer passes "dev available")
+
+## 2026-10-23T12:42:35Z by om-developer target deployment on 8f3a3c4
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (42 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T12:42:35Z by om-developer target workflows on 8f3a3c4
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T12:47:57Z by om-developer target web on bc0f15f
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (252 tests, pnpm test)
+- e2e: n/a (pnpm integration and pnpm e2e need dev, held by 0015; run when the om-reviewer passes "dev available")
+
+## 2026-10-23T12:57:36Z by om-developer target web on bc0f15f (deployed to dev from 564a511, which adds only task docs)
+- lint: pass exit 0 (pnpm lint, block above)
+- typecheck: pass exit 0 (pnpm typecheck, block above)
+- unit: pass exit 0 (252 tests, block above)
+- e2e: pass exit 0 (pnpm integration: 4 tests, exit 0; pnpm e2e: 16 tests, exit 0; against dev, AWS_PROFILE=fless-takemyword)
+
+## 2026-10-23T15:32:49Z by om-developer target api on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (200 tests, pnpm test)
+- e2e: n/a (dev not held this round; the api code is 0015's, verified by its own PR)
+
+## 2026-10-23T15:32:49Z by om-developer target web on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (255 tests, pnpm test); OpenNext bundle exit 0
+- e2e: n/a (dev not held this round; integration 4 and e2e 16 passed on dev before the rebase)
+
+## 2026-10-23T15:32:49Z by om-developer target desktop on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint; Windows pnpm rust:lint exit 0 on the worktree at the same commit)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (235 vitest tests, pnpm test; Windows pnpm rust:test exit 0, 219 passed, 10 ignored)
+- e2e: n/a
+
+## 2026-10-23T15:32:49Z by om-developer target cognito on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T15:32:49Z by om-developer target shared on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (46 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T15:32:49Z by om-developer target brand on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T15:32:49Z by om-developer target deployment on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (42 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T15:32:49Z by om-developer target infra on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (init -backend=false and validate in core, dev and prd)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T15:32:49Z by om-developer target workflows on 4af31fd (fresh clone, no deployment.json, .env or .next)
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T15:39:46Z by om-developer targets api and web on 4af31fd (deployed to dev from 7fb63f8, which adds only task docs)
+- api e2e: pass exit 0 (37 tests, pnpm e2e against dev, AWS_PROFILE=fless-takemyword)
+- web integration: pass exit 0 (4 tests, pnpm integration against dev)
+- web e2e: pass exit 0 (16 tests, pnpm e2e against dev)

@@ -18,7 +18,7 @@ import { localeCookieName, localeFrom } from "./i18n.ts";
 import { themeCookieName, themeFrom } from "./theme.ts";
 import { refreshCookieName, sessionCookieName, sessionCookies } from "./session.ts";
 
-const origin = "https://dev.takemyword.fless.dev";
+const origin = "https://dictation.example.com";
 
 function setup() {
   const { deps, cognito, logged } = fakeDeps();

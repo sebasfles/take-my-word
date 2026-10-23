@@ -11,7 +11,7 @@ import {
   currentUsername,
   requireAppSession,
 } from "@/lib/server/request.ts";
-import "../../styles/account.css";
+import "@/styles/account.css";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   await requireAppSession();
@@ -42,7 +42,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <StateStringsProvider value={t.state}>{children}</StateStringsProvider>
         </main>
       </div>
-      <SiteFooter t={t} theme={theme} />
+      <SiteFooter t={t} theme={theme} locale={locale} />
     </>
   );
 }

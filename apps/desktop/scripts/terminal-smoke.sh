@@ -5,7 +5,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: scripts/terminal-smoke.sh --app 'C:\path\take-my-word.exe' [--tries 5] [--targets 1,2,3,4,5]
                                  [--multiline app|direct|none] [--hold] [--race update|paste] [--sign-in .env]
-                                 [--scratch /mnt/c/dir] [--out dir] [--run-id id]
+                                 [--scratch /mnt/c/dir] [--out dir] [--run-id id] [--server domain] [--real]
 
 Dictates into terminal targets the run opens itself, from WSL on the Windows host:
   1 Windows Terminal, WSL, tmux, Claude Code    2 Windows Terminal, WSL, tmux
@@ -17,6 +17,8 @@ clipboard update (as 0012's run did) or on every Ctrl+V (it then wins every race
 Needs a debug build (the API stub), nobody at the keyboard, and no other dev instance running.
 --hold needs --sign-in with a file holding CREW_E2E_B_USERNAME and CREW_E2E_B_PASSWORD; the run signs in
 through the sign-in window and signs out from Settings at the end.
+--server domain chooses "Use your own server" with that domain before signing in.
+--real turns the stub off, so each dictation goes through the signed-in server; it needs --multiline none.
 EOF
   exit 2
 }
@@ -27,6 +29,8 @@ tries=5
 targets="1,2,3,4,5"
 multiline="app"
 hold=0
+server=""
+real=0
 race=""
 run_id="tmw-smoke-$(date +%H%M%S)"
 out=""
@@ -39,6 +43,8 @@ while [[ $# -gt 0 ]]; do
     --hold) hold=1; shift ;;
     --race) race="$2"; shift 2 ;;
     --sign-in) sign_in_env="$2"; shift 2 ;;
+    --server) server="$2"; shift 2 ;;
+    --real) real=1; shift ;;
     --out) out="$2"; shift 2 ;;
     --scratch) scratch="$2"; shift 2 ;;
     --run-id) run_id="$2"; shift 2 ;;
@@ -415,6 +421,25 @@ sign_in() {
   [[ "$window" != 0 ]] || { log "WARNING: the sign-in window never appeared"; return 1; }
   guard_ok
   offset="$(app_log_size)"
+  if [[ -n "$server" ]]; then
+    act invoke "$window" 'Empezar|Get started' >/dev/null 2>&1 || true
+    sleep 1
+    guard_ok
+    act invoke "$window" 'Usar tu propio servidor|Use your own server' >/dev/null || { log "WARNING: no own-server link"; return 1; }
+    sleep 1
+    export TMW_SMOKE_SERVER="$server"
+    export WSLENV="${WSLENV:+$WSLENV:}TMW_SMOKE_SERVER"
+    guard_ok
+    psw fill-env "$window" 0 TMW_SMOKE_SERVER >/dev/null || { log "WARNING: the server step has no domain field"; return 1; }
+    act invoke "$window" 'Continuar|Continue' >/dev/null
+    local chosen=$((SECONDS + 30))
+    until app_log_since "$offset" | grep -q "server: $server"; do
+      (( SECONDS < chosen )) || { log "WARNING: the app did not switch to $server"; return 1; }
+      sleep 0.5
+    done
+    log "server: $(app_log_since "$offset" | grep -o "server: .*" | tail -1)"
+    sleep 1
+  fi
   local filled=no
   for _ in $(seq 10); do
     guard_ok
@@ -527,6 +552,8 @@ one_try() {
     for expected in "${expected_two_lines[@]}"; do
       [[ "$text" == *"$expected"* || "$text" == *"[Pasted text"* ]] && landed=yes
     done
+  elif [[ "$real" == 1 ]]; then
+    [[ "$outcome" == "pasted a dictation" && -n "${text//[[:space:]]/}" ]] && landed=yes
   else
     for expected in "${expected_texts[@]}"; do
       [[ "$text" == *"$expected"* ]] && landed=yes
@@ -546,6 +573,7 @@ one_try() {
   app_alive || fail "the app the run started is no longer running"
 }
 
+[[ "$real" == 0 || "$multiline" == none ]] || fail "--real needs --multiline none"
 [[ -z "$(dev_instances)" ]] || fail "a dev instance of the app is already running; close it first"
 (( $(psw idle) >= 300 )) || fail "someone used the machine in the last 5 minutes"
 sealed="$scratch/clipboard.sealed"
@@ -563,7 +591,7 @@ app_pid="$(start "$app" | tail -1)"
 [[ "$app_pid" =~ ^[0-9]+$ ]] || fail "the app did not start"
 sleep 8
 app_alive || fail "the app did not start"
-send_to_app --stub-mode stub-normal
+if [[ "$real" == 1 ]]; then send_to_app --stub-mode stub-off; else send_to_app --stub-mode stub-normal; fi
 sleep 1
 if [[ -n "${sign_in_env:-}" ]] && ! sign_in; then
   hold=0

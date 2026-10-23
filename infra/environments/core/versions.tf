@@ -13,12 +13,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket       = "takemyword-terraform-state-115891590483"
-    key          = "core/terraform.tfstate"
-    region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
-
-    allowed_account_ids = ["115891590483"]
   }
 }

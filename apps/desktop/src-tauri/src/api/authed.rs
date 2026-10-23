@@ -46,6 +46,10 @@ impl<C: Credentials> AuthedApi<C> {
         Self { http, credentials }
     }
 
+    pub fn set_base_url(&self, base_url: &str) {
+        self.http.set_base_url(base_url);
+    }
+
     pub fn styles(&self) -> Result<StyleList, ApiFailure> {
         self.authorized(|token| self.http.get(token, STYLES))
     }
@@ -95,6 +99,7 @@ impl<C: Credentials> DictationApi for AuthedApi<C> {
 mod tests {
     use std::cell::RefCell;
     use std::net::TcpListener;
+    use std::rc::Rc;
     use std::sync::Mutex;
 
     use axum::extract::Path;
@@ -126,6 +131,16 @@ mod tests {
             *self.renewals.borrow_mut() += 1;
             *self.current.borrow_mut() = format!("token-{}", self.renewals.borrow());
             self.token()
+        }
+    }
+
+    impl Credentials for Rc<Tokens> {
+        fn token(&self) -> Result<Secret, ApiFailure> {
+            self.as_ref().token()
+        }
+
+        fn renew(&self, rejected: &Secret) -> Result<Secret, ApiFailure> {
+            self.as_ref().renew(rejected)
         }
     }
 
@@ -212,6 +227,18 @@ mod tests {
         ));
         assert_eq!(seen.lock().unwrap().len(), 1);
         assert_eq!(*api.credentials.renewals.borrow(), 0);
+    }
+
+    #[test]
+    fn a_server_switch_reaches_every_clone_of_the_api() {
+        let (old, old_seen) = gateway("token-0", false);
+        let (new, new_seen) = gateway("token-0", false);
+        let shell = AuthedApi::new(old, Rc::new(credentials("token-0")));
+        let worker = shell.clone();
+        shell.set_base_url(&new.base_url());
+        assert_eq!(worker.styles().unwrap().styles, []);
+        assert!(old_seen.lock().unwrap().is_empty());
+        assert_eq!(*new_seen.lock().unwrap(), ["Bearer token-0"]);
     }
 
     #[test]

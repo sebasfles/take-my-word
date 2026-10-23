@@ -1,7 +1,7 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Icon, type IconName, Skeleton, buttonClass } from "@take-my-word/brand";
 import type { AccountStep } from "../../bridge.ts";
-import { bridge } from "../../bridge.ts";
+import { bridge, problemOf } from "../../bridge.ts";
 import { Gestures } from "../../Gestures.tsx";
 import { type MessageId, t } from "../../i18n.ts";
 import { LanguageChoices } from "../../LanguageChoices.tsx";
@@ -10,7 +10,7 @@ import { UserContextChoices } from "../../UserContextChoices.tsx";
 import { Actions, Frame } from "./Frame.tsx";
 import { useMicrophoneCheck } from "./MicrophoneCheck.tsx";
 import type { Draft, Flow } from "./Onboarding.tsx";
-import { ChoosePasswordForm, SignInForm } from "./SignIn.tsx";
+import { ChoosePasswordForm, ServerChoice, ServerForm, SignInForm } from "./SignIn.tsx";
 import { BrandVisual, KeysVisual, LiveMeter, TrayVisual, WelcomeVisual } from "./visuals.tsx";
 
 function Point({ icon, text }: { icon: IconName; text: MessageId }) {
@@ -43,16 +43,23 @@ export function WelcomeStep({ flow }: { flow: Flow }) {
 }
 
 export function SignInStep({ flow }: { flow: Flow }) {
-  const [password, setPassword] = useState(false);
+  const [view, setView] = useState<"signIn" | "password" | "server">("signIn");
+  const [server, setServer] = useState<string | null>(null);
+  const [choiceError, setChoiceError] = useState<MessageId | null>(null);
+
+  useEffect(() => {
+    void bridge.server().then(setServer);
+  }, []);
+
   const onStep = (step: AccountStep) => {
     if (step === "choosePassword") {
-      setPassword(true);
+      setView("password");
       return;
     }
-    setPassword(false);
+    setView("signIn");
     flow.signedIn(step);
   };
-  if (password) {
+  if (view === "password") {
     return (
       <Frame
         flow={flow}
@@ -63,8 +70,29 @@ export function SignInStep({ flow }: { flow: Flow }) {
         <ChoosePasswordForm
           onStep={onStep}
           onBackToSignIn={(message) => {
-            setPassword(false);
+            setView("signIn");
             flow.backToSignIn(message);
+          }}
+        />
+      </Frame>
+    );
+  }
+  if (view === "server") {
+    return (
+      <Frame
+        flow={flow}
+        title={t("server.title")}
+        intro={t("server.intro")}
+        visual={<BrandVisual />}
+      >
+        <ServerForm
+          onChosen={(chosen) => {
+            setServer(chosen);
+            setChoiceError(null);
+            setView("signIn");
+          }}
+          onBack={() => {
+            setView("signIn");
           }}
         />
       </Frame>
@@ -73,6 +101,28 @@ export function SignInStep({ flow }: { flow: Flow }) {
   return (
     <Frame flow={flow} title={t("signIn.title")} intro={t("signIn.intro")} visual={<BrandVisual />}>
       <SignInForm notice={flow.notice} onStep={onStep} />
+      <ServerChoice
+        server={server}
+        onOwn={() => {
+          setView("server");
+        }}
+        onOfficial={() => {
+          bridge
+            .useOfficialServer()
+            .then(() => {
+              setServer(null);
+              setChoiceError(null);
+            })
+            .catch((reason: unknown) => {
+              setChoiceError(problemOf(reason).message);
+            });
+        }}
+      />
+      {choiceError && (
+        <p className="form-error" role="alert">
+          {t(choiceError)}
+        </p>
+      )}
     </Frame>
   );
 }

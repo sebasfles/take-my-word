@@ -3,6 +3,7 @@ node_modules/
 docs/tasks/_drafts/
 .claude/agent-memory/
 .env
+deployment.json
 .env.*
 !.env.example
 .DS_Store

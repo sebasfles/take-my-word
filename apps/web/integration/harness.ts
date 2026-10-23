@@ -19,7 +19,7 @@ export function env(name: string): string {
   return value;
 }
 
-export const origin = "https://dev.takemyword.fless.dev";
+export const origin = env("WEB_URL");
 export const userPoolId = env("USER_POOL_ID");
 export const apiUrl = env("API_URL");
 

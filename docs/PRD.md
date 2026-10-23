@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Product Requirements Document
@@ -55,14 +55,15 @@ Details: [modules/mobile/prd.md](modules/mobile/prd.md)
 
 ### See the account on the web
 
-The web is informative: it shows the account, dictionary, styles, app rules and history read-only, and the landing page offers the downloads.
+The web is informative: it shows the account, dictionary, styles, app rules and history read-only, and the landing, in Spanish at `/es` and English at `/en`, offers the downloads, explains privacy, answers common questions and invites people to run their own.
 Editing happens in the desktop and mobile apps.
-Details: spread across the module files above; the landing is phase 5.
+Details: spread across the module files above.
 
 ### Run the service
 
 One AWS account, dev and prd environments, deploys on merge.
-Details: [modules/infra/prd.md](modules/infra/prd.md)
+Anyone can run the whole service in their own AWS account, with their own Groq and OpenAI keys, and point the official desktop app at it with "Use your own server".
+Details: [modules/infra/prd.md](modules/infra/prd.md), [self-host/README.md](../self-host/README.md)
 
 ## Cross-cutting rules
 

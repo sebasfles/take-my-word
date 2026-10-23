@@ -1,6 +1,10 @@
 module "web_certificate" {
   source = "../../modules/aws/acm"
 
+  providers = {
+    aws = aws.us_east_1
+  }
+
   domain_name = var.web_hostname
   zone_id     = data.aws_route53_zone.this.zone_id
 }

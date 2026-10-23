@@ -1,12 +1,12 @@
 ---
 updated: 2026-10-23
-source: 0014_desktop_ux
+source: 0016_self_hosting
 ---
 
 # Technical Requirements Document
 
 Describes the whole application as it is built today; planned parts say so in their section.
-One public monorepo, `sebasfles/take-my-word`, holds every app, the infrastructure and these docs.
+One public monorepo holds every app, the infrastructure and these docs; nothing in it is specific to the official deployment, whose values live in its gitignored `deployment.json` and its Actions variables (see [infra](modules/infra/trd.md)).
 Built and deployed to dev and prd: `apps/api`, `apps/web`, `packages/shared`, `infra`; released on Windows through GitHub Releases: `apps/desktop`; planned: `apps/mobile`.
 
 ## Components
@@ -18,6 +18,7 @@ Built and deployed to dev and prd: `apps/api`, `apps/web`, `packages/shared`, `i
 | desktop | app | `apps/desktop` | `develop` | Tauri 2 (Rust shell), React + TypeScript UI |
 | mobile | app | `apps/mobile` | `develop` | Expo managed workflow, EAS Build, Submit and Update |
 | shared | package | `packages/shared` | `develop` | TypeScript, zod contracts shared by api, web, desktop and mobile |
+| deployment | package | `packages/deployment` | `develop` | TypeScript: the deployment config, `pnpm tf`, `pnpm deploy:*` and `pnpm selfhost` |
 | brand | package | `packages/brand` | `develop` | TypeScript and plain CSS: tokens, fonts, assets and primitives shared by web and desktop |
 | infra | code | `infra` | `develop` | Terraform, AWS provider |
 
@@ -29,8 +30,8 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 - Layout: one folder per Lambda entry (`api/`, `dictate/`, `authorizer/`, `dictionary-usage/`) and one per module (`dictation/`, `dictionary/`, `styles/`, `app-rules/`, `settings/`, `history/`), provider adapters under `dictation/providers/`, shared helpers in `lib/`.
 - Install: `pnpm install --frozen-lockfile` at the root.
 - Workspace files: `.env` at the repository root, gitignored, never committed or printed.
-  It holds `GROQ_API_KEY` and `OPENAI_API_KEY` (copied into the providers secret), `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID` and `GITHUB_APP_PEM` (read by `infra/scripts/tf`), and `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD`, `CREW_E2E_B_USERNAME`, `CREW_E2E_B_PASSWORD`, `TABLE_NAME` and `API_URL` (read by `pnpm token` and `pnpm e2e` in `apps/api`).
-  `pnpm e2e` also needs the `fless-takemyword` AWS profile, for Polly speech and for resetting `crew-e2e-b`'s `SETTINGS` item.
+  It holds `GROQ_API_KEY` and `OPENAI_API_KEY` (copied into the providers secret), `GITHUB_APP_PEM` (read by `pnpm tf` when the config has `github`), and `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `CREW_E2E_USERNAME`, `CREW_E2E_PASSWORD`, `CREW_E2E_B_USERNAME`, `CREW_E2E_B_PASSWORD`, `TABLE_NAME` and `API_URL` (read by `pnpm token` and `pnpm e2e` in `apps/api`).
+  `pnpm e2e` also needs the deployment's AWS profile in `AWS_PROFILE`, for Polly speech and for resetting `crew-e2e-b`'s `SETTINGS` item.
 - API spec: `none`; the zod contracts in `packages/shared` are the source of truth.
 - Data: one DynamoDB table `take-my-word-{env}`, no ORM, no migrations; item kinds per module in each `database.md`.
 - Delivery: GitHub Actions on `develop` (dev) and `main` (prd) build and run `aws lambda update-function-code`; see [infra](modules/infra/README.md).
@@ -38,9 +39,10 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 ### web
 
 - Stack: Next.js 16 App Router, React 19, TypeScript, plain CSS; built with OpenNext 4 (incremental and tag caches off, images unoptimized), served by a Lambda Function URL behind CloudFront; Next.js and OpenNext pinned.
-- Layout: `src/app` (landing, `sign-in`, `app` for the account, `api` for the route handlers), `src/lib` (session, auth flows, handlers, `es` and `en` dictionaries, API client), `src/components`; `public/static/` is the only public folder; `integration/` and `e2e/` run against dev.
+- Layout: `src/app` (`en` and `es`, the public landing, each its own root layout; `(account)` for `sign-in`, `app` and `gallery`; `api` for the route handlers; `robots.ts`, `sitemap.ts`, `.well-known/take-my-word.json`, the global 404), `src/proxy.ts` (the `/` redirect and `X-Robots-Tag`), `src/lib` (session, auth flows, handlers, `es` and `en` dictionaries, API client), `src/components`; `public/static/` is the only public folder; `integration/` and `e2e/` run against dev.
 - Install: root `pnpm install --frozen-lockfile`; `pnpm exec playwright install chromium` for e2e and screenshots.
-- Workspace files: the root `.env` (`USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `API_URL`, `CREW_E2E_*`, `TABLE_NAME`) and the `fless-takemyword` profile for `pnpm integration` and `pnpm e2e`, which create, seed (Polly speech) and delete throwaway users; `pnpm screenshots` mocks the API and needs none.
+- Build: `RELEASES_REPOSITORY` (required) and `WEB_INDEXED_ORIGIN` (the only origin search engines may index; empty means none) are inlined at build time.
+- Workspace files: the root `.env` (`USER_POOL_ID`, `USER_POOL_CLIENT_ID`, `API_URL`, `CREW_E2E_*`, `TABLE_NAME`, `WEB_URL`, `RELEASES_REPOSITORY`) and the deployment's profile in `AWS_PROFILE` for `pnpm integration` and `pnpm e2e`, which create, seed (Polly speech) and delete throwaway users; `pnpm screenshots` mocks the API and needs a build made with `RELEASES_REPOSITORY`.
 - Delivery: `reusable-deploy-web` on the same pushes as api, gated per job; static assets to S3, code to the Lambda, CloudFront invalidation; see [infra](modules/infra/trd.md).
 
 ### desktop
@@ -48,9 +50,9 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 - Stack: Tauri 2 with Rust for the OS layer (a native `WH_KEYBOARD_LL` key hook on Windows, macOS and Linux in phase 5; `cpal` recording, `enigo` paste, active window, keychain) and React + TypeScript for the settings window and overlay.
 - Layout: `src/` (UI), `src-tauri/` (Rust shell and plugins).
 - Install: root `pnpm install --frozen-lockfile`, Rust toolchain via `rustup`, platform prerequisites of Tauri 2.
-- Workspace files: none to build; dev and prd API URLs and pool ids are public and committed, and `pnpm tauri:build:dev` or `pnpm tauri:build:prd` picks one at build time.
+- Workspace files: `pnpm tauri:build:dev` or `pnpm tauri:build:prd` reads the environment's official server, the updater public key and the releases repository from env (`TAKE_MY_WORD_SERVER`, `RELEASES_REPOSITORY` and, for prd, `TAKE_MY_WORD_UPDATER_PUBKEY`) or from `deployment.json`, and refuses to build without them.
   The root `.env` keeps `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, the updater key that `desktop-release` reads from Actions secrets; only the prd config carries the updater.
-- Delivery: `pnpm release:desktop X.Y.Z` bumps the version, tags `desktop-vX.Y.Z` with the notes and pushes; `desktop-release` builds the prd installer with `tauri-action`, verifies `latest.json` against the committed public key and publishes the GitHub Release as latest, with the installer also under `take-my-word-windows-x64-setup.exe` for the landing.
+- Delivery: `pnpm release:desktop X.Y.Z` bumps the version, tags `desktop-vX.Y.Z` with the notes and pushes; `desktop-release` builds the prd installer with `tauri-action`, verifies `latest.json` against `DESKTOP_UPDATER_PUBKEY` and publishes the GitHub Release as latest, with the installer also under `take-my-word-windows-x64-setup.exe` for the landing.
   The first tag, `desktop-v0.1.0`, was made by hand; never rewrite at or below a pushed tag.
   The installer is not code-signed, so SmartScreen warns on first install; Windows first, macOS and Linux in phase 5.
 
@@ -64,7 +66,7 @@ Package manager: pnpm workspace at the root; Node version pinned in `.nvmrc`.
 
 ### infra
 
-- Stack: Terraform, `environments/{core,dev,prd}`, `stacks/app`, `modules/aws/*`, applied only from Sebastian's machine with the SSO profile `fless-takemyword`.
+- Stack: Terraform, `environments/{core,dev,prd}`, `stacks/app`, `modules/aws/*`, run through `pnpm tf <root>` with the values of `deployment.json`; the official deployment is applied only from Sebastian's machine, a self-hosted one by `pnpm selfhost`.
 - Delivery: `core` owns the GitHub OIDC provider, GitHub App wiring, Actions environments and branch rulesets; `stacks/app` owns one deploy role per env; see [infra](modules/infra/trd.md).
 
 ## Verification targets
@@ -77,12 +79,13 @@ Locally the real-clipboard test is ignored; `desktop-ci` runs every desktop chec
 | Target | Path | lint | typecheck | unit | e2e |
 |---|---|---|---|---|---|
 | api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
-| web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the `fless-takemyword` profile for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, with the `fless-takemyword` profile and `TABLE_NAME` for throwaway users, `--workers=1`) |
+| web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the deployment's profile in `AWS_PROFILE` for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, with that profile and `TABLE_NAME` for throwaway users, `--workers=1`) |
 | desktop | `apps/desktop` | `pnpm lint && pnpm rust:lint` (prettier, eslint, cargo fmt, clippy on all targets and on release with `--features dev` on Windows, then `rust:lint:linux`: the UI built and `linux-check`'s clippy in an `ubuntu:24.04` container with its apt packages) | `pnpm typecheck` | `pnpm test && pnpm rust:test` (vitest `--no-file-parallelism`, cargo `--test-threads=1`) | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
 | cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |
 | shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
 | brand | `packages/brand` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
+| deployment | `packages/deployment` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |
 | infra | `infra` | `terraform fmt -check -recursive` | `terraform -chdir=environments/{core,dev,prd} validate`, after `init -backend=false` on a fresh clone | n/a | n/a |
 | workflows | `.` | `pnpm lint:workflows` (actionlint) | n/a | n/a | n/a |
 
@@ -103,8 +106,8 @@ Modules belong to the application and may span components.
 ## Environments and delivery
 
 - Base branch `develop`; `main` is production.
-- Every change arrives by pull request into `develop`; merging deploys dev (`dev.takemyword.fless.dev`) and opens the promotion PR `develop -> main`, which deploys prd (`takemyword.fless.dev`).
-- AWS account `takemyword` (115891590483), regions us-east-1 and us-east-2 only, budget 5 USD per month.
+- Every change arrives by pull request into `develop`; merging deploys dev (`dev.<domain>`) and opens the promotion PR `develop -> main`, which deploys prd (`<domain>`).
+- The official deployment has its own AWS account, regions us-east-1 and us-east-2 only, budget 5 USD per month; anyone can run their own with `self-host/README.md`.
 
 ## Conventions
 

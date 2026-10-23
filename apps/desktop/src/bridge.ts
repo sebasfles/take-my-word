@@ -25,6 +25,7 @@ export type OverlayState =
 export interface AccountView {
   signedIn: boolean;
   username: string | null;
+  server: string | null;
 }
 
 export interface AppState {
@@ -97,6 +98,9 @@ export const bridge = {
   finishOnboarding: () => invoke<undefined>("finish_onboarding"),
   dismissHandsFreeNote: () => invoke<undefined>("dismiss_hands_free_note"),
   accountStatus: () => invoke<AccountView>("account_status"),
+  server: () => invoke<string | null>("server"),
+  useServer: (domain: string) => invoke<string | null>("use_server", { domain }),
+  useOfficialServer: () => invoke<undefined>("use_official_server"),
   signIn: (username: string, password: string) =>
     invoke<AccountStep>("sign_in", { username, password }),
   choosePassword: (password: string) => invoke<AccountStep>("choose_password", { password }),

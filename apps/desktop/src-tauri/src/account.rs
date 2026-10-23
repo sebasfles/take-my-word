@@ -7,6 +7,7 @@ use crate::auth::account::{AccountError, SignInStep, User};
 use crate::commands::blocking;
 use crate::i18n::Message;
 use crate::locale::{self, Language};
+use crate::server::{self, SelfHosted, ServerError};
 use crate::shell::Shell;
 use crate::{tray, windows};
 
@@ -15,6 +16,7 @@ use crate::{tray, windows};
 pub struct AccountView {
     signed_in: bool,
     username: Option<String>,
+    server: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -58,12 +60,26 @@ impl From<AccountError> for Problem {
             AccountError::InvalidPassword => (Message::InvalidPassword, false),
             AccountError::Expired => (Message::SignInExpired, true),
             AccountError::SignedOut => (Message::SessionEnded, true),
+            AccountError::StillSignedIn => (Message::ServerSignedIn, false),
             AccountError::Unavailable(_) => (Message::Unreachable, false),
         };
         Self {
             message,
             back_to_sign_in,
         }
+    }
+}
+
+impl From<ServerError> for Problem {
+    fn from(error: ServerError) -> Self {
+        log::warn!("choosing a server failed: {error}");
+        match error {
+            ServerError::InvalidDomain(_) => Message::ServerInvalidDomain,
+            ServerError::Unreachable(_) => Message::ServerUnreachable,
+            ServerError::NotTakeMyWord(_) => Message::ServerNotTakeMyWord,
+            ServerError::Version(_) => Message::ServerNewer,
+        }
+        .into()
     }
 }
 
@@ -113,9 +129,36 @@ pub async fn account_status(app: AppHandle) -> AccountView {
         AccountView {
             signed_in,
             username,
+            server: shell.settings().server.map(|chosen| chosen.domain),
         }
     })
     .await
+}
+
+#[tauri::command]
+pub fn server(shell: State<'_, Shell>) -> Option<String> {
+    shell.settings().server.map(|chosen| chosen.domain)
+}
+
+#[tauri::command]
+pub async fn use_server(app: AppHandle, domain: String) -> Result<Option<String>, Problem> {
+    blocking(app, move |_, shell| {
+        let domain = server::normalize_domain(&domain)?;
+        let discovered = server::discover(&domain)?;
+        let chosen = (discovered != *shell.official()).then_some(SelfHosted {
+            domain,
+            server: discovered,
+        });
+        let shown = chosen.as_ref().map(|chosen| chosen.domain.clone());
+        shell.use_server(chosen)?;
+        Ok(shown)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn use_official_server(app: AppHandle) -> Result<(), Problem> {
+    blocking(app, |_, shell| Ok(shell.use_server(None)?)).await
 }
 
 #[tauri::command]

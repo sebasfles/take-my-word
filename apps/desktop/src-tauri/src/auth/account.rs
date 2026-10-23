@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -11,6 +11,7 @@ use time::OffsetDateTime;
 use super::Secret;
 use super::cognito::{Cognito, CognitoError, NewDevice, NewPasswordChallenge, SignIn, Tokens};
 use crate::keychain::{Keychain, StoredSession};
+use crate::server::Server;
 
 const RENEW_BEFORE: Duration = Duration::from_secs(5 * 60);
 const CREDENTIAL_ERRORS: [&str; 4] = [
@@ -36,13 +37,32 @@ pub trait IdentityProvider: Send + Sync {
 }
 
 pub struct CognitoProvider {
-    pub cognito: Cognito,
-    pub device_name: String,
+    cognito: RwLock<Cognito>,
+    device_name: String,
+}
+
+impl CognitoProvider {
+    pub fn new(cognito: Cognito, device_name: impl Into<String>) -> Self {
+        Self {
+            cognito: RwLock::new(cognito),
+            device_name: device_name.into(),
+        }
+    }
+
+    pub fn connect(&self, server: &Server) -> Result<(), CognitoError> {
+        let cognito = Cognito::for_server(server)?;
+        *self.cognito.write().unwrap_or_else(PoisonError::into_inner) = cognito;
+        Ok(())
+    }
+
+    fn cognito(&self) -> RwLockReadGuard<'_, Cognito> {
+        self.cognito.read().unwrap_or_else(PoisonError::into_inner)
+    }
 }
 
 impl IdentityProvider for CognitoProvider {
     fn sign_in(&self, username: &str, password: &Secret) -> Result<SignIn, CognitoError> {
-        self.cognito
+        self.cognito()
             .sign_in(username, password, OffsetDateTime::now_utc())
     }
 
@@ -51,7 +71,8 @@ impl IdentityProvider for CognitoProvider {
         challenge: &NewPasswordChallenge,
         new_password: &Secret,
     ) -> Result<Tokens, CognitoError> {
-        self.cognito.complete_new_password(challenge, new_password)
+        self.cognito()
+            .complete_new_password(challenge, new_password)
     }
 
     fn confirm_device(
@@ -59,12 +80,12 @@ impl IdentityProvider for CognitoProvider {
         access_token: &Secret,
         device: &NewDevice,
     ) -> Result<(), CognitoError> {
-        self.cognito
+        self.cognito()
             .confirm_device(access_token, device, &self.device_name)
     }
 
     fn refresh(&self, refresh_token: &Secret, device_key: &Secret) -> Result<Tokens, CognitoError> {
-        self.cognito.refresh(refresh_token, device_key)
+        self.cognito().refresh(refresh_token, device_key)
     }
 
     fn forget_device(
@@ -72,11 +93,11 @@ impl IdentityProvider for CognitoProvider {
         access_token: &Secret,
         device_key: &Secret,
     ) -> Result<(), CognitoError> {
-        self.cognito.forget_device(access_token, device_key)
+        self.cognito().forget_device(access_token, device_key)
     }
 
     fn revoke_token(&self, refresh_token: &Secret) -> Result<(), CognitoError> {
-        self.cognito.revoke_token(refresh_token)
+        self.cognito().revoke_token(refresh_token)
     }
 }
 
@@ -102,6 +123,8 @@ pub enum AccountError {
     Expired,
     #[error("signed out")]
     SignedOut,
+    #[error("still signed in")]
+    StillSignedIn,
     #[error("{0}")]
     Unavailable(String),
 }
@@ -290,6 +313,18 @@ impl<I: IdentityProvider, K: Keychain> Account<I, K> {
         }
         self.end_locally(&mut state);
         self.settle(state, ());
+    }
+
+    pub fn while_signed_out<T>(&self, change: impl FnOnce(&I) -> T) -> Result<T, AccountError> {
+        let mut state = self.lock();
+        let result = match &mut *state {
+            State::SignedIn(_) => Err(AccountError::StillSignedIn),
+            State::SignedOut(challenge) => {
+                *challenge = None;
+                Ok(change(&self.provider))
+            }
+        };
+        self.settle(state, result)
     }
 
     fn fresh(&self, state: &mut State, rejected: Option<&Secret>) -> Result<Secret, AccountError> {
@@ -581,6 +616,33 @@ mod tests {
 
     fn calls(account: &Account<Fake, MemoryKeychain>) -> Vec<String> {
         account.provider.calls.lock().unwrap().clone()
+    }
+
+    #[test]
+    fn the_server_changes_only_while_signed_out_and_drops_a_pending_new_password_step() {
+        let (signed_in, _) = account(Fake::default(), MemoryKeychain::holding(stored()));
+        assert_eq!(
+            signed_in.while_signed_out(|_| ()),
+            Err(AccountError::StillSignedIn)
+        );
+
+        let challenge = NewPasswordChallenge {
+            username: "sebastian".into(),
+            session: Secret::new("session-0"),
+        };
+        let (account, _) = account(
+            Fake::answering([Answer::SignIn(Ok(SignIn::NewPasswordRequired(challenge)))]),
+            MemoryKeychain::default(),
+        );
+        account
+            .sign_in("sebastian", Secret::new("temporary"))
+            .unwrap();
+        assert_eq!(account.while_signed_out(|_| "switched"), Ok("switched"));
+        assert_eq!(
+            account.complete_new_password(Secret::new("chosen")),
+            Err(AccountError::Expired)
+        );
+        assert_eq!(calls(&account), ["sign_in sebastian temporary"]);
     }
 
     #[test]

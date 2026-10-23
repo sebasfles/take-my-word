@@ -14,7 +14,6 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   FIXED_INSTALLER: take-my-word-windows-x64-setup.exe
-  PRD_CONFIG: apps/desktop/src-tauri/tauri.prd.conf.json
 
 jobs:
   release:
@@ -99,9 +98,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAKE_MY_WORD_SERVER: ${{ vars.DESKTOP_PRD_SERVER }}
+          TAKE_MY_WORD_UPDATER_PUBKEY: ${{ vars.DESKTOP_UPDATER_PUBKEY }}
+          RELEASES_REPOSITORY: ${{ github.repository }}
         with:
           projectPath: apps/desktop
-          tauriScript: pnpm tauri
+          tauriScript: node scripts/tauri.ts prd
           args: --config src-tauri/tauri.prd.conf.json
           releaseId: ${{ steps.draft.outputs.id }}
           releaseBody: ${{ steps.tag.outputs.notes }}
@@ -126,9 +128,10 @@ jobs:
           gh api -X POST "https://uploads.github.com/$release/assets?name=$FIXED_INSTALLER" \
             -H "Content-Type: application/octet-stream" --input "${installers[0]}" --jq '"uploaded \(.name) as asset \(.id)"'
 
-      - name: Verify latest.json and the installers against the committed public key
+      - name: Verify latest.json and the installers against the updater public key
         env:
           RELEASE_ID: ${{ steps.draft.outputs.id }}
+          UPDATER_PUBKEY: ${{ vars.DESKTOP_UPDATER_PUBKEY }}
         run: |
           dir="$RUNNER_TEMP/release-assets"
           mkdir -p "$dir"
@@ -139,7 +142,7 @@ jobs:
               gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > "$dir/$name"
             done
           node apps/desktop/scripts/release-check.ts --dir "$dir" --assets "$RUNNER_TEMP/assets.json" \
-            --config "$PRD_CONFIG" --repo "$GITHUB_REPOSITORY" --tag "$TAG"
+            --pubkey "$UPDATER_PUBKEY" --repo "$GITHUB_REPOSITORY" --tag "$TAG"
 
       - name: Publish as the latest release
         if: steps.tag.outputs.prerelease == 'false'

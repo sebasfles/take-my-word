@@ -2,7 +2,7 @@ import type { HistoryItem } from "@take-my-word/shared";
 import { describe, expect, it } from "vitest";
 import { accountApi } from "./api.ts";
 
-const apiUrl = "https://api.dev.takemyword.fless.dev";
+const apiUrl = "https://api.dictation.example.com";
 
 const settings = {
   defaultStyleId: "formal",

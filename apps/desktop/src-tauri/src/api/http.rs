@@ -1,3 +1,4 @@
+use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
 use reqwest::blocking::multipart::{Form, Part};
@@ -14,7 +15,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub struct HttpApi {
-    base_url: String,
+    base_url: Arc<RwLock<String>>,
     client: Client,
 }
 
@@ -30,9 +31,24 @@ impl HttpApi {
     pub fn new(base_url: impl Into<String>) -> Result<Self, ApiFailure> {
         let client = Client::builder().build().map_err(network)?;
         Ok(Self {
-            base_url: base_url.into(),
+            base_url: Arc::new(RwLock::new(base_url.into())),
             client,
         })
+    }
+
+    pub fn set_base_url(&self, base_url: impl Into<String>) {
+        *self
+            .base_url
+            .write()
+            .unwrap_or_else(PoisonError::into_inner) = base_url.into();
+    }
+
+    #[cfg(test)]
+    pub fn base_url(&self) -> String {
+        self.base_url
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     pub fn dictate(
@@ -99,7 +115,8 @@ impl HttpApi {
     }
 
     fn url(&self, path: &str) -> String {
-        format!("{}{path}", self.base_url)
+        let base_url = self.base_url.read().unwrap_or_else(PoisonError::into_inner);
+        format!("{base_url}{path}")
     }
 }
 

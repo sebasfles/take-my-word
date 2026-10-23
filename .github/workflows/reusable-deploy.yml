@@ -30,30 +30,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build the Lambda bundles
-        run: pnpm --filter @take-my-word/api build
+        run: pnpm deploy:api build
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Update the function code
+      - name: Swap the function code
         env:
           DICTATE_FUNCTION_NAME: ${{ vars.DICTATE_FUNCTION_NAME }}
           AUTHORIZER_FUNCTION_NAME: ${{ vars.AUTHORIZER_FUNCTION_NAME }}
           API_FUNCTION_NAME: ${{ vars.API_FUNCTION_NAME }}
           DICTIONARY_USAGE_FUNCTION_NAME: ${{ vars.DICTIONARY_USAGE_FUNCTION_NAME }}
-        run: |
-          deploy() {
-            aws lambda update-function-code \
-              --function-name "$1" \
-              --zip-file "fileb://apps/api/dist/$2.zip" \
-              --query '[FunctionName,CodeSha256]' \
-              --output text \
-              --no-cli-pager
-            aws lambda wait function-updated-v2 --function-name "$1"
-          }
-          deploy "$AUTHORIZER_FUNCTION_NAME" authorizer
-          deploy "$DICTATE_FUNCTION_NAME" dictate
-          deploy "$API_FUNCTION_NAME" api
-          deploy "$DICTIONARY_USAGE_FUNCTION_NAME" dictionary-usage
+        run: pnpm deploy:api swap

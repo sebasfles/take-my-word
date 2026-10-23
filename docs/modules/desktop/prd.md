@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-23
-source: 0015_user_context
+source: 0016_self_hosting
 ---
 
 # Desktop: product
@@ -59,11 +59,20 @@ Errors and empty states: a rejected combination is explained and the old hotkey 
 1. The user signs out from the tray or from settings.
 2. The device is forgotten, its session revoked and the keychain cleared, even when the service cannot be reached; the sign-in window opens.
 
+### Use your own server
+
+1. On the sign-in step, a small "Use your own server" link under the sign-in button asks for a domain.
+2. The app reads that domain's Take My Word configuration, checks it, and shows the domain on the sign-in step with "Use the official server" next to it; sign-in then goes to that server.
+3. Settings, Account shows the server in use; signing out keeps the choice and offers the way back to the official server.
+
+Errors and empty states: a malformed domain, an unreachable host, a site that is not Take My Word, a newer server version than the app knows, or a change attempted while signed in each get their own message, and the current server stays.
+
 ### Update
 
 1. At start and every 6 hours the app looks for a new version.
 2. When there is one, a small window shows the version and its notes, without taking focus from the app the user is typing in.
-3. "Install and restart" downloads it, installs it once no dictation is in progress, and the app comes back on the new version; "Later" hides it until the next check.
+3. Updates always come from the official releases, whichever server the user signs in to.
+4. "Install and restart" downloads it, installs it once no dictation is in progress, and the app comes back on the new version; "Later" hides it until the next check.
 
 Errors and empty states: a failed download or install says so and offers to try again; the current version keeps running.
 

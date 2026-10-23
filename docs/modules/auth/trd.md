@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-22
-source: 0010_brand_web
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Auth: technical
@@ -32,6 +32,7 @@ Desktop and mobile go straight to Cognito; the web goes through its own route ha
 | `POST /api/session/refresh` | Renew an expiring session; called by the browser under a Web Lock. |
 | `POST /api/session/sign-out` | Forget the device, revoke the refresh token, clear the cookies. |
 | `POST /api/locale`, `POST /api/theme` | Remember the browser's language or theme in a preference cookie. |
+| `GET /.well-known/take-my-word.json` | Discovery for clients: API URL, region, pool and client ids, versioned, schema `discoverySchema` in `packages/shared`, built from the web's own environment; cached 5 minutes. |
 | `DELETE /api/dictations/{id}` | Delete a dictation with the session's token; 401 when the session needs renewing, so the browser renews under the Web Lock and retries once. |
 
 Each checks `Origin` against `WEB_ORIGIN`; no page calls the API from the browser.
@@ -56,8 +57,8 @@ The authorizer answers HTTP API simple responses, cached 5 minutes per `Authoriz
 ## Configuration
 
 - Authorizer environment: `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, set by `infra/stacks/app`.
-- Web function environment: `USER_POOL_ID`, `USER_POOL_CLIENT_ID` (the `native` client), `WEB_ORIGIN`, `WEB_SECRET_ID`; the secret `take-my-word-{env}/web` holds `COOKIE_KEY` (32 bytes, base64), written outside Terraform.
-- Web preferences: `tmw-lang` (`en` or `es`) wins over `Accept-Language` (highest q of `es` or `en`, any region), else English; `tmw-theme` (`system`, `light`, `dark`) renders as `data-theme` on `<html>` and in `theme-color`, so nothing flashes and no inline script runs.
+- Web function environment: `USER_POOL_ID`, `USER_POOL_CLIENT_ID` (the `native` client), `WEB_ORIGIN`, `WEB_SECRET_ID`; the secret `<deployment>-{env}/web` holds `COOKIE_KEY` (32 bytes, base64), written outside Terraform.
+- Web preferences: the public pages carry their language in the path (`/en`, `/es`); `/` redirects to one, and sign-in, account and gallery pick theirs, by `tmw-lang` (`en` or `es`), then `Accept-Language` (highest q of `es` or `en`, any region), else English; the landing's sign-in links pass `?lang=`, which the proxy stores in `tmw-lang` and drops; `tmw-theme` (`system`, `light`, `dark`) renders as `data-theme` on `<html>` and in `theme-color`, so nothing flashes and no inline script runs.
 - Web session: `__Host-tmw-session` and `__Host-tmw-refresh`, AES-256-GCM sealed, HttpOnly, Secure, SameSite=Lax; Max-Age 400 days with remember me, renewed on every refresh, a browser-session cookie without it; `__Host-tmw-challenge` holds the new-password challenge for 3 minutes.
 - Token lifetimes in Terraform: access and id 1 h, refresh 3650 days with rotation (10 s grace).
 

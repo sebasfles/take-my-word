@@ -167,4 +167,47 @@ describe("Onboarding", () => {
     await screen.findByRole("heading", { name: "Sign in" });
     expect(screen.getByRole("alert").textContent).toBe("Your session ended. Sign in again.");
   });
+
+  it("signs in to a self-hosted server chosen by domain and can return to the official one", async () => {
+    render(<Onboarding plan={["signIn", "microphone"]} onDone={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Sign in" });
+    fireEvent.click(screen.getByRole("button", { name: "Use your own server" }));
+    await screen.findByRole("heading", { name: "Your own server" });
+    fireEvent.change(screen.getByLabelText("Domain"), {
+      target: { value: "https://Dictation.example.com/" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByText("Server: https://Dictation.example.com/");
+    expect(fakeBridge.useServer).toHaveBeenCalledWith("https://Dictation.example.com/");
+    fireEvent.click(screen.getByRole("button", { name: "Use the official server" }));
+    await screen.findByRole("button", { name: "Use your own server" });
+    expect(fakeBridge.useOfficialServer).toHaveBeenCalledOnce();
+    expect(screen.queryByText(/^Server:/)).toBeNull();
+    signIn();
+    await screen.findByRole("heading", { name: "Check your microphone" });
+  });
+
+  it("keeps the domain step open with the reason when the domain is not a server", async () => {
+    fakeBridge.useServer.mockRejectedValueOnce(
+      Object.assign(new Error("server.notTakeMyWord"), { backToSignIn: false }),
+    );
+    render(<Onboarding plan={["signIn"]} onDone={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Use your own server" }));
+    fireEvent.change(screen.getByLabelText("Domain"), { target: { value: "example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "That domain does not run Take My Word.",
+    );
+    expect(screen.getByRole("heading", { name: "Your own server" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByRole("heading", { name: "Sign in" });
+  });
+
+  it("shows the stored self-hosted server on the sign-in step", async () => {
+    fakeBridge.server.mockResolvedValueOnce("dictation.example.com");
+    render(<Onboarding plan={["signIn"]} onDone={vi.fn()} />);
+    await screen.findByText("Server: dictation.example.com");
+    expect(screen.getByRole("button", { name: "Use the official server" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Use your own server" })).toBeNull();
+  });
 });
