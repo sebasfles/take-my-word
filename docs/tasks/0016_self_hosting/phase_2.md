@@ -65,4 +65,14 @@ Deferred:
 
 - Adding users after setup is documented through the Cognito console; a `pnpm selfhost user` command could come later.
 
+### Round 2
+
+Done, one per finding:
+
+1. `accountToUse`: a first run takes the account from STS; when `deployment.json` already names an account, a profile resolving to another one stops setup and removal with the same message. Unit-tested.
+2. `stateBucketUse`: setup and removal accept a state bucket only when it does not exist yet or carries `Project=<name>` and `ManagedBy=pnpm selfhost`, and refuse any other before planning or destroying; removal checks it before touching Terraform, skips Terraform when the bucket is gone, and always deletes the whole own bucket. The foreign-bucket branch is gone. The bucket is tagged right after it is created. Unit-tested.
+3. `--plan` now says what it does in the usage, the README and the skill: it saves the answers and creates the empty state bucket it needs, shows the plan, and changes nothing else.
+
+Process: the code is commit e892526 and the verify block names it; this commit carries only the notes and verify.log.
+
 ## Result
