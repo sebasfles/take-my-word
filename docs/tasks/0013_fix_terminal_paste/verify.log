@@ -1,0 +1,10 @@
+# verify.log: 0013_fix_terminal_paste
+
+## 2026-10-23T07:04:40Z by om-developer target desktop on 2636406
+- lint: pass exit 0 (pnpm lint; .verify/desktop-lint-js.out) and pass exit 0 (pnpm rust:lint, cargo fmt and clippy on Windows; .verify/desktop-lint-rust.out)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 tests, pnpm test, vitest --no-file-parallelism) and pass exit 0 (176 passed, 9 ignored, pnpm rust:test, cargo --test-threads=1; .verify/desktop-unit-rust.out)
+- e2e: n/a
+Node 24 (the repo's .nvmrc); the rust steps ran through scripts/windows.sh on the mirror C:\dev\tmw-0013 synced at 2636406.
+The rust:test run overlapped 0014's cargo fmt, clippy and test on its own mirror (its keychain test included); it was green, so it was not rerun.
+Real-clipboard tests (ignored here, run by desktop-ci): 36 of 36 with --include-ignored on the same Rust code before a rustfmt-only change to one test assertion (evidence/fix15).

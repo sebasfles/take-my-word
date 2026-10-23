@@ -224,6 +224,19 @@ pub fn probe_order(threads: &[(u32, u32)], depth: impl Fn(u32) -> usize) -> Vec<
 }
 
 #[cfg(any(windows, test))]
+pub fn ran_first<T: Copy>(ordered: &[T], ran: impl Fn(usize) -> bool) -> Vec<T> {
+    let (active, idle): (Vec<_>, Vec<_>) = ordered
+        .iter()
+        .enumerate()
+        .partition(|(index, _)| ran(*index));
+    active
+        .into_iter()
+        .chain(idle)
+        .map(|(_, thread)| *thread)
+        .collect()
+}
+
+#[cfg(any(windows, test))]
 pub fn sends_to(chain: &[WaitNode], receiver: u32) -> bool {
     matches!(
         chain,
@@ -414,6 +427,16 @@ mod tests {
         assert_eq!(
             probe_order(&threads, depth),
             vec![(20, 3), (10, 1), (30, 6), (20, 5), (10, 2), (10, 4)]
+        );
+    }
+
+    #[test]
+    fn threads_that_ran_since_the_keystroke_are_probed_first_in_their_probe_order() {
+        let ordered = [(20, 3), (10, 1), (30, 6), (20, 5), (10, 2), (10, 4)];
+        let ran = [false, false, true, false, true, false];
+        assert_eq!(
+            ran_first(&ordered, |index| ran[index]),
+            vec![(30, 6), (10, 2), (20, 3), (10, 1), (20, 5), (10, 4)]
         );
     }
 
