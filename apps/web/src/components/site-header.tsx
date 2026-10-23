@@ -10,6 +10,7 @@ export function SiteHeader(props: {
   theme: Theme;
   t: Dictionary;
   brandHref: string;
+  switchHref?: string;
   nav?: ReactNode;
   children?: ReactNode;
 }) {
@@ -23,6 +24,7 @@ export function SiteHeader(props: {
           <ThemeSwitch initial={props.theme} t={props.t.theme} />
           <LocaleSwitch
             target={props.locale === "es" ? "en" : "es"}
+            href={props.switchHref}
             text={props.t.locale.switchTo}
             label={props.t.locale.switchLabel}
           />

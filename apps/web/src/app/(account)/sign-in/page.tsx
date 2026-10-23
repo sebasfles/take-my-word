@@ -5,13 +5,14 @@ import { SignInForm } from "@/components/sign-in-form.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { SiteHeader } from "@/components/site-header.tsx";
 import { signInRedirect } from "@/lib/gate.ts";
+import { publicPath } from "@/lib/seo.ts";
 import {
   currentDictionary,
   currentLocale,
   currentSession,
   currentTheme,
 } from "@/lib/server/request.ts";
-import "../../styles/auth.css";
+import "@/styles/auth.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await currentDictionary();
@@ -27,7 +28,7 @@ export default async function SignInPage() {
 
   return (
     <>
-      <SiteHeader locale={locale} theme={theme} t={t} brandHref="/" />
+      <SiteHeader locale={locale} theme={theme} t={t} brandHref={publicPath(locale)} />
       <main id="main" className="auth container">
         <aside className="auth-aside" aria-hidden="true">
           <Mark size={72} className="auth-mark" />
@@ -39,7 +40,7 @@ export default async function SignInPage() {
           <SignInForm key={locale} t={t.signIn} />
         </div>
       </main>
-      <SiteFooter t={t} theme={theme} />
+      <SiteFooter t={t} theme={theme} locale={locale} />
     </>
   );
 }

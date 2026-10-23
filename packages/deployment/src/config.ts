@@ -61,6 +61,10 @@ export const deploymentConfigSchema = z
       .refine((list) => new Set(list).size === list.length, "each environment once")
       .default(["prd"])
       .meta({ description: "Environments this deployment runs." }),
+    indexed: z.boolean().default(false).meta({
+      description:
+        "Let search engines index the prd web at https://<domain>; off, every page answers noindex. dev is never indexed.",
+    }),
     releases: repositorySchema.meta({
       description:
         "GitHub repository, as owner/name, whose releases hold the desktop app the web links to.",
@@ -135,6 +139,10 @@ export function loadConfig(root: string): DeploymentConfig {
 
 export function hostedZone(config: DeploymentConfig): string {
   return config.hostedZone ?? config.domain;
+}
+
+export function indexedOrigin(config: DeploymentConfig): string | undefined {
+  return config.indexed ? `https://${config.domain}` : undefined;
 }
 
 export function stateBucket(config: DeploymentConfig): string {

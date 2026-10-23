@@ -293,6 +293,7 @@ export async function ensureFirstUser(
 
 export interface DeployedMarker {
   commit: string;
+  build?: string;
 }
 
 const markerKey = "selfhost/deployed.json";
@@ -302,8 +303,9 @@ export async function readDeployed(region: string, Bucket: string): Promise<Depl
   try {
     const object = await s3.send(new GetObjectCommand({ Bucket, Key: markerKey }));
     const parsed: unknown = JSON.parse((await object.Body?.transformToString()) ?? "{}");
-    const commit = (parsed as { commit?: unknown }).commit;
-    return typeof commit === "string" ? { commit } : null;
+    const { commit, build } = parsed as { commit?: unknown; build?: unknown };
+    if (typeof commit !== "string") return null;
+    return typeof build === "string" ? { commit, build } : { commit };
   } catch (error) {
     if (isNamed(error, "NoSuchKey")) return null;
     throw error;

@@ -2,7 +2,11 @@ import { join } from "node:path";
 import type { NextConfig } from "next";
 
 const workspaceRoot = join(import.meta.dirname, "..", "..");
-const releasesRepository = process.env.RELEASES_REPOSITORY;
+const buildEnv: Record<string, string> = { WEB_BUILT_AT: new Date().toISOString() };
+for (const name of ["RELEASES_REPOSITORY", "WEB_INDEXED_ORIGIN"]) {
+  const value = process.env[name];
+  if (value !== undefined) buildEnv[name] = value;
+}
 
 const config: NextConfig = {
   transpilePackages: ["@take-my-word/shared", "@take-my-word/cognito", "@take-my-word/brand"],
@@ -10,7 +14,8 @@ const config: NextConfig = {
   poweredByHeader: false,
   outputFileTracingRoot: workspaceRoot,
   turbopack: { root: workspaceRoot },
-  ...(releasesRepository === undefined ? {} : { env: { RELEASES_REPOSITORY: releasesRepository } }),
+  env: buildEnv,
+  experimental: { globalNotFound: true },
 };
 
 export default config;

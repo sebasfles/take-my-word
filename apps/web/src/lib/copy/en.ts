@@ -57,9 +57,10 @@ export const en = {
     description:
       "Voice dictation for Windows: hold a key, speak, release, and clean text lands in the app you are using.",
     ogAlt: "Take My Word: Say it once. It’s written.",
+    landingTitle: "Take My Word · Voice dictation for Windows",
   },
   skip: "Skip to content",
-  locale: { switchTo: "ES", switchLabel: "Ver en español" },
+  locale: { switchTo: "ES", switchLabel: "ES, ver en español" },
   theme: { label: "Theme", system: "System", light: "Light", dark: "Dark" },
   nav: {
     label: "Main",
@@ -67,6 +68,7 @@ export const en = {
     home: "Home",
     howItWorks: "How it works",
     privacy: "Privacy",
+    selfHost: "Run your own",
     download: "Download",
   },
   landing: {
@@ -162,6 +164,92 @@ export const en = {
         },
       ],
     },
+    selfHost: {
+      kicker: "Open source",
+      title: "Run your own.",
+      body: "Take My Word is open source under the MIT license. Run the whole service in your own AWS account, with your own Groq and OpenAI keys, and point the desktop app at it.",
+      stepsLabel: "Steps",
+      recommended: "Recommended",
+      steps: [
+        {
+          title: "Clone the repository",
+          body: "Get the code from GitHub and install it with `pnpm install`.",
+        },
+        {
+          title: "Let Claude Code set it up",
+          body: "Install the self-host skill and type `/self-host`. It asks only for your AWS profile, region and domain, and runs every step for you.",
+          recommended: true,
+        },
+        {
+          title: "Or run it by hand",
+          body: "`pnpm selfhost` asks the same questions in your terminal and runs the same steps.",
+        },
+        {
+          title: "Point the app at it",
+          body: "On the desktop app’s sign-in, choose “Use your own server” and type your domain. Updates keep coming from the official releases.",
+        },
+      ],
+      guide: "Read the guide on GitHub",
+      license: "MIT license",
+      cost: {
+        title: "What it costs",
+        checked: "Prices checked on {date}.",
+        rows: [
+          {
+            item: "AWS, prd environment",
+            price: "about 1.30 USD a month",
+            note: "0.50 for the Route 53 zone, 0.80 for two secrets, cents for the rest.",
+            links: [
+              { text: "Route 53", href: "https://aws.amazon.com/route53/pricing/" },
+              { text: "Secrets Manager", href: "https://aws.amazon.com/secrets-manager/pricing/" },
+            ],
+          },
+          {
+            item: "Groq whisper-large-v3-turbo",
+            price: "0.04 USD per hour of audio",
+            note: "Speech to text, at least 10 seconds per request.",
+            links: [{ text: "Groq", href: "https://console.groq.com/docs/speech-to-text" }],
+          },
+          {
+            item: "OpenAI gpt-5.4-nano",
+            price: "0.20 USD per 1M input tokens, 1.25 USD per 1M output tokens",
+            note: "Cleans up the transcript.",
+            links: [{ text: "OpenAI", href: "https://developers.openai.com/api/docs/pricing" }],
+          },
+        ],
+        example:
+          "An example month at 15 minutes of dictation a day: Groq about 0.30 USD, OpenAI about 0.35 USD and AWS about 1.30 USD, about 2 USD in total.",
+        free: "Groq’s free plan covers light personal use, and OpenAI gives complimentary daily tokens to organizations that share API traffic, so the providers can cost nothing.",
+        freeLink: { text: "OpenAI’s terms", href: "https://help.openai.com/en/articles/10306912" },
+        domain: "Your domain is not included.",
+      },
+    },
+    faq: {
+      kicker: "Questions",
+      title: "Before you ask.",
+      items: [
+        {
+          question: "What is Take My Word?",
+          answer:
+            "A voice dictation app for Windows. Hold Ctrl + Win, speak in English or Spanish, release, and clean, punctuated text is pasted into the app you are using.",
+        },
+        {
+          question: "What happens to my voice?",
+          answer:
+            "The audio is transcribed and discarded; it is never stored. The text is kept for 90 days so you can find it in your history, and you can delete any dictation sooner.",
+        },
+        {
+          question: "How much does it cost?",
+          answer:
+            "The app is free to download, and the official service is invitation only for now. Running your own costs about 2 USD a month at 15 minutes of dictation a day, paid directly to AWS, Groq and OpenAI.",
+        },
+        {
+          question: "Can I run my own?",
+          answer:
+            "Yes. It is open source under the MIT license: clone the repository, let Claude Code’s self-host skill set it up in your AWS account or run pnpm selfhost, then choose “Use your own server” in the desktop app.",
+        },
+      ],
+    },
     get: {
       title: "Ready when you are.",
       body: "Take My Word is invitation only for now. Install it on Windows and sign in with the account from your invitation.",
@@ -169,6 +257,7 @@ export const en = {
     footer: {
       rights: "Take My Word",
       releases: "Releases",
+      source: "Source code",
     },
     invite: "For now Take My Word is invitation only.",
     haveAccount: "Already have an account?",
@@ -305,6 +394,11 @@ export const en = {
     deleteFailed: "We could not delete the dictation. Try again.",
     emptyTitle: "No dictations yet",
     empty: "No dictations yet. They show up here when you dictate from the desktop app.",
+  },
+  notFound: {
+    title: "Page not found",
+    body: "This address does not exist on Take My Word.",
+    home: "Go to the home page",
   },
   renew: {
     renewing: "Renewing your session…",

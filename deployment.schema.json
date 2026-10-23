@@ -58,6 +58,11 @@
         "enum": ["dev", "prd"]
       }
     },
+    "indexed": {
+      "default": false,
+      "description": "Let search engines index the prd web at https://<domain>; off, every page answers noindex. dev is never indexed.",
+      "type": "boolean"
+    },
     "releases": {
       "type": "string",
       "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9._-]+$",

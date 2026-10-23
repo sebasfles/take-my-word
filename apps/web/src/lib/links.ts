@@ -1,6 +1,9 @@
 const repositoryPattern = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 
 export interface ReleaseLinks {
+  repository: string;
+  selfHostGuide: string;
+  license: string;
   releases: string;
   windowsInstaller: string;
   latestManifest: string;
@@ -12,8 +15,12 @@ export function releaseLinks(repository: string | undefined): ReleaseLinks {
       `RELEASES_REPOSITORY must name the GitHub repository whose releases hold the desktop app, as owner/name; got ${JSON.stringify(repository)}`,
     );
   }
-  const releases = `https://github.com/${repository}/releases`;
+  const source = `https://github.com/${repository}`;
+  const releases = `${source}/releases`;
   return {
+    repository: source,
+    selfHostGuide: `${source}/tree/HEAD/self-host`,
+    license: `${source}/blob/HEAD/LICENSE`,
     releases,
     windowsInstaller: `${releases}/latest/download/take-my-word-windows-x64-setup.exe`,
     latestManifest: `${releases}/latest/download/latest.json`,

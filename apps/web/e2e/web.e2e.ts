@@ -60,6 +60,7 @@ test("serves the English landing with the download link and switches to Spanish"
 }) => {
   const response = await page.goto("/");
   expect(response?.status()).toBe(200);
+  await expect(page).toHaveURL(/\/en$/);
   const headers = response?.headers() ?? {};
   expect(headers["strict-transport-security"]).toContain("max-age=");
   expect(headers["x-content-type-options"]).toBe("nosniff");
@@ -79,7 +80,8 @@ test("serves the English landing with the download link and switches to Spanish"
     /^(Version \d+\.\d+\.\d+ for|For) Windows 10 and 11\.$/,
   );
 
-  await page.getByRole("button", { name: "Ver en español" }).click();
+  await page.getByRole("link", { name: "ES, ver en español" }).click();
+  await expect(page).toHaveURL(/\/es$/);
   await expect(footer.getByText("Tu palabra, nuestra orden.")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "es");
   await expect(hero.getByRole("link", { name: "Descargar para Windows" })).toHaveAttribute(
@@ -103,7 +105,8 @@ test("keeps the language chosen with the switch over the browser's", async ({ br
     const page = await context.newPage();
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
-    await page.getByRole("button", { name: "Ver en inglés" }).click();
+    await page.getByRole("link", { name: "EN, view in English" }).click();
+    await expect(page).toHaveURL(/\/en$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     for (const path of ["/", "/sign-in", "/"]) {
       await page.goto(path);
@@ -112,6 +115,67 @@ test("keeps the language chosen with the switch over the browser's", async ({ br
     await expect(page.getByRole("contentinfo").getByText("Your Word, Our Command.")).toBeVisible();
   } finally {
     await context.close();
+  }
+});
+
+test("redirects / to a language page that names its alternates", async ({ page }) => {
+  for (const [acceptLanguage, target] of [
+    ["en-US,en;q=0.9", "/en"],
+    ["es-MX,es;q=0.9", "/es"],
+  ] as const) {
+    const response = await page.request.get("/", {
+      headers: { "accept-language": acceptLanguage },
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(307);
+    expect(new URL(response.headers().location ?? "", "https://any.invalid").pathname).toBe(target);
+  }
+  for (const locale of ["en", "es"]) {
+    await page.goto(`/${locale}`);
+    const origin = new URL(page.url()).origin;
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      `${origin}/${locale}`,
+    );
+    for (const [lang, href] of [
+      ["en", `${origin}/en`],
+      ["es", `${origin}/es`],
+      ["x-default", origin],
+    ] as const) {
+      await expect(page.locator(`link[rel="alternate"][hreflang="${lang}"]`)).toHaveAttribute(
+        "href",
+        href,
+      );
+    }
+    const data = JSON.parse(
+      (await page.locator('script[type="application/ld+json"]').textContent()) ?? "{}",
+    ) as {
+      "@graph": { "@type": string }[];
+    };
+    expect(data["@graph"].map((node) => node["@type"]).sort()).toEqual([
+      "FAQPage",
+      "Person",
+      "SoftwareApplication",
+      "WebSite",
+    ]);
+  }
+});
+
+test("keeps dev and every private page out of search results, crawlable", async ({ page }) => {
+  const robots = await page.request.get("/robots.txt");
+  expect(robots.status()).toBe(200);
+  const robotsText = await robots.text();
+  expect(robotsText).toMatch(/^Allow: \/$/m);
+  expect(robotsText).toMatch(/^Sitemap: https:\/\/.+\/sitemap\.xml$/m);
+  const sitemap = await (await page.request.get("/sitemap.xml")).text();
+  const listed = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(
+    (match) => new URL(match[1] ?? "").pathname,
+  );
+  expect(listed).toEqual(["/en", "/es"]);
+  for (const path of ["/en", "/es", "/sign-in", "/app"]) {
+    const response = await page.request.get(path);
+    expect(response.headers()["x-robots-tag"]).toBe("noindex");
+    expect(await response.text()).toMatch(/<meta name="robots" content="noindex/);
   }
 });
 

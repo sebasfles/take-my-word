@@ -78,14 +78,22 @@ export function apiSwapSteps(root: string, targets: ApiTargets): Step[] {
   );
 }
 
-export function webBuildSteps(root: string, releasesRepository: string): Step[] {
+export interface WebBuild {
+  releasesRepository: string;
+  indexedOrigin?: string | undefined;
+}
+
+export function webBuildSteps(root: string, build: WebBuild): Step[] {
   return [
     {
       name: "build the web with OpenNext",
       command: "pnpm",
       args: ["--filter", "@take-my-word/web", "bundle"],
       cwd: root,
-      env: { RELEASES_REPOSITORY: releasesRepository },
+      env: {
+        RELEASES_REPOSITORY: build.releasesRepository,
+        WEB_INDEXED_ORIGIN: build.indexedOrigin ?? "",
+      },
     },
     {
       name: "package the server function",
@@ -172,7 +180,10 @@ export function deploySteps(side: string | undefined, phase: string | undefined)
     return apiSwapSteps(repositoryRoot, requiredEnv(apiFunctions.map(([name]) => name)));
   }
   if (side === "web" && phase === "build") {
-    return webBuildSteps(repositoryRoot, requiredEnv(["RELEASES_REPOSITORY"]).RELEASES_REPOSITORY);
+    return webBuildSteps(repositoryRoot, {
+      releasesRepository: requiredEnv(["RELEASES_REPOSITORY"]).RELEASES_REPOSITORY,
+      indexedOrigin: process.env.WEB_INDEXED_ORIGIN,
+    });
   }
   if (side === "web" && phase === "swap")
     return webSwapSteps(repositoryRoot, requiredEnv(webTargets));

@@ -147,3 +147,12 @@ Deviation agreed with the om-reviewer: the dictation ran on a dev debug build of
 The Windows host is released: nothing of ours runs there (only Sebastian's prd app); the builds stay in `C:\dev\tmw-0016-{prd,dev,debug}` until clean-task.
 
 ## Result
+
+Closed 2026-10-23 at 27fced9 after five rounds, reviewed clean by the om-reviewer.
+
+- Outcome: `pnpm selfhost` (setup, idempotent update, `--plan`, `--yes`, `remove` with a leftovers check), `self-host/README.md` with dated costs and `self-host/skill/SKILL.md`; the desktop's "Use your own server" with discovery validated at parity with `discoverySchema` through shared vectors, stored in `settings.json`, switched only while signed out, in the prd and dev apps.
+- Evidence: the scratch deployment `tmw-scratch` in us-east-2 under `selfhost.<official zone>`: setup in 6 min with the approved plan (96/0/0), a second run that changed nothing, the web sign-in through the new-password step, a dictation through "Use your own server" landing in a text box and on History, and a removal that left nothing. Windows rust checks green, the prd build built and never launched, web integration and e2e green on dev.
+- Deviations: the dictation ran on a dev debug build of the same commit with `--dictate-wav`, not a prd build, so Sebastian's prd identity was never touched (recorded in Context & decisions); the post-release re-run of 0.3.0 against scratch was dropped by the om-manager.
+- Findings across rounds: the account was taken from the profile without a check, a foreign state bucket could be used or emptied, `--plan` was described as changing nothing, the tag index kept a deleted user pool, a test carried the official account id.
+- Carried to phase 3, required before the PR: the core, dev and prd plans after the rebase on 0015 (moves only, then the crew applies the moves).
+- Debt created: the leftovers check confirms only user pools against their service; a self-hosted server older than the app may miss routes (D5).

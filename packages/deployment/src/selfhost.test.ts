@@ -9,6 +9,7 @@ import {
 import { ConfigError, parseConfig } from "./config.ts";
 import {
   accountToUse,
+  buildKey,
   needsDeploy,
   nextProviderKeys,
   planOutcome,
@@ -16,6 +17,7 @@ import {
   repositoryOf,
   SelfHostError,
   selfHostProblem,
+  webBuildOf,
 } from "./selfhost.ts";
 import { siteHosts } from "./terraform.ts";
 
@@ -33,6 +35,16 @@ describe("pnpm selfhost", () => {
       github: { owner: "o", repository: "r", appId: "1", appInstallationId: "2" },
     });
     expect(selfHostProblem(withCi)).toMatch(/github section/);
+  });
+
+  it("keeps a self-hosted web out of search results unless the config asks for it", () => {
+    expect(webBuildOf(parseConfig(base))).toEqual({
+      releasesRepository: "owner/take-my-word",
+      indexedOrigin: undefined,
+    });
+    expect(webBuildOf(parseConfig({ ...base, indexed: true })).indexedOrigin).toBe(
+      "https://dictation.example.com",
+    );
   });
 
   it("takes the account from the profile on a first run and refuses another one afterwards", () => {
@@ -76,12 +88,28 @@ describe("pnpm selfhost", () => {
   });
 
   it("deploys code only when it changed, the tree is dirty or the infrastructure moved", () => {
-    const clean = { deployed: "abc", head: "abc", dirty: false, infraChanged: false };
+    const build = buildKey(webBuildOf(parseConfig(base)));
+    const clean = {
+      deployed: { commit: "abc", build },
+      head: "abc",
+      build,
+      dirty: false,
+      infraChanged: false,
+    };
     expect(needsDeploy(clean)).toBe(false);
     expect(needsDeploy({ ...clean, deployed: null })).toBe(true);
     expect(needsDeploy({ ...clean, head: "def" })).toBe(true);
     expect(needsDeploy({ ...clean, dirty: true })).toBe(true);
     expect(needsDeploy({ ...clean, infraChanged: true })).toBe(true);
+  });
+
+  it("rebuilds the web when the config changes what the build bakes in", () => {
+    const build = (extra: object) => buildKey(webBuildOf(parseConfig({ ...base, ...extra })));
+    const deployed = { commit: "abc", build: build({}) };
+    const state = { deployed, head: "abc", dirty: false, infraChanged: false };
+    expect(needsDeploy({ ...state, build: build({ indexed: true }) })).toBe(true);
+    expect(needsDeploy({ ...state, build: build({ releases: "other/take-my-word" }) })).toBe(true);
+    expect(needsDeploy({ ...state, deployed: { commit: "abc" }, build: build({}) })).toBe(true);
   });
 
   it("reads terraform plan's detailed exit code and stops on a failed plan", () => {

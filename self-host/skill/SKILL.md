@@ -65,7 +65,7 @@ You run the same steps as the manual path, through `pnpm selfhost --yes`, and yo
 
 `git pull`, `pnpm install`, then `pnpm selfhost --plan`.
 Summarize the plan; if it destroys or replaces anything, say what and why it matters before going on.
-With their agreement, run `pnpm selfhost --yes`; it redeploys the code only when the commit changed.
+With their agreement, run `pnpm selfhost --yes`; it redeploys the code only when the commit, `releases` or `indexed` changed.
 
 ## Remove
 

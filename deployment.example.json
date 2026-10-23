@@ -10,6 +10,7 @@
   "hostedZone": "example.com",
   "stateBucket": "take-my-word-terraform-state-123456789012",
   "environments": ["prd"],
+  "indexed": false,
   "releases": "owner/take-my-word",
   "github": {
     "owner": "owner",

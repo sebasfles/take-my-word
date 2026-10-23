@@ -91,6 +91,7 @@ Your answers live in `deployment.json` and your keys only in Secrets Manager; bo
 Without questions, `pnpm selfhost --yes` uses `deployment.json` as it is and reads the keys from `.env`.
 `pnpm selfhost --plan` saves your answers and creates the empty state bucket it needs, shows the Terraform plan, and changes nothing else.
 The first user is `admin` unless you pass `--user <name>`.
+Your web answers `noindex` to search engines; set `"indexed": true` in `deployment.json` and run the setup again to let them index the prd site.
 
 ## Sign in
 
@@ -109,7 +110,7 @@ pnpm install
 pnpm selfhost
 ```
 
-It applies infrastructure changes after showing the plan, and redeploys the code only when the commit changed.
+It applies infrastructure changes after showing the plan, and redeploys the code only when the commit, `releases` or `indexed` changed.
 To change a provider key, run `pnpm selfhost` and type the new one; empty answers keep the stored keys.
 
 ## Remove everything

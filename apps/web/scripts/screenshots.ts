@@ -279,7 +279,19 @@ async function shootPages(browser: Browser): Promise<void> {
         await context.addCookies([{ name: "tmw-lang", value: locale, url: webOrigin }]);
         const page = await context.newPage();
         await page.goto(`${webOrigin}/`);
+        if (new URL(page.url()).pathname !== `/${locale}`) {
+          throw new Error(`/ with tmw-lang=${locale} landed on ${page.url()}`);
+        }
         await shoot(page, name("landing"));
+        for (const section of ["self-host", "faq"]) {
+          const box = await page.locator(`#${section}`).boundingBox();
+          if (box === null) throw new Error(`#${section} is not on the landing`);
+          await page.screenshot({
+            path: join(out, `${name(`landing-${section}`)}.png`),
+            fullPage: true,
+            clip: { x: 0, y: box.y, width: box.width, height: box.height },
+          });
+        }
         await page.goto(`${webOrigin}/sign-in`);
         await shoot(page, name("sign-in"));
 
@@ -353,7 +365,7 @@ async function shootHero(browser: Browser): Promise<void> {
         colorScheme: scheme,
       });
       const page = await context.newPage();
-      await page.goto(`${webOrigin}/`);
+      await page.goto(`${webOrigin}/en`);
       await shoot(page, join("hero", `first-screen-${scheme}-${String(width)}x${String(height)}`), {
         fullPage: false,
       });
@@ -373,7 +385,7 @@ async function shootHero(browser: Browser): Promise<void> {
       reducedMotion: "reduce",
     });
     const still = await reduced.newPage();
-    await still.goto(`${webOrigin}/`);
+    await still.goto(`${webOrigin}/en`);
     await still.evaluate(() => document.fonts.ready);
     await still.screenshot({ path: join(out, "hero", `reduced-motion-${String(width)}.png`) });
     await reduced.close();
@@ -384,7 +396,7 @@ async function shootHero(browser: Browser): Promise<void> {
       recordVideo: { dir: videoDir, size: viewport },
     });
     const page = await recording.newPage();
-    await page.goto(`${webOrigin}/`);
+    await page.goto(`${webOrigin}/en`);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(10_000);
     const video = page.video();

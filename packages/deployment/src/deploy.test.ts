@@ -37,7 +37,7 @@ describe("api deploy", () => {
 });
 
 describe("web deploy", () => {
-  const build = webBuildSteps(root, "owner/take-my-word");
+  const build = webBuildSteps(root, { releasesRepository: "owner/take-my-word" });
   const swap = webSwapSteps(root, {
     WEB_FUNCTION_NAME: "x-web",
     WEB_ASSETS_BUCKET: "x-assets",
@@ -48,8 +48,19 @@ describe("web deploy", () => {
 
   it("builds and zips with no AWS call, with the releases repository the links point at", () => {
     expect(touchesAws(build)).toBe(false);
-    expect(build[0]?.env).toEqual({ RELEASES_REPOSITORY: "owner/take-my-word" });
+    expect(build[0]?.env).toEqual({
+      RELEASES_REPOSITORY: "owner/take-my-word",
+      WEB_INDEXED_ORIGIN: "",
+    });
     expect(build.map(line)).toContain(`zip -qry ${zip} .`);
+  });
+
+  it("builds an indexed web only for the origin it is given", () => {
+    const indexed = webBuildSteps(root, {
+      releasesRepository: "owner/take-my-word",
+      indexedOrigin: "https://dictation.example.com",
+    });
+    expect(indexed[0]?.env?.WEB_INDEXED_ORIGIN).toBe("https://dictation.example.com");
   });
 
   it("swaps the zip the build left, building nothing", () => {

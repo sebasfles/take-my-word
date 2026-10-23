@@ -24,18 +24,27 @@ import {
   writeDeployed,
   writeSecret,
   zoneFor,
+  type DeployedMarker,
   type SecretValues,
 } from "./aws.ts";
 import {
   ConfigError,
   configFile,
+  indexedOrigin,
   loadConfig,
   parseConfig,
   stateBucket,
   type DeploymentConfig,
   type Environment,
 } from "./config.ts";
-import { apiBuildSteps, apiSwapSteps, run, webBuildSteps, webSwapSteps } from "./deploy.ts";
+import {
+  apiBuildSteps,
+  apiSwapSteps,
+  run,
+  webBuildSteps,
+  webSwapSteps,
+  type WebBuild,
+} from "./deploy.ts";
 import { Prompt } from "./prompt.ts";
 import { siteHosts } from "./terraform.ts";
 import { terraform } from "./tf.ts";
@@ -87,13 +96,27 @@ export function nextProviderKeys(
   };
 }
 
+export function webBuildOf(config: DeploymentConfig): WebBuild {
+  return { releasesRepository: config.releases, indexedOrigin: indexedOrigin(config) };
+}
+
+export function buildKey(build: WebBuild): string {
+  return JSON.stringify([build.releasesRepository, build.indexedOrigin ?? null]);
+}
+
 export function needsDeploy(state: {
-  deployed: string | null;
+  deployed: DeployedMarker | null;
   head: string;
+  build: string;
   dirty: boolean;
   infraChanged: boolean;
 }): boolean {
-  return state.dirty || state.infraChanged || state.deployed !== state.head;
+  return (
+    state.dirty ||
+    state.infraChanged ||
+    state.deployed?.commit !== state.head ||
+    state.deployed.build !== state.build
+  );
 }
 
 export function planOutcome(status: number): "unchanged" | "changes" {
@@ -456,17 +479,18 @@ async function setup(options: { yes: boolean; user: string; plan: boolean }): Pr
     step("Code");
     const head = git(["rev-parse", "HEAD"]);
     const dirty = git(["status", "--porcelain", "--untracked-files=no"]) !== "";
+    const build = webBuildOf(config);
     const pending: [Environment, Outputs][] = [];
     for (const [env, { outputs, changed }] of applied) {
       const deployed = await readDeployed(config.aws.region, outputs.web.WEB_ASSETS_BUCKET);
-      if (needsDeploy({ deployed: deployed?.commit ?? null, head, dirty, infraChanged: changed })) {
+      if (needsDeploy({ deployed, head, build: buildKey(build), dirty, infraChanged: changed })) {
         pending.push([env, outputs]);
       } else {
         console.log(`${env} already runs ${head.slice(0, 7)}.`);
       }
     }
     if (pending.length > 0) {
-      run([...apiBuildSteps(repositoryRoot), ...webBuildSteps(repositoryRoot, config.releases)]);
+      run([...apiBuildSteps(repositoryRoot), ...webBuildSteps(repositoryRoot, build)]);
       for (const [env, outputs] of pending) {
         step(`Deploying ${head.slice(0, 7)}${dirty ? " with local changes" : ""} to ${env}`);
         run([
@@ -474,7 +498,10 @@ async function setup(options: { yes: boolean; user: string; plan: boolean }): Pr
           ...webSwapSteps(repositoryRoot, outputs.web),
         ]);
         if (!dirty) {
-          await writeDeployed(config.aws.region, outputs.web.WEB_ASSETS_BUCKET, { commit: head });
+          await writeDeployed(config.aws.region, outputs.web.WEB_ASSETS_BUCKET, {
+            commit: head,
+            build: buildKey(build),
+          });
         }
       }
     }

@@ -32,6 +32,7 @@ jobs:
       - name: Build with OpenNext and package the server function
         env:
           RELEASES_REPOSITORY: ${{ github.repository }}
+          WEB_INDEXED_ORIGIN: ${{ vars.WEB_INDEXED_ORIGIN }}
         run: pnpm deploy:web build
 
       - uses: aws-actions/configure-aws-credentials@v6
