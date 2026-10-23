@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-22
-source: 0012_fix_lost_paste
+updated: 2026-10-23
+source: 0013_fix_terminal_paste
 ---
 
 # Desktop: architecture and debt
@@ -330,3 +330,41 @@ source: 0012_fix_lost_paste
 - Debt created: the retry can paste twice if the target keeps retrying to open the clipboard for longer than the settle after a contention; a thread or process the target creates after the offer is never proven, so its read leaves the text with a notification; a monitor that wins the race on both attempts leaves the text with a notification; proving a Chromium read costs about 65 to 190 ms.
 - Revisit when: a paste lands twice, a target's read is reported unproven in the log, or the share of pastes left in the clipboard grows on machines with such a monitor.
 - Source: 0012_fix_lost_paste
+- Superseded by 2026-10-23: Threads that ran since the keystroke are probed first
+
+## 2026-10-23: Threads that ran since the keystroke are probed first
+
+- Decision: the proof of a read without a window stays the 2026-10-22 one (a wait chain shows a thread of the target's process tree blocked sending this render request to the clipboard thread; only the first read after the keystroke counts; one retry), with a new order: each attempt reads the cycle time of every target thread at its keystroke, and a read without a window probes first the threads whose cycle time grew since then, in the old order (depth from the target, main threads first), then the rest, under the same 200 ms budget.
+  The snapshot taken at an offer keeps a query handle per target thread, and the handles live until the next offer replaces the snapshot; a thread that ran gets its wait chain looked at sooner and is not trusted more.
+- Alternatives rejected: a larger budget (Windows Terminal hosts about 110 threads, 44 to 46 of them GUI, at about 12 ms per wait chain); a fresh thread snapshot inside the render request (about 40 ms); recognizing terminals by executable name (no reader rule may depend on one).
+- Reason: Windows Terminal reads without a window from one of its own GUI threads, 25th to 28th in the old order, so the budget ran out after 15 to 19 threads and every paste into it stayed in the clipboard (24 of 24 on the base build); with this order 48 of 48 of its reads were proven after 3 or 4 threads in 31 to 81 ms, and reading the cycle times costs 10 to 165 us.
+- Debt created: the 2026-10-22 entry's debt stands: the retry can paste twice, a thread or process created after the offer is never proven, and a monitor that wins both attempts leaves the text with a notification; one that opens the clipboard on every Ctrl+V, faster than the target, wins every time (6 of 6 left in the clipboard in a text box, and the monitor never got the text).
+- Revisit when: a paste lands twice, a target's read is reported unproven in the log, or the share of pastes left in the clipboard grows on machines with such a monitor.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: The clipboard thread answers render requests while it waits to open the clipboard
+
+- Decision: between `OpenClipboard` retries (offer, restore, keep, put, and the History copy owner), the clipboard thread waits on its sent-message queue and answers what arrives instead of sleeping.
+- Alternatives rejected: a longer patience, which only stretches the stall.
+- Reason: a reader that already holds the clipboard open and asks for the text waits on the clipboard thread, which was asleep until that reader let go, so the restore gave up after 3 s and the app said the clipboard was lost; a test that holds the clipboard open through a restore fails on the old loop after 3.25 s and passes in 0.36 s.
+- Debt created: none.
+- Revisit when: a restore or an offer fails with the clipboard busy in the log.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: Multi-line text goes to Windows Terminal as dictated
+
+- Decision: the paste never joins lines and never adds a line break or Enter; in Windows Terminal the lines arrive as one block where the shell supports bracketed paste (bash, tmux, Claude Code), and in a Windows PowerShell 5.1 tab the terminal shows its own multi-line warning first.
+- Alternatives rejected: joining lines for every Windows Terminal paste, which would break the one-block paste in bash, tmux and Claude Code, since the app cannot tell the tabs apart and no rule may depend on an executable name; a per-app rule option.
+- Reason: Windows PowerShell 5.1 ships PSReadLine 2.0.0 without bracketed paste, so a line break in a paste is an Enter there; that is the terminal's behavior, and its warning is the guard.
+- Debt created: confirming the warning in a Windows PowerShell 5.1 tab runs every line but the last.
+- Revisit when: Windows PowerShell ships a PSReadLine with bracketed paste, or users ask for joined lines.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: Config tests remove their scratch folders
+
+- Decision: the config tests' scratch path is a guard that deletes its folder on drop, also when a test fails.
+- Alternatives rejected: a new dependency for temporary folders.
+- Reason: every test run left a `tmw-config-<name>-<pid>` folder in the temp directory.
+- Debt created: the folders earlier runs left stay on Sebastian's machine (6964 in `%TEMP%` on 2026-10-23); removing them is his call.
+- Revisit when: Sebastian clears them.
+- Source: 0013_fix_terminal_paste

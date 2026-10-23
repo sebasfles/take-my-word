@@ -58,3 +58,4 @@ In target 4, Windows Terminal's multi-line warning was confirmed: the first line
 Target 5 (conhost, Windows PowerShell 5.1) took 3 of 3 in a second run, because the first run aborted while closing target 4 (round 3 finding, a harness error, not the app).
 Sebastian's clipboard was sealed before each run and restored with the same sha256 after both.
 Result: matches Expected on 26e5a8a.
+Round 4 (d9a3b1c) changes only the smoke's window close and the notes, with no app code since 26e5a8a; its run on 9954fb4 closed targets 4 and 5 cleanly (smoke exit 0) with the same results, so the verification stands.
