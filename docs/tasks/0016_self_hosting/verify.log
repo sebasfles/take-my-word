@@ -134,3 +134,21 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (39 tests, pnpm test --no-file-parallelism)
 - e2e: n/a
+
+## 2026-10-23T12:42:35Z by om-developer target web on 8f3a3c4
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (248 tests, pnpm test)
+- e2e: n/a (pnpm integration and pnpm e2e need dev, held by 0015; run when the om-reviewer passes "dev available")
+
+## 2026-10-23T12:42:35Z by om-developer target deployment on 8f3a3c4
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (42 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T12:42:35Z by om-developer target workflows on 8f3a3c4
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
