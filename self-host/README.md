@@ -89,7 +89,7 @@ The domain itself is not included.
 
 Your answers live in `deployment.json` and your keys only in Secrets Manager; both stay out of git.
 Without questions, `pnpm selfhost --yes` uses `deployment.json` as it is and reads the keys from `.env`.
-`pnpm selfhost --plan` shows what a run would change in AWS and stops before changing it.
+`pnpm selfhost --plan` saves your answers and creates the empty state bucket it needs, shows the Terraform plan, and changes nothing else.
 The first user is `admin` unless you pass `--user <name>`.
 
 ## Sign in

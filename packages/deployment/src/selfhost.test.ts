@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isDeploymentRecord, isOwnBucket, temporaryPassword, zoneFor } from "./aws.ts";
-import { parseConfig } from "./config.ts";
+import { isDeploymentRecord, stateBucketUse, temporaryPassword, zoneFor } from "./aws.ts";
+import { ConfigError, parseConfig } from "./config.ts";
 import {
+  accountToUse,
   needsDeploy,
   nextProviderKeys,
   planOutcome,
@@ -26,6 +27,14 @@ describe("pnpm selfhost", () => {
       github: { owner: "o", repository: "r", appId: "1", appInstallationId: "2" },
     });
     expect(selfHostProblem(withCi)).toMatch(/github section/);
+  });
+
+  it("takes the account from the profile on a first run and refuses another one afterwards", () => {
+    expect(accountToUse(null, "111111111111", "me")).toBe("111111111111");
+    expect(accountToUse("111111111111", "111111111111", "me")).toBe("111111111111");
+    expect(() => accountToUse("111111111111", "222222222222", "me")).toThrow(
+      /me is account 222222222222, not 111111111111/,
+    );
   });
 
   it("reads the releases repository from every form of origin URL", () => {
@@ -132,14 +141,17 @@ describe("AWS rules of the setup and the removal", () => {
     expect(leftover("dev.example.com.", "A")).toBe(false);
   });
 
-  it("deletes a whole state bucket only when pnpm selfhost created it for this deployment", () => {
-    const tags = [
+  it("uses a state bucket only when it is missing or pnpm selfhost created it for this deployment", () => {
+    const own = [
       { Key: "Project", Value: "tmw-mine" },
       { Key: "ManagedBy", Value: "pnpm selfhost" },
     ];
-    expect(isOwnBucket(tags, "tmw-mine")).toBe(true);
-    expect(isOwnBucket(tags, "tmw-other")).toBe(false);
-    expect(isOwnBucket([{ Key: "Project", Value: "tmw-mine" }], "tmw-mine")).toBe(false);
+    expect(stateBucketUse(null, "tmw-mine", "b")).toBe("create");
+    expect(stateBucketUse(own, "tmw-mine", "b")).toBe("own");
+    for (const foreign of [own, [], [{ Key: "Project", Value: "tmw-mine" }]]) {
+      expect(() => stateBucketUse(foreign, "tmw-other", "b")).toThrow(ConfigError);
+    }
+    expect(() => stateBucketUse([], "tmw-mine", "b")).toThrow(/another deployment's state/);
   });
 
   it("generates temporary passwords Cognito's policy accepts", () => {

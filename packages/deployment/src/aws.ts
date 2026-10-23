@@ -120,21 +120,51 @@ function bucketTags(name: string) {
   ];
 }
 
-export async function ensureStateBucket(config: DeploymentConfig): Promise<"created" | "exists"> {
-  const s3 = new S3Client({ region: config.aws.region });
-  const Bucket = stateBucket(config);
+export type BucketTags = readonly { Key?: string | undefined; Value?: string | undefined }[];
+
+export function isOwnBucket(tags: BucketTags, name: string): boolean {
+  const value = (key: string) => tags.find((tag) => tag.Key === key)?.Value;
+  return value("Project") === name && value("ManagedBy") === createdBy;
+}
+
+export function stateBucketUse(
+  tags: BucketTags | null,
+  name: string,
+  bucket: string,
+): "create" | "own" {
+  if (tags === null) return "create";
+  if (isOwnBucket(tags, name)) return "own";
+  throw new ConfigError(
+    `the state bucket ${bucket} was not created by pnpm selfhost for ${name}, so it may hold another deployment's state; name a bucket that does not exist yet in stateBucket, or leave stateBucket out`,
+  );
+}
+
+async function stateBucketTags(s3: S3Client, Bucket: string): Promise<BucketTags | null> {
   try {
-    await s3.send(new HeadBucketCommand({ Bucket }));
-    return "exists";
+    return (await s3.send(new GetBucketTaggingCommand({ Bucket }))).TagSet ?? [];
   } catch (error) {
+    if (isNamed(error, "NoSuchBucket") || isStatus(error, 404)) return null;
+    if (isNamed(error, "NoSuchTagSet")) return [];
     if (isStatus(error, 403)) {
       throw new ConfigError(
-        `the state bucket ${Bucket} belongs to another account; set another stateBucket`,
+        `the state bucket ${Bucket} belongs to another account or this profile cannot read it; set another stateBucket`,
         { cause: error },
       );
     }
-    if (!isStatus(error, 404)) throw error;
+    throw error;
   }
+}
+
+export async function checkStateBucket(config: DeploymentConfig): Promise<"create" | "own"> {
+  const s3 = new S3Client({ region: config.aws.region });
+  const Bucket = stateBucket(config);
+  return stateBucketUse(await stateBucketTags(s3, Bucket), config.name, Bucket);
+}
+
+export async function ensureStateBucket(config: DeploymentConfig): Promise<"created" | "exists"> {
+  if ((await checkStateBucket(config)) === "own") return "exists";
+  const s3 = new S3Client({ region: config.aws.region });
+  const Bucket = stateBucket(config);
   await s3.send(
     new CreateBucketCommand({
       Bucket,
@@ -146,6 +176,9 @@ export async function ensureStateBucket(config: DeploymentConfig): Promise<"crea
             },
           }),
     }),
+  );
+  await s3.send(
+    new PutBucketTaggingCommand({ Bucket, Tagging: { TagSet: bucketTags(config.name) } }),
   );
   await s3.send(
     new PutPublicAccessBlockCommand({
@@ -169,15 +202,12 @@ export async function ensureStateBucket(config: DeploymentConfig): Promise<"crea
       },
     }),
   );
-  await s3.send(
-    new PutBucketTaggingCommand({ Bucket, Tagging: { TagSet: bucketTags(config.name) } }),
-  );
   return "created";
 }
 
-async function deleteVersions(s3: S3Client, Bucket: string, Prefix?: string): Promise<void> {
+async function deleteVersions(s3: S3Client, Bucket: string): Promise<void> {
   for (;;) {
-    const listed = await s3.send(new ListObjectVersionsCommand({ Bucket, Prefix }));
+    const listed = await s3.send(new ListObjectVersionsCommand({ Bucket }));
     const objects = [...(listed.Versions ?? []), ...(listed.DeleteMarkers ?? [])]
       .filter((version) => version.Key !== undefined)
       .map((version) => ({ Key: version.Key ?? "", VersionId: version.VersionId }));
@@ -186,29 +216,11 @@ async function deleteVersions(s3: S3Client, Bucket: string, Prefix?: string): Pr
   }
 }
 
-export function isOwnBucket(
-  tags: readonly { Key?: string | undefined; Value?: string | undefined }[],
-  name: string,
-) {
-  const value = (key: string) => tags.find((tag) => tag.Key === key)?.Value;
-  return value("Project") === name && value("ManagedBy") === createdBy;
-}
-
 export async function removeState(config: DeploymentConfig): Promise<string> {
-  const s3 = new S3Client({ region: config.aws.region });
   const Bucket = stateBucket(config);
-  let tags: { Key?: string | undefined; Value?: string | undefined }[];
-  try {
-    tags = (await s3.send(new GetBucketTaggingCommand({ Bucket }))).TagSet ?? [];
-  } catch (error) {
-    if (isNamed(error, "NoSuchBucket")) return `the state bucket ${Bucket} is already gone`;
-    if (!isNamed(error, "NoSuchTagSet")) throw error;
-    tags = [];
-  }
-  if (!isOwnBucket(tags, config.name)) {
-    for (const root of config.environments) await deleteVersions(s3, Bucket, `${root}/`);
-    return `deleted this deployment's state from ${Bucket}, which pnpm selfhost did not create`;
-  }
+  if ((await checkStateBucket(config)) === "create")
+    return `the state bucket ${Bucket} is already gone`;
+  const s3 = new S3Client({ region: config.aws.region });
   await deleteVersions(s3, Bucket);
   await s3.send(new DeleteBucketCommand({ Bucket }));
   return `deleted the state bucket ${Bucket}`;

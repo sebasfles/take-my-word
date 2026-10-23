@@ -11,6 +11,7 @@ import {
 } from "@take-my-word/shared";
 import {
   callerAccount,
+  checkStateBucket,
   cookieKey,
   ensureFirstUser,
   ensureStateBucket,
@@ -43,7 +44,7 @@ import { readDotEnv, repositoryRoot } from "./workspace.ts";
 const usage = `usage:
   pnpm selfhost              set up or update your deployment, asking what it needs
   pnpm selfhost --yes        the same without questions: ${configFile} as it is, keys from .env
-  pnpm selfhost --plan       show what a run would change in AWS, and stop before changing it
+  pnpm selfhost --plan       save the answers, create the empty state bucket, show the plan and stop
   pnpm selfhost remove       delete everything your deployment created, its state bucket included
 options:
   --user <name>              username of the first user (default: admin)
@@ -246,19 +247,32 @@ async function askConfig(
   };
 }
 
-async function confirmAccount(config: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const aws = config.aws as { profile: string; region: string; accountId: string };
-  useProfile(aws.profile, aws.region);
-  let account: string;
+export function accountToUse(configured: string | null, caller: string, profile: string): string {
+  if (configured === null || configured === caller) return caller;
+  throw new SelfHostError(
+    `the profile ${profile} is account ${caller}, not ${configured}; ${configFile} belongs to that account`,
+  );
+}
+
+async function callerOf(profile: string, region: string): Promise<string> {
+  useProfile(profile, region);
   try {
-    account = await callerAccount(aws.region);
+    return await callerAccount(region);
   } catch (error) {
     throw new SelfHostError(
-      `the profile ${aws.profile} has no working credentials (${(error as Error).message}); for SSO, run aws sso login --profile ${aws.profile}`,
+      `the profile ${profile} has no working credentials (${(error as Error).message}); for SSO, run aws sso login --profile ${profile}`,
       { cause: error },
     );
   }
-  return { ...config, aws: { ...aws, accountId: account } };
+}
+
+async function confirmAccount(
+  config: Record<string, unknown>,
+  configured: string | null,
+): Promise<Record<string, unknown>> {
+  const aws = config.aws as { profile: string; region: string; accountId: string };
+  const caller = await callerOf(aws.profile, aws.region);
+  return { ...config, aws: { ...aws, accountId: accountToUse(configured, caller, aws.profile) } };
 }
 
 async function withHostedZone(config: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -410,7 +424,8 @@ async function setup(options: { yes: boolean; user: string; plan: boolean }): Pr
       );
     }
     step("AWS account and domain");
-    draft = await withHostedZone(await confirmAccount(draft));
+    const configured = existing === null ? null : parseConfig(existing).aws.accountId;
+    draft = await withHostedZone(await confirmAccount(draft, configured));
     const config = parseConfig(draft);
     if (JSON.stringify(existing) !== JSON.stringify(draft)) {
       saveConfig(draft);
@@ -498,13 +513,12 @@ async function remove(options: { yes: boolean }): Promise<void> {
   const config = loadConfig(repositoryRoot);
   const problem = selfHostProblem(config);
   if (problem !== null) throw new SelfHostError(problem);
-  useProfile(config.aws.profile, config.aws.region);
-  const account = await callerAccount(config.aws.region);
-  if (account !== config.aws.accountId) {
-    throw new SelfHostError(
-      `the profile ${config.aws.profile} is account ${account}, not ${config.aws.accountId}`,
-    );
-  }
+  const account = accountToUse(
+    config.aws.accountId,
+    await callerOf(config.aws.profile, config.aws.region),
+    config.aws.profile,
+  );
+  const bucket = await checkStateBucket(config);
   if (!options.yes) {
     if (!process.stdin.isTTY) throw new SelfHostError("removal needs a terminal, or --yes");
     const prompt = new Prompt();
@@ -515,15 +529,11 @@ async function remove(options: { yes: boolean }): Promise<void> {
     if (typed !== config.domain) throw new SelfHostError("stopped; nothing was deleted");
   }
   const removal = { TF_VAR_removal: "true" };
-  for (const env of [...config.environments].reverse()) {
+  const withState = bucket === "own" ? [...config.environments].reverse() : [];
+  if (bucket === "create") console.log(`${stateBucket(config)} is gone, so no state is left.`);
+  for (const env of withState) {
     step(`Removing ${env}`);
-    const init = terraform(config, env, ["init", "-input=false", "-reconfigure"]);
-    if (init.status !== 0) {
-      console.log(
-        `terraform init on ${env} failed; its state is gone, so there is nothing to destroy.`,
-      );
-      continue;
-    }
+    terraformOrFail(config, env, ["init", "-input=false", "-reconfigure"]);
     const state = terraform(config, env, ["state", "list"], { capture: true });
     if (state.status !== 0 || state.stdout.trim() === "") {
       console.log(`${env} has nothing in its state.`);

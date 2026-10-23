@@ -51,7 +51,8 @@ You run the same steps as the manual path, through `pnpm selfhost --yes`, and yo
    Use `["dev", "prd"]` when they want dev.
    `deployment.schema.json` documents every key.
 
-7. Run `pnpm selfhost --plan` and summarize the plan for them: how many resources it adds, changes and destroys, and that every name starts with the deployment name.
+7. Run `pnpm selfhost --plan`; it creates only the empty state bucket it needs to plan, and changes nothing else.
+   Summarize the plan for them: how many resources it adds, changes and destroys, and that every name starts with the deployment name.
    Go on only when they agree.
 8. Tell them the first run takes 20 to 40 minutes, then run `pnpm selfhost --yes --user <username>` with a long timeout, in the background if your tools allow, and follow its output.
    If it stops, read the reason it prints, fix what the README's "When something fails" says, and run it again; it resumes.
