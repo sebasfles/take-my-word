@@ -227,3 +227,13 @@ Round 3 evidence complete: Acceptance 1 (hold, hands-free, stop, Esc, shortcut, 
 ### Round 5
 
 Flaky test on the windows runner: `Onboarding.test.tsx` asserted `checkMicrophone(true)` right after the microphone heading appeared, but that heading renders when the sign-in promise resolves outside `act`, so the step's mount effect could still be pending. Both microphone assertions now wait for the call itself. Audit of the onboarding, Main, Settings, Overlay, Root and insert tests: every other bridge assertion follows a `fireEvent` handler that calls the bridge synchronously or flushes its effects inside `act`, so no other change. Proof: the file ran 50 times locally in a row, 50 passed, 0 failed.
+
+### Rebase on develop after 0013 (36d789a)
+
+Plain rebase, no tag on the branch. Every code commit applied without conflict: 0013 changed the clipboard thread, the stub, `config.rs` tests (a self-deleting `Scratch`, which derefs to the path, so 0014's settings test compiles unchanged) and `Cargo.toml`, and did not touch `paste.rs`, the `Paste` trait or `Paster`, so `own_window.rs` needed no change.
+Conflicts, all in the docs commit:
+- `docs/modules/desktop/ard.md`: frontmatter `source` to 0014_desktop_ux; 0013's four new entries (threads that ran probed first, the clipboard thread answering while it waits, multi-line text in Windows Terminal, config test folders) kept in full, then 0014's three new entries after them.
+- `docs/modules/desktop/prd.md`: `source` to 0014_desktop_ux; Rules: 0014's wording for starting a dictation during processing and for the target window (with the own-window insert), 0013's terminal, Windows PowerShell 5.1 and administrator-terminal rules kept.
+- `docs/modules/desktop/trd.md`: `source` to 0014_desktop_ux; Structure: 0014's session, `own_window.rs`, `account.rs`, `windows.rs` and `src` rows, 0013's paste row (threads that ran first) and scripts row (terminal smoke); Testing: 0014's screenshot sizes, 0013's terminal smoke lines, and the Windows checks line carrying both 0013's and 0014's runs.
+- `docs/ARD.md` debt index: 0013's rows (the paste retry row as 0013 rewrote it, the PowerShell 5.1 row, the config folders row) kept, 0014's two desktop rows and its styles row added; checked against the module ARDs.
+WSL checks on the rebased head: typecheck, eslint and prettier, 164 vitest, and the Linux clippy (all targets) green; the Windows cargo waits for host time.
