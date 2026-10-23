@@ -199,5 +199,11 @@ The branch is never rebased or force-pushed from here.
 - prd landing, 16:06:38 UTC: `https://<prd domain>/` 200, "Version 0.3.0 for Windows 10 and 11." in both download notes.
 - PR #23 on 76dc174: ci, linux-check, windows and release all pass.
 - Sebastian's update, read-only: at 16:07 UTC his installed app is still 0.2.0 (`HKCU\...\Uninstall` DisplayVersion 0.2.0, running since 2026-10-22 14:09 local). Its log shows the 6-hour checks ("no update available" at 01:09, 07:09 and 13:09, before the release); the next check comes at about 19:09 in the log's clock, or at his next start. Pending until he accepts the update; nothing of his was touched.
+- Sebastian's upgrade, done by the om-manager with the 0.3.0 release installer (`/S`, quit and relaunch), read-only at about 16:15 UTC:
+  - `HKCU\...\Uninstall`, "Take My Word": DisplayVersion 0.3.0; the process runs from the installed path since 2026-10-23 11:13 local (16:13 UTC).
+  - Log since the relaunch: 16:13:01 updater "no update available" (nothing newer than 0.3.0); 16:13:03 `api getSettings: ok` (twice), 16:13:04 "loaded 0 app rules", 16:13:04 `api getUsage: ok`.
+    These are bearer-token calls, so the keychain session was restored; `getUsage` is read only when Settings, General opens, so the relaunch landed on settings, not on a sign-in window.
+  - The app logs no version line and writes `server:` only when the server is switched (`shell.rs`), so neither appears on a plain relaunch; the version is the DisplayVersion above.
+  - `settings.json` is still in place, unchanged since 2026-10-22 14:16, with keys `firstRunDone`, `hotkey`, `onboardedUsers` (values not read). No `server` key, so the app uses the official server, as a 0.2.0 file reads in 0.3.0.
 
 ## Result
