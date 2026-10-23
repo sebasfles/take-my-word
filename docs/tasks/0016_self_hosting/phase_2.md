@@ -75,4 +75,16 @@ Done, one per finding:
 
 Process: the code is commit e892526 and the verify block names it; this commit carries only the notes and verify.log.
 
+### Round 3
+
+Evidence on the Windows host (`computer available`), no code change:
+
+- Windows `rust:lint` and `rust:test` on 5726592, whose code is e892526: green, 218 passed, 9 ignored.
+- Local prd build, built and never launched (decided with the om-reviewer: Sebastian's prd app shares the prd identifier, so a prd run would touch his settings, session, autostart and single instance):
+  - `pnpm tauri:build:prd --no-sign` with the official prd server and updater key from `deployment.json`: exit 0.
+  - A first run without `--no-sign` built the same installer and stopped at the updater signature ("A public key has been found, but no private key"): the release key stays with `desktop-release`, and WSLENV does not forward variables to the host, so no local signing.
+  - Artefacts, kept in `C:\dev\tmw-0016-prd`: `take-my-word.exe` sha256 f871ca9fb50709ba3f332eb062c96e2673cf92cae3446c6de52c28927beb3926, `Take My Word_0.2.0_x64-setup.exe` sha256 b91a7ebcfdbaad5fc5f772ea3a993c686d3472ed8e1feb6d756521c63bae3a31.
+  - The exe embeds the prd discovery document byte for byte (`apiUrl` https://api.takemyword.fless.dev), the updater public key of `deployment.json` and the `releases/latest/download/latest.json` endpoint.
+- The dictation against scratch will run on a dev release build of the same commit with the dev identity, dev folders and Credential Manager entries backed up and restored, the idle guard and a clipboard snapshot, as in 0014.
+
 ## Result

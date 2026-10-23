@@ -110,3 +110,8 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (38 tests, pnpm test --no-file-parallelism)
 - e2e: n/a
+
+## 2026-10-23T10:39:44Z by om-developer target desktop (Windows host) on 5726592 (code identical to e892526)
+- rust:lint: pass exit 0 (pnpm rust:lint: cargo fmt, clippy all targets, clippy release --features dev, then rust:lint:linux)
+- rust:test: pass exit 0 (218 passed, 9 ignored, pnpm rust:test, --test-threads=1)
+- prd build: pass exit 0 (pnpm tauri:build:prd --no-sign, official prd server and updater key from deployment.json); updater signing skipped on purpose, the release key stays with desktop-release; a first run without --no-sign built the same installer and stopped at "A public key has been found, but no private key"
