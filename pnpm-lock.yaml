@@ -74,11 +74,20 @@ importers:
       hono:
         specifier: 4.13.13
         version: 4.13.13
+      undici:
+        specifier: 8.12.3
+        version: 8.12.3
       zod:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@aws-sdk/client-cloudwatch-logs':
+        specifier: 3.1154.0
+        version: 3.1154.0
       '@aws-sdk/client-cognito-identity-provider':
+        specifier: 3.1154.0
+        version: 3.1154.0
+      '@aws-sdk/client-lambda':
         specifier: 3.1154.0
         version: 3.1154.0
       '@aws-sdk/client-polly':
@@ -87,6 +96,9 @@ importers:
       '@take-my-word/cognito':
         specifier: workspace:*
         version: link:../../packages/cognito
+      '@take-my-word/deployment':
+        specifier: workspace:*
+        version: link:../../packages/deployment
       '@types/aws-lambda':
         specifier: 8.10.164
         version: 8.10.164
@@ -402,6 +414,10 @@ packages:
 
   '@aws-sdk/client-iam@3.1154.0':
     resolution: {integrity: sha512-I3u8YmWMsYbo2JM2q+3Nf7O19orMd/fMk6BSGEAfMZggm3OEE4KkqYXM7ayRttCFGQuBw0zQnSWRh6clRPY03Q==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-lambda@3.1154.0':
+    resolution: {integrity: sha512-LEwXH3tA80F09Aw3dDcK/zoBCs7HMSimAYuplVMq+irpdRFZ6hgk4EyApyxYs5f8qjkGuSO4+WGv0FWbnNcHjA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-lambda@3.984.0':
@@ -3357,7 +3373,7 @@ snapshots:
     dependencies:
       '@aws-sdk/core': 3.978.4
       '@aws-sdk/credential-provider-node': 3.972.87
-      '@aws-sdk/types': 3.974.6
+      '@aws-sdk/types': 3.975.0
       '@smithy/core': 3.36.1
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1
@@ -3438,6 +3454,17 @@ snapshots:
       '@aws-sdk/core': 3.978.4
       '@aws-sdk/credential-provider-node': 3.972.87
       '@aws-sdk/types': 3.974.6
+      '@smithy/core': 3.36.1
+      '@smithy/fetch-http-handler': 5.8.0
+      '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@aws-sdk/client-lambda@3.1154.0':
+    dependencies:
+      '@aws-sdk/core': 3.978.4
+      '@aws-sdk/credential-provider-node': 3.972.87
+      '@aws-sdk/types': 3.975.0
       '@smithy/core': 3.36.1
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1

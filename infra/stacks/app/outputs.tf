@@ -77,3 +77,8 @@ output "web_secret_id" {
   description = "Secret holding the web's COOKIE_KEY, written outside Terraform"
   value       = module.web_secret.arn
 }
+
+output "eval_function_name" {
+  description = "Eval Lambda the evaluation harness swaps and invokes; null without eval_function"
+  value       = var.eval_function ? module.eval[0].name : null
+}

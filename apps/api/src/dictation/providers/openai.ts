@@ -23,11 +23,15 @@ const responseSchema = z.object({
 export interface OpenaiOptions extends HttpOptions {
   apiKey: () => Promise<string>;
   model?: string;
+  reasoningEffort?: string;
+  temperature?: number;
 }
 
 export function openaiRefiner({
   apiKey,
   model = defaultOpenaiModel,
+  reasoningEffort,
+  temperature,
   ...http
 }: OpenaiOptions): Refiner {
   const label = `${openaiId}:${model}`;
@@ -42,7 +46,14 @@ export function openaiRefiner({
             authorization: `Bearer ${await apiKey()}`,
             "content-type": "application/json",
           },
-          body: JSON.stringify({ model, instructions, input: raw, store: false }),
+          body: JSON.stringify({
+            model,
+            instructions,
+            input: raw,
+            store: false,
+            ...(reasoningEffort !== undefined && { reasoning: { effort: reasoningEffort } }),
+            ...(temperature !== undefined && { temperature }),
+          }),
         },
         { timeoutMs: defaultTimeoutMs, ...http },
       );

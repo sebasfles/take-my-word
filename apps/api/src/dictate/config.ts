@@ -4,6 +4,8 @@ import { defaultGroqWhisperModel } from "../dictation/providers/groq-whisper.ts"
 import { defaultOpenaiModel } from "../dictation/providers/openai.ts";
 import { defaultSilenceLevels } from "../dictation/silence.ts";
 
+export const defaultSttPromptTokenBudget = 224;
+
 const configSchema = z
   .object({
     TABLE_NAME: z.string().min(1),
@@ -15,7 +17,11 @@ const configSchema = z
     SILENCE_FLOOR_DBFS: z.coerce.number().max(0).default(defaultSilenceLevels.floorDbfs),
     SPEECH_LEVEL_DBFS: z.coerce.number().max(0).default(defaultSilenceLevels.speechLevelDbfs),
     DICTIONARY_HALF_LIFE_DAYS: z.coerce.number().positive().default(dictionaryHalfLifeDays),
-    STT_PROMPT_TOKEN_BUDGET: z.coerce.number().int().nonnegative().default(224),
+    STT_PROMPT_TOKEN_BUDGET: z.coerce
+      .number()
+      .int()
+      .nonnegative()
+      .default(defaultSttPromptTokenBudget),
   })
   .refine((config) => config.SILENCE_FLOOR_DBFS < config.SPEECH_LEVEL_DBFS, {
     message: "SILENCE_FLOOR_DBFS must be below SPEECH_LEVEL_DBFS",

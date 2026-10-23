@@ -1,16 +1,6 @@
-import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import {
-  AdminCreateUserCommand,
-  AdminDeleteUserCommand,
-  AdminSetUserPasswordCommand,
-  CognitoIdentityProviderClient,
-} from "@aws-sdk/client-cognito-identity-provider";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { BatchWriteCommand, DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { signIn } from "@take-my-word/cognito";
 import {
   dictationResponseSchema,
   historyPageSchema,
@@ -22,6 +12,8 @@ import {
 import { z } from "zod";
 import { synthesize } from "../e2e/speech.ts";
 import { loadWorkspaceEnv, requiredEnv } from "../scripts/sign-in.ts";
+import { missedTerms as missed, wordsOf } from "./harness/metrics.ts";
+import { createThrowawayUser } from "./harness/throwaway-user.ts";
 
 const out = process.argv[2];
 if (!out) {
@@ -69,64 +61,6 @@ const api = requiredEnv("API_URL");
 const userPoolId = requiredEnv("USER_POOL_ID");
 const clientId = requiredEnv("USER_POOL_CLIENT_ID");
 const tableName = requiredEnv("TABLE_NAME");
-const admin = new CognitoIdentityProviderClient({ region });
-const table = DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
-
-async function createUser() {
-  const username = `eval-context-${randomBytes(4).toString("hex")}`;
-  const password = `Tmw-${randomBytes(12).toString("hex")}-Aa1`;
-  const created = await admin.send(
-    new AdminCreateUserCommand({
-      UserPoolId: userPoolId,
-      Username: username,
-      TemporaryPassword: password,
-      MessageAction: "SUPPRESS",
-    }),
-  );
-  const sub = created.User?.Attributes?.find((attribute) => attribute.Name === "sub")?.Value;
-  if (sub === undefined) throw new Error(`${username} has no sub`);
-  await admin.send(
-    new AdminSetUserPasswordCommand({
-      UserPoolId: userPoolId,
-      Username: username,
-      Password: password,
-      Permanent: true,
-    }),
-  );
-  return { username, password, sub };
-}
-
-async function removeUser(user: { username: string; sub: string }) {
-  await admin.send(new AdminDeleteUserCommand({ UserPoolId: userPoolId, Username: user.username }));
-  let start: Record<string, unknown> | undefined;
-  do {
-    const page = await table.send(
-      new QueryCommand({
-        TableName: tableName,
-        KeyConditionExpression: "PK = :pk",
-        ExpressionAttributeValues: { ":pk": `USER#${user.sub}` },
-        ProjectionExpression: "PK, SK",
-        ExclusiveStartKey: start,
-      }),
-    );
-    const keys = (page.Items ?? []).map((item) => ({ PK: String(item.PK), SK: String(item.SK) }));
-    for (let index = 0; index < keys.length; index += 25) {
-      let pending: Record<string, { DeleteRequest: { Key: Record<string, string> } }[]> = {
-        [tableName]: keys.slice(index, index + 25).map((Key) => ({ DeleteRequest: { Key } })),
-      };
-      for (let attempt = 0; (pending[tableName]?.length ?? 0) > 0; attempt += 1) {
-        if (attempt > 5) throw new Error(`items of ${user.username} left after batch deletes`);
-        if (attempt > 0) await sleep(100 * 2 ** attempt);
-        const { UnprocessedItems } = await table.send(
-          new BatchWriteCommand({ RequestItems: pending }),
-        );
-        pending = (UnprocessedItems ?? {}) as typeof pending;
-      }
-    }
-    start = page.LastEvaluatedKey;
-  } while (start !== undefined);
-}
-
 function client(token: string) {
   const headers = { authorization: `Bearer ${token}` };
   return {
@@ -163,27 +97,7 @@ function client(token: string) {
   };
 }
 
-const typographic = (text: string) =>
-  text
-    .normalize("NFC")
-    .replace(/[’‘ʼ]/g, "'")
-    .replace(/[“”«»„]/g, '"');
-
-const wordsOf = (text: string) =>
-  typographic(text)
-    .toLowerCase()
-    .split(/[\s.,;:!?¿¡"()]+/)
-    .map((word) => word.replace(/^[-']+|[-']+$/g, ""))
-    .filter((word) => word !== "");
-
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
-const has = (text: string, term: string) =>
-  new RegExp(`(^|[^\\p{L}\\p{N}])${escape(typographic(term))}($|[^\\p{L}\\p{N}])`, "iu").test(
-    typographic(text),
-  );
-
-const missedTerms = (text: string, sample: Sample) =>
-  sample.terms.filter((term) => !has(text, term));
+const missedTerms = (text: string, sample: Sample) => missed(text, sample.terms);
 
 function extraWords(text: string, sample: Sample): string[] {
   const expected = new Set(wordsOf(sample.text));
@@ -260,16 +174,9 @@ function report(results: Result[]): string {
   return `${lines.join("\n")}\n`;
 }
 
-const user = await createUser();
+const user = await createThrowawayUser({ region, userPoolId, clientId, tableName }, "eval-context");
 try {
-  const signedIn = await signIn({
-    userPoolId,
-    clientId,
-    username: user.username,
-    password: user.password,
-  });
-  if (signedIn.kind !== "signed-in") throw new Error(`${user.username} could not sign in`);
-  const session = client(signedIn.session.accessToken);
+  const session = client(user.accessToken);
   const audio = new Map<string, Buffer>();
   for (const sample of fixture.samples) {
     audio.set(sample.id, await synthesize(sample.text, sample.language));
@@ -306,5 +213,5 @@ try {
   );
   console.log(`report written to ${out}`);
 } finally {
-  await removeUser(user);
+  await user.remove();
 }

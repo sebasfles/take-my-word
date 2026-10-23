@@ -47,3 +47,9 @@ variable "debug_audio" {
   type        = bool
   default     = false
 }
+
+variable "eval_function" {
+  description = "Whether dev has the eval Lambda of the evaluation harness; set only for evaluation runs"
+  type        = bool
+  default     = false
+}

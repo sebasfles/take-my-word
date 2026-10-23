@@ -1,8 +1,8 @@
-import type { Language } from "@take-my-word/shared";
 import { z } from "zod";
 import { ProviderError } from "../ports/provider-error.ts";
 import type { TranscribeInput, Transcriber } from "../ports/transcriber.ts";
 import { postForJson, type HttpOptions } from "./http.ts";
+import { appendAudio, detectedLanguage } from "./transcription-form.ts";
 
 export const groqWhisperId = "groq-whisper";
 export const defaultGroqWhisperModel = "whisper-large-v3-turbo";
@@ -10,18 +10,6 @@ const defaultTimeoutMs = 10_000;
 
 const endpoint = "https://api.groq.com/openai/v1/audio/transcriptions";
 const responseSchema = z.object({ text: z.string(), language: z.string().optional() });
-const detectedLanguages: Readonly<Record<string, Language>> = {
-  en: "en",
-  english: "en",
-  es: "es",
-  spanish: "es",
-  castilian: "es",
-};
-
-export function detectedLanguage(name: string | undefined): Language | undefined {
-  return name === undefined ? undefined : detectedLanguages[name.trim().toLowerCase()];
-}
-const mimeTypes = { wav: "audio/wav", m4a: "audio/mp4" } as const;
 
 export interface GroqWhisperOptions extends HttpOptions {
   apiKey: () => Promise<string>;
@@ -38,11 +26,7 @@ export function groqWhisper({
     label,
     async transcribe({ audio, container, language, prompt }: TranscribeInput) {
       const form = new FormData();
-      form.append(
-        "file",
-        new Blob([new Uint8Array(audio)], { type: mimeTypes[container] }),
-        `audio.${container}`,
-      );
+      appendAudio(form, audio, container);
       form.append("model", model);
       if (language === undefined) form.append("response_format", "verbose_json");
       else {

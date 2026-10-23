@@ -116,3 +116,37 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
 - clearance: full: `pnpm tf dev plan` and `apply` for the eval resources; `pnpm tf prd plan` only; code swap and invoke of the dev eval Lambda; Polly; provider calls with the existing keys; the end-to-end suite against dev with throwaway users deleted afterwards. No change to the shared dev Lambdas, no prd apply.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+
+- Adapters behind the existing ports in `apps/api/src/dictation/providers/`: `openai-transcribe` (Transcriber; `languages[]` for `gpt-transcribe`, which also reports detected languages; the gpt-4o models report none) and `groq-chat` (Refiner, chat completions); `openai` gains optional `reasoningEffort` and `temperature`, unsent when unset, so production calls are unchanged; multipart audio and language-name mapping moved to `transcription-form.ts`, shared by both transcribers.
+  `transcriberIds`, `refinerIds` and the production registry are unchanged.
+- Eval Lambda in `apps/api/src/eval/`: zod contract (`warmup`, `transcribe`, `refine`), executor that wraps transcribers in production's `transcribeIn` and times every adapter call, and an instrumented fetch (userland undici) recording time to headers, status, new TLS connections (diagnostics channel `undici:client:connected`) and the `x-ratelimit-*`, `retry-after`, `x-groq-region` and `openai-processing-ms` headers.
+  Fresh calls get a new Agent; reused calls ride a module-level kept-alive Agent; the handler loads the keys before any measured call and logs no audio or text.
+  `production-bundles.test.ts` bundles the four production entries with esbuild and fails if any input comes from `src/eval`, `evaluation` or undici.
+- Terraform: `eval_function` (default false) in `stacks/app`, validated to exist only in dev, wired through `environments/dev`; Lambda `<name>-dev-eval`, 1024 MB like `dictate`, 120 s, only `secretsmanager:GetSecretValue` on the providers secret; output `eval_function_name`.
+  Applied to dev with `-var=eval_function=true` (5 added); `pnpm tf prd plan` shows "No changes", saved as `evidence/prd-plan-round1.txt` in the workspace.
+- Runner in `apps/api/evaluation/`: `pnpm eval:transcription --results <dir> --report <md> [--runs 5] | --smoke` and `pnpm eval:e2e --results <dir> --report <md>`; harness modules for dated prices, plans and sources (`prices.ts`), candidates, metrics (WER with alignment, term errors, invented runs, known hallucination phrases, dominant language, percentiles, sum distribution), Polly voices and seeded noise, build and swap of the eval Lambda, pacing and cost guard, resumable JSONL results, analysis and report.
+  The command refuses uncommitted fixtures or evaluation code, records the last commit touching `apps/api` and the fixtures' sha256, and refuses to resume a results directory of other fixtures, code or run count.
+- Suite 1 fixtures `evaluation/transcription.fixtures.json`: 0015's 20 sentences, 5 mixed es/en, 3 dictations of about 15 s, 2 quiet takes at -46 dBFS, 3 noise takes (-53, -45, -30 dBFS) under each language; voices Lupe and Andres (es), Joanna and Matthew (en), Pedro and Mia (mixed); 66 clips; two fixture dictionaries feed the transcriber prompt through production's `transcriberPrompt` (153 and 166 bytes, under the 224 budget).
+  End-to-end cases are the six marked `endToEnd` in the same file.
+- `eval:context` (0015) now uses the shared throwaway user and word matching.
+- Smoke (non-fixture sentence) through dev: all 5 transcribers and all 10 cleanup settings answer from us-east-1.
+
+Decisions not in the plan:
+
+- Model facts checked 2026-10-23 against the providers: `llama-3.1-8b-instant` (shut down on Groq 2026-08-16) and `qwen/qwen3-32b` (2026-07-17) are not served; the report lists them as not measured with the source. `gpt-4o-transcribe` also retires on 2027-02-26, with `whisper-1` and `gpt-4o-mini-transcribe`; `gpt-5.4-nano` retires 2027-04-01.
+- Lowest effort, probed: `none` with temperature 0 for the three OpenAI models (temperature is refused at any other effort), `low` with temperature 0 for gpt-oss (Groq refuses `none`). As production calls them: nano runs at `none` by default, both Luna models at `medium`, gpt-oss at Groq's default.
+- "both" sends `["es", "en"]` for every case, as a Spanish-first user's settings would, matching 0015.
+- Runs: 5 per clip and language setting; run 1 asks for a fresh connection, later runs reuse; latency is grouped by the connection the call actually got.
+- Hard gate per result, only on text that survives production's level and phrase guards: 3 or more inserted words in a row, a known hallucination phrase not in the expected text, or text whose function words read as the other language; any text on noise that survives the guards is a hallucination. Relative gate: WER and term-error rate per language setting no worse than `whisper-large-v3-turbo` plus the spread of its per-run values. Failed calls count as errors, not as WER.
+- Pacing: per model key, the runner keeps half of every plan limit (per minute, per hour of audio, per day) from its own ledger, shared by sibling results directories, and pauses a Groq model for the day when its daily requests header drops under half; OpenAI's complimentary small-model group is taken at its lowest tier, 2.5M tokens a day. Budget: OpenAI and Polly at list price, Groq at zero on its free plan, 3 USD per run.
+- The eval request contract lives in `apps/api/src/eval/contract.ts`: only the runner and the eval Lambda use it, both in `apps/api`, so it is not a client contract for `packages/shared`.
+- `defaultSttPromptTokenBudget` is exported from `dictate/config.ts` so the fixtures use production's default.
+- undici reuses a socket only a tick after the body is read, so production's back-to-back retranscription in `transcribeIn` can open a second connection; the harness measures that as it happens.
+
+Pending: suite 1 measured runs after the fixture review; capture of suite 2 raws from them, the cleanup runner and its fixtures; end-to-end run; summary with cost per combination and recommendation.
+
+Deferred: `qwen/qwen3.8-27b` is served on Groq (preview, 0.80/4.00 USD per million tokens) but is not in Scope.

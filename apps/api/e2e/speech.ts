@@ -1,6 +1,6 @@
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 
-function pcmToWav(pcm: Buffer): Buffer {
+export function pcmToWav(pcm: Buffer): Buffer {
   const header = Buffer.alloc(44);
   header.write("RIFF", 0, "ascii");
   header.writeUInt32LE(36 + pcm.length, 4);
