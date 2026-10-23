@@ -69,8 +69,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | dictation | 2026-10-21 | Loud noise can make Whisper loop on mixed hallucinations that get refined | A hallucination loop gets pasted in real use |
 | dictation | 2026-10-21 | A history page over many expired items costs one Query per batch until TTL deletes them | TTL lag leaves more than a page of expired items in a partition |
 | dictation | 2026-10-21 | Dictations past the newest 1000 are not reachable on the web | A user keeps more than 1000 dictations in 90 days |
-| dictation | 2026-10-21 | Users cannot see how much of the daily allowance is left | `GET /me/usage` lands |
 | dictation | 2026-10-21 | With several dictation languages, a dictation detected as neither costs a second transcription | Re-transcriptions show up in cost or latency |
+| dictation | 2026-10-23 | The user's context ships with no measured gain and occasional Spanish meaning changes in the refiner | Sebastian picks the direction from 0015's PR |
 | dictionary | 2026-10-21 | Folding merges ñ and umlauts with their base letter; such terms cannot coexist | A user needs two terms that differ only by ñ or an umlaut |
 | dictionary | 2026-10-21 | The byte budget leaves part of Whisper's 224 prompt tokens unused | Users keep more top terms than fit and transcription misses them |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |
@@ -97,6 +97,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-23 | 6964 `tmw-config-*` folders from earlier test runs stay in Sebastian's `%TEMP%` | Sebastian clears them |
 | desktop | 2026-10-23 | Desktop animations run even for users who need reduced motion | A user asks for reduced motion in the desktop app |
 | desktop | 2026-10-23 | A main-window insert answered after 1 s leaves the text in the field and in the clipboard | A dictation shows up twice in the app's own window |
+| desktop | 2026-10-23 | The context step's before and after pairs are single measured runs that do not follow prompt or model changes | The refiner prompt or model changes, or the context's direction changes |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0015_user_context
 ---
 
 # Dictation: architecture and debt
@@ -157,6 +157,7 @@ source: 0008_desktop_features
 - Alternatives rejected: hardcoding the cap in the web; reading `QUOTA#date` from the web function.
 - Reason: the web reads only through the API and its shared contracts.
 - Debt created: users cannot see how much of the day's allowance is left.
+- Resolved by: 0015_user_context, 2026-10-23
 - Revisit when: the follow-up adds `GET /me/usage`.
 - Source: 0009_web_account
 
@@ -177,3 +178,21 @@ source: 0008_desktop_features
 - Debt created: none.
 - Revisit when: every client sends `dictationLanguages`.
 - Source: 0008_desktop_features
+
+## 2026-10-23: The user's context reaches only the refiner, as a tagged background block
+
+- Decision: settings hold up to three pick ids and a detail; `dictate` gives them to the refiner as `<background>` (`<contexto>` in Spanish) in the language used, after the editing contract and before style and dictionary, with a rule that it never adds, inserts or changes meaning; Whisper's prompt stays the ranked dictionary terms.
+- Alternatives rejected: a short hint after the terms in the Whisper prompt, built and measured in 0015 round 1; placing the block after the style.
+- Reason: on the frozen fixtures the hint left raw errors unchanged wherever it fit, and under both languages a Spanish hint on English audio lost a whole sentence; placed before the style, the block falls under "every other rule above still applies".
+- Debt created: the context ships without a measured gain (domain-term errors 35 and 34 without and with it under one language, 34 and 34 under both) and with occasional Spanish meaning changes in the refiner ("Corre" to "Corrige"); the failing terms are speech-recognition errors that labels cannot recover.
+- Revisit when: Sebastian picks the direction from 0015's PR, for example domain vocabularies in the Whisper prompt, a stronger refiner, or removing the context.
+- Source: 0015_user_context
+
+## 2026-10-23: Clients show usage rounded up, clamped, and only when the server reports it
+
+- Decision: `usedSeconds` may pass the cap; clients show started minutes (rounded up) capped at the allowance and the reset in local time; desktop hides the card on a 404 and shows an error line on other failures, while the web hides the row on any failure.
+- Alternatives rejected: rounding to the nearest minute, which shows 0 after a short dictation; failing the web account page when usage fails.
+- Reason: a user who just dictated should see the allowance move; the web account is read-only and must not fail over an informational row; older or self-hosted servers answer 404.
+- Debt created: none.
+- Revisit when: per-user caps arrive, or users ask for seconds.
+- Source: 0015_user_context

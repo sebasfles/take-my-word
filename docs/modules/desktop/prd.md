@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-23
-source: 0014_desktop_ux
+source: 0015_user_context
 ---
 
 # Desktop: product
@@ -16,9 +16,9 @@ It must feel like typing got faster: no window to open, no copy and paste, the u
 ### First run
 
 1. The user downloads the installer from the landing, installs it, and the app opens its main window maximized; it lives in the system tray afterwards and starts with Windows unless turned off.
-2. One flow in the main window walks through what Take My Word does, sign-in (a temporary password is replaced by the user's own), a microphone check with a live level that records and sends nothing, the shortcut with both gestures and a box to practice in, the dictation languages (Windows' language preselected), the default style chosen by seeing the same sentence in each built-in style, and where the app lives afterwards.
-3. Signing in again later asks only for what is missing on this machine: a known user goes straight in, a new user picks languages and style.
-4. The flow can be run again from Settings; a user who set up 0.2.0 sees no flow and gets one dismissible note about hands-free in General.
+2. One flow in the main window walks through what Take My Word does, sign-in (a temporary password is replaced by the user's own), a microphone check with a live level that records and sends nothing, the shortcut with both gestures and a box to practice in, the dictation languages (Windows' language preselected), what the user does (up to three fields and an optional detail, skippable, with one real before and after example), the default style chosen by seeing the same sentence in each built-in style, and where the app lives afterwards.
+3. Signing in again later asks only for what is missing on this machine: a known user goes straight in, a new user picks languages, what they do and style.
+4. The flow can be run again from Settings; a user who set up 0.2.0 sees no flow and gets one dismissible note about hands-free and what they do in General.
 5. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
 
 Errors and empty states: Windows SmartScreen warns on the first install because the installer is not code-signed; a wrong username or password gets one generic message; an unreachable service says so; if Windows blocks the microphone or none is found, the microphone step says so and links to the privacy setting; the microphone check records and sends nothing.
@@ -35,7 +35,7 @@ Errors and empty states: a single short tap does nothing; silence pastes nothing
 
 ### Settings
 
-1. Settings has sections for General (shortcut with both gestures, autostart, theme, app language, dictation languages, how to dictate, the setup guide to run again, and About with the version), Dictionary, Styles (default and custom), App rules, History and Account; the tray's "Add a word" opens Dictionary with the word field ready.
+1. Settings has sections for General (shortcut with both gestures, autostart, theme, app language, dictation languages, what the user does, today's minutes against the daily allowance, how to dictate, the setup guide to run again, and About with the version), Dictionary, Styles (default and custom), App rules, History and Account; the tray's "Add a word" opens Dictionary with the word field ready.
 2. The layout fills the window: content is centered at a readable width, with a second column where it helps (General's how-to and About, an editor's form beside its list), and nothing grows with the window.
 3. An app rule maps an app, picked from the open windows or typed as its executable, to a style and a paste keystroke (Ctrl+V, Ctrl+Shift+V or Shift+Insert); dictating into that app then uses both without the user choosing anything.
 4. History shows the last dictations with "load more", the raw transcript collapsed, copy and delete.

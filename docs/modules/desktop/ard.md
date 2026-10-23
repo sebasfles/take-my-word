@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-23
-source: 0014_desktop_ux
+source: 0015_user_context
 ---
 
 # Desktop: architecture and debt
@@ -400,3 +400,12 @@ source: 0014_desktop_ux
 - Debt created: none.
 - Revisit when: Windows refuses the foreground to a second launch.
 - Source: 0014_desktop_ux
+
+## 2026-10-23: The onboarding example quotes one measured refiner fix per language
+
+- Decision: the context step shows a fixed before and after pair per language, copied verbatim from 0015's round 2 evaluation (en `dev-en-1`, "C slash CD" to "CI/CD"; es `bio-es-2`, "P-Zebra" to "pez cebra"), so the Spanish label names biology; Skip restores the context loaded at the step, and the context is saved with languages and style.
+- Alternatives rejected: an invented pair; generating the example live.
+- Reason: the evaluation showed no overall gain, so only an observed fix may be shown; a live call would cost a dictation per onboarding.
+- Debt created: the pairs are single runs (the English fix held in 6 of 6 runs with context, the Spanish one in 1 of 6) and do not follow prompt or model changes.
+- Revisit when: the refiner prompt or model changes, or the context's direction changes after 0015.
+- Source: 0015_user_context

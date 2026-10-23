@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-23
-source: 0014_desktop_ux
+source: 0015_user_context
 ---
 
 # Desktop: technical
@@ -37,7 +37,7 @@ Windows code sits behind the hook, foreground, clipboard and keychain modules; o
 
 None; desktop is a client.
 
-Calls, all from Rust with the access token: `POST /dictations` (audio and `appId`; the API picks the language), `GET /styles`, `GET /app-rules`, `GET` and `PUT /me/settings` (read first, since `PUT` replaces the item), and the editors' routes through the forwarder: dictionary, styles and app rules CRUD, settings, history page and delete.
+Calls, all from Rust with the access token: `POST /dictations` (audio and `appId`; the API picks the language), `GET /styles`, `GET /app-rules`, `GET` and `PUT /me/settings` (read first, since `PUT` replaces the item), and the editors' routes through the forwarder: dictionary, styles and app rules CRUD, settings, usage (`GET /me/usage`, read when General opens), history page and delete.
 Cognito directly, as unsigned JSON calls: `InitiateAuth`, `RespondToAuthChallenge`, `ConfirmDevice`, `GetTokensFromRefreshToken`, `ForgetDevice`, `RevokeToken`.
 
 Jobs, listeners or scheduled work: the key hook, the microphone thread and the clipboard thread run for the app's lifetime; a renewal, and a rule refresh when the rules are older than 5 min, start in the background at the first press; a level emitter runs only while listening or while the microphone step is shown in a visible window, and a 100 ms held-keys check only while the shortcut is down; prd release builds check `releases/latest/download/latest.json` at start and every 6 hours.

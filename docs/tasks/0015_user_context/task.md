@@ -98,6 +98,7 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
   - the fixture commit precedes the first with-context results;
   - the prd plan output is in the PR before the apply.
 - Round 1 (om-reviewer, 2026-10-23), Scope adjusted: the STT hint is dropped entirely, so Whisper's prompt stays the ranked terms only, whatever the context. Why: on the frozen fixtures, raw term errors were equal with and without the hint wherever it fit. Under both languages, a Spanish hint on English audio lost bio-en-1 whole ("y", 3 of 3 runs) and lost CRISPR-Cas9 and GAPDH. The alternative (hint only on fixed-language passes) keeps a hint with no measured gain that perturbed English spellings. The context reaches the refiner only.
+- Round 2 (om-reviewer, 2026-10-23): Acceptance 2 is not met and goes to the PR as measured, not tuned further. Totals without/with: one language 35/34, both 34/34. Raw was identical in every run, so every difference is the refiner. With context there were 3 Spanish meaning changes in 12 runs, against 1 without. The terms that fail are STT errors ("QB de GetPods", "Coupé CR", "Gapy") that domain labels cannot recover. The fix the data points to (domain vocabularies in the Whisper prompt) reverses this section's consolidation choice, so Sebastian picks the direction from the PR.
 - clearance: full: dev `infra/scripts/tf dev apply`; prd plan and the additive apply above; `update-function-code` on the four dev Lambdas and the web deploy steps; `pnpm e2e` and `pnpm integration` with throwaway users and Polly; the Windows host. No `pnpm release:desktop`.
 
 ## om-developer notes
@@ -183,3 +184,9 @@ Decisions not in the plan:
 
 Pending:
 - Acceptance 2 decision: as measured, user context gives no reliable gain with the current refiner, and it causes occasional meaning changes in Spanish.
+
+### Documentation
+
+- Updated: dictation (README, prd, trd with the evaluation harness and result under Testing, database, ard with two entries and `Resolved by` on 0009's quota debt), desktop (prd, trd, ard), `docs/ARD.md` Debt index.
+- Not changed: dictionary (its ranking and projections are unchanged; the round 1 hint was removed again), auth (no change), infra (route and env lists live in Terraform, and the change was planned in Context & decisions).
+- External actions after the clean signal: `infra/scripts/tf prd init -reconfigure`, `tf prd plan` (full output in `{{workspace}}/tf-prd-plan.txt`: 2 added, the `GET /me/usage` route and integration; 1 changed, `api` env `DAILY_QUOTA_MINUTES = 60`; nothing destroyed or replaced), then `apply` of that saved plan: 2 added, 1 changed, 0 destroyed.
