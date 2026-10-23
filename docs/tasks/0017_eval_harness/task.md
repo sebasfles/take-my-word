@@ -168,3 +168,25 @@ Applied all 7 findings of round 1:
 7. `long-en-1` gets the "2 days" variant; WER splits hyphenated words, term checks stay as written.
 
 `pnpm tf prd plan` still "No changes" (`evidence/prd-plan-round2.txt`).
+
+### Round 3
+
+Suite 1 measured (`reports/transcription-1.md`, raw results in the workspace `results/transcription-1/`): fixtures and code of c100ccf, 3300 calls, 1.239 USD at list price, 0.955 USD charged, 1 failed attempt (a Groq turbo timeout at production's 10 s).
+
+- Hard gate: only `gpt-transcribe` passes.
+  Today's `whisper-large-v3-turbo` and `whisper-large-v3` invent short phrases on noise that survive production's guards ("and the other side of the screen.", "LAMBDA", "¿Qué es lo que se está haciendo?").
+  Both gpt-4o models paste the whole transcriber prompt (the dictionary terms) on every noise take, and `gpt-4o-transcribe` translated an English sentence into Spanish in 7 of 10 runs, with the English hint too.
+- WER: gpt-transcribe 0.5% (one) and 0.8% (both), gpt-4o-mini 0.7 and 0.8%, gpt-4o 1.1 and 1.5%, whisper-large-v3 2.8%, turbo 3.6%; domain-term errors 0.6%, 1.8%, 0.5%, 6.5%, 10.1%.
+- Latency, reused connection, P50 / P95 under one language: turbo 336 / 642 ms, v3 367 / 772, gpt-transcribe 545 / 782, gpt-4o-mini 596 / 1600, gpt-4o 695 / 1048; the gpt-4o models report no language, so under both languages they always transcribe twice (about 1.3 to 1.5 s P50). Groq serves us-east-1 from yul and msp.
+- Fixture error found after freezing: `long-es-1` says "cuando corre los tests"; every model writes the grammatical "corren". It costs every candidate the same word, so the comparison holds; left frozen.
+
+Suite 2 built: `pnpm eval:cleanup --results <dir> --report <md> [--runs 3] | --smoke`, deterministic checks only, from `evaluation/cleanup.fixtures.json` (committed here, before any measured cleanup run):
+
+- 33 cases: 13 raws captured from suite 1 (`pnpm eval:capture <results dir>` lists every distinct wrong raw; the 13 are hand-picked across dictionaries, languages and error kinds) and 20 written ones (fillers and repetitions, a self-correction, a question to someone else, a dictated instruction, negated commands, opposite clauses, casual and formal rewrites in both languages, mixed es/en both ways).
+- Per output: invented content (a word, accents folded, in neither the raw, the expected texts nor the case's allowed words) and wrong language are the hard gate; meaning changes (a required word missing, a forbidden word present), dictionary terms exactly as written, fillers removed, punctuation (capital, closing mark, Spanish ¿ ?), style markers and exact match are measured; relative gate on meaning changes, term errors and failed calls against `gpt-5.4-nano` as production calls it.
+  Every expected text of the fixtures passes all its own checks.
+- 3 runs per case (Context minimum; latency samples are 99 per setting); the Groq models need about 160K tokens each against the 100K the runner may use per day, so the run spans two days by design.
+- `pnpm eval:summary --transcription <dir> --cleanup <dir> --report <md>`: one table per language setting and combination with gates, WER, term errors, meaning changes, P50 / P95 of the sum over all sample pairs (fresh and reused), cost per 15 s dictation and per month (480 and 7200 dictations) at list price and charged, and why each free allowance covers or not.
+- `openWorkspace` keeps credentials already in the environment instead of forcing the profile.
+
+Blocked for the next measured runs: the deployment profile's SSO session expired at about 20:30 UTC; the CLI still holds role credentials until 23:32 UTC, which I passed to the smoke and the e2e verify, but the two-day cleanup run and the end-to-end suite need an interactive `aws sso login` on the profile before they start.

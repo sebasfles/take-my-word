@@ -157,7 +157,7 @@ export interface ModeSummary {
   callsPerDictation: number;
   latencyByConnection: Record<Connection, LatencyStats>;
   latencyLongReused: LatencyStats;
-  samplesMs: number[];
+  samplesByConnection: Record<Connection, number[]>;
 }
 
 export interface CandidateSummary {
@@ -212,6 +212,15 @@ export function summarize(
       const succeeded = ok.filter((entry) => run === undefined || entry.result.run === run);
       return rate(failed.length, failed.length + succeeded.length);
     };
+    const samplesOf = (connection: Connection) =>
+      ok
+        .filter(
+          (entry) =>
+            entry.item.kind === "speech" &&
+            !entry.result.coldStart &&
+            actualConnection(entry.result) === connection,
+        )
+        .map((entry) => dictationMs(entry.result));
     const byConnection = (connection: Connection) =>
       latency(
         ok
@@ -247,9 +256,7 @@ export function summarize(
           )
           .map((entry) => dictationMs(entry.result)),
       ),
-      samplesMs: ok
-        .filter((entry) => entry.item.kind === "speech" && !entry.result.coldStart)
-        .map((entry) => dictationMs(entry.result)),
+      samplesByConnection: { fresh: samplesOf("fresh"), reused: samplesOf("reused") },
     };
   };
   const regions = [

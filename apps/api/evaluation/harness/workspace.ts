@@ -24,7 +24,7 @@ export function openWorkspace(): Workspace {
   }
   if (!config.environments.includes("dev"))
     throw new Error("the deployment has no dev environment");
-  process.env.AWS_PROFILE = config.aws.profile;
+  if (process.env.AWS_ACCESS_KEY_ID === undefined) process.env.AWS_PROFILE = config.aws.profile;
   return {
     config,
     evalFunctionName: `${config.name}-dev-eval`,

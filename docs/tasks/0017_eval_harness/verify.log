@@ -27,3 +27,9 @@
 - typecheck: pass exit 0 (init -backend=false and validate in core, dev and prd)
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-23T20:47:37Z by om-developer target api on 1424479
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (273 tests, pnpm test)
+- e2e: pass exit 0 (37 tests, pnpm e2e against dev, the profile's exported role credentials in the environment because its SSO session had expired)

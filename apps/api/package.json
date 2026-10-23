@@ -12,7 +12,10 @@
     "e2e": "vitest run --config vitest.e2e.config.ts --no-file-parallelism",
     "eval:context": "node evaluation/user-context.ts",
     "eval:transcription": "node evaluation/transcription.ts",
-    "eval:e2e": "node evaluation/end-to-end.ts"
+    "eval:e2e": "node evaluation/end-to-end.ts",
+    "eval:cleanup": "node evaluation/cleanup.ts",
+    "eval:capture": "node evaluation/capture-raws.ts",
+    "eval:summary": "node evaluation/summary.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1154.0",
