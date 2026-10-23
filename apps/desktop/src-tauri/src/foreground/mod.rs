@@ -32,6 +32,10 @@ pub fn parent_processes() -> std::collections::HashMap<u32, u32> {
     platform::parent_processes()
 }
 
+pub fn handle_of(window: &tauri::WebviewWindow) -> Option<isize> {
+    platform::handle_of(window)
+}
+
 pub fn foreground_is_this_process() -> bool {
     platform::foreground_is_this_process()
 }

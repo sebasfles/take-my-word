@@ -4,6 +4,10 @@ pub fn foreground() -> ForegroundApp {
     ForegroundApp::default()
 }
 
+pub fn handle_of(_window: &tauri::WebviewWindow) -> Option<isize> {
+    None
+}
+
 pub fn foreground_is_this_process() -> bool {
     true
 }

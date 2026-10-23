@@ -464,8 +464,7 @@ struct AppPage(AppHandle);
 
 impl Page for AppPage {
     fn main_window(&self) -> Option<isize> {
-        let window = self.0.get_webview_window(windows::MAIN)?;
-        window.hwnd().ok().map(|handle| handle.0 as isize)
+        foreground::handle_of(&self.0.get_webview_window(windows::MAIN)?)
     }
 
     fn insert(&self, id: u64, text: &str) -> bool {

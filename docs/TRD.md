@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0005_desktop_release
+updated: 2026-10-23
+source: 0014_desktop_ux
 ---
 
 # Technical Requirements Document
@@ -78,7 +78,7 @@ Locally the real-clipboard test is ignored; `desktop-ci` runs every desktop chec
 |---|---|---|---|---|---|
 | api | `apps/api` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm e2e` (vitest against `API_URL` of the workspace `.env`, `--no-file-parallelism`) |
 | web | `apps/web` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | `pnpm integration` (vitest against the dev pool and `API_URL` of the workspace `.env`, with the `fless-takemyword` profile for a throwaway user, `--no-file-parallelism`), then `pnpm e2e` (Playwright against `WEB_URL`, dev by default, with the `fless-takemyword` profile and `TABLE_NAME` for throwaway users, `--workers=1`) |
-| desktop | `apps/desktop` | `pnpm lint && pnpm rust:lint` (prettier, eslint, cargo fmt, clippy on all targets and on release with `--features dev`) | `pnpm typecheck` | `pnpm test && pnpm rust:test` (vitest `--no-file-parallelism`, cargo `--test-threads=1`) | n/a |
+| desktop | `apps/desktop` | `pnpm lint && pnpm rust:lint` (prettier, eslint, cargo fmt, clippy on all targets and on release with `--features dev` on Windows, then `rust:lint:linux`: the UI built and `linux-check`'s clippy in an `ubuntu:24.04` container with its apt packages) | `pnpm typecheck` | `pnpm test && pnpm rust:test` (vitest `--no-file-parallelism`, cargo `--test-threads=1`) | n/a |
 | mobile | `apps/mobile` | unknown | unknown | unknown | n/a |
 | cognito | `packages/cognito` | `pnpm lint` | `pnpm typecheck` | n/a | n/a |
 | shared | `packages/shared` | `pnpm lint` | `pnpm typecheck` | `pnpm test` (vitest, `--no-file-parallelism`) | n/a |

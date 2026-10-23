@@ -105,6 +105,10 @@ pub fn parent_processes() -> HashMap<u32, u32> {
     parents
 }
 
+pub fn handle_of(window: &tauri::WebviewWindow) -> Option<isize> {
+    window.hwnd().ok().map(|handle| handle.0 as isize)
+}
+
 pub fn foreground_is_this_process() -> bool {
     let window = unsafe { GetForegroundWindow() };
     !window.is_invalid() && process_of(window) == std::process::id()
