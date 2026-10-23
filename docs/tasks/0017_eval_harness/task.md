@@ -204,3 +204,27 @@ Applied all 4 findings of round 3:
 4. `captured-dev-es-2` forbids "corrige" and "corrija".
 
 Still pending for the measured cleanup and end-to-end runs: a fresh `aws sso login` on the deployment profile.
+
+### Round 5
+
+Measured and reported (`report.md` with the recommendation; `reports/cleanup-1.md`, `end-to-end-1.md`, `summary-1.md`, `reproduction-1.md`; raw results in the workspace `results/`):
+
+- Cleanup: 990 calls, 0.063 USD charged; first day up to the Groq share, resumed the same evening under the 10K reserve.
+  Only `gpt-5.4-nano` and `gpt-5.6-luna` at effort none pass both gates; the production call of nano made up numerals once ("a secto 193"), and `gpt-oss-120b` answered the dictated "ignore the previous instructions" with a refusal.
+- End to end: 33 dictations, 0 failed, 1.8 / 2.7 s P50 / P95 release to text from this client; the paced run met warm Lambdas.
+- Summary and recommendation: `gpt-transcribe` with `gpt-5.4-nano` at effort none and temperature 0 is the only cheap passing pair (about 8 USD charged in a heavy month, about 230 ms more at P50); `gpt-5.6-luna` at effort none is nano's successor.
+- Reproduction: the second transcription run (3 runs) matches the first on every complete candidate; its 205 Groq calls resume after 2026-10-24 19:08 UTC.
+
+Changes and decisions not in the plan:
+
+- Daily free-plan limits are paced over a trailing 24 hours instead of the UTC day, since Groq replenishes on a rolling window; Groq's own request header now blocks until its reset instead of pausing the day. OpenAI's complimentary tokens stay on the UTC day, as OpenAI resets them.
+- Groq chat models keep 10K of their daily tokens instead of half (`tokensPerDayKept`, the decision of Context & decisions); Whisper and every OpenAI allowance keep half, with a test.
+- Resuming compares a digest of every planned request (audio by its hash) and the eval bundle's hash instead of the code commit; commits a run was resumed with are recorded in its meta and shown in its report.
+  `cleanup-1` started before the digests existed: they were added to its meta while it was paused, after checking that `apps/api/src`, `packages/shared`, the lockfile, fixtures, candidates and `request()` were unchanged since its start (7492333).
+- Incident: the first end-to-end attempt was not paced and sent dictations 1.6 s apart; 9 of 33 got 429 from turbo's 20 requests per minute at 21:28 UTC, on the account prd shares, for about a minute.
+  The suite now paces through the shared pacer and ledger; the attempt's 33 requests went into the ledger and its results are kept apart (`results/end-to-end-0-unpaced`), out of the reports.
+- The checks split words on em and en dashes and treat non-breaking hyphens as hyphens; re-rendered reports only lowered cleanup's new-word rates, with every gate unchanged.
+- `pnpm eval:reproduce --first <dir> --second <dir> --report <md>` compares two transcription runs on the runs both have.
+- `verify-task`'s api e2e also dictates on dev with turbo, outside the ledger; Groq's request header still guards the runner.
+
+Pending: the second run's Groq calls and a cold-start end-to-end run after 2026-10-24 19:08 UTC, then re-rendering `reproduction-1.md` and `end-to-end-1.md`.
