@@ -18,3 +18,8 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (160 vitest and 200 cargo tests, 7 ignored, pnpm test && pnpm rust:test)
 - e2e: n/a
+## 2026-10-23T07:34:34Z by om-developer target desktop on 2eb7b2d
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=C:\dev\tmw-0014); the first lint on 166ceed failed only on rustfmt (own_window.rs, shell.rs), fixed in 2eb7b2d
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (164 vitest and 204 cargo tests, 7 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a

@@ -210,3 +210,11 @@ Clipboard snapshots now hash entries in sorted format-name order, so the same cl
 Round 3 findings on 514833e, fixed:
 1. The page inserts only into a textarea or an input that supports a caret (text, search, url, tel; never email or password), and any exception counts as not inserted. Tests: an email input and a throwing `setRangeText` both answer not inserted.
 2. The insert is acknowledged: Rust sends `insert-text` with an id, the page answers `insert_ack(id, inserted)`, and Rust waits up to 1 s (`own_window.rs`). Only an inserted ack counts as pasted; a refusal or no answer keeps the text in the clipboard (the History copy owner) and the worker shows the "not pasted" notice once, since Rust, not the page, keeps it. Tests in Rust: inserted ack, refusal and timeout, another window still pasting through the clipboard, a late ack ignored; in `insert.test.tsx` the page's ack for each case.
+
+Slot of 02:35 on 2eb7b2d (verify green on 2eb7b2d first, after rustfmt on 166ceed; clipboard snapshot file first, sorted-name hash, restored with one write: match, sha256 EC4B1F814E1B87298798769AE064EE496504B8DB5B2BA99DAF5A8203F03C502E before and after, sequence 16856 then 16877; guard 0 real inputs; host restored):
+- Practice hold in the main window: inserted into the practice box (page value is the stub dictation; log "inserted a dictation into the main window", "pasted a dictation").
+- Practice hands-free (double tap, stop tap) in the main window: inserted the same way after clearing the box.
+- Hold with the focus on a button in the main window: the page refused, the text stayed in the clipboard (checked by comparison only) and the worker logged "left a dictation in the clipboard: NotRead", which shows the "not pasted" notice; the practice box kept its earlier text.
+- The foreground stayed the main window (0x1650C9E) before, during and after each, and the overlay was hidden at the end.
+
+Round 3 evidence complete: Acceptance 1 (hold, hands-free, stop, Esc, shortcut, own window), 2 (spinner with animations off, after every show), 3, 4, 5 and 7 on the host; the stuck-hold and own-window paste findings fixed and shown. Screenshots for this round in `.workspaces/0014_desktop_ux/screenshots/round-3`.
