@@ -1,13 +1,13 @@
 ---
-updated: 2026-10-20
-source: setup
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Mobile: architecture and debt
 
 ## 2026-10-20: Expo managed workflow with EAS, inside the monorepo
 
-- Decision: the app is Expo managed in `apps/mobile` of the `sebasfles/take-my-word` monorepo; EAS Build, Submit and Update produce, ship and patch it, running from `apps/mobile`.
+- Decision: the app is Expo managed in `apps/mobile` of the project's monorepo; EAS Build, Submit and Update produce, ship and patch it, running from `apps/mobile`.
 - Alternatives rejected: bare React Native or native apps per platform; a separate mobile repository, as first proposed.
 - Reason: no store pipeline is hand-made, and living in the monorepo lets the app import the zod contracts from `packages/shared` directly.
 - Debt created: none.

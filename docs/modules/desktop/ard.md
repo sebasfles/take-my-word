@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-23
-source: 0014_desktop_ux
+source: 0016_self_hosting
 ---
 
 # Desktop: architecture and debt
@@ -400,3 +400,49 @@ source: 0014_desktop_ux
 - Debt created: none.
 - Revisit when: Windows refuses the foreground to a second launch.
 - Source: 0014_desktop_ux
+
+## 2026-10-23: The server is chosen at run time by discovery; the official one is injected at build time
+
+- Decision: the app signs in to the official server of its environment, read at build time from `TAKE_MY_WORD_SERVER` (the discovery JSON) and refused when missing, or to a server the user picks by domain on the sign-in step, read from `https://<domain>/.well-known/take-my-word.json` and kept in `settings.json`; the switch happens only while signed out, under the session lock, and swaps the Cognito client and the API base together. Dev and prd stay separate apps; this supersedes "Dev and prd are separate apps chosen at build time" (2026-10-21) for the server only.
+- Alternatives rejected: four fields (API URL, region, pool, client) typed by the user; a separate self-host build of the app; keeping the official values in the source.
+- Reason: anyone running their own deployment can use the official installer and its updates by typing a domain, and the repository holds nothing of the official deployment.
+- Debt created: none.
+- Revisit when: a third kind of server or a second app per machine appears.
+- Source: 0016_self_hosting
+
+## 2026-10-23: The chosen server lives in settings.json, not with the keychain session
+
+- Decision: `server` (domain and discovery) is stored in `settings.json`, re-validated at start, kept across sign-out; a 0.2.0 file without it reads as the official server.
+- Alternatives rejected: storing it with the refresh token in Credential Manager, which sign-out clears.
+- Reason: after sign-out the sign-in step must still know which server it shows and offer the way back to the official one; a session refreshed against the wrong pool simply ends.
+- Debt created: none.
+- Revisit when: the app keeps several accounts at once.
+- Source: 0016_self_hosting
+
+## 2026-10-23: Discovery is validated by hand in Rust, held to the shared schema by vectors
+
+- Decision: `server.rs` validates discovery by hand (version, `https://` API host, region and ids by pattern, pool region equal to region) and normalizes the typed domain (trim, lower case, optional `https://` and one trailing slash, nothing else); `discovery_vectors.json` runs the same accepted and refused documents against `discoverySchema` in vitest and the Rust validator in cargo.
+- Alternatives rejected: a regex crate; trusting the document after a JSON parse.
+- Reason: the input comes from any domain; the vectors make the two validators fail together when either drifts, without a new dependency.
+- Debt created: none.
+- Revisit when: the discovery schema gains a version 2.
+- Source: 0016_self_hosting
+
+## 2026-10-23: A self-hosted server older than the app may miss routes
+
+- Decision: the app checks only the discovery `version`; it does not negotiate the API version of a self-hosted server.
+- Alternatives rejected: an API version in discovery now, before any incompatible change exists.
+- Reason: D5 of 0016 keeps discovery minimal; every route so far exists since 0008.
+- Debt created: an app newer than a self-hosted deployment can call a route the server does not have yet, and shows a generic error.
+- Revisit when: a release adds or changes a route the app depends on.
+- Source: 0016_self_hosting
+
+## 2026-10-23: The updater key and official server reach the build as Actions variables
+
+- Decision: `desktop-ci` and `desktop-release` read `DESKTOP_DEV_SERVER`, `DESKTOP_PRD_SERVER` and `DESKTOP_UPDATER_PUBKEY`; the release check verifies `latest.json` against that variable instead of a committed key.
+- Alternatives rejected: keeping the public key and server ids in `tauri.prd.conf.json` and `env.rs`.
+- Reason: the repository carries no value of the official deployment; a fork builds its own app from its own variables.
+- Debt created: none.
+- Revisit when: the updater key rotates.
+- Source: 0016_self_hosting
+

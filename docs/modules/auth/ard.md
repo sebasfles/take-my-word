@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-22
-source: 0010_brand_web
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Auth: architecture and debt
@@ -124,4 +124,13 @@ source: 0010_brand_web
 - Debt created: a failed save leaves a theme shown that is not remembered after reload.
 - Revisit when: users report the theme not sticking.
 - Source: 0010_brand_web
+
+## 2026-10-23: Clients discover a deployment from a well-known file on its domain
+
+- Decision: every deployment's web serves `/.well-known/take-my-word.json` with `version` 1, the `https://` API URL, region, user pool and native client ids, built from the web's existing environment (region from the pool id), validated by `discoverySchema` in `packages/shared`; clients accept HTTPS only and validate region and ids by pattern before using them.
+- Alternatives rejected: asking the user for the pool and client ids; a discovery route on the API.
+- Reason: the user types only a domain; the web already holds every value, so no Lambda variable and no Terraform change are needed.
+- Debt created: none (the API compatibility of older servers is recorded in the desktop ARD).
+- Revisit when: a client needs a value the web does not have, or the schema needs a version 2.
+- Source: 0016_self_hosting
 

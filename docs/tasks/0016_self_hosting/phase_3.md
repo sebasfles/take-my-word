@@ -97,4 +97,48 @@ Dev held from "dev available" to "dev free"; nothing else changed there.
 - Web `integration` 4 passed and `e2e` 16 passed, the three new ones included (`/` to a language page with its alternates and JSON-LD, sign-in from `/es` in Spanish for an English browser, dev and private pages noindex).
 - Develop 61be296 redeployed from a clean clone with develop's own workflow steps, 12:56:33 to 12:57:11 UTC, exit 0 (`.verify/dev-redeploy-develop.out`); `/` serves develop's landing again and `/en` and `/robots.txt` are 404.
 
+### Docs (document-task, whole task)
+
+Done on "round 3 clean, document", for all three phases:
+
+- infra: `trd.md` (deployment config, `pnpm tf`, `pnpm deploy:*`, `pnpm selfhost`, optional CI, the new Actions variables, official values removed), `prd.md` (the "Run your own" flow, indexing and no-official-values rules), `README.md` (owns `packages/deployment` and `self-host/`), `flows.md` (build before credentials; the self-host sequence), `ard.md` (six entries: deployment config, optional CI with `moved`, shared deploy scripts, `pnpm selfhost` boundaries with the leftovers debt, build-time links and indexed origin, `/en` and `/es` root layouts).
+- desktop: `trd.md` (`server.rs`, discovery, the build-time official server, the server in `settings.json`, the updater key from the variable, discovery vectors), `prd.md` ("Use your own server"; updates always from the official releases), `README.md`, `ard.md` (five entries, the first superseding "Dev and prd are separate apps chosen at build time" (2026-10-21) for the server only; the older-server debt).
+- auth: `trd.md` (the discovery route, languages by path, `?lang=` on sign-in), `ard.md` (discovery by well-known file).
+- `docs/ARD.md` Debt index: two rows (infra leftovers check, desktop older self-hosted server); `updated` bumped.
+- Outside `document-task`'s own scope, as the om-reviewer asked: `docs/TRD.md` (the deployment package and its verification target, web layout and build values, desktop build inputs, infra stack, environments) and `docs/PRD.md` (landing and run your own) corrected where they were wrong after this task.
+- D8 scrub: in earlier ARD entries (`docs/ARD.md` and the infra and mobile `ard.md`) only the official value was replaced by a neutral name (the account, its zone, the state bucket, the monorepo, `api.` hosts); the decisions are untouched.
+  This is the one edit to existing ARD entries, for Acceptance 1.
+- Not touched: dictation, dictionary, styles and mobile docs (no behavior change); infra and desktop `database.md` (no data change).
+
+`git grep -n -F` for the account id, the domain (`fless.dev`), the GitHub owner, the SSO profile, the zone id, the App id and installation id, the GitHub user and repository ids, the dev and prd pool and client ids, the state bucket prefix and the updater key (its key line and its base64 form), outside `docs/tasks/`:
+
+```
+$ git grep -n -F -f patterns -- . ':!docs/tasks'
+exit 1
+```
+
+No output, exit 1: no match.
+
+The same grep across the repo, files per folder (only `docs/tasks/`):
+
+```
+2 docs/tasks/0001_platform_skeleton
+1 docs/tasks/0002_desktop_shell
+1 docs/tasks/0003_api_features
+2 docs/tasks/0004_web_landing
+2 docs/tasks/0005_desktop_release
+1 docs/tasks/0006_prd_release
+1 docs/tasks/0007_desktop_integration
+1 docs/tasks/0008_desktop_features
+1 docs/tasks/0009_web_account
+2 docs/tasks/0010_brand_web
+1 docs/tasks/0011_desktop_rebrand
+1 docs/tasks/0012_fix_lost_paste
+1 docs/tasks/0013_fix_terminal_paste
+1 docs/tasks/0014_desktop_ux
+3 docs/tasks/0016_self_hosting
+```
+
+The desktop identifier stays as the documented exception, in `apps/desktop` only.
+
 ## Result
