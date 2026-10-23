@@ -2,6 +2,8 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 use crate::audio::{AudioError, Capture, Captured, MAX_RECORDING, MIN_RECORDING};
+
+const RELEASE_CHECK: Duration = Duration::from_millis(100);
 use crate::hotkey::{ChordEvent, Command, Gesture};
 
 pub enum Input {
@@ -22,6 +24,7 @@ pub trait Sink {
     fn may_record(&mut self) -> bool;
     fn listening(&mut self);
     fn hands_free(&mut self);
+    fn chord_released(&mut self) -> bool;
     fn finished(&mut self, take: Take);
 }
 
@@ -30,6 +33,7 @@ pub struct Session<C, S> {
     sink: S,
     gesture: Gesture,
     recording_since: Option<Instant>,
+    release_check: Option<Instant>,
     checking: bool,
 }
 
@@ -40,6 +44,7 @@ impl<C: Capture, S: Sink> Session<C, S> {
             sink,
             gesture: Gesture::default(),
             recording_since: None,
+            release_check: None,
             checking: false,
         }
     }
@@ -68,20 +73,20 @@ impl<C: Capture, S: Sink> Session<C, S> {
 
     fn deadline(&self) -> Option<Instant> {
         let cap = self.recording_since.map(|since| since + MAX_RECORDING);
-        [cap, self.gesture.deadline()].into_iter().flatten().min()
+        [cap, self.gesture.deadline(), self.release_check]
+            .into_iter()
+            .flatten()
+            .min()
     }
 
     fn handle(&mut self, input: Input) {
         match input {
-            Input::Chord { event, at } => {
-                for command in self.gesture.on_chord(event, at) {
-                    self.apply(command, at);
-                }
-            }
+            Input::Chord { event, at } => self.chord(event, at),
             Input::Stop { at } => {
                 if self.gesture.is_hands_free() {
                     log::info!("hotkey: hands-free stopped from the overlay");
                     self.gesture.reset();
+                    self.release_check = None;
                     self.end(at);
                 }
             }
@@ -92,6 +97,13 @@ impl<C: Capture, S: Sink> Session<C, S> {
                 }
             }
         }
+    }
+
+    fn chord(&mut self, event: ChordEvent, at: Instant) {
+        for command in self.gesture.on_chord(event, at) {
+            self.apply(command, at);
+        }
+        self.release_check = self.gesture.holds_keys().then(|| at + RELEASE_CHECK);
     }
 
     fn apply(&mut self, command: Command, at: Instant) {
@@ -108,11 +120,21 @@ impl<C: Capture, S: Sink> Session<C, S> {
         if let Some(command) = self.gesture.on_deadline(now) {
             self.apply(command, now);
         }
+        if self.release_check.is_some_and(|check| now >= check) {
+            self.release_check = None;
+            if self.sink.chord_released() {
+                log::info!("hotkey: the chord keys read up with no key-up seen, released");
+                self.chord(ChordEvent::Released, now);
+            } else if self.gesture.holds_keys() {
+                self.release_check = Some(now + RELEASE_CHECK);
+            }
+        }
         let capped = self
             .recording_since
             .is_some_and(|since| now >= since + MAX_RECORDING);
         if capped {
             self.gesture.reset();
+            self.release_check = None;
             self.end(now);
         }
     }
@@ -181,6 +203,7 @@ mod tests {
         mic_open: bool,
         zeros: bool,
         signed_out: bool,
+        keys_up: bool,
     }
 
     struct FakeMic {
@@ -229,6 +252,10 @@ mod tests {
 
         fn hands_free(&mut self) {
             self.0.borrow_mut().events.push("hands-free".into());
+        }
+
+        fn chord_released(&mut self) -> bool {
+            self.0.borrow().keys_up
         }
 
         fn finished(&mut self, take: Take) {
@@ -405,6 +432,33 @@ mod tests {
     }
 
     #[test]
+    fn a_hold_whose_key_up_never_arrives_ends_once_the_keys_read_up() {
+        let mut harness = Harness::new(Ok(Duration::from_millis(1950)), Duration::ZERO);
+        harness.send(ChordEvent::Pressed, 0);
+        assert_eq!(
+            harness.session.deadline(),
+            Some(harness.t0 + Duration::from_millis(100))
+        );
+        harness.tick(100);
+        harness.tick(1900);
+        assert!(harness.takes().is_empty());
+        harness.log.borrow_mut().keys_up = true;
+        harness.tick(2000);
+        assert_eq!(harness.takes(), vec!["recorded 2000ms of 1950ms"]);
+        assert_eq!(harness.session.deadline(), None);
+    }
+
+    #[test]
+    fn a_stop_tap_whose_key_up_is_lost_still_stops_hands_free() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(4)), Duration::ZERO);
+        harness.double_tap();
+        harness.send(ChordEvent::Pressed, 4000);
+        harness.log.borrow_mut().keys_up = true;
+        harness.tick(4100);
+        assert_eq!(harness.takes(), vec!["recorded 4100ms of 4000ms"]);
+    }
+
+    #[test]
     fn hands_free_stops_at_two_minutes_and_a_later_tap_does_not_resume_it() {
         let mut harness = Harness::new(Ok(MAX_RECORDING), Duration::ZERO);
         harness.double_tap();
@@ -461,7 +515,6 @@ mod tests {
     fn holding_past_two_minutes_stops_and_sends_once() {
         let mut harness = Harness::new(Ok(MAX_RECORDING), Duration::ZERO);
         harness.send(ChordEvent::Pressed, 0);
-        assert_eq!(harness.session.deadline(), Some(harness.t0 + MAX_RECORDING));
         harness
             .session
             .on_deadline(harness.t0 + MAX_RECORDING - Duration::from_millis(1));

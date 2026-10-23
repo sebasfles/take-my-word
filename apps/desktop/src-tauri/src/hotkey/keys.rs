@@ -72,6 +72,13 @@ impl Keys {
         self.tracker.on_key(event, keyboard)
     }
 
+    pub fn release_if_up(&mut self, keyboard: &dyn KeyHook) -> Option<ChordEvent> {
+        if self.capture.is_some() {
+            return None;
+        }
+        self.tracker.release_if_up(keyboard)
+    }
+
     pub fn start_capture(&mut self, now: Instant) -> Option<ChordEvent> {
         let interrupted = self.tracker.is_active().then_some(ChordEvent::Cancelled);
         self.tracker = ChordTracker::new(self.tracker.hotkey().clone());
@@ -206,6 +213,30 @@ mod tests {
             keys.on_key(event(WIN, true), Source::Hook, later, &Keyboard),
             Some(ChordEvent::Pressed)
         );
+    }
+
+    struct Released;
+
+    impl KeyHook for Released {
+        fn guard_start_menu(&self) {}
+
+        fn is_held(&self, _key: Key) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn a_page_only_press_with_no_key_up_releases_once_the_keys_read_up() {
+        let t0 = Instant::now();
+        let mut keys = Keys::new(Hotkey::ctrl_win());
+        keys.on_key(event(CTRL, true), Source::Page, t0, &Keyboard);
+        assert_eq!(
+            keys.on_key(event(WIN, true), Source::Page, t0, &Keyboard),
+            Some(ChordEvent::Pressed)
+        );
+        assert_eq!(keys.release_if_up(&Keyboard), None);
+        assert_eq!(keys.release_if_up(&Released), Some(ChordEvent::Released));
+        assert_eq!(keys.release_if_up(&Released), None);
     }
 
     #[test]

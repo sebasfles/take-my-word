@@ -84,6 +84,23 @@ impl ChordTracker {
         None
     }
 
+    pub fn release_if_up(&mut self, keyboard: &dyn KeyHook) -> Option<ChordEvent> {
+        if !self.active {
+            return None;
+        }
+        let held = self.hotkey.keys().iter().all(|wanted| {
+            self.down
+                .iter()
+                .any(|key| wanted.matches(*key) && keyboard.is_held(*key))
+        });
+        if held {
+            return None;
+        }
+        self.down.retain(|key| keyboard.is_held(*key));
+        self.active = false;
+        Some(ChordEvent::Released)
+    }
+
     fn holds_every_key(&self) -> bool {
         self.hotkey
             .keys()
@@ -264,6 +281,22 @@ mod tests {
                 &[down(LCTRL), down(LWIN), down(ESCAPE), up(ESCAPE)]
             ),
             vec![ChordEvent::Pressed, ChordEvent::Cancelled]
+        );
+    }
+
+    #[test]
+    fn a_chord_whose_key_up_never_arrives_is_released_once_its_keys_read_up() {
+        let (mut tracker, keyboard) = ctrl_win();
+        feed(&mut tracker, &keyboard, &[down(LCTRL), down(LWIN)]);
+        assert_eq!(tracker.release_if_up(&keyboard), None);
+        *keyboard.released_unseen.borrow_mut() = vec![LWIN];
+        assert_eq!(tracker.release_if_up(&keyboard), Some(ChordEvent::Released));
+        assert_eq!(tracker.release_if_up(&keyboard), None);
+        assert!(feed(&mut tracker, &keyboard, &[up(LWIN), up(LCTRL)]).is_empty());
+        keyboard.released_unseen.borrow_mut().clear();
+        assert_eq!(
+            feed(&mut tracker, &keyboard, &[down(LCTRL), down(LWIN)]),
+            vec![ChordEvent::Pressed]
         );
     }
 

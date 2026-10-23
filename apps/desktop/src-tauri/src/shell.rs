@@ -134,6 +134,8 @@ impl Shell {
             waveform,
             activity: activity.clone(),
             busy: None,
+            keys: Arc::clone(&keys),
+            keyboard: keyboard.clone().unwrap_or_else(|| Arc::new(NoHook)),
         };
         thread::Builder::new()
             .name("session".into())
@@ -358,6 +360,8 @@ struct ShellSink {
     waveform: Waveform,
     activity: Activity,
     busy: Option<Busy>,
+    keys: Arc<Mutex<Keys>>,
+    keyboard: Arc<dyn KeyHook + Send + Sync>,
 }
 
 impl Sink for ShellSink {
@@ -389,6 +393,10 @@ impl Sink for ShellSink {
     fn hands_free(&mut self) {
         hotkey::swallow_escape(true);
         self.overlay.hands_free();
+    }
+
+    fn chord_released(&mut self) -> bool {
+        lock(&self.keys).release_if_up(&*self.keyboard).is_some()
     }
 
     fn finished(&mut self, take: Take) {

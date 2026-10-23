@@ -38,6 +38,13 @@ impl Gesture {
         matches!(self.state, State::HandsFree { .. })
     }
 
+    pub fn holds_keys(&self) -> bool {
+        matches!(
+            self.state,
+            State::Holding { .. } | State::HandsFree { pressed: true }
+        )
+    }
+
     pub fn reset(&mut self) {
         self.state = State::Idle;
     }

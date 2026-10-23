@@ -76,6 +76,22 @@ describe("Root", () => {
     ]);
   });
 
+  it("releases the keys still down when the window loses focus", () => {
+    render(<Root language="en" theme={null} forwardsKeys screen={Title} />);
+    fakeBridge.forwardKey.mockClear();
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "ControlLeft", key: "Control" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "MetaLeft", key: "Meta" }));
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ControlLeft", key: "Control" }));
+    window.dispatchEvent(new FocusEvent("blur"));
+    window.dispatchEvent(new FocusEvent("blur"));
+    expect(fakeBridge.forwardKey.mock.calls).toEqual([
+      ["ControlLeft", true],
+      ["MetaLeft", true],
+      ["ControlLeft", false],
+      ["MetaLeft", false],
+    ]);
+  });
+
   it("never forwards keys from the overlay", () => {
     render(<Root language="en" theme="light" followsTheme={false} screen={Title} />);
     fakeBridge.forwardKey.mockClear();
