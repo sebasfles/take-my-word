@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BudgetExceededError,
@@ -6,7 +9,9 @@ import {
   type LedgerEntry,
   type PacingKey,
 } from "./pacing.ts";
-import { runSchedule, type Attempt, type PlannedItem } from "./scheduler.ts";
+import { maxAttempts, runSchedule, type Attempt, type PlannedItem } from "./scheduler.ts";
+import { appendJsonl, openResultsDir, readJsonl } from "./store.ts";
+import { executePlan } from "./suite.ts";
 
 const keys = new Map<string, PacingKey>([
   [
@@ -51,6 +56,7 @@ function item(
     pacingKey: key,
     estimate: { requests: 1, audioSeconds: 0, tokens: 0, costUsd: 0.01 },
     run,
+    exhausted: (failure) => `${id} exhausted: ${failure.message}`,
   };
 }
 
@@ -63,7 +69,7 @@ function hooks() {
     failed,
     ledger,
     hooks: {
-      done: (id: string) => done.push(id),
+      done: (_id: string, result: string) => done.push(result),
       failed: (id: string, failure: { message: string }) =>
         failed.push(`${id}: ${failure.message}`),
       usage: (entry: LedgerEntry) => ledger.push(entry),
@@ -154,5 +160,66 @@ describe("runSchedule", () => {
       ),
     ).rejects.toThrow(BudgetExceededError);
     expect(recorder.done).toEqual(["a"]);
+  });
+
+  it("stores an item that exhausts its retries as a failed result", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const broken = item("y", "fast", () => Promise.reject(new Error("unreachable")));
+    const throwing: PlannedItem<string> = {
+      ...broken,
+      run: () =>
+        Promise.resolve({
+          usage: { requests: 0, audioSeconds: 0, tokens: 0 },
+          costUsd: 0,
+          headers: {},
+          failure: { message: "invoke failed" },
+        }),
+    };
+    await runSchedule(
+      [throwing],
+      new Pacer(keys, []),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(recorder.failed).toHaveLength(maxAttempts);
+    expect(recorder.done).toEqual(["y exhausted: invoke failed"]);
+  });
+});
+
+describe("executePlan", () => {
+  it("counts what earlier days of the same run already spent, failed attempts included", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tmw-plan-"));
+    try {
+      const dir = openResultsDir(
+        join(root, "run"),
+        { suite: "test", fixturesSha256: "f", codeCommit: "c", runs: 3 },
+        new Date(),
+      );
+      appendJsonl(dir.results, { chargedUsd: 2.5 });
+      const pending: PlannedItem<{ chargedUsd: number }> = {
+        id: "b",
+        pacingKey: "openai:gpt-6-luna",
+        estimate: { requests: 1, audioSeconds: 0, tokens: 0, costUsd: 0.01 },
+        run: () =>
+          Promise.resolve({
+            result: { chargedUsd: 0.01 },
+            usage: { requests: 1, audioSeconds: 0, tokens: 0 },
+            costUsd: 0.01,
+            headers: {},
+          }),
+        exhausted: () => ({ chargedUsd: 0 }),
+      };
+      expect(await executePlan(dir, ["gpt-6-luna"], [pending])).toBe(true);
+      appendJsonl(dir.failures, { id: "a", attempt: 1, message: "x", chargedUsd: 0.485, at: "" });
+      await expect(executePlan(dir, ["gpt-6-luna"], [{ ...pending, id: "c" }])).rejects.toThrow(
+        BudgetExceededError,
+      );
+      expect(readJsonl(dir.results)).toHaveLength(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

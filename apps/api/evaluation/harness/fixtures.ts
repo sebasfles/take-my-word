@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PollyClient } from "@aws-sdk/client-polly";
@@ -111,6 +112,7 @@ export interface Clip {
   audio: Buffer;
   seconds: number;
   levelDbfs: number;
+  sha256: string;
 }
 
 export async function buildClip(
@@ -133,6 +135,7 @@ export async function buildClip(
     audio,
     seconds: seconds(audio),
     levelDbfs: sustainedLevel(audio),
+    sha256: createHash("sha256").update(audio).digest("hex"),
   };
 }
 

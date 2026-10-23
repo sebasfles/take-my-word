@@ -70,46 +70,73 @@ export async function deployAndWarm(workspace: Workspace): Promise<EvalFunction>
   return evalFunction;
 }
 
-export async function executePlan<R>(
+export interface Charged {
+  chargedUsd: number;
+}
+
+export interface FailureRecord extends Charged {
+  id: string;
+  attempt: number;
+  status?: number;
+  message: string;
+  at: string;
+}
+
+export function recordedSpendUsd(dir: ResultsDir): number {
+  const sum = (records: readonly Charged[]) =>
+    records.reduce((total, record) => total + record.chargedUsd, 0);
+  return sum(readJsonl<Charged>(dir.results)) + sum(readJsonl<FailureRecord>(dir.failures));
+}
+
+export async function executePlan<R extends Charged>(
   dir: ResultsDir,
   models: readonly string[],
   items: readonly PlannedItem<R>[],
-  candidateOf: (id: string) => string,
+  options: { now?: () => number; wait?: (ms: number) => Promise<unknown> } = {},
 ): Promise<boolean> {
   const ledger = readJsonl<LedgerEntry>(dir.ledger);
   const pacer = new Pacer(pacingKeys(models), ledger);
-  const guard = new CostGuard(runBudgetUsd);
+  const guard = new CostGuard(runBudgetUsd, recordedSpendUsd(dir));
   const estimate = items.reduce((sum, item) => sum + item.estimate.costUsd, 0);
   console.log(
-    `${String(items.length)} calls pending, estimated ${estimate.toFixed(3)} USD at list price (budget ${runBudgetUsd.toFixed(2)} USD per run)`,
+    `${String(items.length)} calls pending, estimated ${estimate.toFixed(3)} USD charged after ${guard.spentUsd.toFixed(3)} USD already spent (budget ${runBudgetUsd.toFixed(2)} USD per run)`,
   );
   guard.check(estimate);
-  const outcome = await runSchedule(items, pacer, guard, {
-    done: (_id, result) => {
-      appendJsonl(dir.results, result);
+  const outcome = await runSchedule(
+    items,
+    pacer,
+    guard,
+    {
+      done: (_id, result) => {
+        appendJsonl(dir.results, result);
+      },
+      failed: (id, failure, attempt, costUsd) => {
+        const record: FailureRecord = {
+          id,
+          attempt,
+          ...(failure.status !== undefined && { status: failure.status }),
+          message: failure.message,
+          chargedUsd: costUsd,
+          at: new Date().toISOString(),
+        };
+        appendJsonl(dir.failures, record);
+        console.log(`${id} failed (attempt ${String(attempt)}): ${failure.message}`);
+      },
+      usage: (entry) => {
+        appendJsonl(dir.ledger, entry);
+      },
+      progress: (message) => {
+        console.log(message);
+      },
     },
-    failed: (id, failure, attempt) => {
-      appendJsonl(dir.failures, {
-        id,
-        candidate: candidateOf(id),
-        attempt,
-        ...failure,
-        at: new Date().toISOString(),
-      });
-      console.log(`${id} failed (attempt ${String(attempt)}): ${failure.message}`);
-    },
-    usage: (entry) => {
-      appendJsonl(dir.ledger, entry);
-    },
-    progress: (message) => {
-      console.log(message);
-    },
-  });
+    options.now,
+    options.wait,
+  );
   if (outcome.kind === "paused") {
     console.log("paused for today, rerun the same command after 00:00 UTC:");
     for (const reason of outcome.reasons) console.log(`- ${reason}`);
     return false;
   }
-  console.log(`all calls done, ${guard.spentUsd.toFixed(3)} USD spent`);
+  console.log(`all calls done, ${guard.spentUsd.toFixed(3)} USD spent in this run`);
   return true;
 }

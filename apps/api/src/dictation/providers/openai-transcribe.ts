@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ProviderError } from "../ports/provider-error.ts";
-import type { TranscribeInput, Transcriber } from "../ports/transcriber.ts";
+import type { TranscribeInput, Transcriber, TranscriptionUsage } from "../ports/transcriber.ts";
 import { postForJson, type HttpOptions } from "./http.ts";
 import { appendAudio, detectedLanguage } from "./transcription-form.ts";
 
@@ -8,10 +8,23 @@ export const openaiTranscribeId = "openai-transcribe";
 const defaultTimeoutMs = 15_000;
 
 const endpoint = "https://api.openai.com/v1/audio/transcriptions";
+const usageSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("tokens"), input_tokens: z.number(), output_tokens: z.number() }),
+  z.object({ type: z.literal("duration"), seconds: z.number() }),
+]);
+
 const responseSchema = z.object({
   text: z.string(),
   languages: z.array(z.object({ code: z.string() })).optional(),
+  usage: usageSchema.optional().catch(undefined),
 });
+
+function usageOf(usage: z.infer<typeof usageSchema> | undefined): TranscriptionUsage | undefined {
+  if (usage === undefined) return undefined;
+  return usage.type === "duration"
+    ? { seconds: usage.seconds }
+    : { inputTokens: usage.input_tokens, outputTokens: usage.output_tokens };
+}
 
 export type LanguageField = "language" | "languages[]";
 
@@ -48,7 +61,12 @@ export function openaiTranscriber({
       if (!parsed.success) throw new ProviderError(label, `${label} answered an unexpected shape`);
       const detected =
         language === undefined ? detectedLanguage(parsed.data.languages?.[0]?.code) : undefined;
-      return { text: parsed.data.text.trim(), ...(detected && { language: detected }) };
+      const usage = usageOf(parsed.data.usage);
+      return {
+        text: parsed.data.text.trim(),
+        ...(detected && { language: detected }),
+        ...(usage && { usage }),
+      };
     },
   };
 }

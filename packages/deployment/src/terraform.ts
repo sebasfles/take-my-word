@@ -53,5 +53,6 @@ export function terraformVariables(
     TF_VAR_aws_region: config.aws.region,
     ...site,
     ...github,
+    ...(root === "dev" && config.evalFunction && { TF_VAR_eval_function: "true" }),
   };
 }

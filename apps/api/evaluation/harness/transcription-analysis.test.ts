@@ -48,7 +48,8 @@ function result(overrides: Partial<TranscriptionResult>): TranscriptionResult {
     coldStart: false,
     region: "us-east-1",
     memoryMb: 1024,
-    costUsd: 0,
+    listUsd: 0,
+    chargedUsd: 0,
     at: "2026-10-23T12:00:00.000Z",
     ...overrides,
   };
@@ -100,6 +101,18 @@ describe("check", () => {
     expect(on("Gracias.", -30)).toEqual(["hallucination"]);
   });
 
+  it("scores dropped speech as the empty text production pastes", () => {
+    const quiet: SpeechCase = {
+      ...speech,
+      id: "quiet-es-1",
+      text: "Gracias, ya revisé el informe y está todo bien.",
+      terms: ["informe"],
+    };
+    const checked = check(result({ caseId: quiet.id, text: "Gracias.", levelDbfs: -46 }), quiet);
+    expect(checked.pasted).toBe(false);
+    expect(checked).toMatchObject({ errors: 9, words: 9, missed: ["informe"], flags: [] });
+  });
+
   it("leaves failed calls out of accuracy", () => {
     const failed = result({ ok: false, error: { status: 500, message: "x" } });
     delete failed.text;
@@ -129,10 +142,30 @@ describe("relativeGate", () => {
       ...runsOf("same", [oneError, oneError, exact]),
       ...runsOf("worse", [twoErrors, twoErrors, twoErrors]),
     ];
-    const baseline = summarize("baseline", checked, longIds);
-    expect(relativeGate(summarize("same", checked, longIds), baseline).passed).toBe(true);
-    const worse = relativeGate(summarize("worse", checked, longIds), baseline);
+    const baseline = summarize("baseline", checked, [], longIds);
+    expect(relativeGate(summarize("same", checked, [], longIds), baseline).passed).toBe(true);
+    const worse = relativeGate(summarize("worse", checked, [], longIds), baseline);
     expect(worse.passed).toBe(false);
     expect(worse.reasons[0]).toMatch(/^one: WER/);
+  });
+
+  it("fails a candidate whose calls fail more often than the baseline's plus its spread", () => {
+    const checked = [
+      ...runsOf("baseline", [exact, exact, exact]),
+      ...runsOf("flaky", [exact, exact, exact]),
+    ];
+    const failures = [
+      { id: "flaky|dev-es-4/Lupe|one|1", status: 500 },
+      { id: "flaky|dev-es-4/Lupe|one|2", status: 502 },
+      { id: "flaky|dev-es-4/Lupe|one|3", status: 500 },
+      { id: "flaky|dev-es-4/Lupe|one|3", status: 429 },
+    ];
+    const baseline = summarize("baseline", checked, failures, longIds);
+    const flaky = summarize("flaky", checked, failures, longIds);
+    expect(flaky.modes.one).toMatchObject({ failedAttempts: 3, attempts: 6, rateLimited: 1 });
+    const gate = relativeGate(flaky, baseline);
+    expect(gate.passed).toBe(false);
+    expect(gate.reasons).toEqual([expect.stringMatching(/^one: failed calls 50\.0%/)]);
+    expect(relativeGate(summarize("flaky", checked, [], longIds), baseline).passed).toBe(true);
   });
 });

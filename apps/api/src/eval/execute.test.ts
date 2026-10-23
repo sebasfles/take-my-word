@@ -41,7 +41,11 @@ function answer(seenRequest: Seen): {
     const language = seenRequest.fields?.language;
     if (language === undefined)
       return { status: 200, body: { text: "bonjour", language: "french" }, headers: limits };
-    return { status: 200, body: { text: ` in ${language} ` }, headers: limits };
+    return {
+      status: 200,
+      body: { text: ` in ${language} `, usage: { type: "duration", seconds: 3 } },
+      headers: limits,
+    };
   }
   if (seenRequest.json?.model === "limited") {
     return {
@@ -140,6 +144,20 @@ describe("execute", () => {
       file: "RIFF-bytes",
     });
     expect(seen[1]?.contentType).toMatch(/^multipart\/form-data; boundary=/);
+  });
+
+  it("returns the usage each transcriber call was billed by", async () => {
+    const result = await execute(
+      {
+        ...transcribe("fresh"),
+        transcriber: { provider: "openai-transcribe", model: "gpt-transcribe" },
+        languages: ["en"],
+      } as ProviderRequest,
+      deps,
+    );
+    expect(result.calls).toEqual([
+      expect.objectContaining({ requested: "en", usage: { seconds: 3 } }),
+    ]);
   });
 
   it("opens a new connection for every fresh call and keeps one for reused calls", async () => {

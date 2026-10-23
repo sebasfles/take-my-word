@@ -19,11 +19,12 @@ export interface PlannedItem<R> {
   pacingKey: string;
   estimate: Usage & { costUsd: number };
   run: () => Promise<Attempt<R>>;
+  exhausted: (failure: Failure) => R;
 }
 
 export interface SchedulerHooks<R> {
   done: (id: string, result: R) => void;
-  failed: (id: string, failure: Failure, attempt: number) => void;
+  failed: (id: string, failure: Failure, attempt: number, costUsd: number) => void;
   usage: (entry: LedgerEntry) => void;
   progress?: (message: string) => void;
 }
@@ -86,9 +87,9 @@ export async function runSchedule<R>(
     const failure = attempt.failure ?? { message: "no result" };
     if (failure.status === 429) counts.limited += 1;
     else counts.failures += 1;
-    hooks.failed(next.id, failure, counts.failures + counts.limited);
+    hooks.failed(next.id, failure, counts.failures + counts.limited, attempt.costUsd);
     if (counts.failures >= maxAttempts || counts.limited >= maxRateLimited) {
-      if (attempt.result !== undefined) hooks.done(next.id, attempt.result);
+      hooks.done(next.id, attempt.result ?? next.exhausted(failure));
       pending.splice(pending.indexOf(next), 1);
     }
   }

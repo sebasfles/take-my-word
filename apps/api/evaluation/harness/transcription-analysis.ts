@@ -32,8 +32,19 @@ export interface TranscriptionResult {
   coldStart: boolean;
   region: string;
   memoryMb: number;
-  costUsd: number;
+  listUsd: number;
+  chargedUsd: number;
   at: string;
+}
+
+export interface AttemptFailure {
+  id: string;
+  status?: number;
+}
+
+export function itemKey(id: string): { candidate: string; mode: LanguageMode; run: number } {
+  const [candidate = "", , mode = "one", run = "0"] = id.split("|");
+  return { candidate, mode: mode as LanguageMode, run: Number(run) };
 }
 
 export type GateFlag = "invented content" | "hallucination" | "wrong language";
@@ -74,8 +85,8 @@ export function check(result: TranscriptionResult, item: TranscriptionCase): Che
     };
   }
   const references = [item.text, ...item.variants];
-  const counted = bestWordErrors(references, text);
-  const missed = missedTerms(text, item.terms);
+  const counted = bestWordErrors(references, pasted ? text : "");
+  const missed = missedTerms(pasted ? text : "", item.terms);
   const flags: GateFlag[] = [];
   const detail: string[] = [];
   if (pasted) {
@@ -129,6 +140,11 @@ export interface ModeSummary {
   mode: LanguageMode;
   results: number;
   failed: number;
+  attempts: number;
+  failedAttempts: number;
+  rateLimited: number;
+  failureRate: number;
+  failureRatePerRun: number[];
   wer: number;
   werPerRun: number[];
   termErrorRate: number;
@@ -158,9 +174,13 @@ const rate = (numerator: number, denominator: number) =>
 export function summarize(
   candidate: string,
   checked: readonly Checked[],
+  failures: readonly AttemptFailure[],
   longCaseIds: ReadonlySet<string>,
 ): CandidateSummary {
   const mine = checked.filter((entry) => entry.result.candidate === candidate);
+  const myFailures = failures
+    .map((failure) => ({ ...failure, ...itemKey(failure.id) }))
+    .filter((failure) => failure.candidate === candidate);
   const flags: Record<GateFlag, number> = {
     "invented content": 0,
     hallucination: 0,
@@ -184,6 +204,14 @@ export function summarize(
         entries.reduce((sum, entry) => sum + entry.terms, 0),
       );
     const ok = inMode.filter((entry) => entry.result.ok);
+    const failedInMode = myFailures.filter(
+      (failure) => failure.mode === mode && failure.status !== 429,
+    );
+    const failureRateOf = (run?: number) => {
+      const failed = failedInMode.filter((failure) => run === undefined || failure.run === run);
+      const succeeded = ok.filter((entry) => run === undefined || entry.result.run === run);
+      return rate(failed.length, failed.length + succeeded.length);
+    };
     const byConnection = (connection: Connection) =>
       latency(
         ok
@@ -194,6 +222,12 @@ export function summarize(
       mode,
       results: inMode.length,
       failed: inMode.length - ok.length,
+      attempts: ok.length + failedInMode.length,
+      failedAttempts: failedInMode.length,
+      rateLimited: myFailures.filter((failure) => failure.mode === mode && failure.status === 429)
+        .length,
+      failureRate: failureRateOf(),
+      failureRatePerRun: runs.map((run) => failureRateOf(run)),
       wer: werOf(speech),
       werPerRun: perRun(werOf),
       termErrorRate: termRateOf(speech),
@@ -253,6 +287,12 @@ export function relativeGate(
     if (mine.wer > werAllowance) {
       reasons.push(
         `${mode}: WER ${pct(mine.wer)} above the baseline's ${pct(base.wer)} plus its run-to-run spread ${pct(spread(base.werPerRun))}`,
+      );
+    }
+    const failureAllowance = base.failureRate + spread(base.failureRatePerRun);
+    if (mine.failureRate > failureAllowance) {
+      reasons.push(
+        `${mode}: failed calls ${pct(mine.failureRate)} above the baseline's ${pct(base.failureRate)} plus its spread ${pct(spread(base.failureRatePerRun))}`,
       );
     }
     const termAllowance = base.termErrorRate + spread(base.termErrorsPerRun);

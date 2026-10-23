@@ -246,6 +246,33 @@ describe("openai-transcribe transcriber", () => {
     }
   });
 
+  it("returns the usage the model is billed by, tokens or seconds", async () => {
+    const tokens = fakeFetch(200, {
+      text: "Hola.",
+      usage: {
+        type: "tokens",
+        input_tokens: 20,
+        input_token_details: { text_tokens: 0, audio_tokens: 20 },
+        output_tokens: 10,
+        total_tokens: 30,
+      },
+    });
+    const byTokens = await openaiTranscriber({
+      apiKey,
+      fetch: tokens.fetch,
+      model: "gpt-4o-transcribe",
+    }).transcribe({ audio: Buffer.from("RIFF"), container: "wav", language: "es" });
+    expect(byTokens.usage).toEqual({ inputTokens: 20, outputTokens: 10 });
+
+    const duration = fakeFetch(200, { text: "Hola.", usage: { type: "duration", seconds: 3 } });
+    const bySeconds = await openaiTranscriber({
+      apiKey,
+      fetch: duration.fetch,
+      model: "gpt-transcribe",
+    }).transcribe({ audio: Buffer.from("RIFF"), container: "wav", language: "es" });
+    expect(bySeconds.usage).toEqual({ seconds: 3 });
+  });
+
   it("fails with the status and without the provider's body", async () => {
     const { fetch } = fakeFetch(400, { error: { message: "bad key secret-key" } });
     const failure = openaiTranscriber({ apiKey, fetch, model: "gpt-transcribe" }).transcribe({

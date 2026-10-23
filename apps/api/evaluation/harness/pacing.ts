@@ -189,11 +189,12 @@ export class BudgetExceededError extends Error {
 }
 
 export class CostGuard {
-  private spent = 0;
+  private spent: number;
   private readonly budgetUsd: number;
 
-  constructor(budgetUsd: number) {
+  constructor(budgetUsd: number, alreadySpentUsd = 0) {
     this.budgetUsd = budgetUsd;
+    this.spent = alreadySpentUsd;
   }
 
   get spentUsd(): number {

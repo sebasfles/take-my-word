@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import type { ProviderRequest } from "../src/eval/contract.ts";
+import type { Connection, ProviderRequest } from "../src/eval/contract.ts";
 import { transcriberCandidates, type TranscriberCandidate } from "./harness/candidates.ts";
 import type { EvalFunction } from "./harness/eval-lambda.ts";
 import {
@@ -13,10 +13,23 @@ import {
   type Clip,
   type LanguageMode,
 } from "./harness/fixtures.ts";
-import { audioCostUsd, billedAudioSeconds, modelFacts } from "./harness/prices.ts";
+import {
+  billedAudioSeconds,
+  chargedUsd,
+  modelFacts,
+  transcriptionCallUsd,
+} from "./harness/prices.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
 import { openResultsDir, readJsonl } from "./harness/store.ts";
-import { deployAndWarm, executePlan, headersOf, pacingKeyOf, suiteArgs } from "./harness/suite.ts";
+import {
+  deployAndWarm,
+  executePlan,
+  headersOf,
+  pacingKeyOf,
+  recordedSpendUsd,
+  suiteArgs,
+  type FailureRecord,
+} from "./harness/suite.ts";
 import {
   check,
   summarize,
@@ -107,36 +120,53 @@ function plan(
         for (const candidate of transcriberCandidates) {
           const facts = modelFacts(candidate.spec.model);
           const calls = mode === "both" ? 2 : 1;
-          const billed = billedAudioSeconds(facts, Math.ceil(clip.seconds));
-          const charged =
-            facts.provider === "groq" ? 0 : audioCostUsd(facts, Math.ceil(clip.seconds));
-          const connection = run === 1 ? "fresh" : "reused";
+          const estimatedUsd = transcriptionCallUsd(facts, clip.seconds) * calls;
+          const connection: Connection = run === 1 ? "fresh" : "reused";
           const id = `${candidate.id}|${clip.id}|${mode}|${String(run)}`;
+          const base = {
+            id,
+            candidate: candidate.id,
+            caseId: clip.item.id,
+            voice: clip.voice,
+            mode,
+            run,
+            connection,
+            audioSeconds: clip.seconds,
+            levelDbfs: clip.levelDbfs,
+          };
           items.push({
             id,
             pacingKey: pacingKeyOf(candidate.spec.model),
             estimate: {
               requests: calls,
-              audioSeconds: billed * calls,
+              audioSeconds: billedAudioSeconds(facts, clip.seconds) * calls,
               tokens: 0,
-              costUsd: charged * calls,
+              costUsd: chargedUsd(facts, estimatedUsd),
             },
+            exhausted: (failure) => ({
+              ...base,
+              ok: false,
+              error: failure,
+              calls: [],
+              coldStart: false,
+              region: "",
+              memoryMb: 0,
+              listUsd: 0,
+              chargedUsd: 0,
+              at: new Date().toISOString(),
+            }),
             run: async (): Promise<Attempt<TranscriptionResult>> => {
               try {
                 const response = await (
                   await evalFunction()
                 ).invoke(request(candidate, clip, mode, connection));
-                const made = response.calls.length;
+                const listUsd = response.calls.reduce(
+                  (sum, call) => sum + transcriptionCallUsd(facts, clip.seconds, call.usage),
+                  0,
+                );
+                const charged = chargedUsd(facts, listUsd);
                 const result: TranscriptionResult = {
-                  id,
-                  candidate: candidate.id,
-                  caseId: clip.item.id,
-                  voice: clip.voice,
-                  mode,
-                  run,
-                  connection,
-                  audioSeconds: clip.seconds,
-                  levelDbfs: clip.levelDbfs,
+                  ...base,
                   ok: response.ok,
                   ...(response.text !== undefined && { text: response.text }),
                   ...(response.language !== undefined && { language: response.language }),
@@ -145,13 +175,21 @@ function plan(
                   coldStart: response.coldStart,
                   region: response.region,
                   memoryMb: response.memoryMb,
-                  costUsd: charged * made,
+                  listUsd,
+                  chargedUsd: charged,
                   at: new Date().toISOString(),
                 };
                 return {
                   result,
-                  usage: { requests: made, audioSeconds: billed * made, tokens: 0 },
-                  costUsd: charged * made,
+                  usage: {
+                    requests: response.calls.length,
+                    audioSeconds: response.calls.reduce(
+                      (sum, call) => sum + billedAudioSeconds(facts, clip.seconds, call.usage),
+                      0,
+                    ),
+                    tokens: 0,
+                  },
+                  costUsd: charged,
                   headers: headersOf(response.calls),
                   ...(response.error !== undefined && { failure: response.error }),
                 };
@@ -176,21 +214,27 @@ async function measure(results: string, reportPath: string): Promise<void> {
   const state = requireCommittedFixtures(transcriptionFixturesPath, evaluationCodePaths);
   const codeCommit = lastCommitTouching(evaluationCodePaths);
   const fixturesSha256 = sha256(transcriptionFixturesPath);
-  const dir = openResultsDir(
-    results,
-    { suite: "transcription", fixturesSha256, codeCommit, runs: args.runs },
-    new Date(),
-  );
-  console.log(`code ${codeCommit} (HEAD ${state.commit}), fixtures ${fixturesSha256.slice(0, 16)}`);
-
   const clips: Clip[] = [];
   for (const item of fixtures.cases) {
-    for (const voice of voicesFor(fixtures, item))
+    for (const voice of voicesFor(fixtures, item)) {
       clips.push(await buildClip(workspace.polly, item, voice));
+    }
   }
   console.log(
     `${String(clips.length)} clips, ${clips.reduce((sum, clip) => sum + clip.seconds, 0).toFixed(0)} s of audio`,
   );
+  const dir = openResultsDir(
+    results,
+    {
+      suite: "transcription",
+      fixturesSha256,
+      codeCommit,
+      runs: args.runs,
+      clips: Object.fromEntries(clips.map((clip) => [clip.id, clip.sha256])),
+    },
+    new Date(),
+  );
+  console.log(`code ${codeCommit} (HEAD ${state.commit}), fixtures ${fixturesSha256.slice(0, 16)}`);
 
   const done = new Set(readJsonl<TranscriptionResult>(dir.results).map((result) => result.id));
   let deployed: Promise<EvalFunction> | undefined;
@@ -202,7 +246,6 @@ async function measure(results: string, reportPath: string): Promise<void> {
       dir,
       transcriberCandidates.map((candidate) => candidate.spec.model),
       pending,
-      (id) => id.split("|")[0] ?? "",
     ));
   if (!complete) return;
 
@@ -216,13 +259,13 @@ async function measure(results: string, reportPath: string): Promise<void> {
   const longIds = new Set(
     fixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
   );
+  const failures = readJsonl<FailureRecord>(dir.failures);
   const summaries = new Map<string, CandidateSummary>(
     transcriberCandidates.map((candidate) => [
       candidate.id,
-      summarize(candidate.id, checked, longIds),
+      summarize(candidate.id, checked, failures, longIds),
     ]),
   );
-  const failures = readJsonl<{ candidate: string; status?: number; message: string }>(dir.failures);
   writeFileSync(
     reportPath,
     transcriptionReport(
@@ -232,10 +275,13 @@ async function measure(results: string, reportPath: string): Promise<void> {
         codeCommit,
         fixturesSha256,
         functionName: workspace.evalFunctionName,
-        memoryMb: [...new Set(stored.map((result) => result.memoryMb))].join(", "),
-        region: [...new Set(stored.map((result) => result.region))].join(", "),
+        memoryMb: [...new Set(stored.filter((r) => r.memoryMb > 0).map((r) => r.memoryMb))].join(
+          ", ",
+        ),
+        region: [...new Set(stored.filter((r) => r.region !== "").map((r) => r.region))].join(", "),
         runs: args.runs,
-        spentUsd: stored.reduce((sum, result) => sum + result.costUsd, 0),
+        listUsd: stored.reduce((sum, result) => sum + result.listUsd, 0),
+        chargedUsd: recordedSpendUsd(dir),
         failedAttempts: failures,
       },
       fixtures,

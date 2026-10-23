@@ -150,3 +150,21 @@ Decisions not in the plan:
 Pending: suite 1 measured runs after the fixture review; capture of suite 2 raws from them, the cleanup runner and its fixtures; end-to-end run; summary with cost per combination and recommendation.
 
 Deferred: `qwen/qwen3.8-27b` is served on Groq (preview, 0.80/4.00 USD per million tokens) but is not in Scope.
+
+### Round 2
+
+Applied all 7 findings of round 1:
+
+1. `evalFunction` in `deployment.json` (default false, documented in `deployment.example.json` and the generated schema, refused without the dev environment); `pnpm tf` passes `TF_VAR_eval_function` to dev only, never to prd or core; unit test in `packages/deployment`.
+   The workspace copy of `deployment.json` has `"evalFunction": true`, and `pnpm tf dev plan` without any flag shows "No changes"; the official `deployment.json` in the root checkout needs the same key before its next dev apply, or that apply removes the Lambda (I do not touch the main clone).
+2. The cost guard starts from what the results directory already recorded as charged, results and failed attempts alike; failures now record their `chargedUsd`.
+3. `Transcript` carries an optional `usage` (seconds or input and output tokens) that production ignores; `openai-transcribe` returns it and tolerates an unknown usage shape; the eval response carries it per call.
+   Pricing: `gpt-4o-transcribe` 2.50 / 10.00 and `gpt-4o-mini-transcribe` 1.25 / 5.00 USD per 1M audio tokens in / out (model pages, 2026-10-23); `gpt-transcribe` reports `usage.seconds` and is billed by duration like Groq; a per-minute estimate is used only before a call, for the budget.
+   Results keep `listUsd` and `chargedUsd` (Groq charged 0 on its free plan); the report prices a 15 s dictation for token-billed models from their measured cost per audio second.
+4. An item that exhausts its retries is stored as a failed result; the relative gate also fails a failure rate (failed attempts over attempts, 429s apart and reported separately) above the baseline's plus its per-run spread, per language setting.
+   Production does not retry, so every failed attempt counts.
+5. Speech dropped by the silence guard is scored as an empty hypothesis.
+6. Each clip's sha256 goes into the run's `meta.json`; a resume with different audio is refused. Polly returned identical bytes on three calls for the same text and voice.
+7. `long-en-1` gets the "2 days" variant; WER splits hyphenated words, term checks stay as written.
+
+`pnpm tf prd plan` still "No changes" (`evidence/prd-plan-round2.txt`).

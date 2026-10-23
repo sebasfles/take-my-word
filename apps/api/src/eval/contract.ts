@@ -44,6 +44,13 @@ export type ProviderRequest = Exclude<EvalRequest, { kind: "warmup" }>;
 
 export const providerCallSchema = z.object({
   requested: z.enum(languages).optional(),
+  usage: z
+    .object({
+      seconds: z.number().optional(),
+      inputTokens: z.number().optional(),
+      outputTokens: z.number().optional(),
+    })
+    .optional(),
   ms: z.number(),
   headersMs: z.number().optional(),
   status: z.number().optional(),

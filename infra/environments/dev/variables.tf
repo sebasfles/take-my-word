@@ -49,7 +49,7 @@ variable "debug_audio" {
 }
 
 variable "eval_function" {
-  description = "Whether dev has the eval Lambda of the evaluation harness; set only for evaluation runs"
+  description = "Whether dev has the eval Lambda of the evaluation harness; pnpm tf passes it from evalFunction in deployment.json"
   type        = bool
   default     = false
 }

@@ -378,6 +378,9 @@
       "language": "en",
       "dictionary": "developer",
       "text": "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+      "variants": [
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least 2 days of testing before we can deploy to production."
+      ],
       "terms": ["staging", "deploy"],
       "endToEnd": true
     },

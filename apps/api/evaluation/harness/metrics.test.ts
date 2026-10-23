@@ -25,6 +25,11 @@ describe("wordErrors", () => {
     });
   });
 
+  it("splits hyphenated words, so hyphenation is formatting and not a recognition error", () => {
+    expect(wordErrors("The CRISPR-Cas9 knockout.", "The CRISPR Cas9 knockout.").errors).toBe(0);
+    expect(wordErrors("The CRISPR-Cas9 knockout.", "The crisper Cas9 knockout.").errors).toBe(1);
+  });
+
   it("keeps accents, so a missing tilde is an error", () => {
     expect(wordErrors("Está en verde.", "Esta en verde.").errors).toBe(1);
   });
@@ -40,7 +45,8 @@ describe("wordErrors", () => {
   it("takes the best of the expected text and its allowed variants", () => {
     const references = ["We waited forty-eight hours.", "We waited 48 hours."];
     expect(bestWordErrors(references, "We waited 48 hours.").errors).toBe(0);
-    expect(bestWordErrors(references, "We waited forty eight hours.").errors).toBe(2);
+    expect(bestWordErrors(references, "We waited forty eight hours.").errors).toBe(0);
+    expect(bestWordErrors(references, "We waited forty hours.").errors).toBe(1);
   });
 });
 

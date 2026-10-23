@@ -9,14 +9,23 @@ export const sources = {
   groqRateLimits: "https://console.groq.com/docs/rate-limits",
   groqDeprecations: "https://console.groq.com/docs/deprecations",
   pollyPricing: "https://aws.amazon.com/polly/pricing/",
+  openaiModel: (model: string) => `https://developers.openai.com/api/docs/models/${model}`,
 } as const;
 
 export type Provider = "groq" | "openai";
 
 export interface AudioPrice {
-  kind: "audio";
+  kind: "duration";
   usdPerMinute: number;
   minimumBilledSeconds: number;
+  source: string;
+}
+
+export interface AudioTokenPrice {
+  kind: "audio-tokens";
+  usdPerMillionInput: number;
+  usdPerMillionOutput: number;
+  estimatedUsdPerMinute: number;
   source: string;
 }
 
@@ -40,7 +49,7 @@ export interface FreePlanLimits {
 export interface ModelFacts {
   provider: Provider;
   model: string;
-  price: AudioPrice | TokenPrice;
+  price: AudioPrice | AudioTokenPrice | TokenPrice;
   freePlan?: FreePlanLimits;
   complimentaryGroup?: keyof typeof complimentaryDailyTokens;
   retires?: { on: string; source: string };
@@ -77,7 +86,7 @@ export const models: Readonly<Record<string, ModelFacts>> = {
     provider: "groq",
     model: "whisper-large-v3-turbo",
     price: {
-      kind: "audio",
+      kind: "duration",
       usdPerMinute: 0.04 / 60,
       minimumBilledSeconds: 10,
       source: sources.groqModels,
@@ -88,7 +97,7 @@ export const models: Readonly<Record<string, ModelFacts>> = {
     provider: "groq",
     model: "whisper-large-v3",
     price: {
-      kind: "audio",
+      kind: "duration",
       usdPerMinute: 0.111 / 60,
       minimumBilledSeconds: 10,
       source: sources.groqModels,
@@ -99,7 +108,7 @@ export const models: Readonly<Record<string, ModelFacts>> = {
     provider: "openai",
     model: "gpt-transcribe",
     price: {
-      kind: "audio",
+      kind: "duration",
       usdPerMinute: 0.0045,
       minimumBilledSeconds: 0,
       source: sources.openaiPricing,
@@ -109,10 +118,11 @@ export const models: Readonly<Record<string, ModelFacts>> = {
     provider: "openai",
     model: "gpt-4o-transcribe",
     price: {
-      kind: "audio",
-      usdPerMinute: 0.006,
-      minimumBilledSeconds: 0,
-      source: sources.openaiPricing,
+      kind: "audio-tokens",
+      usdPerMillionInput: 2.5,
+      usdPerMillionOutput: 10,
+      estimatedUsdPerMinute: 0.006,
+      source: sources.openaiModel("gpt-4o-transcribe"),
     },
     retires: openaiTranscriptionRetirement,
   },
@@ -120,10 +130,11 @@ export const models: Readonly<Record<string, ModelFacts>> = {
     provider: "openai",
     model: "gpt-4o-mini-transcribe",
     price: {
-      kind: "audio",
-      usdPerMinute: 0.003,
-      minimumBilledSeconds: 0,
-      source: sources.openaiPricing,
+      kind: "audio-tokens",
+      usdPerMillionInput: 1.25,
+      usdPerMillionOutput: 5,
+      estimatedUsdPerMinute: 0.003,
+      source: sources.openaiModel("gpt-4o-mini-transcribe"),
     },
     retires: openaiTranscriptionRetirement,
   },
@@ -210,20 +221,52 @@ export function modelFacts(model: string): ModelFacts {
   return facts;
 }
 
-export function billedAudioSeconds(facts: ModelFacts, seconds: number): number {
-  return facts.price.kind === "audio" ? Math.max(facts.price.minimumBilledSeconds, seconds) : 0;
+export interface CallUsage {
+  seconds?: number | undefined;
+  inputTokens?: number | undefined;
+  outputTokens?: number | undefined;
 }
 
-export function audioCostUsd(facts: ModelFacts, seconds: number): number {
-  if (facts.price.kind !== "audio") return 0;
-  return (billedAudioSeconds(facts, seconds) / 60) * facts.price.usdPerMinute;
+export function billedAudioSeconds(
+  facts: ModelFacts,
+  clipSeconds: number,
+  usage?: CallUsage,
+): number {
+  if (facts.price.kind !== "duration") return clipSeconds;
+  return Math.max(facts.price.minimumBilledSeconds, usage?.seconds ?? Math.ceil(clipSeconds));
+}
+
+export function transcriptionCallUsd(
+  facts: ModelFacts,
+  clipSeconds: number,
+  usage?: CallUsage,
+): number {
+  const price = facts.price;
+  if (price.kind === "duration") {
+    return (billedAudioSeconds(facts, clipSeconds, usage) / 60) * price.usdPerMinute;
+  }
+  if (price.kind === "audio-tokens") {
+    if (usage?.inputTokens === undefined || usage.outputTokens === undefined) {
+      return (clipSeconds / 60) * price.estimatedUsdPerMinute;
+    }
+    return (
+      (usage.inputTokens * price.usdPerMillionInput +
+        usage.outputTokens * price.usdPerMillionOutput) /
+      1_000_000
+    );
+  }
+  throw new Error(`${facts.model} is not a transcription model`);
 }
 
 export function tokenCostUsd(facts: ModelFacts, inputTokens: number, outputTokens: number): number {
-  if (facts.price.kind !== "tokens") return 0;
+  if (facts.price.kind !== "tokens") throw new Error(`${facts.model} is not priced by chat tokens`);
   return (
     (inputTokens * facts.price.usdPerMillionInput +
       outputTokens * facts.price.usdPerMillionOutput) /
     1_000_000
   );
+}
+
+export function chargedUsd(facts: ModelFacts, listUsd: number): number {
+  return facts.freePlan === undefined ? listUsd : 0;
 }

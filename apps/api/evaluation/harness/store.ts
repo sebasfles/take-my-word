@@ -19,6 +19,7 @@ export interface RunMeta {
   fixturesSha256: string;
   codeCommit: string;
   runs: number;
+  clips?: Record<string, string>;
 }
 
 export interface ResultsDir {
@@ -37,11 +38,11 @@ export function openResultsDir(dir: string, meta: RunMeta, now: Date): ResultsDi
     stored = JSON.parse(readFileSync(metaPath, "utf8")) as RunMeta & { startedAt: string };
     const current = stored;
     const differs = (Object.keys(meta) as (keyof RunMeta)[]).some(
-      (key) => current[key] !== meta[key],
+      (key) => JSON.stringify(current[key]) !== JSON.stringify(meta[key]),
     );
     if (differs) {
       throw new Error(
-        `${dir} holds a run of other fixtures, code or settings (${JSON.stringify(current)}); use a new --results directory`,
+        `${dir} holds a run of other fixtures, audio, code or settings (${JSON.stringify(current)}); use a new --results directory`,
       );
     }
   } else {

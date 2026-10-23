@@ -1,9 +1,12 @@
 import type { TranscriberCandidate } from "./candidates.ts";
 import type { TranscriptionFixtures } from "./fixtures.ts";
-import { audioCostUsd, modelFacts, notServed, pricesCheckedOn } from "./prices.ts";
+import { mean } from "./metrics.ts";
+import { modelFacts, notServed, pricesCheckedOn, transcriptionCallUsd } from "./prices.ts";
+import type { FailureRecord } from "./suite.ts";
 import {
   actualConnection,
   hardGatePassed,
+  itemKey,
   pct,
   relativeGate,
   type CandidateSummary,
@@ -20,8 +23,9 @@ export interface RunContext {
   memoryMb: string;
   region: string;
   runs: number;
-  spentUsd: number;
-  failedAttempts: { candidate: string; status?: number; message: string }[];
+  listUsd: number;
+  chargedUsd: number;
+  failedAttempts: FailureRecord[];
 }
 
 export const normalDictationSeconds = 15;
@@ -32,8 +36,30 @@ const stat = (stats: LatencyStats) =>
   stats.count === 0 ? "n/a" : `${ms(stats.p50)} / ${ms(stats.p95)} (${String(stats.count)})`;
 const usd = (value: number) => `${value.toFixed(5)} USD`;
 
-export function dictationCostUsd(candidate: TranscriberCandidate, calls: number): number {
-  return audioCostUsd(modelFacts(candidate.spec.model), normalDictationSeconds) * calls;
+export function usdPerAudioSecond(
+  candidate: TranscriberCandidate,
+  checked: readonly Checked[],
+): number | undefined {
+  const facts = modelFacts(candidate.spec.model);
+  if (facts.price.kind === "duration") return facts.price.usdPerMinute / 60;
+  const measured = checked
+    .map((entry) => entry.result)
+    .filter((result) => result.candidate === candidate.id && result.ok && result.calls.length > 0)
+    .map((result) => result.listUsd / (result.audioSeconds * result.calls.length));
+  return measured.length === 0 ? undefined : mean(measured);
+}
+
+export function dictationCostUsd(
+  candidate: TranscriberCandidate,
+  checked: readonly Checked[],
+  calls: number,
+): number | undefined {
+  const facts = modelFacts(candidate.spec.model);
+  if (facts.price.kind === "duration") {
+    return transcriptionCallUsd(facts, normalDictationSeconds) * calls;
+  }
+  const perSecond = usdPerAudioSecond(candidate, checked);
+  return perSecond === undefined ? undefined : perSecond * normalDictationSeconds * calls;
 }
 
 export function transcriptionReport(
@@ -54,7 +80,7 @@ export function transcriptionReport(
     `Every provider call ran inside the dev eval Lambda \`${context.functionName}\` (${context.region}, ${context.memoryMb} MB, arm64), through the production adapters and production's \`transcribeIn\`, ${String(context.runs)} runs per clip and language setting; run 1 opens a fresh connection, later runs reuse the Lambda's kept-alive one.`,
     `Clips are Polly neural speech generated at run time (voices ${[...new Set([...fixtures.voices.es, ...fixtures.voices.en, ...fixtures.voices.mixed])].join(", ")}) and seeded noise; every candidate got the same bytes and the transcriber prompt of the case's fixture dictionary.`,
     `"one" sends the case's language; "both" lets the transcriber detect among es and en and transcribes again in es when it reports neither, as production does.`,
-    `Prices and plans as checked on ${pricesCheckedOn}; spend of this run ${context.spentUsd.toFixed(3)} USD at list price.`,
+    `Prices and plans as checked on ${pricesCheckedOn}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan).`,
     `Reproduce: \`${context.command}\`.`,
     "",
   );
@@ -68,9 +94,11 @@ export function transcriptionReport(
     const summary = summaries.get(candidate.id);
     const facts = modelFacts(candidate.spec.model);
     const price =
-      facts.price.kind === "audio"
+      facts.price.kind === "duration"
         ? `${(facts.price.usdPerMinute * 60).toFixed(3)} USD/h${facts.price.minimumBilledSeconds > 0 ? `, ${String(facts.price.minimumBilledSeconds)} s minimum` : ""}`
-        : "";
+        : facts.price.kind === "audio-tokens"
+          ? `${String(facts.price.usdPerMillionInput)} / ${String(facts.price.usdPerMillionOutput)} USD per 1M audio tokens in / out`
+          : "";
     const hard = summary === undefined ? "not measured" : hardGatePassed(summary) ? "pass" : "FAIL";
     const relative =
       summary === undefined || baselineSummary === undefined
@@ -114,8 +142,8 @@ export function transcriptionReport(
 
   push("## Accuracy", "");
   push(
-    "| Candidate | Languages | WER | WER per run | Domain-term errors | Language flips | Dropped by guard | Failed calls |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Candidate | Languages | WER | WER per run | Domain-term errors | Language flips | Dropped by guard | Failed calls | Rate limited |",
+    "|---|---|---|---|---|---|---|---|---|",
   );
   for (const candidate of candidates) {
     const summary = summaries.get(candidate.id);
@@ -123,7 +151,7 @@ export function transcriptionReport(
     for (const mode of ["one", "both"] as const) {
       const m = summary.modes[mode];
       push(
-        `| ${candidate.id} | ${mode} | ${pct(m.wer)} | ${m.werPerRun.map(pct).join(", ")} | ${String(m.missedTerms)}/${String(m.terms)} (${pct(m.termErrorRate)}) | ${String(m.flips)}/${String(m.speechResults)} | ${String(m.dropped)} | ${String(m.failed)}/${String(m.results)} |`,
+        `| ${candidate.id} | ${mode} | ${pct(m.wer)} | ${m.werPerRun.map(pct).join(", ")} | ${String(m.missedTerms)}/${String(m.terms)} (${pct(m.termErrorRate)}) | ${String(m.flips)}/${String(m.speechResults)} | ${String(m.dropped)} | ${String(m.failedAttempts)}/${String(m.attempts)} (${pct(m.failureRate)}) | ${String(m.rateLimited)} |`,
       );
     }
   }
@@ -156,14 +184,18 @@ export function transcriptionReport(
     `Per ${String(normalDictationSeconds)} s dictation at list price, with each provider's billing minimum and the measured calls per dictation; a transcriber that reports no detected language always transcribes twice under both languages.`,
     "",
   );
-  push("| Candidate | Per minute | One language | Both languages |", "|---|---|---|---|");
+  push(
+    "| Candidate | Billed by | Per minute | One language | Both languages |",
+    "|---|---|---|---|---|",
+  );
   for (const candidate of candidates) {
     const summary = summaries.get(candidate.id);
     if (summary === undefined) continue;
     const facts = modelFacts(candidate.spec.model);
-    const perMinute = facts.price.kind === "audio" ? facts.price.usdPerMinute : 0;
+    const perSecond = usdPerAudioSecond(candidate, checked);
+    const cell = (value: number | undefined) => (value === undefined ? "n/a" : usd(value));
     push(
-      `| ${candidate.id} | ${usd(perMinute)} | ${usd(dictationCostUsd(candidate, summary.modes.one.callsPerDictation))} | ${usd(dictationCostUsd(candidate, summary.modes.both.callsPerDictation))} |`,
+      `| ${candidate.id} | ${facts.price.kind === "duration" ? "duration" : "measured audio and text tokens"} | ${cell(perSecond === undefined ? undefined : perSecond * 60)} | ${cell(dictationCostUsd(candidate, checked, summary.modes.one.callsPerDictation))} | ${cell(dictationCostUsd(candidate, checked, summary.modes.both.callsPerDictation))} |`,
     );
   }
   push("");
@@ -173,7 +205,7 @@ export function transcriptionReport(
   else {
     const counts = new Map<string, number>();
     for (const failure of context.failedAttempts) {
-      const key = `${failure.candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}`;
+      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     for (const [key, count] of counts) push(`- ${key}, ${String(count)} attempts`);

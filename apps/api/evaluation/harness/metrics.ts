@@ -86,8 +86,11 @@ export function align(reference: readonly string[], hypothesis: readonly string[
   return ops.reverse();
 }
 
+export const recognitionTokens = (text: string): string[] =>
+  wordsOf(text).flatMap((word) => word.split("-").filter((part) => part !== ""));
+
 export function wordErrors(reference: string, hypothesis: string): WordErrors {
-  const ops = align(wordsOf(reference), wordsOf(hypothesis));
+  const ops = align(recognitionTokens(reference), recognitionTokens(hypothesis));
   let longestInsertionRun = 0;
   let run = 0;
   for (const op of ops) {
@@ -100,7 +103,7 @@ export function wordErrors(reference: string, hypothesis: string): WordErrors {
   const insertions = count("I");
   return {
     errors: substitutions + deletions + insertions,
-    words: wordsOf(reference).length,
+    words: recognitionTokens(reference).length,
     substitutions,
     deletions,
     insertions,

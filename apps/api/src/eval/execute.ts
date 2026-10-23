@@ -2,6 +2,7 @@ import type { Language } from "@take-my-word/shared";
 import type { Dispatcher } from "undici";
 import { transcribeIn } from "../dictation/language-selection.ts";
 import { ProviderError } from "../dictation/ports/provider-error.ts";
+import type { TranscriptionUsage } from "../dictation/ports/transcriber.ts";
 import type { Fetch } from "../dictation/providers/http.ts";
 import type { ProviderKeys } from "../lib/secrets.ts";
 import { buildRefiner, buildTranscriber } from "./candidates.ts";
@@ -26,13 +27,18 @@ export async function execute(request: ProviderRequest, deps: ExecuteDeps): Prom
   const fetch = deps.probedFetch(dispatcher, records);
   const calls: ProviderCall[] = [];
 
-  async function measured<T>(requested: Language | undefined, work: () => Promise<T>): Promise<T> {
+  async function measured<T>(
+    requested: Language | undefined,
+    work: () => Promise<T>,
+    usageOf: (result: T) => TranscriptionUsage | undefined = () => undefined,
+  ): Promise<T> {
     const recorded = records.length;
     const start = deps.elapsed();
-    const finish = (error?: string) => {
+    const finish = (error?: string, usage?: TranscriptionUsage) => {
       const http = records[recorded];
       calls.push({
         ...(requested && { requested }),
+        ...(usage && { usage }),
         ms: deps.elapsed() - start,
         ...(http && { headersMs: http.headersMs }),
         ...(http?.status !== undefined && { status: http.status }),
@@ -43,7 +49,7 @@ export async function execute(request: ProviderRequest, deps: ExecuteDeps): Prom
     };
     try {
       const result = await work();
-      finish();
+      finish(undefined, usageOf(result));
       return result;
     } catch (error) {
       finish(error instanceof Error ? error.message : "unknown");
@@ -58,13 +64,16 @@ export async function execute(request: ProviderRequest, deps: ExecuteDeps): Prom
       label = transcriber.label;
       const audio = Buffer.from(request.audioBase64, "base64");
       const chosen = await transcribeIn(request.languages, (requested) =>
-        measured(requested, () =>
-          transcriber.transcribe({
-            audio,
-            container: request.container,
-            ...(requested && { language: requested }),
-            ...(request.prompt !== "" && { prompt: request.prompt }),
-          }),
+        measured(
+          requested,
+          () =>
+            transcriber.transcribe({
+              audio,
+              container: request.container,
+              ...(requested && { language: requested }),
+              ...(request.prompt !== "" && { prompt: request.prompt }),
+            }),
+          (transcript) => transcript.usage,
         ),
       );
       return { ok: true, label, text: chosen.text, language: chosen.language, calls };
