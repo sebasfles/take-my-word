@@ -28,6 +28,8 @@ import {
 import { createThrowawayUser } from "./harness/throwaway-user.ts";
 import {
   evaluationCodePaths,
+  fromInvocation,
+  fromRoot,
   lastCommitTouching,
   measuredRegion,
   openWorkspace,
@@ -47,8 +49,8 @@ if (values.results === undefined || values.report === undefined) {
   console.error("usage: pnpm eval:e2e --results <dir> --report <report.md> [--runs 5] [--burst 3]");
   process.exit(2);
 }
-const resultsDir = values.results;
-const reportPath = values.report;
+const resultsDir = fromInvocation(values.results);
+const reportPath = fromInvocation(values.report);
 const runs = Number(values.runs);
 const burst = Number(values.burst);
 
@@ -190,10 +192,10 @@ function report(
   const push = (...more: string[]) => lines.push(...more);
   push("# End-to-end guard", "");
   push(
-    `Run ${startedAt} against ${api} with the production pipeline as deployed on dev, from code commit \`${codeCommit}\` and fixtures sha256 \`${sha256(transcriptionFixturesPath).slice(0, 16)}\`.`,
+    `Run ${startedAt} against the dev API with the production pipeline as deployed there, from code commit \`${codeCommit}\` and fixtures sha256 \`${sha256(transcriptionFixturesPath).slice(0, 16)}\`.`,
     `A throwaway user with the fixture's developer dictionary dictated each case under its own language; ${String(burst)} concurrent requests opened the run to catch cold starts, then ${String(runs)} sequential runs per case.`,
     "Release to text is measured on the client that sent the request, so it includes that client's network to us-east-1.",
-    `Reproduce: \`pnpm --filter @take-my-word/api eval:e2e --results ${resultsDir} --report ${reportPath} --runs ${String(runs)} --burst ${String(burst)}\`.`,
+    `Reproduce from the repository root: \`pnpm --filter @take-my-word/api eval:e2e --results ${fromRoot(resultsDir)} --report ${fromRoot(reportPath)} --runs ${String(runs)} --burst ${String(burst)}\`.`,
     "",
   );
   const ok = sent.filter((entry) => entry.response !== undefined);
@@ -247,6 +249,7 @@ function report(
   return `${lines.join("\n")}\n`;
 }
 
+await workspace.requireAccount();
 const startedAt = new Date().toISOString();
 const clips = new Map<string, Clip>();
 for (const item of cases) {
@@ -314,4 +317,4 @@ writeFileSync(
   `${JSON.stringify({ startedAt, codeCommit, sent, dictateCold, authorizerCold }, null, 2)}\n`,
 );
 writeFileSync(reportPath, report(sent, dictateCold, authorizerCold, startedAt));
-console.log(`report written to ${reportPath}`);
+console.log(`report written to ${fromRoot(reportPath)}`);

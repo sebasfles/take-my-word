@@ -34,6 +34,7 @@ import {
   type TranscriptionResult,
 } from "./harness/transcription-analysis.ts";
 import { usdPerAudioSecond } from "./harness/transcription-report.ts";
+import { fromInvocation, fromRoot } from "./harness/workspace.ts";
 
 const { values } = parseArgs({
   options: {
@@ -53,19 +54,22 @@ if (
   process.exit(2);
 }
 
+const transcriptionDir = fromInvocation(values.transcription);
+const cleanupDir = fromInvocation(values.cleanup);
+const reportPath = fromInvocation(values.report);
 const transcriptionFixtures = loadTranscriptionFixtures();
 const cleanupFixtures = loadCleanupFixtures(transcriptionFixtures);
 
 const transcriptionCases = new Map(transcriptionFixtures.cases.map((item) => [item.id, item]));
 const transcriptionChecked = readJsonl<TranscriptionResult>(
-  join(values.transcription, "transcription.jsonl"),
+  join(transcriptionDir, "transcription.jsonl"),
 ).map((result) => {
   const item = transcriptionCases.get(result.caseId);
   if (item === undefined) throw new Error(`no case ${result.caseId}`);
   return check(result, item);
 });
 const transcriptionFailures = readJsonl<FailureRecord>(
-  join(values.transcription, "transcription.failures.jsonl"),
+  join(transcriptionDir, "transcription.failures.jsonl"),
 );
 const longIds = new Set(
   transcriptionFixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
@@ -78,14 +82,12 @@ const transcriptionSummaries = new Map<string, CandidateSummary>(
 );
 
 const cleanupCases = new Map(cleanupFixtures.cases.map((item) => [item.id, item]));
-const cleanupChecked = readJsonl<CleanupResult>(join(values.cleanup, "cleanup.jsonl")).map(
-  (result) => {
-    const item = cleanupCases.get(result.caseId);
-    if (item === undefined) throw new Error(`no case ${result.caseId}`);
-    return checkCleanup(result, item);
-  },
-);
-const cleanupFailures = readJsonl<FailureRecord>(join(values.cleanup, "cleanup.failures.jsonl"));
+const cleanupChecked = readJsonl<CleanupResult>(join(cleanupDir, "cleanup.jsonl")).map((result) => {
+  const item = cleanupCases.get(result.caseId);
+  if (item === undefined) throw new Error(`no case ${result.caseId}`);
+  return checkCleanup(result, item);
+});
+const cleanupFailures = readJsonl<FailureRecord>(join(cleanupDir, "cleanup.failures.jsonl"));
 const cleanupSummaries = new Map<string, CleanupSummary>(
   refinerCandidates.map((candidate) => [
     candidate.id,
@@ -114,7 +116,7 @@ const lines: string[] = [];
 const push = (...more: string[]) => lines.push(...more);
 push("# Transcription and cleanup combinations", "");
 push(
-  `Generated ${new Date().toISOString()} from the transcription results in \`${values.transcription}\` and the cleanup results in \`${values.cleanup}\`; prices and plans as checked on ${pricesCheckedOn}.`,
+  `Generated ${new Date().toISOString()} from the transcription results in \`${fromRoot(transcriptionDir)}\` and the cleanup results in \`${fromRoot(cleanupDir)}\`; prices and plans as checked on ${pricesCheckedOn}.`,
   `Gates: both stages pass their hard gate and their relative gate against today's models (see each suite's report).`,
   "Latency is release to text inside us-east-1 for the provider calls only, in ms: the P50 / P95 of the sum over every pair of measured transcription and cleanup samples, so it assumes the two stages are independent and is never a sum of percentiles.",
   `Cost per ${String(dictationSeconds)} s dictation at list price; a light month is ${String(dictationsPerMonth(scenarios[0]))} dictations (2 hours of audio), a heavy month ${String(dictationsPerMonth(scenarios[1]))} (1 hour a day); "charged" counts only stages whose free allowance would not cover that volume.`,
@@ -189,5 +191,5 @@ for (const model of new Set([
   );
 }
 push("");
-writeFileSync(values.report, `${lines.join("\n")}\n`);
-console.log(`summary written to ${values.report}`);
+writeFileSync(reportPath, `${lines.join("\n")}\n`);
+console.log(`summary written to ${fromRoot(reportPath)}`);

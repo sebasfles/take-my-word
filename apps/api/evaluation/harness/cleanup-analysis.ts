@@ -3,6 +3,7 @@ import type { CleanupCase } from "./cleanup-fixtures.ts";
 import {
   dominantLanguage,
   hasTerm,
+  inventedRunThreshold,
   mean,
   percentile,
   recognitionTokens,
@@ -41,7 +42,8 @@ export interface CleanupChecked {
   result: CleanupResult;
   item: CleanupCase;
   flags: CleanupFlag[];
-  invented: string[];
+  newWords: string[];
+  longestNewRun: number;
   exact: boolean;
   missingRequired: string[];
   presentForbidden: string[];
@@ -80,7 +82,8 @@ export function checkCleanup(result: CleanupResult, item: CleanupCase): CleanupC
       result,
       item,
       flags: [],
-      invented: [],
+      newWords: [],
+      longestNewRun: 0,
       exact: false,
       missingRequired: [],
       presentForbidden: [],
@@ -92,11 +95,17 @@ export function checkCleanup(result: CleanupResult, item: CleanupCase): CleanupC
     };
   }
   const vocabulary = vocabularyOf([item.raw, ...item.expected, ...item.allowed, ...item.terms]);
-  const invented = [
-    ...new Set(recognitionTokens(text).filter((word) => !vocabulary.has(fold(word)))),
-  ];
+  const tokens = recognitionTokens(text);
+  const isNew = tokens.map((word) => !vocabulary.has(fold(word)));
+  let longestNewRun = 0;
+  let run = 0;
+  for (const fresh of isNew) {
+    run = fresh ? run + 1 : 0;
+    longestNewRun = Math.max(longestNewRun, run);
+  }
+  const newWords = [...new Set(tokens.filter((_, index) => isNew[index]))];
   const flags: CleanupFlag[] = [];
-  if (invented.length > 0) flags.push("invented content");
+  if (longestNewRun >= inventedRunThreshold) flags.push("invented content");
   const dominant = dominantLanguage(text);
   if (dominant !== undefined && dominant !== item.language) flags.push("wrong language");
   const missingRequired = item.required.filter((word) => !hasTerm(text, word));
@@ -105,7 +114,8 @@ export function checkCleanup(result: CleanupResult, item: CleanupCase): CleanupC
     result,
     item,
     flags,
-    invented,
+    newWords,
+    longestNewRun,
     exact: item.expected.some((expected) => squash(expected) === squash(text)),
     missingRequired,
     presentForbidden,
@@ -129,6 +139,8 @@ export interface CleanupSummary {
   flags: Record<CleanupFlag, number>;
   flagged: CleanupChecked[];
   exactRate: number;
+  newWordRate: number;
+  newWordsPerRun: number[];
   meaningChangeRate: number;
   meaningChangesPerRun: number[];
   fillerRemovalRate: number;
@@ -175,6 +187,8 @@ export function summarizeCleanup(
       entries.reduce((sum, entry) => sum + entry.termsWrong.length, 0),
       entries.reduce((sum, entry) => sum + entry.item.terms.length, 0),
     );
+  const newWordRateOf = (entries: readonly CleanupChecked[]) =>
+    rate(entries.filter((entry) => entry.newWords.length > 0).length, entries.length);
   const changeRateOf = (entries: readonly CleanupChecked[]) =>
     rate(entries.filter((entry) => entry.meaningChanged).length, entries.length);
   const failureRateOf = (run?: number) => {
@@ -201,6 +215,8 @@ export function summarizeCleanup(
     flags,
     flagged: mine.filter((entry) => entry.flags.length > 0),
     exactRate: rate(ok.filter((entry) => entry.exact).length, ok.length),
+    newWordRate: newWordRateOf(ok),
+    newWordsPerRun: runs.map((run) => newWordRateOf(inRun(run))),
     meaningChangeRate: changeRateOf(ok),
     meaningChangesPerRun: runs.map((run) => changeRateOf(inRun(run))),
     fillerRemovalRate: rate(
@@ -263,6 +279,12 @@ export function cleanupRelativeGate(
     candidate.termErrorRate,
     baseline.termErrorRate,
     baseline.termErrorsPerRun,
+  );
+  compare(
+    "outputs with new words",
+    candidate.newWordRate,
+    baseline.newWordRate,
+    baseline.newWordsPerRun,
   );
   compare("failed calls", candidate.failureRate, baseline.failureRate, baseline.failureRatePerRun);
   return { passed: reasons.length === 0, reasons };

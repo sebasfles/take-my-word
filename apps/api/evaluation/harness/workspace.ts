@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { PollyClient } from "@aws-sdk/client-polly";
+import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 import { loadConfig, repositoryRoot, type DeploymentConfig } from "@take-my-word/deployment";
 
 export const measuredRegion = "us-east-1";
@@ -13,6 +14,29 @@ export interface Workspace {
   evalFunctionName: string;
   lambda: LambdaClient;
   polly: PollyClient;
+  requireAccount: () => Promise<void>;
+}
+
+export class WrongAccountError extends Error {
+  constructor(actual: string | undefined, expected: string) {
+    super(
+      `the credentials resolve to account ${actual ?? "unknown"}, not the deployment's ${expected}; refusing to touch it`,
+    );
+    this.name = "WrongAccountError";
+  }
+}
+
+export function accountGuard(
+  callerAccount: () => Promise<string | undefined>,
+  expected: string,
+): () => Promise<void> {
+  let checked: Promise<void> | undefined;
+  return () => {
+    checked ??= callerAccount().then((actual) => {
+      if (actual !== expected) throw new WrongAccountError(actual, expected);
+    });
+    return checked;
+  };
 }
 
 export function openWorkspace(): Workspace {
@@ -30,6 +54,12 @@ export function openWorkspace(): Workspace {
     evalFunctionName: `${config.name}-dev-eval`,
     lambda: new LambdaClient({ region: measuredRegion, maxAttempts: 3 }),
     polly: new PollyClient({ region: measuredRegion }),
+    requireAccount: accountGuard(async () => {
+      const identity = await new STSClient({ region: measuredRegion }).send(
+        new GetCallerIdentityCommand({}),
+      );
+      return identity.Account;
+    }, config.aws.accountId),
   };
 }
 
@@ -90,3 +120,8 @@ export const evaluationCodePaths = [
   join(apiRoot, "evaluation"),
   join(apiRoot, "package.json"),
 ];
+
+export const fromInvocation = (path: string): string =>
+  resolve(process.env.INIT_CWD ?? process.cwd(), path);
+
+export const fromRoot = (path: string): string => relative(repositoryRoot, resolve(path));

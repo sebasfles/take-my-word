@@ -116,6 +116,7 @@
         "Core kubectl get pods en el namespace de staging y mándame los logs."
       ],
       "required": ["mándame"],
+      "forbidden": ["corrige", "corrija"],
       "terms": ["kubectl", "pods", "namespace", "staging", "logs"]
     },
     {

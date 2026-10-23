@@ -93,6 +93,9 @@ importers:
       '@aws-sdk/client-polly':
         specifier: 3.1154.0
         version: 3.1154.0
+      '@aws-sdk/client-sts':
+        specifier: 3.1154.0
+        version: 3.1154.0
       '@take-my-word/cognito':
         specifier: workspace:*
         version: link:../../packages/cognito
@@ -3686,7 +3689,7 @@ snapshots:
       '@aws-sdk/core': 3.978.4
       '@aws-sdk/credential-provider-node': 3.972.87
       '@aws-sdk/signature-v4-multi-region': 3.996.48
-      '@aws-sdk/types': 3.974.6
+      '@aws-sdk/types': 3.975.0
       '@smithy/core': 3.36.1
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1

@@ -5,7 +5,7 @@ import { CostGuard, Pacer, type LedgerEntry, type PacingKey } from "./pacing.ts"
 import { complimentaryDailyTokens, modelFacts, runBudgetUsd } from "./prices.ts";
 import { runSchedule, type PlannedItem } from "./scheduler.ts";
 import { appendJsonl, readJsonl, type ResultsDir } from "./store.ts";
-import type { Workspace } from "./workspace.ts";
+import { fromInvocation, type Workspace } from "./workspace.ts";
 
 export interface SuiteArgs {
   results?: string;
@@ -31,8 +31,8 @@ export function suiteArgs(usage: string, defaultRuns: number): SuiteArgs {
   if (!Number.isInteger(runs) || runs < 3)
     throw new Error("--runs must be an integer of at least 3");
   return {
-    ...(values.results !== undefined && { results: values.results }),
-    ...(values.report !== undefined && { report: values.report }),
+    ...(values.results !== undefined && { results: fromInvocation(values.results) }),
+    ...(values.report !== undefined && { report: fromInvocation(values.report) }),
     runs,
     smoke: values.smoke,
   };
@@ -63,6 +63,7 @@ export const headersOf = (calls: readonly ProviderCall[]): Record<string, string
   calls.reduce<Record<string, string>>((merged, call) => ({ ...merged, ...call.headers }), {});
 
 export async function deployAndWarm(workspace: Workspace): Promise<EvalFunction> {
+  await workspace.requireAccount();
   console.log(`building and swapping ${workspace.evalFunctionName}`);
   const evalFunction = await deployEvalFunction(workspace.lambda, workspace.evalFunctionName);
   const warm = await evalFunction.invoke({ kind: "warmup" });

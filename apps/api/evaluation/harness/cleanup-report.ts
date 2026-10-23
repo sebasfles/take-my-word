@@ -51,7 +51,7 @@ export function cleanupReport(
     `Every call ran inside the dev eval Lambda \`${context.functionName}\` (${context.region}, ${context.memoryMb} MB, arm64) through the production adapters, with production's \`refinerInstructions\` for the case's language, style and fixture dictionary, unchanged for every model; ${String(context.runs)} runs per case, run 1 on a fresh connection.`,
     "Latency is the whole non-streamed call, as production makes it.",
     `Prices as checked on ${pricesCheckedOn}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan).`,
-    `Reproduce: \`${context.command}\`.`,
+    `Reproduce from the repository root: \`${context.command}\`.`,
     "",
   );
 
@@ -96,8 +96,8 @@ export function cleanupReport(
 
   push("## Quality gate", "");
   push(
-    "Hard gate, any occurrence fails: invented content (a word that is in neither the raw transcript, the expected texts nor the case's allowed words) and output that reads as the other language.",
-    "Relative gate against `gpt-5.4-nano` as production calls it: meaning changes (a required word missing or a forbidden word present), dictionary term errors and failed calls, no worse than the baseline plus its run-to-run spread.",
+    "Hard gate, any occurrence fails: invented content (3 or more words in a row that are in neither the raw transcript, the expected texts nor the case's allowed words, accents folded) and output that reads as the other language.",
+    "Relative gate against `gpt-5.4-nano` as production calls it: meaning changes (a required word missing or a forbidden word present), outputs with any single new word, dictionary term errors and failed calls, no worse than the baseline plus its run-to-run spread.",
     "",
   );
   push("| Candidate | Invented content | Wrong language | Relative gate |", "|---|---|---|---|");
@@ -112,14 +112,14 @@ export function cleanupReport(
 
   push("## Quality", "");
   push(
-    "| Candidate | Exact | Meaning changes | Fillers removed | Punctuation | Dictionary terms wrong | Style followed | Failed calls | Rate limited |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| Candidate | Exact | New words | Meaning changes | Fillers removed | Punctuation | Dictionary terms wrong | Style followed | Failed calls | Rate limited |",
+    "|---|---|---|---|---|---|---|---|---|---|",
   );
   for (const candidate of candidates) {
     const s = summaries.get(candidate.id);
     if (s === undefined) continue;
     push(
-      `| ${candidate.id} | ${pct(s.exactRate)} | ${pct(s.meaningChangeRate)} (${s.meaningChangesPerRun.map(pct).join(", ")}) | ${pct(s.fillerRemovalRate)} | ${pct(s.punctuationRate)} | ${pct(s.termErrorRate)} | ${pct(s.styleRate)} | ${String(s.failedAttempts)}/${String(s.attempts)} (${pct(s.failureRate)}) | ${String(s.rateLimited)} |`,
+      `| ${candidate.id} | ${pct(s.exactRate)} | ${pct(s.newWordRate)} | ${pct(s.meaningChangeRate)} (${s.meaningChangesPerRun.map(pct).join(", ")}) | ${pct(s.fillerRemovalRate)} | ${pct(s.punctuationRate)} | ${pct(s.termErrorRate)} | ${pct(s.styleRate)} | ${String(s.failedAttempts)}/${String(s.attempts)} (${pct(s.failureRate)}) | ${String(s.rateLimited)} |`,
     );
   }
   push("");
@@ -178,7 +178,7 @@ export function cleanupReport(
       const r = entry.result;
       const notes = [
         ...entry.flags.map((flag) => `**${flag}**`),
-        ...(entry.invented.length > 0 ? [`new words: ${entry.invented.join(", ")}`] : []),
+        ...(entry.newWords.length > 0 ? [`new words: ${entry.newWords.join(", ")}`] : []),
         ...entry.missingRequired.map((word) => `lost "${word}"`),
         ...entry.presentForbidden.map((word) => `has "${word}"`),
         ...entry.fillersLeft.map((word) => `filler "${word}" left`),

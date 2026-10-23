@@ -51,7 +51,7 @@ describe("checkCleanup", () => {
   it("passes the expected text on every check", () => {
     expect(checkCleanup(result(expected), item)).toMatchObject({
       flags: [],
-      invented: [],
+      newWords: [],
       exact: true,
       meaningChanged: false,
       fillersLeft: [],
@@ -61,17 +61,29 @@ describe("checkCleanup", () => {
     });
   });
 
-  it("flags words in neither the raw nor the expected text as invented content", () => {
+  it("counts single new words without failing the hard gate", () => {
     const checked = checkCleanup(
       result("Corre kubectl get pods en el namespace de staging y mándame los logs, por favor."),
       item,
     );
-    expect(checked.flags).toEqual(["invented content"]);
-    expect(checked.invented).toEqual(["por", "favor"]);
+    expect(checked.flags).toEqual([]);
+    expect(checked.newWords).toEqual(["por", "favor"]);
+    expect(checked.longestNewRun).toBe(2);
     expect(
       checkCleanup(result(expected), { ...item, raw: item.raw.replace("mándame", "mandame") })
-        .invented,
+        .newWords,
     ).toEqual([]);
+  });
+
+  it("fails the hard gate on 3 or more new words in a row, as in transcription", () => {
+    const checked = checkCleanup(
+      result(
+        "Corre kubectl get pods en el namespace de staging y mándame los logs. Avísame cuando termines.",
+      ),
+      item,
+    );
+    expect(checked.flags).toEqual(["invented content"]);
+    expect(checked.longestNewRun).toBe(3);
   });
 
   it("flags a translation as wrong language", () => {
@@ -88,6 +100,7 @@ describe("checkCleanup", () => {
       { ...item, allowed: ["borra", "mándeme"] },
     );
     expect(checked).toMatchObject({
+      newWords: [],
       missingRequired: ["corre", "mándame"],
       presentForbidden: ["borra"],
       meaningChanged: true,
@@ -141,5 +154,19 @@ describe("cleanup gates", () => {
     expect(cleanupRelativeGate(baseline, baseline).passed).toBe(true);
     expect(baseline.fillerRemovalRate).toBe(1);
     expect(baseline.styleRate).toBe(1);
+  });
+
+  it("fails outputs with new words more often than the baseline plus its spread", () => {
+    const polite =
+      "Corre kubectl get pods en el namespace de staging y mándame los logs, por favor.";
+    const checked = [
+      ...runsOf("baseline", [expected, expected, expected]),
+      ...runsOf("chatty", [polite, polite, expected]),
+    ];
+    const chatty = summarizeCleanup("chatty", checked, []);
+    expect(chatty.newWordRate).toBeCloseTo(2 / 3);
+    expect(chatty.flags["invented content"]).toBe(0);
+    const gate = cleanupRelativeGate(chatty, summarizeCleanup("baseline", checked, []));
+    expect(gate.reasons).toEqual([expect.stringMatching(/^outputs with new words 66\.7%/)]);
   });
 });

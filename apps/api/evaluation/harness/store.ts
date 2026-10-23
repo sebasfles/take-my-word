@@ -30,15 +30,51 @@ export interface ResultsDir {
   meta: RunMeta & { startedAt: string };
 }
 
+export type StoredMeta = RunMeta & { startedAt: string };
+
+function paths(dir: string, suite: string): Omit<ResultsDir, "meta"> {
+  return {
+    dir,
+    results: join(dir, `${suite}.jsonl`),
+    failures: join(dir, `${suite}.failures.jsonl`),
+    ledger: join(dirname(dir), "ledger.jsonl"),
+  };
+}
+
+export function readRunMeta(dir: string): StoredMeta | undefined {
+  const metaPath = join(dir, "meta.json");
+  return existsSync(metaPath)
+    ? (JSON.parse(readFileSync(metaPath, "utf8")) as StoredMeta)
+    : undefined;
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+export function openFinishedRun(
+  dir: string,
+  identity: Pick<RunMeta, "suite" | "fixturesSha256" | "runs">,
+): ResultsDir | undefined {
+  const stored = readRunMeta(dir);
+  if (stored === undefined) return undefined;
+  if (
+    stored.suite !== identity.suite ||
+    stored.fixturesSha256 !== identity.fixturesSha256 ||
+    stored.runs !== identity.runs
+  ) {
+    throw new Error(
+      `${dir} holds a run of other fixtures or settings (${JSON.stringify(stored)}); use a new --results directory`,
+    );
+  }
+  return { ...paths(dir, identity.suite), meta: stored };
+}
+
 export function openResultsDir(dir: string, meta: RunMeta, now: Date): ResultsDir {
   mkdirSync(dir, { recursive: true });
-  const metaPath = join(dir, "meta.json");
-  let stored: (RunMeta & { startedAt: string }) | undefined;
-  if (existsSync(metaPath)) {
-    stored = JSON.parse(readFileSync(metaPath, "utf8")) as RunMeta & { startedAt: string };
+  let stored = readRunMeta(dir);
+  if (stored !== undefined) {
     const current = stored;
     const differs = (Object.keys(meta) as (keyof RunMeta)[]).some(
-      (key) => JSON.stringify(current[key]) !== JSON.stringify(meta[key]),
+      (key) => !same(current[key], meta[key]),
     );
     if (differs) {
       throw new Error(
@@ -47,13 +83,7 @@ export function openResultsDir(dir: string, meta: RunMeta, now: Date): ResultsDi
     }
   } else {
     stored = { ...meta, startedAt: now.toISOString() };
-    writeFileSync(metaPath, `${JSON.stringify(stored, null, 2)}\n`);
+    writeFileSync(join(dir, "meta.json"), `${JSON.stringify(stored, null, 2)}\n`);
   }
-  return {
-    dir,
-    results: join(dir, `${meta.suite}.jsonl`),
-    failures: join(dir, `${meta.suite}.failures.jsonl`),
-    ledger: join(dirname(dir), "ledger.jsonl"),
-    meta: stored,
-  };
+  return { ...paths(dir, meta.suite), meta: stored };
 }

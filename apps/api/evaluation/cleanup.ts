@@ -12,13 +12,14 @@ import {
   instructionsFor,
   loadCleanupFixtures,
   type CleanupCase,
+  type CleanupFixtures,
 } from "./harness/cleanup-fixtures.ts";
 import { cleanupReport } from "./harness/cleanup-report.ts";
 import type { EvalFunction } from "./harness/eval-lambda.ts";
 import { loadTranscriptionFixtures, transcriptionFixturesPath } from "./harness/fixtures.ts";
 import { chargedUsd, modelFacts, tokenCostUsd } from "./harness/prices.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
-import { openResultsDir, readJsonl } from "./harness/store.ts";
+import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
 import {
   deployAndWarm,
   executePlan,
@@ -30,6 +31,7 @@ import {
 } from "./harness/suite.ts";
 import {
   evaluationCodePaths,
+  fromRoot,
   lastCommitTouching,
   openWorkspace,
   requireCommittedFixtures,
@@ -176,6 +178,53 @@ function plan(
   return items;
 }
 
+function render(
+  dir: ResultsDir,
+  fixtures: CleanupFixtures,
+  results: string,
+  reportPath: string,
+): void {
+  const stored = readJsonl<CleanupResult>(dir.results);
+  const byId = new Map(fixtures.cases.map((item) => [item.id, item]));
+  const checked = stored.map((result) => {
+    const item = byId.get(result.caseId);
+    if (item === undefined) throw new Error(`no fixture case ${result.caseId}`);
+    return checkCleanup(result, item);
+  });
+  const failures = readJsonl<FailureRecord>(dir.failures);
+  const summaries = new Map<string, CleanupSummary>(
+    refinerCandidates.map((candidate) => [
+      candidate.id,
+      summarizeCleanup(candidate.id, checked, failures),
+    ]),
+  );
+  writeFileSync(
+    reportPath,
+    cleanupReport(
+      {
+        command: `pnpm --filter @take-my-word/api eval:cleanup --results ${fromRoot(results)} --report ${fromRoot(reportPath)} --runs ${String(dir.meta.runs)}`,
+        generatedAt: new Date().toISOString(),
+        codeCommit: dir.meta.codeCommit,
+        fixturesSha256: dir.meta.fixturesSha256,
+        functionName: workspace.evalFunctionName,
+        memoryMb: [...new Set(stored.filter((r) => r.memoryMb > 0).map((r) => r.memoryMb))].join(
+          ", ",
+        ),
+        region: [...new Set(stored.filter((r) => r.region !== "").map((r) => r.region))].join(", "),
+        runs: dir.meta.runs,
+        listUsd: stored.reduce((sum, result) => sum + result.listUsd, 0),
+        chargedUsd: recordedSpendUsd(dir),
+        failedAttempts: failures,
+      },
+      fixtures,
+      refinerCandidates,
+      summaries,
+      checked,
+    ),
+  );
+  console.log(`report written to ${fromRoot(reportPath)}`);
+}
+
 async function measure(results: string, reportPath: string): Promise<void> {
   const state = requireCommittedFixtures(cleanupFixturesPath, [
     transcriptionFixturesPath,
@@ -184,6 +233,15 @@ async function measure(results: string, reportPath: string): Promise<void> {
   const fixtures = loadCleanupFixtures(transcription);
   const codeCommit = lastCommitTouching(evaluationCodePaths);
   const fixturesSha256 = sha256(cleanupFixturesPath);
+  const finished = openFinishedRun(results, { suite: "cleanup", fixturesSha256, runs: args.runs });
+  if (finished !== undefined) {
+    const done = new Set(readJsonl<CleanupResult>(finished.results).map((r) => r.id));
+    const all = plan(() => Promise.reject(new Error("render only")), fixtures.cases, args.runs);
+    if (all.every((item) => done.has(item.id))) {
+      render(finished, fixtures, results, reportPath);
+      return;
+    }
+  }
   const dir = openResultsDir(
     results,
     {
@@ -210,47 +268,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
       [...new Set(refinerCandidates.map((candidate) => candidate.spec.model))],
       pending,
     ));
-  if (!complete) return;
-
-  const stored = readJsonl<CleanupResult>(dir.results);
-  const byId = new Map(fixtures.cases.map((item) => [item.id, item]));
-  const checked = stored.map((result) => {
-    const item = byId.get(result.caseId);
-    if (item === undefined) throw new Error(`no fixture case ${result.caseId}`);
-    return checkCleanup(result, item);
-  });
-  const failures = readJsonl<FailureRecord>(dir.failures);
-  const summaries = new Map<string, CleanupSummary>(
-    refinerCandidates.map((candidate) => [
-      candidate.id,
-      summarizeCleanup(candidate.id, checked, failures),
-    ]),
-  );
-  writeFileSync(
-    reportPath,
-    cleanupReport(
-      {
-        command: `pnpm --filter @take-my-word/api eval:cleanup --results ${results} --report ${reportPath} --runs ${String(args.runs)}`,
-        generatedAt: new Date().toISOString(),
-        codeCommit,
-        fixturesSha256,
-        functionName: workspace.evalFunctionName,
-        memoryMb: [...new Set(stored.filter((r) => r.memoryMb > 0).map((r) => r.memoryMb))].join(
-          ", ",
-        ),
-        region: [...new Set(stored.filter((r) => r.region !== "").map((r) => r.region))].join(", "),
-        runs: args.runs,
-        listUsd: stored.reduce((sum, result) => sum + result.listUsd, 0),
-        chargedUsd: recordedSpendUsd(dir),
-        failedAttempts: failures,
-      },
-      fixtures,
-      refinerCandidates,
-      summaries,
-      checked,
-    ),
-  );
-  console.log(`report written to ${reportPath}`);
+  if (complete) render(dir, fixtures, results, reportPath);
 }
 
 if (args.smoke) await smoke();

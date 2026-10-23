@@ -35,6 +35,7 @@
     "@aws-sdk/client-cognito-identity-provider": "3.1154.0",
     "@aws-sdk/client-lambda": "3.1154.0",
     "@aws-sdk/client-polly": "3.1154.0",
+    "@aws-sdk/client-sts": "3.1154.0",
     "@take-my-word/cognito": "workspace:*",
     "@take-my-word/deployment": "workspace:*",
     "@types/aws-lambda": "8.10.164",

@@ -1,11 +1,11 @@
 # Transcription evaluation
 
-Generated 2026-10-23T20:42:59.223Z from code commit `c100ccf811981df9be63f044403ea01354db10bb` and fixtures sha256 `94e990b5892d786e`.
+Generated 2026-10-23T20:53:31.902Z from code commit `c100ccf811981df9be63f044403ea01354db10bb` and fixtures sha256 `94e990b5892d786e`.
 Every provider call ran inside the dev eval Lambda `take-my-word-dev-eval` (us-east-1, 1024 MB, arm64), through the production adapters and production's `transcribeIn`, 5 runs per clip and language setting; run 1 opens a fresh connection, later runs reuse the Lambda's kept-alive one.
 Clips are Polly neural speech generated at run time (voices Lupe, Andres, Joanna, Matthew, Pedro, Mia) and seeded noise; every candidate got the same bytes and the transcriber prompt of the case's fixture dictionary.
 "one" sends the case's language; "both" lets the transcriber detect among es and en and transcribes again in es when it reports neither, as production does.
 Prices and plans as checked on 2026-10-23; this run's calls cost 1.239 USD at list price, 0.955 USD charged (Groq on its free plan).
-Reproduce: `pnpm --filter @take-my-word/api eval:transcription --results /home/fless/dev/personal/projects/take-my-word/.workspaces/0017_eval_harness/results/transcription-1 --report /home/fless/dev/personal/projects/take-my-word/.workspaces/0017_eval_harness/take-my-word/docs/tasks/0017_eval_harness/reports/transcription-1.md --runs 5`.
+Reproduce from the repository root: `pnpm --filter @take-my-word/api eval:transcription --results ../results/transcription-1 --report docs/tasks/0017_eval_harness/reports/transcription-1.md --runs 5`.
 
 ## Candidates
 

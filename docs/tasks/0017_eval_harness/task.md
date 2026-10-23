@@ -190,3 +190,16 @@ Suite 2 built: `pnpm eval:cleanup --results <dir> --report <md> [--runs 3] | --s
 - `openWorkspace` keeps credentials already in the environment instead of forcing the profile.
 
 Blocked for the next measured runs: the deployment profile's SSO session expired at about 20:30 UTC; the CLI still holds role credentials until 23:32 UTC, which I passed to the smoke and the e2e verify, but the two-day cleanup run and the end-to-end suite need an interactive `aws sso login` on the profile before they start.
+
+### Round 4
+
+Applied all 4 findings of round 3:
+
+1. Cleanup's hard gate on invented content is now a run of 3 or more consecutive words outside the raw, expected and allowed vocabulary, the definition of suite 1; single new words are listed per output and measured as the share of outputs with any, which joins the relative gate (no worse than the baseline plus its spread).
+2. Commands resolve `--results` and `--report` from where pnpm was invoked (`INIT_CWD`) and print them relative to the repository root, so the printed command reproduces from the root; the e2e report names "the dev API" instead of its host.
+   A finished run renders from its stored results with no provider or AWS call, keeping the code commit it was measured with; resuming pending calls still requires the same code and audio.
+   `reports/transcription-1.md` is re-rendered that way: only the generation time and the reproduce line changed.
+3. Before any eval swap or invoke and before the end-to-end suite, the runner checks the STS caller account against `aws.accountId` and refuses a mismatch (checked once per command).
+4. `captured-dev-es-2` forbids "corrige" and "corrija".
+
+Still pending for the measured cleanup and end-to-end runs: a fresh `aws sso login` on the deployment profile.

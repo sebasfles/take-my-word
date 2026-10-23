@@ -20,7 +20,7 @@ import {
   transcriptionCallUsd,
 } from "./harness/prices.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
-import { openResultsDir, readJsonl } from "./harness/store.ts";
+import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
 import {
   deployAndWarm,
   executePlan,
@@ -39,6 +39,7 @@ import {
 import { transcriptionReport } from "./harness/transcription-report.ts";
 import {
   evaluationCodePaths,
+  fromRoot,
   lastCommitTouching,
   openWorkspace,
   requireCommittedFixtures,
@@ -210,10 +211,83 @@ function plan(
   return items;
 }
 
+function itemIds(runs: number): string[] {
+  return fixtures.cases.flatMap((item) =>
+    voicesFor(fixtures, item).flatMap((voice) =>
+      languageModes.flatMap((mode) =>
+        transcriberCandidates.flatMap((candidate) =>
+          Array.from(
+            { length: runs },
+            (_, index) => `${candidate.id}|${item.id}/${voice}|${mode}|${String(index + 1)}`,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+function render(dir: ResultsDir, results: string, reportPath: string): void {
+  const stored = readJsonl<TranscriptionResult>(dir.results);
+  const byId = new Map(fixtures.cases.map((item) => [item.id, item]));
+  const checked = stored.map((result) => {
+    const item = byId.get(result.caseId);
+    if (item === undefined) throw new Error(`no fixture case ${result.caseId}`);
+    return check(result, item);
+  });
+  const longIds = new Set(
+    fixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
+  );
+  const failures = readJsonl<FailureRecord>(dir.failures);
+  const summaries = new Map<string, CandidateSummary>(
+    transcriberCandidates.map((candidate) => [
+      candidate.id,
+      summarize(candidate.id, checked, failures, longIds),
+    ]),
+  );
+  writeFileSync(
+    reportPath,
+    transcriptionReport(
+      {
+        command: `pnpm --filter @take-my-word/api eval:transcription --results ${fromRoot(results)} --report ${fromRoot(reportPath)} --runs ${String(dir.meta.runs)}`,
+        generatedAt: new Date().toISOString(),
+        codeCommit: dir.meta.codeCommit,
+        fixturesSha256: dir.meta.fixturesSha256,
+        functionName: workspace.evalFunctionName,
+        memoryMb: [...new Set(stored.filter((r) => r.memoryMb > 0).map((r) => r.memoryMb))].join(
+          ", ",
+        ),
+        region: [...new Set(stored.filter((r) => r.region !== "").map((r) => r.region))].join(", "),
+        runs: dir.meta.runs,
+        listUsd: stored.reduce((sum, result) => sum + result.listUsd, 0),
+        chargedUsd: recordedSpendUsd(dir),
+        failedAttempts: failures,
+      },
+      fixtures,
+      transcriberCandidates,
+      summaries,
+      checked,
+    ),
+  );
+  console.log(`report written to ${fromRoot(reportPath)}`);
+}
+
 async function measure(results: string, reportPath: string): Promise<void> {
   const state = requireCommittedFixtures(transcriptionFixturesPath, evaluationCodePaths);
   const codeCommit = lastCommitTouching(evaluationCodePaths);
   const fixturesSha256 = sha256(transcriptionFixturesPath);
+  const finished = openFinishedRun(results, {
+    suite: "transcription",
+    fixturesSha256,
+    runs: args.runs,
+  });
+  if (finished !== undefined) {
+    const done = new Set(readJsonl<TranscriptionResult>(finished.results).map((r) => r.id));
+    if (itemIds(args.runs).every((id) => done.has(id))) {
+      render(finished, results, reportPath);
+      return;
+    }
+  }
+
   const clips: Clip[] = [];
   for (const item of fixtures.cases) {
     for (const voice of voicesFor(fixtures, item)) {
@@ -247,50 +321,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
       transcriberCandidates.map((candidate) => candidate.spec.model),
       pending,
     ));
-  if (!complete) return;
-
-  const stored = readJsonl<TranscriptionResult>(dir.results);
-  const byId = new Map(fixtures.cases.map((item) => [item.id, item]));
-  const checked = stored.map((result) => {
-    const item = byId.get(result.caseId);
-    if (item === undefined) throw new Error(`no fixture case ${result.caseId}`);
-    return check(result, item);
-  });
-  const longIds = new Set(
-    fixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
-  );
-  const failures = readJsonl<FailureRecord>(dir.failures);
-  const summaries = new Map<string, CandidateSummary>(
-    transcriberCandidates.map((candidate) => [
-      candidate.id,
-      summarize(candidate.id, checked, failures, longIds),
-    ]),
-  );
-  writeFileSync(
-    reportPath,
-    transcriptionReport(
-      {
-        command: `pnpm --filter @take-my-word/api eval:transcription --results ${results} --report ${reportPath} --runs ${String(args.runs)}`,
-        generatedAt: new Date().toISOString(),
-        codeCommit,
-        fixturesSha256,
-        functionName: workspace.evalFunctionName,
-        memoryMb: [...new Set(stored.filter((r) => r.memoryMb > 0).map((r) => r.memoryMb))].join(
-          ", ",
-        ),
-        region: [...new Set(stored.filter((r) => r.region !== "").map((r) => r.region))].join(", "),
-        runs: args.runs,
-        listUsd: stored.reduce((sum, result) => sum + result.listUsd, 0),
-        chargedUsd: recordedSpendUsd(dir),
-        failedAttempts: failures,
-      },
-      fixtures,
-      transcriberCandidates,
-      summaries,
-      checked,
-    ),
-  );
-  console.log(`report written to ${reportPath}`);
+  if (complete) render(dir, results, reportPath);
 }
 
 if (args.smoke) await smoke();
