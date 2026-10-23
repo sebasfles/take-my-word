@@ -4,6 +4,7 @@ import {
   maxAudioBytes,
   type ApiError,
   type DictationResponse,
+  type UserContext,
 } from "@take-my-word/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DictationRecord } from "../dictation/dictation-store.ts";
@@ -12,6 +13,8 @@ import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { RefineInput } from "../dictation/ports/refiner.ts";
 import type { TranscribeInput, Transcript } from "../dictation/ports/transcriber.ts";
 import type { QuotaCharge } from "../dictation/quota.ts";
+import { refinerInstructions } from "../dictation/instructions.ts";
+import { plainV1 } from "../dictation/prompts/plain.v1.ts";
 import { createSilenceGuard, defaultSilenceLevels } from "../dictation/silence.ts";
 import { createLogger } from "../lib/log.ts";
 import { createMetrics } from "../lib/metrics.ts";
@@ -367,11 +370,16 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
     lastUsedAt,
     createdAt: "2026-01-01T00:00:00.000Z",
   });
-  const settings = (defaultStyleId: string, dictationLanguages: ("es" | "en")[] = ["es"]) => ({
+  const settings = (
+    defaultStyleId: string,
+    dictationLanguages: ("es" | "en")[] = ["es"],
+    context: UserContext = { picks: [], detail: "" },
+  ) => ({
     defaultStyleId,
     locale: dictationLanguages[0] ?? "en",
     dictationLanguages,
     providers: { transcriber: "groq-whisper" as const, refiner: "openai" as const },
+    context,
   });
   const post = (meta: Record<string, unknown>) =>
     world.post(dictationBody({ audio: speech(3), meta: { locale: "es", ...meta } }));
@@ -461,5 +469,85 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
   it("reads nothing for a WAV skipped under the level floor", async () => {
     await world.post(dictationBody({ audio: wav({ seconds: 2, toneDbfs: -70 }) }));
     expect(world.profileLoads).toHaveLength(0);
+  });
+
+  describe("with the user's context", () => {
+    const developer: UserContext = {
+      picks: ["software-development", "data-ai"],
+      detail: "backend con AWS y TypeScript",
+    };
+    const terms = [
+      term("Kubernetes", ["cubernetes"], 9, "2026-10-19T00:00:00.000Z"),
+      term("Zentrafolk", [], 1, "2026-10-20T00:00:00.000Z"),
+    ];
+
+    it("leaves the prompt and the instructions byte-identical to today when empty", async () => {
+      world.profile = { settings: settings("plain", ["es"]), styles: [], terms };
+      await post({});
+      expect(world.transcribed[0]?.prompt).toBe("Kubernetes, Zentrafolk");
+      expect(world.refined[0]?.instructions).toBe(
+        refinerInstructions("es", "", world.profile.terms),
+      );
+      world.profile = { settings: settings("plain", ["en"]), styles: [], terms: [] };
+      await post({});
+      expect(world.transcribed[1]?.prompt).toBeUndefined();
+      expect(world.refined[1]?.instructions).toBe(plainV1.en);
+    });
+
+    it("hints Whisper after the dictionary terms in the first dictation language", async () => {
+      world.profile = { settings: settings("plain", ["es", "en"], developer), styles: [], terms };
+      world.transcript = { text: rawTranscript, language: "en" };
+      await post({});
+      expect(world.transcribed[0]?.prompt).toBe(
+        "Kubernetes, Zentrafolk. Desarrollo de software, datos e IA. backend con AWS y TypeScript",
+      );
+      world.profile = { settings: settings("plain", ["en"], developer), styles: [], terms: [] };
+      await post({});
+      expect(world.transcribed[1]?.prompt).toBe(
+        "Software development, data and AI. backend con AWS y TypeScript",
+      );
+    });
+
+    it("drops the hint whole when the dictionary leaves no room for it", async () => {
+      const crowded = Array.from({ length: 40 }, (_, index) =>
+        term(`Término${String(index)}`, [], 40 - index, "2026-10-20T00:00:00.000Z"),
+      );
+      world.profile = {
+        settings: settings("plain", ["es"], developer),
+        styles: [],
+        terms: crowded,
+      };
+      await post({});
+      const prompt = world.transcribed[0]?.prompt ?? "";
+      expect(prompt.startsWith("Término0, Término1, ")).toBe(true);
+      expect(prompt).not.toContain("software");
+      expect(Buffer.byteLength(prompt)).toBeLessThanOrEqual(224);
+    });
+
+    it("gives the refiner the context as a delimited background in the language used", async () => {
+      world.profile = { settings: settings("plain", ["es", "en"], developer), styles: [], terms };
+      world.transcript = { text: rawTranscript, language: "en" };
+      await post({});
+      const instructions = world.refined[0]?.instructions ?? "";
+      expect(instructions.startsWith(plainV1.en)).toBe(true);
+      expect(instructions).toContain(
+        "<background>\nSoftware development, data and AI. backend con AWS y TypeScript\n</background>",
+      );
+      expect(instructions).toContain("never add or insert anything because of it");
+      expect(instructions.indexOf("</background>")).toBeLessThan(
+        instructions.indexOf("- Kubernetes (cubernetes)"),
+      );
+    });
+
+    it("never logs the context", async () => {
+      world.profile = { settings: settings("plain", ["es"], developer), styles: [], terms: [] };
+      await post({});
+      const everything = world.lines.join("\n");
+      expect(everything).not.toContain("AWS");
+      expect(everything).not.toContain("software");
+      expect(world.logs()).toContainEqual(
+        expect.objectContaining({ message: "dictation done", promptHint: true, contextPicks: 2 }),
+      );
+    });
   });
 });

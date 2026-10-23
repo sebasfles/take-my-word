@@ -131,6 +131,20 @@ function route(request: Record<string, unknown>): Promise<unknown> {
         locale: "es",
         dictationLanguages: ["es"],
         providers: { transcriber: "groq-whisper", refiner: "openai" },
+        context:
+          params.get("context") === "empty"
+            ? { picks: [], detail: "" }
+            : {
+                picks: ["software-development", "data-ai"],
+                detail: "backend con AWS y TypeScript",
+              },
+      });
+    case "getUsage":
+      if (params.get("usage") === "none") return rejected(404, "not_found");
+      return Promise.resolve({
+        usedSeconds: params.get("usage") === "over" ? 3655 : 754,
+        capSeconds: 3600,
+        resetsAt: "2026-10-24T00:00:00.000Z",
       });
     case "replaceSettings":
       return Promise.resolve(request.body);
@@ -218,6 +232,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
             ],
             selected: "plain",
             dictationLanguages: [params.get("lang") === "es" ? "es" : "en"],
+            context: { picks: [], detail: "" },
           });
     case "api_request":
       return route(args?.route as Record<string, unknown>) as Promise<T>;

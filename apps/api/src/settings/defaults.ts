@@ -3,6 +3,7 @@ import {
   defaultRefiner,
   defaultTranscriber,
   dictationLanguagesSchema,
+  emptyUserContext,
   fallbackStyleId,
   languageOfLocale,
   localeFor,
@@ -10,6 +11,8 @@ import {
   refinerIds,
   styleIdSchema,
   transcriberIds,
+  userContextDetailSchema,
+  userContextPicksSchema,
   type Settings,
 } from "@take-my-word/shared";
 import { z } from "zod";
@@ -19,6 +22,7 @@ export const defaultSettings: Settings = {
   locale: localeFor(defaultDictationLanguages),
   dictationLanguages: [...defaultDictationLanguages],
   providers: { transcriber: defaultTranscriber, refiner: defaultRefiner },
+  context: emptyUserContext,
 };
 
 const storedSettingsSchema = z.object({
@@ -31,6 +35,12 @@ const storedSettingsSchema = z.object({
       refiner: z.enum(refinerIds).catch(defaultSettings.providers.refiner),
     })
     .catch(defaultSettings.providers),
+  context: z
+    .object({
+      picks: userContextPicksSchema.catch(defaultSettings.context.picks),
+      detail: userContextDetailSchema.catch(defaultSettings.context.detail),
+    })
+    .catch(defaultSettings.context),
 });
 
 export function settingsFrom(item: Record<string, unknown>): Settings {
@@ -45,5 +55,6 @@ export function settingsFrom(item: Record<string, unknown>): Settings {
     locale: localeFor(dictationLanguages, stored.locale),
     dictationLanguages,
     providers: stored.providers,
+    context: stored.context,
   };
 }

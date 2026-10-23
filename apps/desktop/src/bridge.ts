@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { UserContext } from "@take-my-word/shared";
 import type { Route } from "./api.ts";
 import { isMessageId, type Language, type MessageId } from "./i18n.ts";
 
@@ -52,6 +53,7 @@ export interface Onboarding {
   styles: StyleOption[];
   selected: string;
   dictationLanguages: Language[];
+  context: UserContext;
 }
 
 export interface UiLanguage {
@@ -99,8 +101,8 @@ export const bridge = {
     invoke<AccountStep>("sign_in", { username, password }),
   choosePassword: (password: string) => invoke<AccountStep>("choose_password", { password }),
   onboarding: () => invoke<Onboarding>("onboarding"),
-  saveOnboarding: (styleId: string, dictationLanguages: Language[]) =>
-    invoke<undefined>("save_onboarding", { styleId, dictationLanguages }),
+  saveOnboarding: (styleId: string, dictationLanguages: Language[], context: UserContext) =>
+    invoke<undefined>("save_onboarding", { styleId, dictationLanguages, context }),
   uiLanguage: () => invoke<UiLanguage>("ui_language"),
   setUiLanguage: (choice: Language | null) => invoke<UiLanguage>("set_ui_language", { choice }),
   theme: () => invoke<Theme | null>("theme"),

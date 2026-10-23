@@ -1,0 +1,36 @@
+## 2026-10-23T12:03:57Z by om-developer target shared on 9af31b1
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (28 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T12:03:57Z by om-developer target api on 9af31b1
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (204 tests, pnpm test)
+- e2e: pass exit 0 (37 tests, pnpm e2e, run on 9c68e49 deployed to dev; code tree identical to 9af31b1, which only adds 0016 docs and task notes)
+
+## 2026-10-23T12:03:57Z by om-developer target web on 9af31b1
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (168 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration) then pass exit 0 (13 tests, pnpm e2e), run on 9c68e49 deployed to dev; code tree identical to 9af31b1
+
+## 2026-10-23T12:03:57Z by om-developer target desktop on 9af31b1
+- lint: pass exit 0 (pnpm lint) and pass exit 0 (pnpm rust:lint, Windows host and linux container, run on 9c68e49; code tree identical to 9af31b1)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (171 tests, pnpm test) and pass exit 0 (207 tests, pnpm rust:test on 9c68e49)
+- e2e: n/a
+
+## 2026-10-23T12:03:57Z by om-developer target infra on 9af31b1
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T12:15:11Z by om-developer target desktop on 963ed56
+- lint: pass exit 0 (pnpm lint) and pass exit 0 (pnpm rust:lint on 9c68e49; no Rust change since)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (171 tests, pnpm test) and pass exit 0 (207 tests, pnpm rust:test on 9c68e49; no Rust change since)
+- e2e: n/a
+

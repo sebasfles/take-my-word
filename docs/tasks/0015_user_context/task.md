@@ -100,3 +100,51 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
 - clearance: full: dev `infra/scripts/tf dev apply`; prd plan and the additive apply above; `update-function-code` on the four dev Lambdas and the web deploy steps; `pnpm e2e` and `pnpm integration` with throwaway users and Polly; the Windows host. No `pnpm release:desktop`.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+- Contract in `packages/shared/src/settings.ts`: `userContextPicks` (16 stable ids), `userContextSchema` (`picks` unique, at most 3; `detail` trimmed, at most 200), `context` required on `settingsSchema` and optional on `settingsUpdateSchema`; `usageSchema` in `usage.ts`.
+- API: `SETTINGS` reads `context` with per-field fallback; `PUT` keeps the stored context when absent; `GET /me/usage` in `apps/api/src/usage/` reads `QUOTA#day` through `quotaWindow`, which now also returns `resetsAt`; the `api` handler requires `DAILY_QUOTA_MINUTES` at cold start.
+- Dictation: `dictation/user-context.ts` holds the es and en domain phrase per pick id; `withHint` appends the hint after the ranked terms only when it fits whole in the byte budget; the hint is always in the first dictation language (detection pass and retry alike); the refiner gets a `<background>`/`<contexto>` block in the language used, placed after the editing contract and before style and dictionary; logs carry only `promptHint` and `contextPicks` counts.
+- Terraform: `GET /me/usage` route and `DAILY_QUOTA_MINUTES` on `api_function`; not applied yet.
+- Desktop: `context` onboarding step (user scope, after `languages`, Skip restores the loaded context), `UserContextChoices` shared with Settings > General (`UserContextRow`, explicit Save), `UsageCard` in the General aside, `getUsage` forwarder variant, Rust `UserContext` mirror carried through `onboarding`/`save_onboarding`, contract regenerated; hands-free note and setup guide copy name the context.
+- Web: Account shows `What you do` and `Audio today` (used versus cap, reset in local time).
+- Evaluation: fixture `apps/api/evaluation/user-context.samples.json` and runner `pnpm eval:context <report.md>`, committed in this round before any run.
+- Screenshots: desktop at the 0014 sizes and web Account at 390, 768 and 1280 in `{{workspace}}/screenshots/`.
+
+Decisions not in the plan:
+- Field name `context` in settings; pick ids are kebab-case versions of the labels (`engineering` for Engineering (non-software)).
+- The hint reads "Phrase, phrase. detail" with only the first phrase capitalized; separator from the terms is ". ".
+- A stored context with an unknown pick falls back to no picks (per-field fallback), keeping the detail.
+- Clients show used minutes rounded up (started minutes) and clamped to the cap.
+- Desktop hides the quota on 404 and shows an error line on other failures; the web hides it on any failure, so the read-only page never fails over the quota.
+- Evaluation contexts: developer `software-development` with detail "backend, DevOps"; biology `biology-life-sciences` and `research-academia` with no detail, to measure picks alone; "both" languages is `["es", "en"]` for every sample, so English samples also run with a Spanish hint.
+
+External actions (clearance full):
+- `infra/scripts/tf dev init -reconfigure`, then `tf dev plan` and `apply` of that plan on dev: 2 added (route and integration `GET /me/usage`), 1 changed (`api` env `DAILY_QUOTA_MINUTES = 60`), 0 destroyed.
+- Branch build deployed to dev with `update-function-code` on authorizer, dictate, api, dictionary-usage and web, assets synced to `take-my-word-dev-web-assets-115891590483`, CloudFront invalidated; afterwards develop `61be296` redeployed the same way and dev handed back.
+- `pnpm e2e` (api), `pnpm integration` and `pnpm e2e` (web) against dev with throwaway users and Polly.
+- `pnpm eval:context` against dev: 240 dictations with a throwaway user, deleted afterwards.
+- `rust:lint` and `rust:test` on the Windows host, cargo only.
+
+Evaluation, 2026-10-23, 3 runs per sample and condition, domain-term errors in the clean text, without / with context:
+
+| Group | one language | both (es, en) |
+|---|---|---|
+| dev-en | 6/48 / 9/48 | 9/48 / 8/48 |
+| dev-es | 12/48 / 7/48 | 12/48 / 7/48 |
+| bio-en | 3/36 / 4/36 | 3/36 / 14/36 |
+| bio-es | 12/36 / 9/36 | 12/36 / 10/36 |
+| total | 33 / 29 | 36 / 39 |
+
+- No language flips anywhere; controls gained no words.
+- Acceptance 2 is not met as built: with "both", bio-en-1 came back as the single word "y" in all 3 runs with context (the whole sentence lost), and bio-en-2 and bio-en-3 lost CRISPR-Cas9 and GAPDH; the Spanish hint (first dictation language) on English audio derails Whisper without flipping the detected language.
+- The STT hint barely helps where it fits: raw term errors are equal with and without context in dev-en, dev-es and bio-es, and in English it perturbs spellings (GAPDH to "GAPe", "kubectl get" to "kubechtelgit").
+- The refiner background is where the gain is: dev-es 12 to 7 and bio-es 12 to 9 with identical raw errors; one English regression (dev-en-1, "CI/CD" to "C-slash-CD" in the refiner).
+- Full report with every output: `{{workspace}}/evaluation/report.md`, for the PR.
+
+Pending:
+- The STT hint decision (question sent to the om-reviewer) and a second evaluation run after it, which needs dev again.
+
+Deferred: none.

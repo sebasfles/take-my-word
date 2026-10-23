@@ -6,9 +6,11 @@ import {
   type Overview,
   problemOf,
 } from "../../bridge.ts";
+import { emptyUserContext, type UserContext } from "@take-my-word/shared";
 import type { Language, MessageId } from "../../i18n.ts";
 import { afterSignIn, isLastUserStep, isUserStep, type StepId, steps } from "./plan.ts";
 import {
+  ContextStep,
   HotkeyStep,
   LanguagesStep,
   MicrophoneStep,
@@ -28,6 +30,9 @@ export interface Draft {
   select: (id: string) => void;
   languages: Language[];
   setLanguages: (languages: Language[]) => void;
+  context: UserContext;
+  setContext: (context: UserContext) => void;
+  skipContext: () => void;
 }
 
 export interface Flow {
@@ -52,6 +57,7 @@ const views: Record<StepId, ComponentType<{ flow: Flow }>> = {
   microphone: MicrophoneStep,
   hotkey: HotkeyStep,
   languages: LanguagesStep,
+  context: ContextStep,
   style: StyleStep,
   ready: ReadyStep,
 };
@@ -70,6 +76,7 @@ export function Onboarding({
   const [choices, setChoices] = useState<Choices | null>(null);
   const [selected, setSelected] = useState("");
   const [languages, setLanguages] = useState<Language[]>([]);
+  const [context, setContext] = useState<UserContext>(emptyUserContext);
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -116,7 +123,7 @@ export function Onboarding({
     setBusy(true);
     setError(null);
     bridge
-      .saveOnboarding(selected, languages)
+      .saveOnboarding(selected, languages, context)
       .then(advance)
       .catch((reason: unknown) => {
         const problem = problemOf(reason);
@@ -126,7 +133,7 @@ export function Onboarding({
       .finally(() => {
         setBusy(false);
       });
-  }, [step, plan, selected, languages, advance, backToSignIn]);
+  }, [step, plan, selected, languages, context, advance, backToSignIn]);
 
   const signedIn = (result: AccountStep) => {
     setNotice(null);
@@ -147,6 +154,7 @@ export function Onboarding({
         setChoices(loaded);
         setSelected(loaded.selected);
         setLanguages(loaded.dictationLanguages);
+        setContext(loaded.context);
         setLoad({ kind: "ready" });
       })
       .catch((reason: unknown) => {
@@ -192,6 +200,11 @@ export function Onboarding({
           select: setSelected,
           languages,
           setLanguages,
+          context,
+          setContext,
+          skipContext: () => {
+            setContext(choices?.context ?? emptyUserContext);
+          },
         },
       }}
     />

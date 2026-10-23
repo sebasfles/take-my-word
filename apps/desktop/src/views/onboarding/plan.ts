@@ -13,6 +13,7 @@ export const steps = [
   { id: "microphone", scope: "machine" },
   { id: "hotkey", scope: "machine" },
   { id: "languages", scope: "user" },
+  { id: "context", scope: "user" },
   { id: "style", scope: "user" },
   { id: "ready", scope: "machine" },
 ] as const satisfies readonly Step[];

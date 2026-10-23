@@ -23,6 +23,12 @@ export function transcriberPrompt(
   return { prompt, terms: included };
 }
 
+export function withHint(prompt: string, hint: string, tokenBudget: number): string {
+  if (hint === "") return prompt;
+  const hinted = prompt === "" ? hint : `${prompt}. ${hint}`;
+  return estimateTokens(hinted) > tokenBudget ? prompt : hinted;
+}
+
 export function correctionTable(terms: readonly ProjectedTerm[]): string {
   return terms
     .map(({ term, aliases }) =>

@@ -6,3 +6,4 @@ export * from "./history.ts";
 export * from "./releases.ts";
 export * from "./settings.ts";
 export * from "./styles.ts";
+export * from "./usage.ts";

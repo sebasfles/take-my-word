@@ -1,11 +1,14 @@
 import { AccountSection } from "@/components/account-section.tsx";
+import { LocalTime } from "@/components/local-time.tsx";
 import {
   bothLoaded,
+  contextText,
   languageList,
   languageName,
   refinerNames,
   styleLabel,
   transcriberNames,
+  usageMinutes,
 } from "@/lib/account.ts";
 import { format } from "@/lib/i18n.ts";
 import { loadAccount } from "@/lib/server/account.ts";
@@ -18,9 +21,17 @@ export default async function AccountPage() {
   const t = await currentDictionary();
   const locale = await currentLocale();
   const username = await currentUsername();
-  const data = await loadAccount(async (api) =>
-    bothLoaded(await Promise.all([api.settings(), api.styles()])),
-  );
+  const data = await loadAccount(async (api) => {
+    const [settings, styles, usage] = await Promise.all([
+      api.settings(),
+      api.styles(),
+      api.usage(),
+    ]);
+    const both = bothLoaded([settings, styles]);
+    return both.kind === "ok"
+      ? ({ kind: "ok", value: [...both.value, usage.kind === "ok" ? usage.value : null] } as const)
+      : both;
+  });
 
   return (
     <AccountSection
@@ -29,7 +40,7 @@ export default async function AccountPage() {
       intro={t.app.readOnly}
       data={data}
     >
-      {([settings, styles]) => {
+      {([settings, styles, usage]) => {
         const style = styleLabel(settings.defaultStyleId, styles, t.styles);
         const rows = [
           { label: t.account.username, value: username, testId: "account-username" },
@@ -44,6 +55,28 @@ export default async function AccountPage() {
             value: languageList(settings.dictationLanguages, locale),
             testId: "account-dictation-languages",
           },
+          {
+            label: t.account.context,
+            value: contextText(settings.context, t.account),
+            testId: "account-context",
+          },
+          ...(usage === null
+            ? []
+            : [
+                {
+                  label: t.account.usage,
+                  value: (
+                    <>
+                      {format(t.account.usageValue, usageMinutes(usage))}
+                      <span className="details-note">
+                        {t.account.usageResets}{" "}
+                        <LocalTime value={usage.resetsAt} locale={locale} timeOnly />
+                      </span>
+                    </>
+                  ),
+                  testId: "account-usage",
+                },
+              ]),
           {
             label: t.account.transcriber,
             value: transcriberNames[settings.providers.transcriber],

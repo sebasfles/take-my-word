@@ -151,6 +151,35 @@ pub struct SettingsProviders {
     pub refiner: RefinerId,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[serde(rename_all = "kebab-case")]
+pub enum UserContextPick {
+    SoftwareDevelopment,
+    DataAi,
+    Design,
+    ProductManagement,
+    Marketing,
+    Sales,
+    CustomerSupport,
+    WritingContent,
+    ResearchAcademia,
+    BiologyLifeSciences,
+    MedicineHealth,
+    Law,
+    FinanceAccounting,
+    EducationTeaching,
+    Engineering,
+    Student,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+pub struct UserContext {
+    pub picks: Vec<UserContextPick>,
+    pub detail: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
@@ -160,6 +189,7 @@ pub struct UserSettings {
     pub locale: String,
     pub dictation_languages: Vec<Language>,
     pub providers: SettingsProviders,
+    pub context: UserContext,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

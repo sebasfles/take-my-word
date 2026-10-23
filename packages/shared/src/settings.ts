@@ -15,6 +15,47 @@ export const dictationLanguagesSchema = z
   .min(1)
   .refine((chosen) => new Set(chosen).size === chosen.length, "each language at most once");
 
+export const userContextPicks = [
+  "software-development",
+  "data-ai",
+  "design",
+  "product-management",
+  "marketing",
+  "sales",
+  "customer-support",
+  "writing-content",
+  "research-academia",
+  "biology-life-sciences",
+  "medicine-health",
+  "law",
+  "finance-accounting",
+  "education-teaching",
+  "engineering",
+  "student",
+] as const;
+export type UserContextPick = (typeof userContextPicks)[number];
+
+export const userContextLimits = { maxPicks: 3, maxDetailLength: 200 } as const;
+
+export const userContextPicksSchema = z
+  .array(z.enum(userContextPicks))
+  .max(userContextLimits.maxPicks)
+  .refine((chosen) => new Set(chosen).size === chosen.length, "each pick at most once");
+
+export const userContextDetailSchema = z.string().trim().max(userContextLimits.maxDetailLength);
+
+export const userContextSchema = z.object({
+  picks: userContextPicksSchema,
+  detail: userContextDetailSchema,
+});
+export type UserContext = z.infer<typeof userContextSchema>;
+
+export const emptyUserContext: UserContext = { picks: [], detail: "" };
+
+export function isEmptyUserContext(context: UserContext): boolean {
+  return context.picks.length === 0 && context.detail === "";
+}
+
 export const settingsSchema = z.object({
   defaultStyleId: styleIdSchema,
   locale: localeSchema,
@@ -23,12 +64,14 @@ export const settingsSchema = z.object({
     transcriber: z.enum(transcriberIds),
     refiner: z.enum(refinerIds),
   }),
+  context: userContextSchema,
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
 export const settingsUpdateSchema = settingsSchema.extend({
   locale: localeSchema.optional(),
   dictationLanguages: dictationLanguagesSchema.optional(),
+  context: userContextSchema.optional(),
 });
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
 

@@ -52,10 +52,12 @@ export function Actions({
   flow,
   label,
   disabled = false,
+  onSkip,
 }: {
   flow: Flow;
   label?: MessageId;
   disabled?: boolean;
+  onSkip?: () => void;
 }) {
   const text = label ?? (flow.last ? "onboarding.finish" : "onboarding.next");
   return (
@@ -63,6 +65,11 @@ export function Actions({
       {flow.canGoBack && (
         <Button variant="ghost" onClick={flow.back}>
           {t("onboarding.back")}
+        </Button>
+      )}
+      {onSkip && (
+        <Button variant="ghost" onClick={onSkip} disabled={flow.busy}>
+          {t("context.skip")}
         </Button>
       )}
       <Button onClick={flow.next} loading={flow.busy} disabled={disabled}>

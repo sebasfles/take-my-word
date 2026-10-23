@@ -6,11 +6,19 @@ import { Gestures } from "../../Gestures.tsx";
 import { type MessageId, t } from "../../i18n.ts";
 import { LanguageChoices } from "../../LanguageChoices.tsx";
 import { StyleExamples } from "../../StyleExamples.tsx";
+import { UserContextChoices } from "../../UserContextChoices.tsx";
 import { Actions, Frame } from "./Frame.tsx";
 import { useMicrophoneCheck } from "./MicrophoneCheck.tsx";
 import type { Draft, Flow } from "./Onboarding.tsx";
 import { ChoosePasswordForm, SignInForm } from "./SignIn.tsx";
-import { BrandVisual, KeysVisual, LiveMeter, TrayVisual, WelcomeVisual } from "./visuals.tsx";
+import {
+  BrandVisual,
+  ContextVisual,
+  KeysVisual,
+  LiveMeter,
+  TrayVisual,
+  WelcomeVisual,
+} from "./visuals.tsx";
 
 function Point({ icon, text }: { icon: IconName; text: MessageId }) {
   return (
@@ -191,6 +199,33 @@ export function LanguagesStep({ flow }: { flow: Flow }) {
     >
       <Loaded draft={draft}>
         <LanguageChoices chosen={draft.languages} onChange={draft.setLanguages} />
+      </Loaded>
+      <SaveError flow={flow} />
+    </Frame>
+  );
+}
+
+export function ContextStep({ flow }: { flow: Flow }) {
+  const { draft } = flow;
+  return (
+    <Frame
+      flow={flow}
+      title={t("context.title")}
+      intro={t("context.intro")}
+      visual={<ContextVisual />}
+      actions={
+        <Actions
+          flow={flow}
+          disabled={draft.load.kind !== "ready"}
+          onSkip={() => {
+            draft.skipContext();
+            flow.next();
+          }}
+        />
+      }
+    >
+      <Loaded draft={draft}>
+        <UserContextChoices value={draft.context} onChange={draft.setContext} />
       </Loaded>
       <SaveError flow={flow} />
     </Frame>

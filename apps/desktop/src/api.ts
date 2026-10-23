@@ -20,6 +20,7 @@ import {
   styleInputSchema,
   styleListSchema,
   styleSchema,
+  usageSchema,
 } from "@take-my-word/shared";
 import { z } from "zod";
 import { bridge } from "./bridge.ts";
@@ -39,6 +40,7 @@ export type Route =
   | { route: "deleteAppRule"; id: string }
   | { route: "getSettings" }
   | { route: "replaceSettings"; body: Settings }
+  | { route: "getUsage" }
   | { route: "listDictations"; cursor?: string }
   | { route: "deleteDictation"; id: string };
 
@@ -121,6 +123,7 @@ export const api = {
       () => ({ route: "replaceSettings", body: valid(settingsSchema, settings) }),
       settingsSchema,
     ),
+  getUsage: () => call(() => ({ route: "getUsage" }), usageSchema),
   listDictations: (cursor?: string) =>
     call(
       () => ({ route: "listDictations", ...(cursor !== undefined && { cursor }) }),

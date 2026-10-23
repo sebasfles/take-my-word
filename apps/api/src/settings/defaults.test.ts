@@ -10,6 +10,7 @@ describe("settingsFrom", () => {
       locale: "es-CL",
       dictationLanguages: ["es"],
       providers,
+      context: { picks: [], detail: "" },
     });
     expect(settingsFrom({ defaultStyleId: "plain", locale: "en", providers })).toMatchObject({
       dictationLanguages: ["en"],
@@ -25,6 +26,24 @@ describe("settingsFrom", () => {
         providers,
       }),
     ).toMatchObject({ locale: "en", dictationLanguages: ["en", "es"] });
+  });
+
+  it("keeps a stored context and falls back per field when one no longer parses", () => {
+    const base = { defaultStyleId: "plain", locale: "en", providers };
+    expect(
+      settingsFrom({ ...base, context: { picks: ["law", "student"], detail: "contracts" } })
+        .context,
+    ).toEqual({ picks: ["law", "student"], detail: "contracts" });
+    expect(
+      settingsFrom({ ...base, context: { picks: ["retired-pick"], detail: "contracts" } }).context,
+    ).toEqual({ picks: [], detail: "contracts" });
+    expect(
+      settingsFrom({ ...base, context: { picks: ["law"], detail: "x".repeat(201) } }).context,
+    ).toEqual({ picks: ["law"], detail: "" });
+    expect(settingsFrom({ ...base, context: "garbage" }).context).toEqual({
+      picks: [],
+      detail: "",
+    });
   });
 
   it("falls back to English when neither languages nor a locale were stored", () => {

@@ -1,7 +1,7 @@
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::api::ApiFailure;
+use crate::api::{ApiFailure, UserContext};
 use crate::auth::Secret;
 use crate::auth::account::{AccountError, SignInStep, User};
 use crate::commands::blocking;
@@ -99,6 +99,7 @@ pub struct Onboarding {
     styles: Vec<StyleOption>,
     selected: String,
     dictation_languages: Vec<Language>,
+    context: UserContext,
 }
 
 #[tauri::command]
@@ -181,6 +182,7 @@ pub async fn onboarding(app: AppHandle) -> Result<Onboarding, Problem> {
                 .collect(),
             selected: settings.default_style_id,
             dictation_languages,
+            context: settings.context,
         })
     })
     .await
@@ -191,6 +193,7 @@ pub async fn save_onboarding(
     app: AppHandle,
     style_id: String,
     dictation_languages: Vec<Language>,
+    context: UserContext,
 ) -> Result<(), Problem> {
     if dictation_languages.is_empty() {
         return Err(Message::Generic.into());
@@ -199,6 +202,7 @@ pub async fn save_onboarding(
         let mut settings = shell.api.settings()?;
         settings.default_style_id = style_id;
         settings.dictation_languages = dictation_languages;
+        settings.context = context;
         shell.api.replace_settings(&settings)?;
         let user = shell.account.user()?;
         shell.update_settings(|settings| {

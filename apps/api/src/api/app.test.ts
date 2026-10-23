@@ -8,6 +8,7 @@ import {
   settingsSchema,
   styleListSchema,
   styleSchema,
+  usageSchema,
 } from "@take-my-word/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createLogger } from "../lib/log.ts";
@@ -21,6 +22,7 @@ class World {
   lines: string[] = [];
   app = createApi({
     ...this.stores,
+    dailyQuotaMinutes: 60,
     newId: () => `custom-${String((this.ids += 1))}`,
     now: () => this.now,
     log: createLogger({}, (line) => this.lines.push(line)),
@@ -91,6 +93,7 @@ describe("authorization", () => {
     ["DELETE", "/app-rules/x"],
     ["GET", "/me/settings"],
     ["PUT", "/me/settings"],
+    ["GET", "/me/usage"],
     ["GET", "/dictations"],
     ["DELETE", "/dictations/x"],
   ])("%s %s answers 401 without the authorizer's user", async (method, path) => {
@@ -412,6 +415,7 @@ describe("settings", () => {
       locale: "en",
       dictationLanguages: ["en"],
       providers: { transcriber: "groq-whisper", refiner: "openai" },
+      context: { picks: [], detail: "" },
     });
     expect(await world.stores.settings.get("user-a")).toEqual(first);
   });
@@ -434,6 +438,7 @@ describe("settings", () => {
       locale: "es",
       dictationLanguages: ["es", "en"],
       providers,
+      context: { picks: [], detail: "" },
     });
     const empty = await world.call("PUT", "/me/settings", {
       body: { defaultStyleId: "plain", dictationLanguages: [], providers },
@@ -447,6 +452,7 @@ describe("settings", () => {
       locale: "en",
       dictationLanguages: ["en"],
       providers: { transcriber: "groq-whisper", refiner: "openai" },
+      context: { picks: [], detail: "" },
     };
     expect((await world.call("PUT", "/me/settings", { body })).status).toBe(200);
     expect(settingsSchema.parse((await world.call("GET", "/me/settings")).json)).toEqual(body);
@@ -454,6 +460,74 @@ describe("settings", () => {
       body: { ...body, defaultStyleId: "nope" },
     });
     expect(unknown.status).toBe(400);
+  });
+});
+
+describe("user context", () => {
+  const providers = { transcriber: "groq-whisper", refiner: "openai" };
+  const read = async () =>
+    settingsSchema.parse((await world.call("GET", "/me/settings")).json).context;
+
+  it("saves the context trimmed, keeps it when a client leaves it out, and clears it on empty", async () => {
+    const saved = await world.call("PUT", "/me/settings", {
+      body: {
+        defaultStyleId: "plain",
+        providers,
+        context: { picks: ["software-development", "data-ai"], detail: "  backend with AWS  " },
+      },
+    });
+    expect(saved.status).toBe(200);
+    expect(await read()).toEqual({
+      picks: ["software-development", "data-ai"],
+      detail: "backend with AWS",
+    });
+    await world.call("PUT", "/me/settings", {
+      body: { defaultStyleId: "casual", locale: "en", providers },
+    });
+    expect(await read()).toEqual({
+      picks: ["software-development", "data-ai"],
+      detail: "backend with AWS",
+    });
+    await world.call("PUT", "/me/settings", {
+      body: { defaultStyleId: "plain", providers, context: { picks: [], detail: "" } },
+    });
+    expect(await read()).toEqual({ picks: [], detail: "" });
+  });
+
+  it("refuses more than three picks, a repeated pick, an unknown one and a long detail", async () => {
+    const put = (context: unknown) =>
+      world.call("PUT", "/me/settings", { body: { defaultStyleId: "plain", providers, context } });
+    for (const context of [
+      { picks: ["law", "sales", "design", "student"], detail: "" },
+      { picks: ["law", "law"], detail: "" },
+      { picks: ["astrology"], detail: "" },
+      { picks: [], detail: "x".repeat(201) },
+    ]) {
+      expect((await put(context)).status).toBe(400);
+    }
+    expect(await read()).toEqual({ picks: [], detail: "" });
+  });
+});
+
+describe("usage", () => {
+  it("reports today's seconds against the cap and the next UTC midnight", async () => {
+    world.now = new Date("2026-10-21T23:30:00.000-03:00");
+    world.stores.seedQuota("user-a", "2026-10-22", 125.5);
+    world.stores.seedQuota("user-a", "2026-10-21", 3000);
+    world.stores.seedQuota("user-b", "2026-10-22", 900);
+    const usage = await world.call("GET", "/me/usage");
+    expect(usage.status).toBe(200);
+    expect(usageSchema.parse(usage.json)).toEqual({
+      usedSeconds: 125.5,
+      capSeconds: 3600,
+      resetsAt: "2026-10-23T00:00:00.000Z",
+    });
+  });
+
+  it("is zero before the first dictation of the day and may pass the cap", async () => {
+    expect(usageSchema.parse((await world.call("GET", "/me/usage")).json).usedSeconds).toBe(0);
+    world.stores.seedQuota("user-a", "2026-10-21", 3612);
+    expect(usageSchema.parse((await world.call("GET", "/me/usage")).json).usedSeconds).toBe(3612);
   });
 });
 

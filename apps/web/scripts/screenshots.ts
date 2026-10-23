@@ -32,7 +32,12 @@ const full = {
     locale: "es-MX",
     dictationLanguages: ["es", "en"],
     providers: { transcriber: "groq-whisper", refiner: "openai" },
+    context: {
+      picks: ["software-development", "biology-life-sciences"],
+      detail: "bioinformática con Python y AWS",
+    },
   },
+  usage: { usedSeconds: 1385, capSeconds: 3600, resetsAt: "2026-10-24T00:00:00.000Z" },
   styles: [
     ...builtins,
     {
@@ -104,7 +109,9 @@ const empty = {
     locale: "en",
     dictationLanguages: ["en"],
     providers: { transcriber: "groq-whisper", refiner: "openai" },
+    context: { picks: [], detail: "" },
   },
+  usage: undefined,
   styles: builtins,
   rules: [],
   terms: [],
@@ -122,10 +129,12 @@ function userOf(authorization: string | undefined): Mode | null {
   return modes[claims.username] ?? "full";
 }
 
-function respond(user: typeof full, url: URL): unknown {
+function respond(user: typeof full | typeof empty, url: URL): unknown {
   switch (url.pathname) {
     case "/me/settings":
       return user.settings;
+    case "/me/usage":
+      return user.usage;
     case "/styles":
       return { styles: user.styles };
     case "/app-rules":

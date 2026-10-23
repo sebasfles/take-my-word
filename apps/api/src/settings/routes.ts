@@ -30,6 +30,7 @@ export function settingsRoutes({ settings, styles }: SettingsRoutesDeps) {
         locale: localeFor(dictationLanguages, current.locale),
         dictationLanguages,
         providers: input.providers,
+        context: input.context ?? current.context,
       };
       await settings.put(userId, next);
       return c.json(next);

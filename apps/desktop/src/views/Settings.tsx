@@ -23,9 +23,11 @@ import { focusAddFromSearch, type SettingsSection, settingsSectionFromSearch } f
 import { AppRules } from "./settings/AppRules.tsx";
 import { Dictionary } from "./settings/Dictionary.tsx";
 import { History } from "./settings/History.tsx";
+import { UserContextRow } from "./settings/Context.tsx";
 import { DictationLanguagesRow, UiLanguageRow } from "./settings/Languages.tsx";
 import { SectionPage } from "./settings/parts.tsx";
 import { Styles } from "./settings/Styles.tsx";
+import { UsageCard } from "./settings/Usage.tsx";
 
 type Capture = { step: "idle" } | { step: "listening" } | { step: "proposed"; keys: string[] };
 
@@ -166,9 +168,12 @@ function General({
           <UiLanguageRow />
 
           <DictationLanguagesRow />
+
+          <UserContextRow />
         </div>
 
         <aside className="general-aside">
+          <UsageCard />
           <section className="panel aside-card" aria-labelledby="how-to-dictate">
             <h2 id="how-to-dictate" className="aside-title">
               {t("settings.howTo")}

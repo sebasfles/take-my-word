@@ -66,8 +66,9 @@ module "api_function" {
   log_retention_days = var.log_retention_days
 
   environment = {
-    TABLE_NAME   = module.table.name
-    NODE_OPTIONS = "--enable-source-maps"
+    TABLE_NAME          = module.table.name
+    DAILY_QUOTA_MINUTES = tostring(var.daily_quota_minutes)
+    NODE_OPTIONS        = "--enable-source-maps"
   }
 
   policy_statements = {

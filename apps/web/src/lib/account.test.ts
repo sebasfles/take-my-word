@@ -2,6 +2,7 @@ import type { DictionaryTerm, Style } from "@take-my-word/shared";
 import { describe, expect, it } from "vitest";
 import {
   bothLoaded,
+  contextText,
   formatDate,
   formatDateTime,
   formatSeconds,
@@ -12,6 +13,7 @@ import {
   sortTerms,
   styleLabel,
   termSort,
+  usageMinutes,
 } from "./account.ts";
 import { dictionary } from "./i18n.ts";
 
@@ -171,5 +173,34 @@ describe("languageList", () => {
     expect(languageList(["es"], "en")).toBe("Spanish");
     expect(languageList(["es", "en"], "en")).toBe("Spanish and English");
     expect(languageList(["en", "es"], "es")).toBe("Inglés y español");
+  });
+});
+
+describe("the user's context and usage", () => {
+  it("lists the picks in the reader's language, then the detail, or says it is not set", () => {
+    expect(
+      contextText({ picks: ["law", "student"], detail: "contratos" }, dictionary("es").account),
+    ).toBe("Derecho, Estudiante. contratos");
+    expect(contextText({ picks: ["data-ai"], detail: "" }, dictionary("en").account)).toBe(
+      "Data and AI",
+    );
+    expect(contextText({ picks: [], detail: "CRISPR" }, dictionary("en").account)).toBe("CRISPR");
+    expect(contextText({ picks: [], detail: "" }, dictionary("es").account)).toBe("Sin indicar");
+  });
+
+  it("counts started minutes and never shows more than the cap", () => {
+    const resetsAt = "2026-10-24T00:00:00.000Z";
+    expect(usageMinutes({ usedSeconds: 61, capSeconds: 3600, resetsAt })).toEqual({
+      used: "2",
+      cap: "60",
+    });
+    expect(usageMinutes({ usedSeconds: 3725, capSeconds: 3600, resetsAt })).toEqual({
+      used: "60",
+      cap: "60",
+    });
+    expect(usageMinutes({ usedSeconds: 0, capSeconds: 1800, resetsAt })).toEqual({
+      used: "0",
+      cap: "30",
+    });
   });
 });
