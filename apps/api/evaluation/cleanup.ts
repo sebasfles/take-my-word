@@ -206,7 +206,9 @@ function render(
       {
         command: `pnpm --filter @take-my-word/api eval:cleanup --results ${fromRoot(results)} --report ${fromRoot(reportPath)} --runs ${String(dir.meta.runs)}`,
         generatedAt: new Date().toISOString(),
-        codeCommit: dir.meta.codeCommit,
+        codeCommit: [dir.meta.codeCommit, ...(dir.meta.resumedWith ?? [])].join(
+          "`, resumed with `",
+        ),
         fixturesSha256: dir.meta.fixturesSha256,
         functionName: workspace.evalFunctionName,
         memoryMb: [...new Set(stored.filter((r) => r.memoryMb > 0).map((r) => r.memoryMb))].join(
