@@ -23,3 +23,8 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (164 vitest and 204 cargo tests, 7 ignored, pnpm test && pnpm rust:test)
 - e2e: n/a
+## 2026-10-23T08:15:49Z by om-developer target desktop on 820c32e
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=C:\dev\tmw-0014; rust:lint now ends with rust:lint:linux, linux-check's clippy in ubuntu:24.04, which failed with E0599 on the previous shell.rs and passes here)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (164 vitest and 204 cargo tests, 7 ignored, pnpm test && pnpm rust:test)
+- e2e: n/a

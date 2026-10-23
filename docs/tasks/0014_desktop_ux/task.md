@@ -218,3 +218,8 @@ Slot of 02:35 on 2eb7b2d (verify green on 2eb7b2d first, after rustfmt on 166cee
 - The foreground stayed the main window (0x1650C9E) before, during and after each, and the overlay was hidden at the end.
 
 Round 3 evidence complete: Acceptance 1 (hold, hands-free, stop, Esc, shortcut, own window), 2 (spinner with animations off, after every show), 3, 4, 5 and 7 on the host; the stuck-hold and own-window paste findings fixed and shown. Screenshots for this round in `.workspaces/0014_desktop_ux/screenshots/round-3`.
+
+### Round 4
+
+1. The main window's handle now comes through `foreground::handle_of` (Windows `hwnd()`, other platforms `None`), so non-Windows builds compile without any `allow` and the main-window comparison never matches there.
+2. `apps/desktop/scripts/linux.sh` (`pnpm rust:lint:linux`, chained at the end of `rust:lint`) builds the UI and runs `linux-check`'s `cargo clippy --all-targets --locked -- -D warnings` in an `ubuntu:24.04` container with the job's apt packages; it failed with E0599 on the previous `shell.rs` and passes on 820c32e; the desktop row of the TRD's verification targets says so.
