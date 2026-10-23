@@ -1,11 +1,11 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0014_desktop_ux
 ---
 
 # Desktop
 
-The tray app where most dictation happens: hold a key, speak, release, and clean text is pasted into the focused app.
+The tray app where most dictation happens: hold the shortcut or tap it twice, speak, and clean text is pasted into the focused app.
 It records the audio, sends it to the API, pastes the result with the keystroke the app needs, and restores the clipboard.
 Windows first; macOS and Linux follow.
 
@@ -21,4 +21,4 @@ Windows first; macOS and Linux follow.
 - [trd.md](trd.md): structure and endpoints
 - [ard.md](ard.md): decisions and debt
 - [database.md](database.md): tables and invariants
-- [flows.md](flows.md): hold to talk with the session
+- [flows.md](flows.md): hold to talk and hands-free with the session

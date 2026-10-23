@@ -76,6 +76,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |
 | styles | 2026-10-21 | A failed release after a style delete leaves a rule naming that style | A client shows a dangling style to a user |
 | styles | 2026-10-21 | Built-in style descriptions on the web do not follow prompt changes | A built-in prompt changes intent, or a fourth built-in arrives |
+| styles | 2026-10-23 | Desktop style examples are fixed refiner outputs that do not follow prompt changes; casual barely differs from plain | A built-in prompt changes, or casual is retuned |
 | desktop | 2026-10-20 | Rust toolchain in a TypeScript monorepo | Rust layer grows past OS glue |
 | desktop | 2026-10-20 | macOS first run needs the Fn setting changed and Accessibility granted | An OS update breaks the hook, or toggle mode is requested |
 | desktop | 2026-10-20 | Larger uploads than Opus; dictations stop at two minutes | Payload size shows in latency or users hit the cap |
@@ -94,6 +95,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-23 | The paste retry can paste twice; reads from threads born after the offer and monitors that win twice (one reading on every Ctrl+V always does) leave the text with a notification | A paste lands twice, or a target read logs as unproven |
 | desktop | 2026-10-23 | Confirming Windows Terminal's multi-line warning in a Windows PowerShell 5.1 tab runs every line but the last | PSReadLine with bracketed paste ships, or users ask for joined lines |
 | desktop | 2026-10-23 | 6964 `tmw-config-*` folders from earlier test runs stay in Sebastian's `%TEMP%` | Sebastian clears them |
+| desktop | 2026-10-23 | Desktop animations run even for users who need reduced motion | A user asks for reduced motion in the desktop app |
+| desktop | 2026-10-23 | A main-window insert answered after 1 s leaves the text in the field and in the clipboard | A dictation shows up twice in the app's own window |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

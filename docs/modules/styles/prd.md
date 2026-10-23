@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0014_desktop_ux
 ---
 
 # Styles: product
@@ -31,6 +31,7 @@ Errors and empty states: mobile cannot see other apps, so there are no app rules
 ### Manage styles and app rules
 
 1. In settings on desktop or mobile, the user sees the built-in styles and their own custom ones; the web shows them read-only.
+   On desktop, during onboarding and in Styles, each built-in shows the same sample sentence as the refiner wrote it in that style, with the words it changed marked against what was said, and a custom style shows its directions as its description.
 2. The user creates a custom style by naming it and writing how the text should read.
 3. The user adds an app rule: an app, the style to use in it and the paste keystroke.
 4. The user edits or deletes custom styles and app rules at any time.

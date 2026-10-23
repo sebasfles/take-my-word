@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0014_desktop_ux
 ---
 
 # Dictionary: product
@@ -17,7 +17,7 @@ The user writes a term once and stops fixing it by hand.
 ### Add a term
 
 1. The user opens the dictionary in the desktop or mobile app, or picks "Add a word" in the desktop tray; the web shows it read-only.
-2. They type the term exactly as it must be written, and optionally one or more "sounds like" aliases.
+2. They type the word as it must be written, guided by an example; on desktop the optional "sounds like" aliases sit under Advanced, with Kubernetes heard as "cuberneti" as the example.
 3. The term appears in the list and applies from the next dictation.
 
 ### Edit or remove a term
