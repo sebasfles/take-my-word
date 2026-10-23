@@ -128,3 +128,9 @@
 
 ## 2026-10-23T12:10:47Z by om-developer target desktop on b06fc0f
 - scripts/terminal-smoke.sh: bash -n clean; run once with --server and --real against scratch (pastes 1, landed 1); no other change to desktop code since e892526, whose Windows rust:lint and rust:test are green
+
+## 2026-10-23T12:11:57Z by om-developer target deployment on 8df450d
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (39 tests, pnpm test --no-file-parallelism)
+- e2e: n/a

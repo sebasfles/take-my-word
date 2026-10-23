@@ -140,4 +140,10 @@ Findings of the run for the product:
 
 Deviation agreed with the om-reviewer: the dictation ran on a dev debug build of the same commit, not a local prd build, so Sebastian's prd app and identity were never touched.
 
+### Round 5
+
+1. The user pool test uses example ids (`123456789012`, `us-east-2_AbC123xyZ`); outside `docs/tasks/` the official account now appears only in `docs/` module text, which the docs pass scrubs. Code 8df450d, verify block on it.
+
+The Windows host is released: nothing of ours runs there (only Sebastian's prd app); the builds stay in `C:\dev\tmw-0016-{prd,dev,debug}` until clean-task.
+
 ## Result
