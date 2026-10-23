@@ -69,6 +69,7 @@ source: 0014_desktop_ux
 - Reason: recordings now match the hold within 40 ms, and the prepared stream's session stays inactive, so Windows shows no microphone in use while idle.
 - Debt created: a prepared stream on a Bluetooth headset may switch it to the hands-free profile or hold the device; untested.
 - Revisit when: someone uses a Bluetooth headset with the app, or audio quality drops on one.
+- Amended by 0014_desktop_ux: the stream also has a monitor mode that plays and meters without buffering, used only while the onboarding's microphone step is shown in a visible window, so Windows shows the microphone in use then; a hold during the check takes the stream over and the check resumes after; monitoring never buffers, so a check left open holds no audio, where reusing a recording would keep up to 120 s.
 - Source: 0002_desktop_shell
 
 ## 2026-10-21: Rust mirrors the shared contract by hand

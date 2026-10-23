@@ -16,7 +16,7 @@ It must feel like typing got faster: no window to open, no copy and paste, the u
 ### First run
 
 1. The user downloads the installer from the landing, installs it, and the app opens its main window maximized; it lives in the system tray afterwards and starts with Windows unless turned off.
-2. One flow in the main window walks through what Take My Word does, sign-in (a temporary password is replaced by the user's own), a microphone check with a live level, the shortcut with both gestures and a box to practice in, the dictation languages (Windows' language preselected), the default style chosen by seeing the same sentence in each built-in style, and where the app lives afterwards.
+2. One flow in the main window walks through what Take My Word does, sign-in (a temporary password is replaced by the user's own), a microphone check with a live level that records and sends nothing, the shortcut with both gestures and a box to practice in, the dictation languages (Windows' language preselected), the default style chosen by seeing the same sentence in each built-in style, and where the app lives afterwards.
 3. Signing in again later asks only for what is missing on this machine: a known user goes straight in, a new user picks languages and style.
 4. The flow can be run again from Settings; a user who set up 0.2.0 sees no flow and gets one dismissible note about hands-free in General.
 5. On macOS the app asks the user to set "Press Fn key to" to do nothing and to grant Accessibility, and explains why.
