@@ -141,4 +141,9 @@ The same grep across the repo, files per folder (only `docs/tasks/`):
 
 The desktop identifier stays as the documented exception, in `apps/desktop` only.
 
+Docs findings, one per finding:
+
+1. The desktop entry "Dev and prd are separate apps chosen at build time" (2026-10-21) carries `Superseded by 2026-10-23: ... (the server only)` in the file's marker form.
+2. `take-my-word-{env}` is `<deployment>-{env}` in the infra `trd.md` and `database.md`, the desktop `database.md` and the auth `trd.md` and `database.md`; the two left are inside dated ARD entries (infra table, auth cookie key), true when written and true for the official deployment.
+
 ## Result

@@ -148,6 +148,7 @@ source: 0016_self_hosting
 - Debt created: none.
 - Revisit when: a third environment appears.
 - Source: 0007_desktop_integration
+- Superseded by 2026-10-23: The server is chosen at run time by discovery; the official one is injected at build time (the server only)
 
 ## 2026-10-21: Tokens never reach the WebView
 

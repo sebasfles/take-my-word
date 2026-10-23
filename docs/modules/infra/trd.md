@@ -27,11 +27,11 @@ The official deployment runs `core`, `dev` and `prd` from Sebastian's machine an
 | Lambda `api` | Hono, every CRUD route (dictionary, styles, app rules, settings, history); 512 MB, 15 s; Node 24, ARM64, bundled with esbuild. |
 | Lambda `dictate` | `POST /dictations`; 60 s timeout and more memory than `api`. |
 | Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream through an event source mapping filtered to inserts of `DICTATION#`, batch 10, retry 2, bisect, batch item failures (dictionary module). |
-| DynamoDB `take-my-word-{env}` | The single table, with TTL and a stream enabled. |
+| DynamoDB `<deployment>-{env}` | The single table, with TTL and a stream enabled. |
 | Cognito user pool | Configured by the auth module, created here. |
 | Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`; `<deployment>-{env}/web` holds the web's `COOKIE_KEY`; prd's recovery window is 7 days, 0 under `removal`. |
 | S3 debug bucket | Dev only, optional raw audio for debugging, one-day lifecycle. |
-| Web hosting | Lambda `web` (OpenNext server, 512 MB, 30 s) behind an `AWS_IAM` Function URL, the private bucket `take-my-word-{env}-web-assets-{account}` for `/_next/static/*` and `/static/*`, and one CloudFront distribution with OAC to both, caching disabled for the server and a headers policy (HSTS, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`); its certificate comes from an `aws.us_east_1` provider alias, so any region works. |
+| Web hosting | Lambda `web` (OpenNext server, 512 MB, 30 s) behind an `AWS_IAM` Function URL, the private bucket `<deployment>-{env}-web-assets-{account}` for `/_next/static/*` and `/static/*`, and one CloudFront distribution with OAC to both, caching disabled for the server and a headers policy (HSTS, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`); its certificate comes from an `aws.us_east_1` provider alias, so any region works. |
 | Route 53 records | `<domain>` for prd and `dev.<domain>` for dev (A and AAAA to CloudFront), and an `api.` alias in front of each, each with its ACM certificate, in the zone named by `hostedZone`, which Terraform reads and never owns. |
 | CloudWatch | Structured logs and EMF metrics per provider; every log group keeps 30 days. |
 
