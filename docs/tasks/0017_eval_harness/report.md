@@ -41,8 +41,9 @@ The production switch is a separate task: a `gpt-transcribe` adapter is now in t
 ## Other findings
 
 - Whisper's hallucinations on noise survive today's silence guard because the phrases are new; the phrase list cannot keep up with them, which is the 0001 debt this run measured.
-- Groq's free plan is per account and shared by dev and prd: an unpaced end-to-end attempt of this task sent dictations 1.6 s apart and 9 of 33 got 429 from turbo's 20 requests per minute, for about a minute at 21:28 UTC; the suite now paces itself, and the attempt is kept out of the reports.
-- A user dictating more often than every 3 s would hit the same 429 on turbo today.
+- Groq's free plan is per account and shared by dev and prd: an unpaced end-to-end attempt of this task sent dictations 1.6 s apart and 9 of 33 got 429 from turbo's 20 requests per minute, for about a minute at 21:28 UTC on 2026-10-23; the suite now paces itself, and the attempt is kept out of the reports.
+  Whether prd dictations failed in that minute is not verified, since prd logs are outside this task's clearance; prd's `dictate` logs show it, as "provider failed" lines with status 429 between about 21:27 and 21:30 UTC on 2026-10-23.
+- That limit is account-wide: 20 transcriptions per minute across every user and both environments, so a few users dictating at once, or one `pnpm e2e` run on dev, can make prd dictations fail with 429 today; the switch task should weigh it, since `gpt-transcribe` runs under OpenAI's per-account limits instead.
 - Latency a user feels on dev (client to us-east-1, warm Lambda): 1.6 to 1.8 s P50 release to text; in the unpaced attempt's three cold requests a cold `dictate` added about 1.4 s, with 430 to 570 ms of init; the paced run found the Lambdas warm, and its cold rerun is pending.
   A normal dictation pays fresh provider connections, since Node's default keep-alive drops them after about 4 s; on fresh connections turbo was 385 ms and gpt-transcribe 592 ms at P50.
 

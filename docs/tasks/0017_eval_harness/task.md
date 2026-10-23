@@ -228,3 +228,8 @@ Changes and decisions not in the plan:
 - `verify-task`'s api e2e also dictates on dev with turbo, outside the ledger; Groq's request header still guards the runner.
 
 Pending: the second run's Groq calls and a cold-start end-to-end run after 2026-10-24 19:08 UTC, then re-rendering `reproduction-1.md` and `end-to-end-1.md`.
+
+### Round 6 (in progress)
+
+- `report.md`: Groq's 20 transcriptions per minute is account-wide (every user, dev and prd), named as a production risk for the switch task; the incident states that prd impact is not verified and how to check it.
+- For `document-task`, dictation debt: production's transcriber shares one free-plan rate limit across every user and both environments, so concurrent users or a dev e2e run can make prd dictations fail with 429.
