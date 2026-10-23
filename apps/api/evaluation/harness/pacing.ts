@@ -25,6 +25,7 @@ export type Readiness =
 
 const minuteMs = 60_000;
 const hourMs = 3_600_000;
+const dayMs = 86_400_000;
 
 export const utcDay = (at: number): string => new Date(at).toISOString().slice(0, 10);
 
@@ -63,7 +64,6 @@ function earliestWithin(
 
 export class Pacer {
   private readonly blockedUntil = new Map<string, number>();
-  private readonly pausedForDay = new Map<string, { day: string; reason: string }>();
   private readonly keys: ReadonlyMap<string, PacingKey>;
   private readonly ledger: LedgerEntry[];
   private readonly share: number;
@@ -86,12 +86,7 @@ export class Pacer {
 
   readiness(key: string, need: Usage, now: number): Readiness {
     const config = this.config(key);
-    const paused = this.pausedForDay.get(key);
-    if (paused?.day === utcDay(now)) return { kind: "tomorrow", reason: paused.reason };
-
-    const today = utcDay(now);
     const own = this.ledger.filter((entry) => entry.key === key);
-    const ownToday = own.filter((entry) => utcDay(entry.at) === today);
     const sum = (entries: readonly LedgerEntry[], field: keyof Usage) =>
       entries.reduce((total, entry) => total + entry[field], 0);
     const plan = config.plan;
@@ -101,13 +96,23 @@ export class Pacer {
       ["tokens per day", "tokens", plan?.tokensPerDay],
     ];
     for (const [name, field, limit] of daily) {
-      if (limit !== undefined && sum(ownToday, field) + need[field] > limit * this.share) {
+      if (limit === undefined || need[field] === 0) continue;
+      const at = earliestWithin(
+        own,
+        dayMs,
+        now,
+        (entry) => entry[field],
+        need[field],
+        limit * this.share,
+      );
+      if (at - now > hourMs) {
         return {
           kind: "tomorrow",
-          reason: `${name}: the runner keeps half of ${String(limit)} free`,
+          reason: `${name}: the runner keeps half of ${String(limit)} free over any 24 hours; resume after ${new Date(at).toISOString()}`,
         };
       }
     }
+    const today = utcDay(now);
     if (config.complimentary) {
       const group = config.complimentary.group;
       const groupToday = this.ledger.filter(
@@ -127,6 +132,9 @@ export class Pacer {
     const waits = [this.blockedUntil.get(key) ?? now];
     if (plan) {
       const windows: [number, (entry: LedgerEntry) => number, number, number | undefined][] = [
+        [dayMs, (entry) => entry.requests, need.requests, plan.requestsPerDay],
+        [dayMs, (entry) => entry.audioSeconds, need.audioSeconds, plan.audioSecondsPerDay],
+        [dayMs, (entry) => entry.tokens, need.tokens, plan.tokensPerDay],
         [minuteMs, (entry) => entry.requests, need.requests, plan.requestsPerMinute],
         [hourMs, (entry) => entry.audioSeconds, need.audioSeconds, plan.audioSecondsPerHour],
         [minuteMs, (entry) => entry.tokens, need.tokens, plan.tokensPerMinute],
@@ -168,10 +176,7 @@ export class Pacer {
       if (limit === undefined || remaining === undefined || remaining >= limit * this.share)
         continue;
       if (provider === "groq" && budget === "requests") {
-        this.pausedForDay.set(key, {
-          day: utcDay(now),
-          reason: `${String(remaining)} of ${String(limit)} daily requests left for production`,
-        });
+        block(now + (parseResetMs(headers["x-ratelimit-reset-requests"]) ?? hourMs));
         continue;
       }
       block(now + (parseResetMs(headers[`x-ratelimit-reset-${budget}`]) ?? minuteMs));

@@ -134,7 +134,9 @@ export async function executePlan<R extends Charged>(
     options.wait,
   );
   if (outcome.kind === "paused") {
-    console.log("paused for today, rerun the same command after 00:00 UTC:");
+    console.log(
+      "paused to keep half of the free plans for production; rerun the same command after the times below:",
+    );
     for (const reason of outcome.reasons) console.log(`- ${reason}`);
     return false;
   }

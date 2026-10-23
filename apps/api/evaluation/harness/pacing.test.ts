@@ -65,25 +65,28 @@ describe("Pacer", () => {
     expect(readiness).toEqual({ kind: "at", at: noon - 3_000_000 + 3_600_000 });
   });
 
-  it("stops for the day when its own daily usage would pass half of a daily limit", () => {
+  it("keeps half of a daily limit free over any 24 hours, not per calendar day", () => {
     const ledger = entries("groq:chat", 1, () => noon - 3_600_000, {
       requests: 1,
       audioSeconds: 0,
       tokens: 99_500,
     });
     const pacer = new Pacer(keys, ledger);
-    expect(
-      pacer.readiness("groq:chat", { requests: 1, audioSeconds: 0, tokens: 600 }, noon),
-    ).toMatchObject({
-      kind: "tomorrow",
-    });
+    const big = { requests: 1, audioSeconds: 0, tokens: 600 };
+    const readiness = pacer.readiness("groq:chat", big, noon);
+    expect(readiness).toMatchObject({ kind: "tomorrow" });
+    expect(readiness.kind === "tomorrow" && readiness.reason).toMatch(
+      /resume after 2026-10-24T11:00:00.000Z$/,
+    );
     expect(
       pacer.readiness("groq:chat", { requests: 1, audioSeconds: 0, tokens: 400 }, noon),
     ).toEqual({ kind: "now" });
-    const nextDay = noon + 13 * 3_600_000;
-    expect(
-      pacer.readiness("groq:chat", { requests: 1, audioSeconds: 0, tokens: 600 }, nextDay),
-    ).toEqual({ kind: "now" });
+    expect(pacer.readiness("groq:chat", big, noon + 13 * 3_600_000)).toMatchObject({
+      kind: "tomorrow",
+    });
+    expect(pacer.readiness("groq:chat", big, noon + 23 * 3_600_000 + 60_000)).toEqual({
+      kind: "now",
+    });
   });
 
   it("shares a complimentary group's daily tokens across its models", () => {
@@ -127,17 +130,21 @@ describe("Pacer", () => {
     ]);
   });
 
-  it("pauses a Groq model for the day once production's half of the daily requests is reached", () => {
+  it("waits for Groq's reset once production's half of the daily requests is reached", () => {
     const pacer = new Pacer(keys, []);
     pacer.observe(
       "groq:whisper",
-      { "x-ratelimit-limit-requests": "2000", "x-ratelimit-remaining-requests": "999" },
+      {
+        "x-ratelimit-limit-requests": "2000",
+        "x-ratelimit-remaining-requests": "999",
+        "x-ratelimit-reset-requests": "32m24s",
+      },
       noon,
     );
-    expect(pacer.readiness("groq:whisper", call, noon + 60_000)).toMatchObject({
-      kind: "tomorrow",
+    expect(pacer.readiness("groq:whisper", call, noon + 60_000)).toEqual({
+      kind: "at",
+      at: noon + 1_944_000,
     });
-    expect(pacer.readiness("groq:whisper", call, noon + 13 * 3_600_000)).toEqual({ kind: "now" });
   });
 
   it("waits for the reset when a per-window budget falls under half, and after a retry-after", () => {
