@@ -94,6 +94,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Clipboard snapshot (om-manager, 2026-10-23): before any run injects input or touches the clipboard, the clipboard is saved to a DPAPI-encrypted file, with its formats and hash logged (never content), then restored and verified by hash at the end.
   No shell tracing (`set -x`) around clipboard code; the snapshot never reaches logs, command lines or evidence, only the DPAPI file (om-manager, 2026-10-23, after the round 1 trace incident).
 - Config test temp folders (om-reviewer, 2026-10-23, out of Scope on purpose): config.rs's tests leave a `%TEMP%\tmw-config-*` folder per run (6951 on the host). Round 2 makes them clean up after themselves. The leftover folders are not deleted, since only folders a run's own tests created may go (om-manager); the PR lists them for Sebastian.
+- Windows mirror (om-manager, 2026-10-23, after round 2 synced into the default `C:\dev\take-my-word`): every host command sets `TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0013` explicitly (windows.sh takes a WSL path), the run tools refuse any other value, the smoke never syncs a mirror so it needs no check, and `C:\dev\take-my-word` is never touched again (it did not exist before round 2 created it; the om-manager removes it at clean). `scripts/windows.sh` keeps its documented default (om-reviewer), since it is every task's verify entry point.
 - Replication (om-reviewer): the classic window is launched explicitly as `conhost.exe powershell.exe` (and `pwsh.exe`), since Windows 11 may hand consoles to WT. Each target also gets a multi-line dictation, which may come from a debug-only stub mode with a fixed two-line text.
 - Isolation (om-reviewer): tmux runs on its own socket (`tmux -L tmw-0013-{{n}}`), never on the default server where the crew lives, and only that server is killed. WindowsTerminal.exe, OpenConsole and conhost processes the run did not start are never killed; the run's WT window (`wt -w tmw-0013-{{n}}`) closes by ending its own shells. Before every dictation the run checks that the foreground window is its own and aborts otherwise.
 - Claude Code in the smoke (om-reviewer): throwaway directory, no prompt ever submitted, no Enter sent, exited by the run; skip user hooks and MCP servers where the CLI allows.
@@ -196,3 +197,9 @@ Decisions the plan did not record (ARD entries in `document-task`, or the smoke'
 
 4. The smoke's clipboard safety, guard and process rules as listed under findings 2 to 5.
 
+
+### Round 3
+
+Finding applied: round 2's `rust:test` ran without `TMW_WINDOWS_CHECKOUT`, so `scripts/windows.sh` synced a dirty tree into its default mirror `C:\dev\take-my-word`, which that run created (it did not exist before); its result could not be tied to the round's commit.
+Rerun on this round's commit through `C:\dev\tmw-0013`; my run drivers now refuse to start unless `TMW_WINDOWS_CHECKOUT` is `/mnt/c/dev/tmw-0013` (the WSL path `windows.sh` expects for `C:\dev\tmw-0013`).
+`C:\dev\take-my-word` is left to the om-manager at clean time.
