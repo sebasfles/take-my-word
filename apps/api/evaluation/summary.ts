@@ -156,10 +156,10 @@ for (const mode of languageModes) {
       const months = scenarios.map((scenario) => {
         const stages = [stageMonth(tStage, scenario), stageMonth(cStage, scenario)];
         for (const [stage, month] of [
-          [tStage, stages[0]],
-          [cStage, stages[1]],
+          [transcriber.id, stages[0]],
+          [refiner.id, stages[1]],
         ] as const) {
-          if (month !== undefined) notes.set(`${stage.model}, ${scenario.name}`, month.why);
+          if (month !== undefined) notes.set(`${stage}, ${scenario.name}`, month.why);
         }
         const list = stages.reduce((sum, stage) => sum + stage.listUsd, 0);
         const charged = stages.reduce((sum, stage) => sum + (stage.covered ? 0 : stage.listUsd), 0);

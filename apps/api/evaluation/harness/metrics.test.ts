@@ -7,6 +7,7 @@ import {
   percentile,
   sumDistribution,
   wordErrors,
+  wordsOf,
 } from "./metrics.ts";
 
 describe("wordErrors", () => {
@@ -28,6 +29,19 @@ describe("wordErrors", () => {
   it("splits hyphenated words, so hyphenation is formatting and not a recognition error", () => {
     expect(wordErrors("The CRISPR-Cas9 knockout.", "The CRISPR Cas9 knockout.").errors).toBe(0);
     expect(wordErrors("The CRISPR-Cas9 knockout.", "The crisper Cas9 knockout.").errors).toBe(1);
+  });
+
+  it("treats em and en dashes as separators and typographic hyphens as hyphens", () => {
+    expect(wordsOf("The token expired\u2014the API token.")).toEqual([
+      "the",
+      "token",
+      "expired",
+      "the",
+      "api",
+      "token",
+    ]);
+    expect(wordErrors("Hagamos el standup.", "Hagamos el stand\u2011up.").errors).toBe(2);
+    expect(wordErrors("Hagamos el stand-up.", "Hagamos el stand\u2011up.").errors).toBe(0);
   });
 
   it("keeps accents, so a missing tilde is an error", () => {

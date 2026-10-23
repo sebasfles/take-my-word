@@ -11,7 +11,7 @@ export const typographic = (text: string): string =>
 export const wordsOf = (text: string): string[] =>
   typographic(text)
     .toLowerCase()
-    .split(/[\s.,;:!?¿¡"()]+/)
+    .split(/[\s.,;:!?¿¡"()\u2013\u2014]+/)
     .map((word) => word.replace(/^[-']+|[-']+$/g, ""))
     .filter((word) => word !== "");
 
@@ -87,7 +87,7 @@ export function align(reference: readonly string[], hypothesis: readonly string[
 }
 
 export const recognitionTokens = (text: string): string[] =>
-  wordsOf(text).flatMap((word) => word.split("-").filter((part) => part !== ""));
+  wordsOf(text).flatMap((word) => word.split(/[-\u2010\u2011]/).filter((part) => part !== ""));
 
 export function wordErrors(reference: string, hypothesis: string): WordErrors {
   const ops = align(recognitionTokens(reference), recognitionTokens(hypothesis));
