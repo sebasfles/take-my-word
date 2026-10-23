@@ -323,6 +323,9 @@ function AccountRow() {
                 : t("settings.account.signedIn")
               : t("settings.account.signedOut")}
         </p>
+        {account?.server && (
+          <p className="setting-note">{t("settings.account.server", { domain: account.server })}</p>
+        )}
       </div>
       {account?.signedIn === true && (
         <button

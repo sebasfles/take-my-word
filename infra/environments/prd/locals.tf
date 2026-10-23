@@ -7,8 +7,8 @@ locals {
 
   debug_bucket                   = false
   point_in_time_recovery         = true
-  deletion_protection            = true
-  secret_recovery_window_in_days = 7
+  deletion_protection            = !var.removal
+  secret_recovery_window_in_days = var.removal ? 0 : 7
 
   tags = {
     Project     = local.project

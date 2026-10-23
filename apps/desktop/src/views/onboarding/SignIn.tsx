@@ -145,3 +145,93 @@ export function ChoosePasswordForm({
     </form>
   );
 }
+
+export function ServerForm({
+  onChosen,
+  onBack,
+}: {
+  onChosen: (server: string | null) => void;
+  onBack: () => void;
+}) {
+  const [domain, setDomain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<MessageId | null>(null);
+
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    bridge
+      .useServer(domain)
+      .then(onChosen)
+      .catch((reason: unknown) => {
+        setError(problemOf(reason).message);
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  return (
+    <form className="window-form" onSubmit={submit}>
+      <TextInput
+        label={t("server.domain")}
+        hint={t("server.domainHint")}
+        name="domain"
+        type="text"
+        inputMode="url"
+        autoComplete="url"
+        autoCapitalize="none"
+        spellCheck={false}
+        autoFocus
+        required
+        value={domain}
+        onChange={(event) => {
+          setDomain(event.target.value);
+        }}
+        aria-describedby={error ? "server-error" : undefined}
+      />
+      {error && (
+        <p id="server-error" className="form-error" role="alert">
+          {t(error)}
+        </p>
+      )}
+      <div className="onboarding-actions">
+        <Button variant="ghost" onClick={onBack} disabled={busy}>
+          {t("onboarding.back")}
+        </Button>
+        <Button type="submit" loading={busy}>
+          {t(busy ? "server.submitting" : "server.submit")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+export function ServerChoice({
+  server,
+  onOwn,
+  onOfficial,
+}: {
+  server: string | null;
+  onOwn: () => void;
+  onOfficial: () => void;
+}) {
+  if (server === null) {
+    return (
+      <p className="server-choice">
+        <button type="button" className="text-link" onClick={onOwn}>
+          {t("signIn.ownServer")}
+        </button>
+      </p>
+    );
+  }
+  return (
+    <p className="server-choice">
+      <span>{t("signIn.server", { domain: server })}</span>
+      <button type="button" className="text-link" onClick={onOfficial}>
+        {t("signIn.officialServer")}
+      </button>
+    </p>
+  );
+}

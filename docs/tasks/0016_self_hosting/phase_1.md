@@ -79,3 +79,11 @@ Done, one per finding:
 Still pending before phase 1 closes: Windows `rust:lint` and `rust:test`, web `integration` and `e2e`, and the core, dev and prd plans after the rebase on 0015 and the SSO login.
 
 ## Result
+
+Closed 2026-10-23 at afe949f after two rounds, reviewed clean by the om-reviewer.
+
+- Outcome: `deployment.json` with its example and generated JSON Schema in `packages/deployment`; `pnpm tf` with a generated backend; Terraform takes every per-deployment value, CI optional behind `github` with `moved` blocks for the deploy role and its policy; the web certificate from an `aws.us_east_1` alias; `pnpm deploy:<api|web> <build|swap>` shared by CI (build before the role) and the setup to come; discovery schema in `packages/shared` and `/.well-known/take-my-word.json` from the web's existing env; release links and the desktop's official server and updater injected at build time; OG card without the domain.
+- Deviations: none from the plan. Round 1 findings were the build running with the deploy role's credentials, a pattern-only e2e link check and a tautological updater test.
+- Carried to phase 2, required before the PR: Windows `rust:lint` and `rust:test`, web `integration` and `e2e` (both wait for shared dev and host), and the core, dev and prd plans after the rebase on 0015 (moves only, then the crew applies the moves).
+- Actions variables for the om-manager before merge: `DESKTOP_DEV_SERVER`, `DESKTOP_PRD_SERVER`, `DESKTOP_UPDATER_PUBKEY` (see notes).
+- Debt created: none new; the release check now trusts the `DESKTOP_UPDATER_PUBKEY` variable instead of a committed key (recorded for the PR's Decisions).

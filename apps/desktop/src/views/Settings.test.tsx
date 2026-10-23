@@ -159,13 +159,29 @@ describe("Settings", () => {
     render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
-    fakeBridge.accountStatus.mockResolvedValue({ signedIn: false, username: null });
+    fakeBridge.accountStatus.mockResolvedValue({ signedIn: false, username: null, server: null });
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(fakeBridge.signOut).toHaveBeenCalledOnce();
     await screen.findByText("Signed out. Sign in to dictate.");
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     expect(fakeBridge.openSignIn).toHaveBeenCalledOnce();
-    fakeBridge.accountStatus.mockResolvedValue({ signedIn: true, username: "sebastian" });
+    fakeBridge.accountStatus.mockResolvedValue({
+      signedIn: true,
+      username: "sebastian",
+      server: null,
+    });
+  });
+
+  it("names the server when the account lives on a self-hosted one", async () => {
+    fakeBridge.accountStatus.mockResolvedValueOnce({
+      signedIn: true,
+      username: "sebastian",
+      server: "dictation.example.com",
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    await screen.findByText("Signed in as sebastian");
+    expect(screen.getByText("Server: dictation.example.com")).toBeTruthy();
   });
 
   it("opens on the section the shell asks for and moves between sections", async () => {
@@ -329,7 +345,11 @@ describe("Settings", () => {
     render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
-    fakeBridge.accountStatus.mockResolvedValueOnce({ signedIn: false, username: null });
+    fakeBridge.accountStatus.mockResolvedValueOnce({
+      signedIn: false,
+      username: null,
+      server: null,
+    });
     act(() => {
       listeners.accountChanged?.(false);
     });

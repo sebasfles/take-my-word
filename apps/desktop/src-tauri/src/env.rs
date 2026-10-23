@@ -6,9 +6,8 @@ compile_error!(
     "release builds need an environment: pnpm tauri:build:dev or pnpm tauri:build:prd in apps/desktop"
 );
 
-use serde::Deserialize;
-
 use crate::hotkey::HotkeyKey;
+use crate::server::Server;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Environment {
@@ -26,32 +25,12 @@ pub const PRD: Environment = Environment {
     default_hotkey: &[HotkeyKey::Ctrl, HotkeyKey::Meta],
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[cfg_attr(test, derive(schemars::JsonSchema))]
-#[serde(rename_all = "camelCase")]
-pub struct Server {
-    pub version: u8,
-    pub api_url: String,
-    pub region: String,
-    pub user_pool_id: String,
-    pub client_id: String,
-}
-
-const DISCOVERY_VERSION: u8 = 1;
-
 fn parse_server(json: Option<&str>) -> Result<Server, String> {
     let json = json.ok_or(
         "this build has no official server; build with pnpm tauri:build:dev or pnpm tauri:build:prd in apps/desktop",
     )?;
-    let server: Server = serde_json::from_str(json)
-        .map_err(|error| format!("the official server of this build is not valid: {error}"))?;
-    if server.version != DISCOVERY_VERSION {
-        return Err(format!(
-            "the official server of this build is discovery version {}, this app reads {DISCOVERY_VERSION}",
-            server.version
-        ));
-    }
-    Ok(server)
+    Server::from_json(json.as_bytes())
+        .map_err(|error| format!("the official server of this build is not valid: {error}"))
 }
 
 pub fn official_server() -> Result<Server, String> {

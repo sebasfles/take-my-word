@@ -106,6 +106,34 @@ const shots: Shot[] = [
     },
   },
   {
+    name: "onboarding-server",
+    query: fresh,
+    act: async (page, text) => {
+      await welcomed(page, text);
+      await page.getByRole("button", { name: text("signIn.ownServer") }).click();
+      await page.getByRole("heading", { name: text("server.title") }).waitFor();
+    },
+  },
+  {
+    name: "onboarding-server-error",
+    query: `${fresh}&server-error=server.notTakeMyWord`,
+    act: async (page, text) => {
+      await welcomed(page, text);
+      await page.getByRole("button", { name: text("signIn.ownServer") }).click();
+      await page.getByLabel(text("server.domain")).fill("example.com");
+      await page.getByRole("button", { name: text("server.submit") }).click();
+      await page.getByRole("alert").waitFor();
+    },
+  },
+  {
+    name: "onboarding-sign-in-own-server",
+    query: `${fresh}&server=dictation.example.com`,
+    act: async (page, text) => {
+      await welcomed(page, text);
+      await page.getByRole("button", { name: text("signIn.officialServer") }).waitFor();
+    },
+  },
+  {
     name: "onboarding-choose-password",
     query: `${fresh}&signin=new-password`,
     act: choosePassword,
@@ -216,6 +244,15 @@ const shots: Shot[] = [
     act: async (page, text) => {
       await page
         .getByText(text("settings.account.signedInAs", { username: "sebastian" }))
+        .waitFor();
+    },
+  },
+  {
+    name: "settings-account-own-server",
+    query: "view=main&section=account&server=dictation.example.com",
+    act: async (page, text) => {
+      await page
+        .getByText(text("settings.account.server", { domain: "dictation.example.com" }))
         .waitFor();
     },
   },

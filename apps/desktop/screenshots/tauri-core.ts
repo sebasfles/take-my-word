@@ -201,9 +201,15 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
     case "account_status":
       return answer(
         params.get("account") === "signed-out"
-          ? { signedIn: false, username: null }
-          : { signedIn: true, username: "sebastian" },
+          ? { signedIn: false, username: null, server: params.get("server") }
+          : { signedIn: true, username: "sebastian", server: params.get("server") },
       );
+    case "server":
+      return answer(params.get("server"));
+    case "use_server": {
+      const failure = params.get("server-error");
+      return failure === null ? answer("dictation.example.com") : problem(failure);
+    }
     case "sign_in":
       if (params.get("signin") === "wrong") {
         return problem("account.wrongCredentials");

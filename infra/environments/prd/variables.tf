@@ -41,3 +41,9 @@ variable "github_app_pem" {
   sensitive   = true
   default     = null
 }
+
+variable "removal" {
+  description = "Set only by pnpm selfhost remove: lifts deletion protection and the secrets' recovery window so destroy leaves nothing"
+  type        = bool
+  default     = false
+}

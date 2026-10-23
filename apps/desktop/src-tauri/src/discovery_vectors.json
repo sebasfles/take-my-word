@@ -1,0 +1,327 @@
+{
+  "base": {
+    "version": 1,
+    "apiUrl": "https://api.dictation.example.com",
+    "region": "eu-west-2",
+    "userPoolId": "eu-west-2_AbC123xyZ",
+    "clientId": "1example23client45id6789ab"
+  },
+  "accepted": [
+    {
+      "why": "the base document",
+      "set": {}
+    },
+    {
+      "why": "keys a later version 1 adds",
+      "set": {
+        "motd": "hi"
+      }
+    },
+    {
+      "why": "a two-label API host",
+      "set": {
+        "apiUrl": "https://example.co"
+      }
+    },
+    {
+      "why": "labels of 63 characters",
+      "set": {
+        "apiUrl": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com"
+      }
+    },
+    {
+      "why": "digits and inner hyphens in labels",
+      "set": {
+        "apiUrl": "https://api-2.x1.example.com"
+      }
+    },
+    {
+      "why": "a punycode label",
+      "set": {
+        "apiUrl": "https://api.xn--mnchen-3ya.de"
+      }
+    },
+    {
+      "why": "a region with several words",
+      "set": {
+        "region": "us-gov-west-1",
+        "userPoolId": "us-gov-west-1_Pool1"
+      }
+    },
+    {
+      "why": "a two-digit region number",
+      "set": {
+        "region": "ap-southeast-12",
+        "userPoolId": "ap-southeast-12_Pool1"
+      }
+    },
+    {
+      "why": "a pool suffix of 55 characters",
+      "set": {
+        "userPoolId": "eu-west-2_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "why": "a client id of 128 characters",
+      "set": {
+        "clientId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    }
+  ],
+  "refused": [
+    {
+      "why": "version 2",
+      "set": {
+        "version": 2
+      }
+    },
+    {
+      "why": "version 0",
+      "set": {
+        "version": 0
+      }
+    },
+    {
+      "why": "the version as a string",
+      "set": {
+        "version": "1"
+      }
+    },
+    {
+      "why": "plain http",
+      "set": {
+        "apiUrl": "http://api.dictation.example.com"
+      }
+    },
+    {
+      "why": "a trailing slash",
+      "set": {
+        "apiUrl": "https://api.dictation.example.com/"
+      }
+    },
+    {
+      "why": "a port",
+      "set": {
+        "apiUrl": "https://api.dictation.example.com:8443"
+      }
+    },
+    {
+      "why": "user info",
+      "set": {
+        "apiUrl": "https://user@api.dictation.example.com"
+      }
+    },
+    {
+      "why": "a path and query",
+      "set": {
+        "apiUrl": "https://api.dictation.example.com/v1?x=1"
+      }
+    },
+    {
+      "why": "a single label",
+      "set": {
+        "apiUrl": "https://localhost"
+      }
+    },
+    {
+      "why": "an IP address",
+      "set": {
+        "apiUrl": "https://192.168.0.1"
+      }
+    },
+    {
+      "why": "an upper-case host",
+      "set": {
+        "apiUrl": "https://API.dictation.example.com"
+      }
+    },
+    {
+      "why": "a label starting with a hyphen",
+      "set": {
+        "apiUrl": "https://-api.example.com"
+      }
+    },
+    {
+      "why": "a label ending with a hyphen",
+      "set": {
+        "apiUrl": "https://api-.example.com"
+      }
+    },
+    {
+      "why": "an empty label",
+      "set": {
+        "apiUrl": "https://api..example.com"
+      }
+    },
+    {
+      "why": "a trailing dot",
+      "set": {
+        "apiUrl": "https://api.example.com."
+      }
+    },
+    {
+      "why": "a label of 64 characters",
+      "set": {
+        "apiUrl": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com"
+      }
+    },
+    {
+      "why": "a host over 253 characters",
+      "set": {
+        "apiUrl": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com"
+      }
+    },
+    {
+      "why": "a one-letter top-level label",
+      "set": {
+        "apiUrl": "https://api.example.c"
+      }
+    },
+    {
+      "why": "a digit in the top-level label",
+      "set": {
+        "apiUrl": "https://api.example.c0m"
+      }
+    },
+    {
+      "why": "a host with a space",
+      "set": {
+        "apiUrl": "https://api example.com"
+      }
+    },
+    {
+      "why": "only the scheme",
+      "set": {
+        "apiUrl": "https://"
+      }
+    },
+    {
+      "why": "a region with a host after it",
+      "set": {
+        "region": "eu-west-2.evil.example"
+      }
+    },
+    {
+      "why": "a region with a path before it",
+      "set": {
+        "region": "evil.example/eu-west-2"
+      }
+    },
+    {
+      "why": "an upper-case region",
+      "set": {
+        "region": "EU-WEST-2"
+      }
+    },
+    {
+      "why": "a region without a number",
+      "set": {
+        "region": "eu-west"
+      }
+    },
+    {
+      "why": "a region with a three-digit number",
+      "set": {
+        "region": "eu-west-123"
+      }
+    },
+    {
+      "why": "a region with one word",
+      "set": {
+        "region": "eu-2"
+      }
+    },
+    {
+      "why": "a three-letter region prefix",
+      "set": {
+        "region": "eur-west-2"
+      }
+    },
+    {
+      "why": "a pool in another region",
+      "set": {
+        "userPoolId": "us-east-1_AbC123xyZ"
+      }
+    },
+    {
+      "why": "a pool without a suffix",
+      "set": {
+        "userPoolId": "eu-west-2_"
+      }
+    },
+    {
+      "why": "a pool suffix with a slash",
+      "set": {
+        "userPoolId": "eu-west-2_a/b"
+      }
+    },
+    {
+      "why": "a pool suffix of 56 characters",
+      "set": {
+        "userPoolId": "eu-west-2_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "why": "a pool without the separator",
+      "set": {
+        "userPoolId": "eu-west-2AbC123xyZ"
+      }
+    },
+    {
+      "why": "a client id with a space",
+      "set": {
+        "clientId": "client id"
+      }
+    },
+    {
+      "why": "an empty client id",
+      "set": {
+        "clientId": ""
+      }
+    },
+    {
+      "why": "an upper-case client id",
+      "set": {
+        "clientId": "Client1"
+      }
+    },
+    {
+      "why": "a client id of 129 characters",
+      "set": {
+        "clientId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "why": "a null field",
+      "set": {
+        "clientId": null
+      }
+    },
+    {
+      "why": "a number for a string",
+      "set": {
+        "region": 2
+      }
+    },
+    {
+      "why": "no version",
+      "remove": ["version"]
+    },
+    {
+      "why": "no apiUrl",
+      "remove": ["apiUrl"]
+    },
+    {
+      "why": "no region",
+      "remove": ["region"]
+    },
+    {
+      "why": "no userPoolId",
+      "remove": ["userPoolId"]
+    },
+    {
+      "why": "no clientId",
+      "remove": ["clientId"]
+    }
+  ]
+}

@@ -11,7 +11,7 @@ use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi};
 #[cfg(debug_assertions)]
 use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
-use crate::auth::account::{Account, CognitoProvider};
+use crate::auth::account::{Account, AccountError, CognitoProvider};
 use crate::auth::cognito::Cognito;
 use crate::clipboard::{self, Clipboard, ClipboardError};
 use crate::config::{self, Placement, Settings};
@@ -26,6 +26,7 @@ use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverla
 use crate::own_window::{ACK_TIMEOUT, Acks, Keeper, OwnWindowFirst, Page};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
+use crate::server::{SelfHosted, Server};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
 use crate::{account, env};
@@ -39,6 +40,7 @@ pub type AppApi = AuthedApi<Arc<AppAccount>>;
 pub struct Shell {
     pub account: Arc<AppAccount>,
     pub api: AppApi,
+    official: Server,
     pub rules: Arc<RuleCache>,
     #[cfg(debug_assertions)]
     pub stub: Stub,
@@ -63,7 +65,7 @@ impl Shell {
     pub fn start(
         app: &AppHandle,
         settings_path: PathBuf,
-        settings: Settings,
+        mut settings: Settings,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         windows::create_overlay(app)?;
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
@@ -81,11 +83,20 @@ impl Shell {
             windows::MAIN,
             "microphone-level",
         );
-        let server = env::official_server()?;
-        let provider = CognitoProvider {
-            cognito: Cognito::for_server(&server)?,
-            device_name: device_name(app),
-        };
+        let official = env::official_server()?;
+        settings.server = settings.server.take().and_then(|chosen| {
+            chosen
+                .checked()
+                .inspect_err(|error| {
+                    log::warn!("the stored server is not valid, using the official one: {error}");
+                })
+                .ok()
+        });
+        let server = settings
+            .server
+            .as_ref()
+            .map_or(&official, |chosen| &chosen.server);
+        let provider = CognitoProvider::new(Cognito::for_server(server)?, device_name(app));
         let keychain = SystemKeychain::new(env::CURRENT.identifier)?;
         let listener_app = app.clone();
         let account = Arc::new(Account::restore(
@@ -93,7 +104,7 @@ impl Shell {
             keychain,
             Box::new(move |signed_in| account::changed(&listener_app, signed_in)),
         ));
-        let api = AuthedApi::new(HttpApi::new(server.api_url)?, Arc::clone(&account));
+        let api = AuthedApi::new(HttpApi::new(server.api_url.clone())?, Arc::clone(&account));
         let rules = Arc::new(RuleCache::default());
         let dictation_api = api.clone();
         #[cfg(debug_assertions)]
@@ -156,6 +167,7 @@ impl Shell {
         Ok(Self {
             account,
             api,
+            official,
             rules,
             #[cfg(debug_assertions)]
             stub,
@@ -175,6 +187,31 @@ impl Shell {
             proposed: Mutex::new(None),
             copies: OnceLock::new(),
         })
+    }
+
+    pub fn official(&self) -> &Server {
+        &self.official
+    }
+
+    pub fn use_server(&self, chosen: Option<SelfHosted>) -> Result<(), AccountError> {
+        let server = chosen
+            .as_ref()
+            .map_or(&self.official, |chosen| &chosen.server)
+            .clone();
+        self.account.while_signed_out(|provider| {
+            provider
+                .connect(&server)
+                .map_err(|error| AccountError::Unavailable(error.to_string()))?;
+            self.api.set_base_url(&server.api_url);
+            log::info!(
+                "server: {}",
+                chosen
+                    .as_ref()
+                    .map_or("the official one", |chosen| chosen.domain.as_str())
+            );
+            self.update_settings(|settings| settings.server = chosen);
+            Ok(())
+        })?
     }
 
     pub fn settings(&self) -> Settings {

@@ -9,7 +9,7 @@ use time::OffsetDateTime;
 
 use super::Secret;
 use super::srp::{self, Ephemeral, PasswordChallenge, SrpError};
-use crate::env::Server;
+use crate::server::Server;
 
 const TIMEOUT: Duration = Duration::from_secs(15);
 const TARGET_PREFIX: &str = "AWSCognitoIdentityProviderService.";

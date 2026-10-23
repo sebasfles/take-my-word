@@ -13,6 +13,11 @@ export function rootProblem(config: DeploymentConfig, root: Root): string | null
     : `${root} is not one of this deployment's environments (${config.environments.join(", ")})`;
 }
 
+export function siteHosts(domain: string, env: Environment): { web: string; api: string } {
+  const web = env === "prd" ? domain : `dev.${domain}`;
+  return { web, api: `api.${web}` };
+}
+
 export function backendConfig(config: DeploymentConfig, root: Root): string {
   return [
     `bucket = ${JSON.stringify(stateBucket(config))}`,

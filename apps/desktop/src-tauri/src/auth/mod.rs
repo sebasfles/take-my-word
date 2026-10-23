@@ -97,10 +97,10 @@ mod dev_pool {
             return;
         };
         let service = format!("dev.fless.takemyword.test.api.{}", std::process::id());
-        let provider = CognitoProvider {
-            cognito: Cognito::for_server(&server).unwrap(),
-            device_name: "Take My Word cargo test".into(),
-        };
+        let provider = CognitoProvider::new(
+            Cognito::for_server(&server).unwrap(),
+            "Take My Word cargo test",
+        );
         let account = Arc::new(Account::restore(
             provider,
             SystemKeychain::new(&service).unwrap(),
@@ -108,7 +108,10 @@ mod dev_pool {
         ));
         let step = account.sign_in(&username, Secret::new(password)).unwrap();
         assert!(matches!(step, SignInStep::SignedIn(_)));
-        let api = AuthedApi::new(HttpApi::new(server.api_url.clone()).unwrap(), Arc::clone(&account));
+        let api = AuthedApi::new(
+            HttpApi::new(server.api_url.clone()).unwrap(),
+            Arc::clone(&account),
+        );
         let styles = api.styles().unwrap().styles;
         assert!(styles.iter().any(|style| style.id == "casual"));
         let settings = api.settings().unwrap();

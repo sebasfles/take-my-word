@@ -138,7 +138,7 @@ fn the_rust_mirror_matches_the_shared_contract() {
         ("settings", rust::<UserSettings>()),
         ("styleList", rust::<StyleList>()),
         ("appRuleList", rust::<AppRuleList>()),
-        ("discovery", rust::<crate::env::Server>()),
+        ("discovery", rust::<crate::server::Server>()),
     ]);
     let drifted = contract
         .as_object()
