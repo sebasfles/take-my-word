@@ -1,6 +1,12 @@
 import { parseArgs } from "node:util";
-import type { ProviderCall } from "../../src/eval/contract.ts";
-import { deployEvalFunction, type EvalFunction } from "./eval-lambda.ts";
+import { createHash } from "node:crypto";
+import type { ProviderCall, ProviderRequest } from "../../src/eval/contract.ts";
+import {
+  buildEvalBundle,
+  deployEvalFunction,
+  type EvalBundle,
+  type EvalFunction,
+} from "./eval-lambda.ts";
 import { CostGuard, Pacer, type LedgerEntry, type PacingKey } from "./pacing.ts";
 import { complimentaryDailyTokens, modelFacts, runBudgetUsd } from "./prices.ts";
 import { runSchedule, type PlannedItem } from "./scheduler.ts";
@@ -62,13 +68,37 @@ export function pacingKeys(models: readonly string[]): Map<string, PacingKey> {
 export const headersOf = (calls: readonly ProviderCall[]): Record<string, string> =>
   calls.reduce<Record<string, string>>((merged, call) => ({ ...merged, ...call.headers }), {});
 
-export async function deployAndWarm(workspace: Workspace): Promise<EvalFunction> {
+export async function deployAndWarm(
+  workspace: Workspace,
+  bundle?: EvalBundle,
+): Promise<EvalFunction> {
   await workspace.requireAccount();
   console.log(`building and swapping ${workspace.evalFunctionName}`);
-  const evalFunction = await deployEvalFunction(workspace.lambda, workspace.evalFunctionName);
+  const evalFunction = await deployEvalFunction(
+    workspace.lambda,
+    workspace.evalFunctionName,
+    bundle ?? (await buildEvalBundle()),
+  );
   const warm = await evalFunction.invoke({ kind: "warmup" });
   console.log(`warm: ${warm.region}, cold start ${String(warm.coldStart)}`);
   return evalFunction;
+}
+
+export function requestsSha256(
+  requests: readonly { id: string; request: ProviderRequest }[],
+): string {
+  const hash = createHash("sha256");
+  for (const { id, request } of [...requests].sort((a, b) => a.id.localeCompare(b.id))) {
+    const comparable =
+      request.kind === "transcribe"
+        ? {
+            ...request,
+            audioBase64: createHash("sha256").update(request.audioBase64).digest("hex"),
+          }
+        : request;
+    hash.update(`${id}\t${JSON.stringify(comparable)}\n`);
+  }
+  return hash.digest("hex");
 }
 
 export interface Charged {

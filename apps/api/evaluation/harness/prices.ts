@@ -43,6 +43,7 @@ export interface FreePlanLimits {
   audioSecondsPerDay?: number;
   tokensPerMinute?: number;
   tokensPerDay?: number;
+  tokensPerDayKept?: number;
   source: string;
 }
 
@@ -68,6 +69,7 @@ const groqChatPlan: FreePlanLimits = {
   requestsPerDay: 1_000,
   tokensPerMinute: 8_000,
   tokensPerDay: 200_000,
+  tokensPerDayKept: 10_000,
   source: sources.groqRateLimits,
 };
 

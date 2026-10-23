@@ -195,7 +195,14 @@ describe("executePlan", () => {
     try {
       const dir = openResultsDir(
         join(root, "run"),
-        { suite: "test", fixturesSha256: "f", codeCommit: "c", runs: 3 },
+        {
+          suite: "test",
+          fixturesSha256: "f",
+          codeCommit: "c",
+          runs: 3,
+          requestsSha256: "r",
+          evalBundleSha256: "b",
+        },
         new Date(),
       );
       appendJsonl(dir.results, { chargedUsd: 2.5 });

@@ -66,26 +66,58 @@ describe("Pacer", () => {
   });
 
   it("keeps half of a daily limit free over any 24 hours, not per calendar day", () => {
-    const ledger = entries("groq:chat", 1, () => noon - 3_600_000, {
-      requests: 1,
+    const ledger = entries("groq:whisper", 1, () => noon - 3_600_000, {
+      requests: 999,
       audioSeconds: 0,
-      tokens: 99_500,
+      tokens: 0,
     });
     const pacer = new Pacer(keys, ledger);
-    const big = { requests: 1, audioSeconds: 0, tokens: 600 };
-    const readiness = pacer.readiness("groq:chat", big, noon);
+    const two = { requests: 2, audioSeconds: 0, tokens: 0 };
+    const readiness = pacer.readiness("groq:whisper", two, noon);
     expect(readiness).toMatchObject({ kind: "tomorrow" });
     expect(readiness.kind === "tomorrow" && readiness.reason).toMatch(
-      /resume after 2026-10-24T11:00:00.000Z$/,
+      /keeps 1000 of 2000 free over any 24 hours; resume after 2026-10-24T11:00:00.000Z$/,
     );
     expect(
-      pacer.readiness("groq:chat", { requests: 1, audioSeconds: 0, tokens: 400 }, noon),
+      pacer.readiness("groq:whisper", { requests: 1, audioSeconds: 0, tokens: 0 }, noon),
     ).toEqual({ kind: "now" });
-    expect(pacer.readiness("groq:chat", big, noon + 13 * 3_600_000)).toMatchObject({
+    expect(pacer.readiness("groq:whisper", two, noon + 13 * 3_600_000)).toMatchObject({
       kind: "tomorrow",
     });
-    expect(pacer.readiness("groq:chat", big, noon + 23 * 3_600_000 + 60_000)).toEqual({
+    expect(pacer.readiness("groq:whisper", two, noon + 23 * 3_600_000 + 60_000)).toEqual({
       kind: "now",
+    });
+  });
+
+  it("lets Groq chat use its daily tokens down to 10K left, while Whisper and OpenAI keep half", () => {
+    const chatLedger = entries("groq:chat", 1, () => noon - 3_600_000, {
+      requests: 1,
+      audioSeconds: 0,
+      tokens: 189_500,
+    });
+    const chatPacer = new Pacer(keys, chatLedger);
+    const tokens = (count: number) => ({ requests: 1, audioSeconds: 0, tokens: count });
+    expect(chatPacer.readiness("groq:chat", tokens(400), noon)).toEqual({ kind: "now" });
+    const over = chatPacer.readiness("groq:chat", tokens(600), noon);
+    expect(over.kind === "tomorrow" && over.reason).toMatch(/keeps 10000 of 200000 free/);
+
+    const whisperLedger = entries("groq:whisper", 1, () => noon - 3_600_000, {
+      requests: 0,
+      audioSeconds: 14_390,
+      tokens: 0,
+    });
+    const audio = new Pacer(keys, whisperLedger).readiness(
+      "groq:whisper",
+      { requests: 0, audioSeconds: 20, tokens: 0 },
+      noon,
+    );
+    expect(audio.kind === "tomorrow" && audio.reason).toMatch(/keeps 14400 of 28800 free/);
+
+    const openai = new Pacer(keys, [
+      { key: "openai:nano", group: "openai-small", at: noon - 1_000, ...tokens(450) },
+    ]);
+    expect(openai.readiness("openai:nano", tokens(100), noon)).toMatchObject({
+      kind: "tomorrow",
     });
   });
 

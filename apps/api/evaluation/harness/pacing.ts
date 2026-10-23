@@ -20,6 +20,13 @@ export interface PacingKey {
   complimentary?: { group: string; tokensPerDay: number };
 }
 
+interface Window {
+  name: string;
+  ms: number;
+  field: keyof Usage;
+  cap: { limit: number; allowed: number } | undefined;
+}
+
 export type Readiness =
   { kind: "now" } | { kind: "at"; at: number } | { kind: "tomorrow"; reason: string };
 
@@ -84,69 +91,85 @@ export class Pacer {
     return config;
   }
 
+  private windows(plan: FreePlanLimits): Window[] {
+    const half = (limit: number | undefined) =>
+      limit === undefined ? undefined : { limit, allowed: limit * this.share };
+    const tokensPerDay =
+      plan.tokensPerDay !== undefined && plan.tokensPerDayKept !== undefined
+        ? { limit: plan.tokensPerDay, allowed: plan.tokensPerDay - plan.tokensPerDayKept }
+        : half(plan.tokensPerDay);
+    return [
+      { name: "requests per day", ms: dayMs, field: "requests", cap: half(plan.requestsPerDay) },
+      {
+        name: "audio seconds per day",
+        ms: dayMs,
+        field: "audioSeconds",
+        cap: half(plan.audioSecondsPerDay),
+      },
+      { name: "tokens per day", ms: dayMs, field: "tokens", cap: tokensPerDay },
+      {
+        name: "requests per minute",
+        ms: minuteMs,
+        field: "requests",
+        cap: half(plan.requestsPerMinute),
+      },
+      {
+        name: "audio seconds per hour",
+        ms: hourMs,
+        field: "audioSeconds",
+        cap: half(plan.audioSecondsPerHour),
+      },
+      {
+        name: "tokens per minute",
+        ms: minuteMs,
+        field: "tokens",
+        cap: half(plan.tokensPerMinute),
+      },
+    ];
+  }
+
   readiness(key: string, need: Usage, now: number): Readiness {
     const config = this.config(key);
     const own = this.ledger.filter((entry) => entry.key === key);
-    const sum = (entries: readonly LedgerEntry[], field: keyof Usage) =>
-      entries.reduce((total, entry) => total + entry[field], 0);
-    const plan = config.plan;
-    const daily: [string, keyof Usage, number | undefined][] = [
-      ["requests per day", "requests", plan?.requestsPerDay],
-      ["audio seconds per day", "audioSeconds", plan?.audioSecondsPerDay],
-      ["tokens per day", "tokens", plan?.tokensPerDay],
-    ];
-    for (const [name, field, limit] of daily) {
-      if (limit === undefined || need[field] === 0) continue;
+    const waits = [this.blockedUntil.get(key) ?? now];
+    for (const window of config.plan ? this.windows(config.plan) : []) {
+      if (window.cap === undefined || need[window.field] === 0) continue;
       const at = earliestWithin(
         own,
-        dayMs,
+        window.ms,
         now,
-        (entry) => entry[field],
-        need[field],
-        limit * this.share,
+        (entry) => entry[window.field],
+        need[window.field],
+        window.cap.allowed,
       );
-      if (at - now > hourMs) {
+      if (at === Infinity) {
         return {
           kind: "tomorrow",
-          reason: `${name}: the runner keeps half of ${String(limit)} free over any 24 hours; resume after ${new Date(at).toISOString()}`,
+          reason: `${window.name}: one call needs more than the runner may use`,
         };
       }
+      if (window.ms === dayMs && at - now > hourMs) {
+        return {
+          kind: "tomorrow",
+          reason: `${window.name}: the runner keeps ${String(window.cap.limit - window.cap.allowed)} of ${String(window.cap.limit)} free over any 24 hours; resume after ${new Date(at).toISOString()}`,
+        };
+      }
+      waits.push(at);
     }
-    const today = utcDay(now);
     if (config.complimentary) {
       const group = config.complimentary.group;
-      const groupToday = this.ledger.filter(
-        (entry) => entry.group === group && utcDay(entry.at) === today,
-      );
-      if (
-        sum(groupToday, "tokens") + need.tokens >
-        config.complimentary.tokensPerDay * this.share
-      ) {
+      const today = utcDay(now);
+      const used = this.ledger
+        .filter((entry) => entry.group === group && utcDay(entry.at) === today)
+        .reduce((total, entry) => total + entry.tokens, 0);
+      if (used + need.tokens > config.complimentary.tokensPerDay * this.share) {
         return {
           kind: "tomorrow",
           reason: `complimentary tokens of ${group}: the runner keeps half of ${String(config.complimentary.tokensPerDay)} free`,
         };
       }
     }
-
-    const waits = [this.blockedUntil.get(key) ?? now];
-    if (plan) {
-      const windows: [number, (entry: LedgerEntry) => number, number, number | undefined][] = [
-        [dayMs, (entry) => entry.requests, need.requests, plan.requestsPerDay],
-        [dayMs, (entry) => entry.audioSeconds, need.audioSeconds, plan.audioSecondsPerDay],
-        [dayMs, (entry) => entry.tokens, need.tokens, plan.tokensPerDay],
-        [minuteMs, (entry) => entry.requests, need.requests, plan.requestsPerMinute],
-        [hourMs, (entry) => entry.audioSeconds, need.audioSeconds, plan.audioSecondsPerHour],
-        [minuteMs, (entry) => entry.tokens, need.tokens, plan.tokensPerMinute],
-      ];
-      for (const [windowMs, measure, needed, limit] of windows) {
-        if (limit === undefined || needed === 0) continue;
-        waits.push(earliestWithin(own, windowMs, now, measure, needed, limit * this.share));
-      }
-    }
     const at = Math.max(...waits);
-    if (at === Infinity)
-      return { kind: "tomorrow", reason: "one call needs more than half a limit" };
     return at <= now ? { kind: "now" } : { kind: "at", at };
   }
 

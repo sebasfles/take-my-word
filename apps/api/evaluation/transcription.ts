@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import type { Connection, ProviderRequest } from "../src/eval/contract.ts";
 import { transcriberCandidates, type TranscriberCandidate } from "./harness/candidates.ts";
-import type { EvalFunction } from "./harness/eval-lambda.ts";
+import { buildEvalBundle, type EvalFunction } from "./harness/eval-lambda.ts";
 import {
   buildClip,
   languageModes,
@@ -27,6 +27,7 @@ import {
   headersOf,
   pacingKeyOf,
   recordedSpendUsd,
+  requestsSha256,
   suiteArgs,
   type FailureRecord,
 } from "./harness/suite.ts";
@@ -113,6 +114,7 @@ function plan(
   evalFunction: () => Promise<EvalFunction>,
   clips: readonly Clip[],
   runs: number,
+  requests: { id: string; request: ProviderRequest }[] = [],
 ): PlannedItem<TranscriptionResult>[] {
   const items: PlannedItem<TranscriptionResult>[] = [];
   for (let run = 1; run <= runs; run += 1) {
@@ -124,6 +126,8 @@ function plan(
           const estimatedUsd = transcriptionCallUsd(facts, clip.seconds) * calls;
           const connection: Connection = run === 1 ? "fresh" : "reused";
           const id = `${candidate.id}|${clip.id}|${mode}|${String(run)}`;
+          const built = request(candidate, clip, mode, connection);
+          requests.push({ id, request: built });
           const base = {
             id,
             candidate: candidate.id,
@@ -158,9 +162,7 @@ function plan(
             }),
             run: async (): Promise<Attempt<TranscriptionResult>> => {
               try {
-                const response = await (
-                  await evalFunction()
-                ).invoke(request(candidate, clip, mode, connection));
+                const response = await (await evalFunction()).invoke(built);
                 const listUsd = response.calls.reduce(
                   (sum, call) => sum + transcriptionCallUsd(facts, clip.seconds, call.usage),
                   0,
@@ -297,6 +299,11 @@ async function measure(results: string, reportPath: string): Promise<void> {
   console.log(
     `${String(clips.length)} clips, ${clips.reduce((sum, clip) => sum + clip.seconds, 0).toFixed(0)} s of audio`,
   );
+  const bundle = await buildEvalBundle();
+  const requests: { id: string; request: ProviderRequest }[] = [];
+  let deployed: Promise<EvalFunction> | undefined;
+  const evalFunction = () => (deployed ??= deployAndWarm(workspace, bundle));
+  const items = plan(evalFunction, clips, args.runs, requests);
   const dir = openResultsDir(
     results,
     {
@@ -304,6 +311,8 @@ async function measure(results: string, reportPath: string): Promise<void> {
       fixturesSha256,
       codeCommit,
       runs: args.runs,
+      requestsSha256: requestsSha256(requests),
+      evalBundleSha256: bundle.sha256,
       clips: Object.fromEntries(clips.map((clip) => [clip.id, clip.sha256])),
     },
     new Date(),
@@ -311,9 +320,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
   console.log(`code ${codeCommit} (HEAD ${state.commit}), fixtures ${fixturesSha256.slice(0, 16)}`);
 
   const done = new Set(readJsonl<TranscriptionResult>(dir.results).map((result) => result.id));
-  let deployed: Promise<EvalFunction> | undefined;
-  const evalFunction = () => (deployed ??= deployAndWarm(workspace));
-  const pending = plan(evalFunction, clips, args.runs).filter((item) => !done.has(item.id));
+  const pending = items.filter((item) => !done.has(item.id));
   const complete =
     pending.length === 0 ||
     (await executePlan(

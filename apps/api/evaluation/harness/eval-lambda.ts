@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,7 +18,12 @@ import {
 
 const apiRoot = join(import.meta.dirname, "..", "..");
 
-export async function buildEvalZip(): Promise<Buffer> {
+export interface EvalBundle {
+  zip: Buffer;
+  sha256: string;
+}
+
+export async function buildEvalBundle(): Promise<EvalBundle> {
   const dir = mkdtempSync(join(tmpdir(), "tmw-eval-"));
   try {
     await build({
@@ -45,7 +51,12 @@ export async function buildEvalZip(): Promise<Buffer> {
       join(dir, "index.mjs"),
       join(dir, "index.mjs.map"),
     ]);
-    return readFileSync(zip);
+    return {
+      zip: readFileSync(zip),
+      sha256: createHash("sha256")
+        .update(readFileSync(join(dir, "index.mjs")))
+        .digest("hex"),
+    };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -59,9 +70,9 @@ export interface EvalFunction {
 export async function deployEvalFunction(
   lambda: LambdaClient,
   name: string,
+  bundle: EvalBundle,
 ): Promise<EvalFunction> {
-  const zip = await buildEvalZip();
-  await lambda.send(new UpdateFunctionCodeCommand({ FunctionName: name, ZipFile: zip }));
+  await lambda.send(new UpdateFunctionCodeCommand({ FunctionName: name, ZipFile: bundle.zip }));
   await waitUntilFunctionUpdatedV2({ client: lambda, maxWaitTime: 120 }, { FunctionName: name });
   return {
     name,

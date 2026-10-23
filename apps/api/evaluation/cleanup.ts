@@ -15,7 +15,7 @@ import {
   type CleanupFixtures,
 } from "./harness/cleanup-fixtures.ts";
 import { cleanupReport } from "./harness/cleanup-report.ts";
-import type { EvalFunction } from "./harness/eval-lambda.ts";
+import { buildEvalBundle, type EvalFunction } from "./harness/eval-lambda.ts";
 import { loadTranscriptionFixtures, transcriptionFixturesPath } from "./harness/fixtures.ts";
 import { chargedUsd, modelFacts, tokenCostUsd } from "./harness/prices.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
@@ -26,6 +26,7 @@ import {
   headersOf,
   pacingKeyOf,
   recordedSpendUsd,
+  requestsSha256,
   suiteArgs,
   type FailureRecord,
 } from "./harness/suite.ts";
@@ -97,6 +98,7 @@ function plan(
   evalFunction: () => Promise<EvalFunction>,
   cases: readonly CleanupCase[],
   runs: number,
+  requests: { id: string; request: ProviderRequest }[] = [],
 ): PlannedItem<CleanupResult>[] {
   const items: PlannedItem<CleanupResult>[] = [];
   for (let run = 1; run <= runs; run += 1) {
@@ -109,6 +111,8 @@ function plan(
           (instructionsFor(transcription, item).length + item.raw.length) / 3,
         );
         const base = { id, candidate: candidate.id, caseId: item.id, run, connection };
+        const built = request(candidate, item, connection);
+        requests.push({ id, request: built });
         items.push({
           id,
           pacingKey: pacingKeyOf(candidate.spec.model),
@@ -132,9 +136,7 @@ function plan(
           }),
           run: async (): Promise<Attempt<CleanupResult>> => {
             try {
-              const response = await (
-                await evalFunction()
-              ).invoke(request(candidate, item, connection));
+              const response = await (await evalFunction()).invoke(built);
               const tokens = response.usage ?? { inputTokens: 0, outputTokens: 0 };
               const listUsd = tokenCostUsd(facts, tokens.inputTokens, tokens.outputTokens);
               const charged = chargedUsd(facts, listUsd);
@@ -242,6 +244,11 @@ async function measure(results: string, reportPath: string): Promise<void> {
       return;
     }
   }
+  const bundle = await buildEvalBundle();
+  const requests: { id: string; request: ProviderRequest }[] = [];
+  let deployed: Promise<EvalFunction> | undefined;
+  const evalFunction = () => (deployed ??= deployAndWarm(workspace, bundle));
+  const items = plan(evalFunction, fixtures.cases, args.runs, requests);
   const dir = openResultsDir(
     results,
     {
@@ -249,6 +256,8 @@ async function measure(results: string, reportPath: string): Promise<void> {
       fixturesSha256,
       codeCommit,
       runs: args.runs,
+      requestsSha256: requestsSha256(requests),
+      evalBundleSha256: bundle.sha256,
       clips: { transcriptionFixtures: sha256(transcriptionFixturesPath) },
     },
     new Date(),
@@ -256,11 +265,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
   console.log(`code ${codeCommit} (HEAD ${state.commit}), fixtures ${fixturesSha256.slice(0, 16)}`);
 
   const done = new Set(readJsonl<CleanupResult>(dir.results).map((result) => result.id));
-  let deployed: Promise<EvalFunction> | undefined;
-  const evalFunction = () => (deployed ??= deployAndWarm(workspace));
-  const pending = plan(evalFunction, fixtures.cases, args.runs).filter(
-    (item) => !done.has(item.id),
-  );
+  const pending = items.filter((item) => !done.has(item.id));
   const complete =
     pending.length === 0 ||
     (await executePlan(

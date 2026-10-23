@@ -114,6 +114,7 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
 - Output (om-reviewer): this task's reports in this task folder; raw JSON in the workspace; one command per suite.
 - Review checks beyond the Pipeline: prd plan "No changes" attached; fixture commits before results; nothing in the four production bundles imports eval code; unit tests for the new adapters, the metrics (WER, term errors, gate flags) and the pacing and cost guard; throwaway users deleted.
 - clearance: full: `pnpm tf dev plan` and `apply` for the eval resources; `pnpm tf prd plan` only; code swap and invoke of the dev eval Lambda; Polly; provider calls with the existing keys; the end-to-end suite against dev with throwaway users deleted afterwards. No change to the shared dev Lambdas, no prd apply.
+- Allowances adjusted (om-manager, 2026-10-23, during the cleanup run): Groq chat models (`gpt-oss-120b`, `gpt-oss-20b`), which production does not call, may use their daily token limit down to 10K tokens left instead of keeping half; Groq Whisper, which production calls, keeps the half reserve, as does every OpenAI allowance. Why: the reserve protects production, and production uses no Groq chat model; the cleanup run then finishes in one day when the limit allows, otherwise it carries over.
 
 ## om-developer notes
 

@@ -20,6 +20,8 @@ export interface RunMeta {
   codeCommit: string;
   runs: number;
   clips?: Record<string, string>;
+  requestsSha256: string;
+  evalBundleSha256: string;
 }
 
 export interface ResultsDir {
@@ -27,10 +29,10 @@ export interface ResultsDir {
   results: string;
   failures: string;
   ledger: string;
-  meta: RunMeta & { startedAt: string };
+  meta: StoredMeta;
 }
 
-export type StoredMeta = RunMeta & { startedAt: string };
+export type StoredMeta = RunMeta & { startedAt: string; resumedWith?: string[] };
 
 function paths(dir: string, suite: string): Omit<ResultsDir, "meta"> {
   return {
@@ -74,12 +76,17 @@ export function openResultsDir(dir: string, meta: RunMeta, now: Date): ResultsDi
   if (stored !== undefined) {
     const current = stored;
     const differs = (Object.keys(meta) as (keyof RunMeta)[]).some(
-      (key) => !same(current[key], meta[key]),
+      (key) => key !== "codeCommit" && !same(current[key], meta[key]),
     );
     if (differs) {
       throw new Error(
-        `${dir} holds a run of other fixtures, audio, code or settings (${JSON.stringify(current)}); use a new --results directory`,
+        `${dir} holds a run of other fixtures, audio, requests, eval code or settings (${JSON.stringify(current)}); use a new --results directory`,
       );
+    }
+    const resumes = current.resumedWith ?? [];
+    if (current.codeCommit !== meta.codeCommit && !resumes.includes(meta.codeCommit)) {
+      stored = { ...current, resumedWith: [...resumes, meta.codeCommit] };
+      writeFileSync(join(dir, "meta.json"), `${JSON.stringify(stored, null, 2)}\n`);
     }
   } else {
     stored = { ...meta, startedAt: now.toISOString() };
