@@ -223,3 +223,7 @@ Round 3 evidence complete: Acceptance 1 (hold, hands-free, stop, Esc, shortcut, 
 
 1. The main window's handle now comes through `foreground::handle_of` (Windows `hwnd()`, other platforms `None`), so non-Windows builds compile without any `allow` and the main-window comparison never matches there.
 2. `apps/desktop/scripts/linux.sh` (`pnpm rust:lint:linux`, chained at the end of `rust:lint`) builds the UI and runs `linux-check`'s `cargo clippy --all-targets --locked -- -D warnings` in an `ubuntu:24.04` container with the job's apt packages; it failed with E0599 on the previous `shell.rs` and passes on 820c32e; the desktop row of the TRD's verification targets says so.
+
+### Round 5
+
+Flaky test on the windows runner: `Onboarding.test.tsx` asserted `checkMicrophone(true)` right after the microphone heading appeared, but that heading renders when the sign-in promise resolves outside `act`, so the step's mount effect could still be pending. Both microphone assertions now wait for the call itself. Audit of the onboarding, Main, Settings, Overlay, Root and insert tests: every other bridge assertion follows a `fireEvent` handler that calls the bridge synchronously or flushes its effects inside `act`, so no other change. Proof: the file ran 50 times locally in a row, 50 passed, 0 failed.

@@ -46,10 +46,14 @@ describe("Onboarding", () => {
     fireEvent.click(screen.getByRole("button", { name: "Get started" }));
     signIn();
     await screen.findByRole("heading", { name: "Check your microphone" });
-    expect(fakeBridge.checkMicrophone).toHaveBeenLastCalledWith(true);
+    await vi.waitFor(() => {
+      expect(fakeBridge.checkMicrophone).toHaveBeenLastCalledWith(true);
+    });
     next();
     await screen.findByRole("heading", { name: "Two ways to dictate" });
-    expect(fakeBridge.checkMicrophone).toHaveBeenLastCalledWith(false);
+    await vi.waitFor(() => {
+      expect(fakeBridge.checkMicrophone).toHaveBeenLastCalledWith(false);
+    });
     expect(screen.getByLabelText("Practice here")).toBeTruthy();
     next();
     fireEvent.click(await screen.findByRole("checkbox", { name: "English" }));
