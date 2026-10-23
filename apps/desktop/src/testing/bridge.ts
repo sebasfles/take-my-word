@@ -19,7 +19,7 @@ export const listeners: {
   overlayLevel?: (level: number) => void;
   microphoneLevel?: (level: number) => void;
   microphoneStatus?: (status: MicStatus) => void;
-  insertText?: (text: string) => void;
+  insertText?: (insert: { id: number; text: string }) => void;
   mainNavigate?: (query: string) => void;
   uiLanguage?: (language: Language) => void;
   theme?: (theme: Theme | null) => void;
@@ -86,7 +86,9 @@ export const fakeBridge = {
   openMicrophoneSettings: vi.fn(() => Promise.resolve(undefined)),
   dismissOverlay: vi.fn(() => Promise.resolve(undefined)),
   stopDictation: vi.fn(() => Promise.resolve(undefined)),
-  keepDictation: vi.fn<(text: string) => Promise<undefined>>(() => Promise.resolve(undefined)),
+  insertAck: vi.fn<(id: number, inserted: boolean) => Promise<undefined>>(() =>
+    Promise.resolve(undefined),
+  ),
   forwardKey: vi.fn<(code: string, down: boolean) => Promise<undefined>>(() =>
     Promise.resolve(undefined),
   ),
@@ -137,7 +139,7 @@ export const fakeBridge = {
     listeners.overlayLevel = handler;
     return Promise.resolve(() => undefined);
   }),
-  onInsertText: vi.fn((handler: (text: string) => void) => {
+  onInsertText: vi.fn((handler: (insert: { id: number; text: string }) => void) => {
     listeners.insertText = handler;
     return Promise.resolve(() => undefined);
   }),

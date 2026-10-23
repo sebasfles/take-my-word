@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::activity::{Activity, Busy};
-use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi, PasteKeystroke};
+use crate::api::{ApiFailure, AppRuleList, AuthedApi, HttpApi};
 #[cfg(debug_assertions)]
 use crate::api::{Stub, Stubbed};
 use crate::audio::{Microphone, MicrophoneStatus};
@@ -15,7 +15,7 @@ use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
 use crate::clipboard::{self, Clipboard, ClipboardError};
 use crate::config::{self, Placement, Settings};
-use crate::dictation::{Job, Notifier, Paste, Worker};
+use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
 use crate::hotkey::{
     self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyEvent, KeyHook, Keys, Side, Source,
@@ -23,7 +23,8 @@ use crate::hotkey::{
 use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverlay};
-use crate::paste::{EnigoKeystroke, Modifiers, PasteResult, Paster, Timing};
+use crate::own_window::{ACK_TIMEOUT, Acks, Keeper, OwnWindowFirst, Page};
+use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
@@ -44,6 +45,7 @@ pub struct Shell {
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     pub microphone: MicrophoneStatus,
     pub activity: Activity,
+    pub acks: Acks,
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
     keys: Arc<Mutex<Keys>>,
@@ -112,9 +114,14 @@ impl Shell {
             },
             timing: Timing::default(),
         };
+        let acks = Acks::default();
         let paste = OwnWindowFirst {
-            app: app.clone(),
+            page: AppPage(app.clone()),
+            keeper: AppKeeper(app.clone()),
+            acks: acks.clone(),
             others: paste,
+            timeout: ACK_TIMEOUT,
+            next_id: 0,
         };
         let mut worker = Worker {
             api: dictation_api,
@@ -154,6 +161,7 @@ impl Shell {
             overlay,
             microphone: microphone_status,
             activity,
+            acks,
             #[cfg(debug_assertions)]
             jobs,
             keys,
@@ -452,34 +460,32 @@ impl CheckGate {
     }
 }
 
-struct OwnWindowFirst<P> {
-    app: AppHandle,
-    others: P,
+struct AppPage(AppHandle);
+
+impl Page for AppPage {
+    fn main_window(&self) -> Option<isize> {
+        let window = self.0.get_webview_window(windows::MAIN)?;
+        window.hwnd().ok().map(|handle| handle.0 as isize)
+    }
+
+    fn insert(&self, id: u64, text: &str) -> bool {
+        let payload = serde_json::json!({ "id": id, "text": text });
+        self.0
+            .emit_to(windows::MAIN, "insert-text", payload)
+            .inspect_err(|error| log::warn!("inserting into the main window failed: {error}"))
+            .is_ok()
+    }
 }
 
-impl<P: Paste> Paste for OwnWindowFirst<P> {
-    fn paste(
-        &mut self,
-        text: &str,
-        target: Option<isize>,
-        keystroke: PasteKeystroke,
-    ) -> PasteResult {
-        let main = self.app.get_webview_window(windows::MAIN);
-        let main_handle = main
-            .as_ref()
-            .and_then(|window| window.hwnd().ok())
-            .map(|handle| handle.0 as isize);
-        if target.is_none() || target != main_handle {
-            return self.others.paste(text, target, keystroke);
-        }
-        log::info!("inserting a dictation into the main window");
-        match self.app.emit_to(windows::MAIN, "insert-text", text) {
-            Ok(()) => PasteResult::Pasted,
-            Err(error) => {
-                log::warn!("inserting into the main window failed: {error}");
-                PasteResult::Failed
-            }
-        }
+struct AppKeeper(AppHandle);
+
+impl Keeper for AppKeeper {
+    fn keep(&self, text: &str) -> bool {
+        self.0
+            .state::<Shell>()
+            .copy(text)
+            .inspect_err(|error| log::warn!("keeping a dictation in the clipboard failed: {error}"))
+            .is_ok()
     }
 }
 
@@ -530,11 +536,7 @@ impl Modifiers for HeldModifiers {
 #[derive(Clone)]
 pub struct TrayNotifier(AppHandle);
 
-impl TrayNotifier {
-    pub fn new(app: AppHandle) -> Self {
-        Self(app)
-    }
-}
+
 
 impl Notifier for TrayNotifier {
     fn notify(&self, sentence: &[Message]) {

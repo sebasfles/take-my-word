@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeBridge, listeners } from "./testing/bridge.ts";
@@ -9,7 +9,7 @@ vi.mock("./bridge.ts", async (importOriginal) => ({
   bridge: fakeBridge,
 }));
 
-function Field() {
+function Fields() {
   const [value, setValue] = useState("Hola ");
   return (
     <>
@@ -21,41 +21,59 @@ function Field() {
         }}
       />
       <p data-testid="state">{value}</p>
+      <input aria-label="email" type="email" />
       <button type="button">elsewhere</button>
     </>
   );
 }
 
+async function dictate(text: string) {
+  await act(async () => {
+    await Promise.resolve();
+    listeners.insertText?.({ id: 4, text });
+  });
+}
+
 describe("dictations into the app's own window", () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
-  it("land at the caret of the focused field and reach the view's state", async () => {
-    render(<Root language="en" theme={null} forwardsKeys screen={Field} />);
-    const box = screen.getByLabelText<HTMLTextAreaElement>("practice");
-    box.focus();
-    box.setSelectionRange(5, 5);
+  function start(focus: string) {
+    render(<Root language="en" theme={null} forwardsKeys screen={Fields} />);
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
-    await act(async () => {
-      await Promise.resolve();
-      listeners.insertText?.("mundo.");
-    });
+    const element = screen.getByLabelText(focus);
+    element.focus();
+    return element;
+  }
+
+  it("land at the caret of the focused field, reach the view's state and are acknowledged", async () => {
+    const box = start("practice") as HTMLTextAreaElement;
+    box.setSelectionRange(5, 5);
+    await dictate("mundo.");
     expect(screen.getByTestId("state").textContent).toBe("Hola mundo.");
-    expect(fakeBridge.keepDictation).not.toHaveBeenCalled();
+    expect(fakeBridge.insertAck).toHaveBeenCalledWith(4, true);
   });
 
-  it("stay on the clipboard when no field has focus", async () => {
-    render(<Root language="en" theme={null} forwardsKeys screen={Field} />);
-    fireEvent.focus(screen.getByRole("button", { name: "elsewhere" }));
-    screen.getByRole("button", { name: "elsewhere" }).focus();
-    vi.spyOn(document, "hasFocus").mockReturnValue(true);
-    await act(async () => {
-      await Promise.resolve();
-      listeners.insertText?.("mundo.");
+  it("are refused when the focus is not on a field that takes text at a caret", async () => {
+    start("email");
+    await dictate("a@b.cl");
+    expect(fakeBridge.insertAck).toHaveBeenCalledWith(4, false);
+    render(<button type="button">alone</button>);
+    screen.getByRole("button", { name: "alone" }).focus();
+    await dictate("hola");
+    expect(fakeBridge.insertAck).toHaveBeenLastCalledWith(4, false);
+  });
+
+  it("are refused when inserting throws", async () => {
+    start("practice");
+    vi.spyOn(HTMLTextAreaElement.prototype, "setRangeText").mockImplementation(() => {
+      throw new DOMException("not now", "InvalidStateError");
     });
-    expect(fakeBridge.keepDictation).toHaveBeenCalledWith("mundo.");
+    await dictate("mundo.");
+    expect(fakeBridge.insertAck).toHaveBeenCalledWith(4, false);
     expect(screen.getByTestId("state").textContent).toBe("Hola ");
   });
 });
