@@ -70,4 +70,19 @@ Deferred:
 
 - None.
 
+### Round 2
+
+Code is commit bc0f15f, which the verify block names; this commit carries only these notes and verify.log.
+Only `apps/web` changed, so web is the only target re-run.
+
+Done, one per finding:
+
+1. `robotsTag` lets `/` through on the indexed origin, so the x-default's 307 carries no noindex there; dev and self-hosted still answer noindex on `/`. Covered in `seo.test.ts` and `site-proxy.test.ts`.
+2. The landing's sign-in links (header, "Already have an account?") and the footer's go to `/sign-in?lang=<page language>`; the proxy stores `tmw-lang` with the same cookie as the switch (`lib/preference.ts`, now shared with `localeHandler`) and answers 307 to `/sign-in` without `lang`, keeping any other parameter; an unknown language is dropped without a cookie.
+   Those links are plain anchors now, since they cross root layouts and the proxy redirects them.
+   Unit tests in `site-proxy.test.ts`; a new e2e ("signs in from /es in Spanish for an English browser with no language cookie") runs on dev; the same flow passed locally on a production build: `/es`, header sign-in, `/sign-in` with `lang="es"` and "Inicia sesión".
+3. Landing inline code keeps `white-space: nowrap` (applied after round 1's screenshots were taken); every page screenshot is refreshed, including the 390 crops.
+
+Evidence refreshed: `seo/opennext-invoke.txt` (the `/` 307 without noindex on the indexed origin, noindex on dev's).
+
 ## Result
