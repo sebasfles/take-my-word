@@ -146,4 +146,43 @@ Docs findings, one per finding:
 1. The desktop entry "Dev and prd are separate apps chosen at build time" (2026-10-21) carries `Superseded by 2026-10-23: ... (the server only)` in the file's marker form.
 2. `take-my-word-{env}` is `<deployment>-{env}` in the infra `trd.md` and `database.md`, the desktop `database.md` and the auth `trd.md` and `database.md`; the two left are inside dated ARD entries (infra table, auth cookie key), true when written and true for the official deployment.
 
+### Round 4
+
+Code is commit 4af31fd (rebased on develop 7ae8a05, 0015 merged), which the verify blocks name; this commit carries only these notes and verify.log.
+
+Clipboard flake, outside scope (om-manager, Sebastian's rule on flaky tests):
+
+- Failure: PR #22 desktop-ci, run 39974182496 attempt 1, `a_reader_outside_the_target_app_gets_nothing_and_does_not_count_as_the_paste` panicked at `win32.rs:1124`, left `Some("dictado privado [private]")`, right `None`; attempt 2 passed.
+- Cause: the test offered the text to `own pid + 4` as a process "elsewhere", but a read is allowed for the target or any process below it (`depth_below` walks the reader's ancestors). Windows reuses freed pids, so a child often has a lower pid than its parent; when an ancestor of the test process (cargo, the shell, node, the runner) held exactly `pid + 4`, the test process counted as a descendant of the target and the read rendered. The production rule is right; the test's guess was not. `a_reader_holding_the_clipboard_open_during_the_restore_is_answered_and_the_restore_lands` made the same guess.
+- Fix: both tests offer to `NO_PROCESS_HAS_THIS_ID` (2); Windows process ids are multiples of 4, so no reader or ancestor can match it, whatever the runner's tree or pid reuse. No sleep, retry or ignore. New real-clipboard test `a_reader_below_the_target_app_gets_the_text_and_counts_as_the_paste` targets the test process's own parent and expects the read to render: the exact condition that failed the old test, now deterministic.
+- Evidence on the Windows host (`computer available` to `computer free`), in `.workspaces/0016_self_hosting/flake/`: idle gate (600 s idle at start), clipboard sealed with DPAPI (sha256 83c76b16...e305); the new test passed; 20 serial runs of `clipboard::win32 --include-ignored --test-threads=1` from the built test binary, 11 passed in each, 0 failed, no real input in any run (`guard.log`); clipboard restored and verified with the same sha256; the sealed file deleted. No abort happened, so no restart. `ancestry.txt`: a chain on the host (57908 powershell, 60520 cmd, 61204 powershell, ... explorer, then an exited parent) shows children with lower pids than their parents, and a root whose parent pid is free for reuse.
+- desktop-ci on this branch (run 39958142927) had passed all 227 tests and failed only on the dev installer step for lack of `DESKTOP_DEV_SERVER`, now set by the om-manager.
+
+Web lint on a fresh clone (finding on PR #23, run 39958142873):
+
+- Reproduced on a fresh clone of 309e960: "route.ts was not found by the project service"; TypeScript's include globs skip dot folders, and the worktree passed only through its generated `.next` types.
+- Fix: `apps/web/tsconfig.json` includes `src/app/.well-known/**/*.ts`. From now on every round is verified from a fresh clone.
+
+Rebase on develop 7ae8a05 (0015), four conflicts, each kept both tasks' behavior:
+
+1. `apps/desktop/src-tauri/src/api/contract.schema.json` (generated): regenerated with `pnpm contract` from the merged `packages/shared`, so it carries 0015's new usage contract and everything else unchanged.
+2. `apps/web/e2e/account.e2e.ts`: kept 0015's context-badge assertion and 0016's switch label "EN, view in English" (formatted after the merge).
+3. `docs/modules/desktop/prd.md` and `trd.md` frontmatter: `source: 0016_self_hosting`, the later task.
+4. `docs/modules/desktop/trd.md` calls line: kept 0015's line with `GET /me/usage` and added 0016's discovery line.
+
+0015 also changed Rust (`account.rs`, `api/mod.rs`, `api/routes.rs`) without conflicts; Windows `rust:lint` and `rust:test` ran on the rebased commit while the host was still held: both exit 0, 219 passed, 10 ignored.
+The D8 grep after the rebase still finds nothing outside `docs/tasks/` (exit 1).
+
+Verify: every target of the TRD table on a fresh clone of 4af31fd with no `deployment.json`, `.env` or `.next`, all exit 0 (api 200, web 255 plus the OpenNext bundle, desktop 235, shared 46, brand 58, deployment 42 tests; infra fmt and validate for core, dev and prd; actionlint). Web integration and e2e and the api e2e need dev, not held this round.
+
+Terraform on the rebased branch (`.verify/plan-*.out`, `apply-*-moves.out`, `replan-*.out`):
+
+- `pnpm tf core plan`: No changes.
+- `pnpm tf dev plan` and `pnpm tf prd plan`: only `module.app.aws_iam_role.deploy has moved to module.app.aws_iam_role.deploy[0]` and `module.app.aws_iam_role_policy.deploy has moved to module.app.aws_iam_role_policy.deploy[0]`; Plan: 0 to add, 0 to change, 0 to destroy.
+- Guard met, so the saved plans were applied: dev and prd "Apply complete! Resources: 0 added, 0 changed, 0 destroyed."
+- Re-plan of core, dev and prd with `-detailed-exitcode`: exit 0, "No changes. Your infrastructure matches the configuration." for all three.
+- Phase 1 Acceptance 2 is met.
+
+The branch was rebased, so it needs `--force-with-lease` (no tag exists).
+
 ## Result
