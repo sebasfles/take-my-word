@@ -2,9 +2,9 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 use crate::audio::{AudioError, Capture, Captured, MAX_RECORDING, MIN_RECORDING};
+use crate::hotkey::{ChordEvent, Command, Gesture};
 
 const RELEASE_CHECK: Duration = Duration::from_millis(100);
-use crate::hotkey::{ChordEvent, Command, Gesture};
 
 pub enum Input {
     Chord { event: ChordEvent, at: Instant },

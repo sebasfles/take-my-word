@@ -123,13 +123,13 @@ impl Overlay for WindowOverlay {
             log::warn!("updating the overlay failed: {error}");
         }
         if state == OverlayState::Hidden {
-            let _ = window.hide();
+            set_shown(&window, false);
             set_memory_target(&window, MemoryTarget::Low);
             return;
         }
         set_memory_target(&window, MemoryTarget::Normal);
         place_above_taskbar(&self.app, &window);
-        let _ = window.show();
+        set_shown(&window, true);
         if matches!(state, OverlayState::Error { .. }) {
             let overlay = self.clone();
             thread::spawn(move || {
@@ -207,6 +207,18 @@ fn place_above_taskbar(app: &AppHandle, window: &tauri::WebviewWindow) {
     let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
     let y = area.position.y + area.size.height as i32 - size.height as i32 - margin;
     let _ = window.set_position(PhysicalPosition::new(x, y));
+}
+
+fn set_shown(window: &tauri::WebviewWindow, shown: bool) {
+    #[cfg(windows)]
+    if let Ok(handle) = window.hwnd() {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{SW_HIDE, SW_SHOWNOACTIVATE, ShowWindow};
+        let hwnd = HWND(handle.0.cast());
+        let _ = unsafe { ShowWindow(hwnd, if shown { SW_SHOWNOACTIVATE } else { SW_HIDE }) };
+        return;
+    }
+    let _ = if shown { window.show() } else { window.hide() };
 }
 
 #[derive(Clone, Copy)]

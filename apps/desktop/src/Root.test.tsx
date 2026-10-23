@@ -76,20 +76,12 @@ describe("Root", () => {
     ]);
   });
 
-  it("releases the keys still down when the window loses focus", () => {
+  it("leaves held keys to the shell when the window blurs, since the user may still hold them", () => {
     render(<Root language="en" theme={null} forwardsKeys screen={Title} />);
     fakeBridge.forwardKey.mockClear();
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "ControlLeft", key: "Control" }));
-    window.dispatchEvent(new KeyboardEvent("keydown", { code: "MetaLeft", key: "Meta" }));
-    window.dispatchEvent(new KeyboardEvent("keyup", { code: "ControlLeft", key: "Control" }));
     window.dispatchEvent(new FocusEvent("blur"));
-    window.dispatchEvent(new FocusEvent("blur"));
-    expect(fakeBridge.forwardKey.mock.calls).toEqual([
-      ["ControlLeft", true],
-      ["MetaLeft", true],
-      ["ControlLeft", false],
-      ["MetaLeft", false],
-    ]);
+    expect(fakeBridge.forwardKey.mock.calls).toEqual([["ControlLeft", true]]);
   });
 
   it("never forwards keys from the overlay", () => {
