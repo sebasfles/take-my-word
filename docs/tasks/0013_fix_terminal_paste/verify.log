@@ -23,3 +23,10 @@ Node 24; the rust steps ran through scripts/windows.sh on the mirror C:\dev\tmw-
 - e2e: n/a
 Node 24; every rust step ran with TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0013 and its artefact reads "windows.sh: /mnt/c/dev/tmw-0013 at 4e94c7f65c3569950d3d50ce3574e905ed3ba0b4", clean tree, run after the commit.
 This block replaces the rust:test line of the e58bc7a block, which ran on another mirror with a dirty tree.
+
+## 2026-10-23T07:58:47Z by om-developer target desktop on 9954fb4
+- lint: pass exit 0 (pnpm lint; .verify/desktop-lint-js.out) and pass exit 0 (pnpm rust:lint, cargo fmt and clippy on Windows; .verify/desktop-lint-rust.out)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (134 tests, pnpm test, vitest --no-file-parallelism) and pass exit 0 (176 passed, 9 ignored, pnpm rust:test, cargo --test-threads=1; .verify/desktop-unit-rust.out)
+- e2e: n/a
+Node 24; every rust step ran with TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0013 and its artefact reads "windows.sh: /mnt/c/dev/tmw-0013 at 9954fb4da7fa8aea76c2238183a9c615a4b83c11", clean tree, run after the commit.

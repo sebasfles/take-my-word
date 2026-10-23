@@ -203,3 +203,9 @@ Decisions the plan did not record (ARD entries in `document-task`, or the smoke'
 Finding applied: round 2's `rust:test` ran without `TMW_WINDOWS_CHECKOUT`, so `scripts/windows.sh` synced a dirty tree into its default mirror `C:\dev\take-my-word`, which that run created (it did not exist before); its result could not be tied to the round's commit.
 Rerun on this round's commit through `C:\dev\tmw-0013`; my run drivers now refuse to start unless `TMW_WINDOWS_CHECKOUT` is `/mnt/c/dev/tmw-0013` (the WSL path `windows.sh` expects for `C:\dev\tmw-0013`).
 `C:\dev\take-my-word` is left to the om-manager at clean time.
+
+### Round 4
+
+Finding applied: closing targets 4 and 5 sends Ctrl+F11 (the shell exits), then waits up to 10 s for the window to disappear; only if it is still there does it post `WM_CLOSE` and wait again, and a window that is gone counts as closed whatever `close-window` answered.
+Before, `close-window` on a window already going away answered "not closed" and `set -e` ended the run; that was also the silent stop after targets 4 and 5 in my round 1 runs, which I had not explained.
+Re-verified on 9954fb4 (`evidence/round4`): targets 4 and 5, 2 of 2 each plus the two-line dictation, both closed and the run finished (smoke exit 0); target 4's two-line ran line 1 after its confirmed warning, as decided; clipboard restored with the same hash; dev folder restored from a snapshot taken before the run.

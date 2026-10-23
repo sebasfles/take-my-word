@@ -49,3 +49,12 @@ In conhost the reader is `powershell.exe` itself (PSReadLine's paste), proven at
 A probe that owned the clipboard the same way and walked every thread without a budget found the reader in all 9 tries (3 per window): a GUI thread of `WindowsTerminal.exe` that existed at the offer, 25th to 28th of the 44 to 46 GUI threads in the proof's order (the process hosts every Windows Terminal window on the machine, about 110 threads), and 5th to 8th among the threads whose cycle time grew after the keystroke; in conhost it was PowerShell's third GUI thread.
 Multi-line, pasted directly by the run (the base build has no two-line dictation): targets 1 to 3 received both lines as one block through bracketed paste and ran nothing; target 4 showed Windows Terminal's multi-line warning, cancelled by the run; target 5 got both lines into PSReadLine's buffer and ran nothing.
 Logs: `.workspaces/0013_fix_terminal_paste/evidence/base/` (`smoke2` to `smoke6` per run, `probe1` and `probe2` for the reader probe).
+
+## om-reviewer verification
+
+2026-10-23 07:40 to 07:50 UTC, commit 26e5a8a, debug build on the mirror `C:\dev\tmw-0013`, API stub in Normal and two-line modes, signed out, driven by the committed `apps/desktop/scripts/terminal-smoke.sh` after the 5 min idle gate.
+Targets 1 to 4 (Windows Terminal with WSL, tmux and Claude Code; WSL and tmux; WSL bash; Windows PowerShell 5.1) took 2 of 2 dictations each and the two-line dictation, with the text read back from the target, no line run and the previous clipboard back.
+In target 4, Windows Terminal's multi-line warning was confirmed: the first line ran and the second stayed in PSReadLine's buffer, which is what Context & decisions accepts.
+Target 5 (conhost, Windows PowerShell 5.1) took 3 of 3 in a second run, because the first run aborted while closing target 4 (round 3 finding, a harness error, not the app).
+Sebastian's clipboard was sealed before each run and restored with the same sha256 after both.
+Result: matches Expected on 26e5a8a.

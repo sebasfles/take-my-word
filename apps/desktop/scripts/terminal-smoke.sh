@@ -368,17 +368,29 @@ close_target() {
       class="$(class_of "$n")"
       if guard_clear && psw focus "$window" >/dev/null && [[ "$(psw is-foreground "$window")" == yes ]] && guard_clear; then
         act chord ctrl f11 >/dev/null
-        sleep 1.5
       else
-        log "target $n could not be focused to close: window $(psw find "$class" "$(title_of "$n")"), foreground $(psw foreground)"
+        log "target $n could not be focused to close; foreground $(psw foreground)"
       fi
-      if [[ "$(psw find "$class" "$(title_of "$n")")" != 0 ]]; then
-        psw close-window "$window" >/dev/null
-        log "target $n closed through its window"
-      else
+      if window_gone "$class" "$n"; then
         log "target $n closed"
+      else
+        psw close-window "$window" >/dev/null || true
+        if window_gone "$class" "$n"; then
+          log "target $n closed through its window"
+        else
+          log "WARNING: target $n is still open; close $(title_of "$n") by hand"
+        fi
       fi ;;
   esac
+}
+
+window_gone() {
+  local class="$1" n="$2" deadline=$((SECONDS + 10))
+  while (( SECONDS < deadline )); do
+    [[ "$(psw find "$class" "$(title_of "$n")")" == 0 ]] && return 0
+    sleep 0.5
+  done
+  return 1
 }
 
 app_window() {
