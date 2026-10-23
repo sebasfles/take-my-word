@@ -87,4 +87,57 @@ Evidence on the Windows host (`computer available`), no code change:
   - The exe embeds the prd discovery document byte for byte (`apiUrl` https://api.takemyword.fless.dev), the updater public key of `deployment.json` and the `releases/latest/download/latest.json` endpoint.
 - The dictation against scratch will run on a dev release build of the same commit with the dev identity, dev folders and Credential Manager entries backed up and restored, the idle guard and a clipboard snapshot, as in 0014.
 
+### Round 4
+
+Code: b06fc0f (`terminal-smoke.sh --server <domain> --real`, defaults unchanged) and d835329 (the removal's leftovers check confirms a tagged user pool with Cognito before counting it: AWS's tag index kept the deleted pool for over 15 minutes). Both found in this round's evidence.
+
+Official plans, preview before the rebase on 0015 (`pnpm tf <root> plan -lock=false`, never applied):
+
+- core: "No changes. Your infrastructure matches the configuration."
+- prd: the two moves `module.app.aws_iam_role.deploy` and `module.app.aws_iam_role_policy.deploy` to `[0]`, "Plan: 0 to add, 0 to change, 0 to destroy."
+- dev: the same two moves, plus 0015's additive changes reversed (not ours): destroy of the `GET /me/usage` integration and route, `DAILY_QUOTA_MINUTES` removed from the api function; "Plan: 0 to add, 1 to change, 2 to destroy."
+
+Dev (`dev available`): this branch's api and web deployed with `pnpm deploy:<api|web> build|swap` (12:02:58-12:03:52); discovery 200 and valid; web `integration` 4 passed and `e2e` 13 passed (`WEB_URL` and `RELEASES_REPOSITORY` added to the workspace `.env`); then develop 61be296 redeployed from a clean clone with develop's own workflow steps (12:06:40-12:07:46, exit 0), discovery back to 404; `dev free` sent.
+
+Scratch run, from a fresh clone of the branch, the skill driven by a subagent that knew only the clone, the skill and the README; I answered as the person. Transcript, secrets redacted:
+
+- 11:34:01 fresh clone of feat/0016_self_hosting at f1f96b9, origin set to the GitHub URL; no deployment.json, no .env.
+- 11:34:08-11:34:12 person: README steps 1-2 (pnpm install --frozen-lockfile, copy self-host/skill to .claude/skills/self-host).
+- 11:34:34 agent: /self-host started; tools checked (node 24.21.0, pnpm 10.34.7, terraform 1.13.3, aws 2.28.8, git 2.43.0, zip 3.0).
+- 11:34:55 agent asks: profile (lists profiles), region (us-east-1), domain, dev (no), first username (admin).
+- 11:35:08 person: profile fless-takemyword, region us-east-2, domain selfhost.takemyword.fless.dev, prd only, user scratch, deployment name tmw-scratch.
+- 11:35:16-11:35:23 agent: sts get-caller-identity (115891590483), zone found takemyword.fless.dev; asks the person to write the two keys into .env.
+- 11:36 person: wrote GROQ_API_KEY and OPENAI_API_KEY into .env (values redacted, never in the chat).
+- 11:35:42-11:35:50 agent: checked the key names only; its write of deployment.json was refused by this harness (background subagents cannot write to an unisolated directory), not by the product; it also ran pnpm selfhost --plan too early, which stopped at once with "deployment.json is missing" and changed nothing.
+- 11:37 person: saved deployment.json exactly as the agent proposed it (tmw-scratch, fless-takemyword, 115891590483, us-east-2, selfhost.takemyword.fless.dev, zone takemyword.fless.dev, prd, releases from origin).
+- 11:36:24-11:37:11 agent: pnpm selfhost --plan, exit 0; it created the empty state bucket tmw-scratch-terraform-state-115891590483 (us-east-2, tags Project=tmw-scratch, ManagedBy=pnpm selfhost); plan 96 to add, 0 to change, 0 to destroy; agent summarized and asked to go on.
+- 11:38 developer check of selfhost.tfplan (terraform show -json): 96 create, 1 data read, nothing else; every tags_all is Project=tmw-scratch, Environment=prd; names all tmw-scratch-prd*, /aws/lambda/tmw-scratch-prd-*, /aws/apigateway/tmw-scratch-prd, or sub-names (app client native, stage $default, role policies logs and access); DNS: 5 records in zone Z06585121NIUBTW9PNNB1, A and AAAA selfhost.takemyword.fless.dev, A api.selfhost.takemyword.fless.dev, two ACM validation CNAMEs for those two hosts.
+- 11:38 person (after the om-reviewer approved the plan): agrees to apply.
+- 11:38:27-11:44:34 agent: pnpm selfhost --yes --user scratch, exit 0 (6 min 7 s): "Plan: 96 to add, 0 to change, 0 to destroy." then "Apply complete! Resources: 96 added, 0 changed, 0 destroyed.", provider keys stored, cookie key generated, f1f96b9 deployed, user scratch created, discovery answered, Ready.
+- 11:44:38 agent to person: web https://selfhost.takemyword.fless.dev, API https://api.selfhost.takemyword.fless.dev, user scratch, temporary password <redacted>, the desktop steps, and that the keys may now leave .env.
+- 11:44:56 person: asks for the update the skill describes.
+- 11:45:04-11:45:34 agent: git pull exit 1 (the scratch clone tracks a branch that exists only locally; expected for this test, not a product issue), pnpm install exit 0 (up to date), pnpm selfhost --plan exit 0: "No changes. Your infrastructure matches the configuration.", "prd already matches the code."; asks before --yes.
+- 11:45:55-11:46:02 developer as the person, web sign-in through Playwright (Chromium, en, 1280x800): https://selfhost.takemyword.fless.dev/sign-in with scratch and the temporary password, "Choose your password" step, new password (generated, kept in a 0600 file outside every worktree), "Save and sign in", landed on /app showing scratch. Screenshots: scratch-evidence/web-new-password.png, web-signed-in.png.
+- 11:45:55-11:46:25 agent, second run: pnpm selfhost --yes --user scratch, exit 0 (30 s): state bucket "already exists"; "No changes. Your infrastructure matches the configuration." and "prd already matches the code; nothing to apply."; "The provider keys of prd are already stored."; "prd already runs f1f96b9." (no build, no swap); "prd already has users; none created."; discovery answered; Ready.
+- 11:49:00 host snapshot: Roaming dev folder absent; Local dev.fless.takemyword.dev copied, 193 files, listing sha256 9ae844a8c8f378921cdab9289c38fc0b70f9454e73398afc623b8b390cf4761b; Credential Manager: only the three prd entries (*.dev.fless.takemyword), no dev entry.
+- 11:49:42-11:50:52 dictation: debug build of b06fc0f (dev identity, sha256 299c1be5f33c4cc009278ee11a56a27c5ce0f503776c35dbbdf41bb2c755573c), terminal-smoke --targets 6 --tries 1 --multiline none --server selfhost.takemyword.fless.dev --real; clipboard sealed (sha256 f2d2921e...cc51); app log "dev: API stub mode Off, real API", "server: selfhost.takemyword.fless.dev", "signed in"; speech.wav dictated 11:50:18.9, pasted 11:50:21.5 into the WinForms box: "Hello, this is a test." (landed yes, clipboard back yes); scratch API access log 11:50:19 POST /dictations 200; the guard logged no real input; the automated sign-out failed on WSL interop ("signing out did not finish"), the app was stopped; clipboard restored and verified, same sha256.
+- 11:51:36 web History on scratch (Playwright, signed in with the chosen password) shows "Hello, this is a test." at 11:50, Style Plain, Audio 2.2 s (scratch-evidence/web-history.png).
+- 11:52 host restore: the run's three dev credentials (*.dev.fless.takemyword.dev, the scratch session) deleted with cmdkey; Credential Manager listing identical to before; Roaming dev folder (settings.json written by the run) removed, absent again; Local dev folder restored, listing sha256 9ae844a8...761b identical; only Sebastian's prd app running, untouched.
+- 11:52:23 person: removal requested, typed selfhost.takemyword.fless.dev to confirm.
+- ~11:52-12:08 agent: pnpm selfhost remove --yes: "Apply complete! Resources: 0 added, 4 changed, 0 destroyed." (table and pool protection off, both secrets' recovery window 0), "Destroy complete! Resources: 96 destroyed.", "deleted the state bucket tmw-scratch-terraform-state-115891590483", then the leftovers check listed only arn:aws:cognito-idp:us-east-2:115891590483:userpool/us-east-2_F86wSZwly for 10 minutes and stopped with "these remain after removal"; DescribeUserPool on that id answered ResourceNotFoundException: the tagging index lags behind the deletion (false leftover). Fixed in d835329: a tagged user pool counts only when Cognito still describes it.
+- 12:10 person: pulled d835329 into the clone.
+- 12:09:05-12:09:22 agent, removal again on d835329: "tmw-scratch-terraform-state-115891590483 is gone, so no state is left.", "Nothing of tmw-scratch is left in account 115891590483.", exit 0.
+- 12:09:42 independent check (`scratch-evidence/leftovers.txt` in the workspace): in us-east-2 and us-east-1 no ACM certificate for selfhost, no log group, no secret (pending deletion included), no Lambda, table, user pool or HTTP API named tmw-scratch; no IAM role, S3 bucket or CloudFront distribution; no record under selfhost.takemyword.fless.dev in the zone; the tag index still lists the deleted pool us-east-2_F86wSZwly, which DescribeUserPool answers ResourceNotFoundException.
+- 12:10 local cleanup: the clone's `.env`, the chosen password, the run logs holding the temporary password, the clones and the host's scratch and backup folders deleted; the builds stay in `C:\dev\tmw-0016-{prd,dev,debug}`.
+
+Timings: setup 6 min 7 s from apply to Ready (plan step 47 s), second run 30 s, removal 16 min (destroy and the 10-minute leftovers wait), removal again 17 s.
+
+Findings of the run for the product:
+
+- The tag index outlives a deleted user pool: fixed in d835329.
+- The skill's subagent could not write `deployment.json` in this harness (background subagents cannot write outside a worktree); a person's Claude Code session can, so the skill is unchanged.
+- `git pull` in the update step failed only because the scratch branch is not on the remote.
+
+Deviation agreed with the om-reviewer: the dictation ran on a dev debug build of the same commit, not a local prd build, so Sebastian's prd app and identity were never touched.
+
 ## Result

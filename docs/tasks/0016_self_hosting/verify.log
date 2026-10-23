@@ -115,3 +115,16 @@
 - rust:lint: pass exit 0 (pnpm rust:lint: cargo fmt, clippy all targets, clippy release --features dev, then rust:lint:linux)
 - rust:test: pass exit 0 (218 passed, 9 ignored, pnpm rust:test, --test-threads=1)
 - prd build: pass exit 0 (pnpm tauri:build:prd --no-sign, official prd server and updater key from deployment.json); updater signing skipped on purpose, the release key stays with desktop-release; a first run without --no-sign built the same installer and stopped at "A public key has been found, but no private key"
+
+## 2026-10-23T12:10:47Z by om-developer target deployment on d835329
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (39 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T12:10:47Z by om-developer target web on b06fc0f (deployed to dev by hand; web code unchanged since)
+- e2e: pass exit 0 (pnpm integration: 4 tests against dev, --no-file-parallelism; pnpm e2e: 13 passed against WEB_URL=https://dev.<domain>, --workers=1)
+- dev discovery: https://dev.<domain>/.well-known/take-my-word.json 200, valid against discoverySchema
+
+## 2026-10-23T12:10:47Z by om-developer target desktop on b06fc0f
+- scripts/terminal-smoke.sh: bash -n clean; run once with --server and --real against scratch (pastes 1, landed 1); no other change to desktop code since e892526, whose Windows rust:lint and rust:test are green
