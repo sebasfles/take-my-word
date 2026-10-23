@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import type { AccountApi } from "./api.ts";
 import { completeNewPassword, refreshSession, signIn, signOut, type AuthDeps } from "./auth.ts";
-import { isLocale, localeCookieName, localeMaxAgeSeconds } from "./i18n.ts";
+import { isLocale, localeCookieName } from "./i18n.ts";
 import { isSameOrigin } from "./origin.ts";
+import { preferenceCookie } from "./preference.ts";
 import { isTheme, themeCookieName } from "./theme.ts";
 import {
   clearedSessionCookies,
@@ -131,20 +132,6 @@ export function signOutHandler(deps: Deps) {
     if (!isSameOrigin(request, d.webOrigin)) return forbidden();
     const cookies = await signOut(d, readSession(jar(request), d.key));
     return json({ step: "done" }, 200, cookies);
-  };
-}
-
-function preferenceCookie(name: string, value: string): CookieToSet {
-  return {
-    name,
-    value,
-    options: {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: localeMaxAgeSeconds,
-    },
   };
 }
 

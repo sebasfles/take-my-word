@@ -29,8 +29,14 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 export function robotsTag(pathname: string, indexed: boolean): string | null {
-  return indexed && isPublicPath(pathname) ? null : "noindex";
+  return indexed && (pathname === "/" || isPublicPath(pathname)) ? null : "noindex";
 }
+
+export function signInPath(locale: Locale): string {
+  return `/sign-in?${languageParameter}=${locale}`;
+}
+
+export const languageParameter = "lang";
 
 export function languageAlternates(origin = ""): Record<Locale | "x-default", string> {
   return {

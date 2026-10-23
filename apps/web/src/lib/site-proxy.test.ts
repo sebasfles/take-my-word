@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
+import { localeFrom } from "./locale.ts";
 import { siteProxy } from "./site-proxy.ts";
 
 const official = "https://dictation.example.com";
@@ -23,7 +24,7 @@ describe("siteProxy at /", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(`${official}${target}`);
     expect(response.headers.get("vary")).toBe("Cookie, Accept-Language");
-    expect(response.headers.get("x-robots-tag")).toBe("noindex");
+    expect(response.headers.get("x-robots-tag")).toBeNull();
   });
 
   it("keeps the query string", () => {
@@ -32,9 +33,36 @@ describe("siteProxy at /", () => {
   });
 });
 
+describe("siteProxy at /sign-in?lang=", () => {
+  const proxy = siteProxy({ webOrigin: () => official, indexedOrigin: official });
+
+  it("stores the public page's language and drops it from the URL", () => {
+    const response = proxy(request("/sign-in?lang=es", { "accept-language": "en-US,en;q=0.9" }));
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(`${official}/sign-in`);
+    const cookie = response.cookies.get("tmw-lang");
+    expect(cookie?.value).toBe("es");
+    expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "lax", path: "/" });
+    expect(localeFrom(cookie?.value, "en-US,en;q=0.9")).toBe("es");
+  });
+
+  it("keeps the other parameters and ignores a language it does not offer", () => {
+    const response = proxy(request("/sign-in?next=%2Fapp&lang=fr"));
+    expect(response.headers.get("location")).toBe(`${official}/sign-in?next=%2Fapp`);
+    expect(response.cookies.get("tmw-lang")).toBeUndefined();
+  });
+
+  it("leaves a plain /sign-in alone", () => {
+    const response = proxy(request("/sign-in"));
+    expect(response.status).toBe(200);
+    expect(response.cookies.get("tmw-lang")).toBeUndefined();
+  });
+});
+
 describe("siteProxy X-Robots-Tag", () => {
-  it("lets the official deployment's public pages be indexed and nothing else", () => {
+  it("lets the official deployment's public pages and their x-default be indexed, nothing else", () => {
     const proxy = siteProxy({ webOrigin: () => official, indexedOrigin: official });
+    expect(proxy(request("/")).headers.get("x-robots-tag")).toBeNull();
     expect(proxy(request("/en")).headers.get("x-robots-tag")).toBeNull();
     expect(proxy(request("/es")).headers.get("x-robots-tag")).toBeNull();
     expect(proxy(request("/sign-in")).headers.get("x-robots-tag")).toBe("noindex");
@@ -47,10 +75,8 @@ describe("siteProxy X-Robots-Tag", () => {
     ["a self-hosted build", "https://copy.example.org", null],
   ])("keeps %s out of search results", (_, webOrigin, indexedOrigin) => {
     const proxy = siteProxy({ webOrigin: () => webOrigin, indexedOrigin });
-    for (const path of ["/en", "/es", "/sign-in"]) {
-      const response = proxy(request(path));
-      expect(response.status).toBe(200);
-      expect(response.headers.get("x-robots-tag")).toBe("noindex");
+    for (const path of ["/", "/en", "/es", "/sign-in"]) {
+      expect(proxy(request(path)).headers.get("x-robots-tag")).toBe("noindex");
     }
   });
 });

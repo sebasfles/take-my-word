@@ -161,6 +161,22 @@ test("redirects / to a language page that names its alternates", async ({ page }
   }
 });
 
+test("signs in from /es in Spanish for an English browser with no language cookie", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ locale: "en-US" });
+  try {
+    const page = await context.newPage();
+    await page.goto("/es");
+    await page.locator(".site-header").getByRole("link", { name: "Iniciar sesión" }).click();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.getByRole("heading", { name: "Inicia sesión" })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
 test("keeps dev and every private page out of search results, crawlable", async ({ page }) => {
   const robots = await page.request.get("/robots.txt");
   expect(robots.status()).toBe(200);

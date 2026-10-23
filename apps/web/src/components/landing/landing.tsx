@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { buttonClass, Mark, Waveform } from "@take-my-word/brand";
 import { Demo, StaticExample } from "@/components/landing/demo.tsx";
@@ -12,7 +11,7 @@ import { SiteHeader } from "@/components/site-header.tsx";
 import { demoScripts, dictionary, type Locale } from "@/lib/i18n.ts";
 import { landingMetadata } from "@/lib/server/metadata.ts";
 import { currentTheme } from "@/lib/server/request.ts";
-import { publicPath } from "@/lib/seo.ts";
+import { publicPath, signInPath } from "@/lib/seo.ts";
 import "@/styles/landing.css";
 
 export function landingPageMetadata(locale: Locale): Metadata {
@@ -43,9 +42,9 @@ export async function Landing({ locale }: { locale: Locale }) {
           </nav>
         }
       >
-        <Link href="/sign-in" className={buttonClass({ variant: "ghost", size: "sm" })}>
+        <a href={signInPath(locale)} className={buttonClass({ variant: "ghost", size: "sm" })}>
           {t.nav.signIn}
-        </Link>
+        </a>
       </SiteHeader>
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
@@ -210,7 +209,7 @@ export async function Landing({ locale }: { locale: Locale }) {
             <p>{l.get.body}</p>
             <Download t={l} align="center" />
             <p className="get-account">
-              {l.haveAccount} <Link href="/sign-in">{t.nav.signIn}</Link>
+              {l.haveAccount} <a href={signInPath(locale)}>{t.nav.signIn}</a>
             </p>
           </div>
         </section>

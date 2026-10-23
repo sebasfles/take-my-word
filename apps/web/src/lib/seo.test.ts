@@ -38,7 +38,8 @@ describe("indexing", () => {
   it.each([
     ["/en", true, null],
     ["/es", true, null],
-    ["/", true, "noindex"],
+    ["/", true, null],
+    ["/", false, "noindex"],
     ["/sign-in", true, "noindex"],
     ["/app", true, "noindex"],
     ["/app/history", true, "noindex"],
