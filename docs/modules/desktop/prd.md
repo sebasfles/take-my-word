@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-22
-source: 0011_desktop_rebrand
+updated: 2026-10-23
+source: 0013_fix_terminal_paste
 ---
 
 # Desktop: product
@@ -71,7 +71,9 @@ Errors and empty states: a failed download or install says so and offers to try 
 - The dev app defaults to Ctrl+Alt+Win so it can sit beside the prd app on Ctrl+Win; a hotkey the user saved is kept.
 - Holding the hotkey while the previous dictation is processing starts a new recording; the earlier text is pasted once the new hold ends, and its failure, if any, arrives as a notification.
 - The paste goes only to the window that had focus when the hold began.
-- When the paste cannot land (an administrator window, the window changed, the target never read it), the text stays in the clipboard and a notification says so; when the earlier clipboard cannot be put back, a notification says that too.
+- Terminals need no app rule: Windows Terminal (WSL, tmux, Claude Code, PowerShell) and the classic console take the dictation with Ctrl+V, and multi-line text keeps its line breaks and arrives as one block where the shell supports it.
+- In a Windows Terminal tab running Windows PowerShell 5.1, a multi-line dictation brings up the terminal's own warning, and confirming it runs every line but the last, because PSReadLine 2.0 has no bracketed paste; that is the terminal's behavior, not the app's, which never adds a line break or an Enter.
+- When the paste cannot land (an administrator window, a terminal run as administrator included, since Windows blocks typed input there; the window changed; the target never read it), the text stays in the clipboard and a notification says why; when the earlier clipboard cannot be put back, a notification says that too.
 - Audio leaves the machine only to be transcribed and is never stored.
 - The dictated text stays out of Windows clipboard history and the cloud clipboard, and only the target app is given it.
 - The app speaks Spanish when Windows does, English otherwise, and follows Windows' light or dark theme; a choice of either in General applies to every open window at once and is kept, and the overlay looks the same in both themes.

@@ -1,5 +1,5 @@
 ---
-updated: 2026-10-22
+updated: 2026-10-23
 source: setup
 ---
 
@@ -91,7 +91,9 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-21 | A new CRUD route needs a forwarder variant before the views can use it | The editors need a route the enum lacks |
 | desktop | 2026-10-21 | A rule edited elsewhere reaches this machine's paste keystroke up to 5 min later | A paste uses a stale keystroke after an edit elsewhere |
 | desktop | 2026-10-22 | The `image` crate is in the binary to decode the tray frames | Release binary size matters |
-| desktop | 2026-10-22 | The paste retry can paste twice; reads from threads born after the offer and monitors that win twice leave the text with a notification | A paste lands twice, or a target read logs as unproven |
+| desktop | 2026-10-23 | The paste retry can paste twice; reads from threads born after the offer and monitors that win twice (one reading on every Ctrl+V always does) leave the text with a notification | A paste lands twice, or a target read logs as unproven |
+| desktop | 2026-10-23 | Confirming Windows Terminal's multi-line warning in a Windows PowerShell 5.1 tab runs every line but the last | PSReadLine with bracketed paste ships, or users ask for joined lines |
+| desktop | 2026-10-23 | 6964 `tmw-config-*` folders from earlier test runs stay in Sebastian's `%TEMP%` | Sebastian clears them |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

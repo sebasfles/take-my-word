@@ -51,7 +51,31 @@ mod tests {
     use super::*;
     use crate::hotkey::HotkeyKey;
 
-    fn scratch(name: &str, contents: Option<&str>) -> std::path::PathBuf {
+    struct Scratch(std::path::PathBuf);
+
+    impl std::ops::Deref for Scratch {
+        type Target = Path;
+
+        fn deref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl AsRef<Path> for Scratch {
+        fn as_ref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            if let Some(dir) = self.0.parent() {
+                let _ = fs::remove_dir_all(dir);
+            }
+        }
+    }
+
+    fn scratch(name: &str, contents: Option<&str>) -> Scratch {
         let dir = std::env::temp_dir().join(format!("tmw-config-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -59,7 +83,7 @@ mod tests {
         if let Some(contents) = contents {
             fs::write(&path, contents).unwrap();
         }
-        path
+        Scratch(path)
     }
 
     #[test]

@@ -26,15 +26,17 @@ const WAV_MEDIA_TYPES: [&str; 4] = ["audio/wav", "audio/wave", "audio/x-wav", "a
 pub enum StubMode {
     Off,
     Normal,
+    TwoLines,
     Silence,
     QuotaExceeded,
     NetworkError,
 }
 
 impl StubMode {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Off,
         Self::Normal,
+        Self::TwoLines,
         Self::Silence,
         Self::QuotaExceeded,
         Self::NetworkError,
@@ -44,6 +46,7 @@ impl StubMode {
         match self {
             Self::Off => "Off, real API",
             Self::Normal => "Normal",
+            Self::TwoLines => "Two lines",
             Self::Silence => "Silence (empty text)",
             Self::QuotaExceeded => "Quota exceeded (429)",
             Self::NetworkError => "Network error",
@@ -54,6 +57,7 @@ impl StubMode {
         match self {
             Self::Off => "stub-off",
             Self::Normal => "stub-normal",
+            Self::TwoLines => "stub-two-lines",
             Self::Silence => "stub-silence",
             Self::QuotaExceeded => "stub-quota",
             Self::NetworkError => "stub-network",
@@ -181,6 +185,11 @@ async fn dictations(
         StubMode::Off | StubMode::Normal => {
             axum::Json(canned(meta.locale.as_deref().unwrap_or("es"), shared.delay)).into_response()
         }
+        StubMode::TwoLines => axum::Json(two_lines(
+            meta.locale.as_deref().unwrap_or("es"),
+            shared.delay,
+        ))
+        .into_response(),
         StubMode::Silence => axum::Json(silence(shared.delay)).into_response(),
         StubMode::QuotaExceeded => api_error(
             ApiErrorCode::QuotaExceeded,
@@ -280,6 +289,19 @@ fn canned(locale: &str, delay: Duration) -> DictationResponse {
     } else {
         "Hola, este es un dictado de prueba de Take My Word."
     };
+    response(text, delay)
+}
+
+fn two_lines(locale: &str, delay: Duration) -> DictationResponse {
+    let text = if locale.starts_with("en") {
+        "First line of a Take My Word test.\nSecond line of the same dictation."
+    } else {
+        "Primera línea de una prueba de Take My Word.\nSegunda línea del mismo dictado."
+    };
+    response(text, delay)
+}
+
+fn response(text: &str, delay: Duration) -> DictationResponse {
     DictationResponse {
         raw: text.to_lowercase().replace([',', '.'], ""),
         text: text.into(),
@@ -467,6 +489,10 @@ mod tests {
         let normal = api.dictate(wav(1.0), &meta("en-US")).unwrap();
         assert!(normal.has_text());
         assert!(normal.text.starts_with("Hello"));
+
+        stub.set_mode(StubMode::TwoLines);
+        let two_lines = api.dictate(wav(1.0), &meta("es")).unwrap();
+        assert_eq!(two_lines.text.lines().count(), 2);
 
         stub.set_mode(StubMode::Silence);
         assert!(!api.dictate(wav(1.0), &meta("es")).unwrap().has_text());
