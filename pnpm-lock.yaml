@@ -118,6 +118,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@take-my-word/deployment':
+        specifier: workspace:*
+        version: link:../../packages/deployment
       '@tauri-apps/cli':
         specifier: 2.12.3
         version: 2.12.3
@@ -245,6 +248,15 @@ importers:
       '@aws-sdk/client-cognito-identity-provider':
         specifier: 3.1154.0
         version: 3.1154.0
+
+  packages/deployment:
+    dependencies:
+      '@take-my-word/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/shared:
     dependencies:

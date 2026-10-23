@@ -6,5 +6,6 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts"],
     fileParallelism: false,
+    env: { RELEASES_REPOSITORY: "owner/take-my-word" },
   },
 });

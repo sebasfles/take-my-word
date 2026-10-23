@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { buttonClass } from "@take-my-word/brand";
 import { format, type Dictionary } from "@/lib/i18n.ts";
-import { windowsDownloadUrl } from "@/lib/links.ts";
+import { links } from "@/lib/links.ts";
 import { latestDesktopVersion } from "@/lib/server/release.ts";
 
 function WindowsIcon() {
@@ -30,7 +30,7 @@ export function Download({
 }) {
   return (
     <div className="download" data-align={align}>
-      <a className={buttonClass({ size: "lg" })} href={windowsDownloadUrl}>
+      <a className={buttonClass({ size: "lg" })} href={links.windowsInstaller}>
         <WindowsIcon />
         {t.download}
       </a>

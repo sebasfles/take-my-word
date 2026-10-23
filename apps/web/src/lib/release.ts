@@ -1,9 +1,7 @@
 import { desktopReleaseManifestSchema } from "@take-my-word/shared";
 
-export const latestManifestUrl =
-  "https://github.com/sebasfles/take-my-word/releases/latest/download/latest.json";
-
 export interface ReleaseDeps {
+  manifestUrl: string;
   fetch: typeof fetch;
   now: () => number;
   timeoutMs: number;
@@ -16,7 +14,7 @@ export function releaseVersionReader(deps: ReleaseDeps) {
 
   async function load(): Promise<string | null> {
     try {
-      const response = await deps.fetch(latestManifestUrl, {
+      const response = await deps.fetch(deps.manifestUrl, {
         signal: AbortSignal.timeout(deps.timeoutMs),
         redirect: "follow",
       });

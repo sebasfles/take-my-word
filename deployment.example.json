@@ -1,0 +1,32 @@
+{
+  "$schema": "./deployment.schema.json",
+  "name": "take-my-word",
+  "aws": {
+    "profile": "my-aws-profile",
+    "accountId": "123456789012",
+    "region": "us-east-1"
+  },
+  "domain": "dictation.example.com",
+  "hostedZone": "example.com",
+  "stateBucket": "take-my-word-terraform-state-123456789012",
+  "environments": ["prd"],
+  "releases": "owner/take-my-word",
+  "github": {
+    "owner": "owner",
+    "repository": "take-my-word",
+    "appId": "1234567",
+    "appInstallationId": "12345678"
+  },
+  "desktop": {
+    "updaterPublicKey": "base64 of the minisign public key",
+    "servers": {
+      "prd": {
+        "version": 1,
+        "apiUrl": "https://api.dictation.example.com",
+        "region": "us-east-1",
+        "userPoolId": "us-east-1_AbCdEfGhI",
+        "clientId": "0123456789abcdefghijklmnop"
+      }
+    }
+  }
+}

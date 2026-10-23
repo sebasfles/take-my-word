@@ -10,7 +10,7 @@ function env(name: string): string {
 const username = env("CREW_E2E_USERNAME");
 const password = env("CREW_E2E_PASSWORD");
 const installer =
-  "https://github.com/sebasfles/take-my-word/releases/latest/download/take-my-word-windows-x64-setup.exe";
+  /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/latest\/download\/take-my-word-windows-x64-setup\.exe$/;
 
 async function signIn(page: Page, options: { remember: boolean }): Promise<void> {
   await page.goto("/sign-in");

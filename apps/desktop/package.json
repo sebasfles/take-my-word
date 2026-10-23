@@ -17,9 +17,10 @@
     "windows:build": "pnpm windows:prepare && scripts/windows.sh pnpm tauri:build:dev",
     "screenshots": "node screenshots/capture.ts",
     "contract": "node contract/write.ts",
-    "tauri:build:dev": "tauri build --config src-tauri/tauri.dev.conf.json",
-    "tauri:build:prd": "tauri build --config src-tauri/tauri.prd.conf.json",
-    "check:version": "node scripts/version.ts"
+    "tauri:build:dev": "node scripts/tauri.ts dev build",
+    "tauri:build:prd": "node scripts/tauri.ts prd build",
+    "check:version": "node scripts/version.ts",
+    "tauri:dev": "node scripts/tauri.ts dev dev"
   },
   "dependencies": {
     "@take-my-word/brand": "workspace:*",
@@ -30,6 +31,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@take-my-word/deployment": "workspace:*",
     "@tauri-apps/cli": "2.12.3",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",

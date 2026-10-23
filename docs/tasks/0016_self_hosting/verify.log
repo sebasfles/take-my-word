@@ -1,0 +1,42 @@
+## 2026-10-23T09:24:03Z by om-developer target shared on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (45 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target brand on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (58 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target deployment on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (26 tests, pnpm test --no-file-parallelism)
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target web on 472f21e
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (175 tests, pnpm test --no-file-parallelism)
+- e2e: not run (pnpm integration and pnpm e2e need the dev stack, held by 0015, and the expired SSO session)
+
+## 2026-10-23T09:24:03Z by om-developer target desktop on 472f21e
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint:linux)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (169 tests, pnpm test --no-file-parallelism)
+- rust:lint (Windows) and rust:test: not run, the Windows host is held by 0015; cargo test --locked -- --test-threads=1 in the tmw-linux-check container: 194 passed, 1 ignored
+
+## 2026-10-23T09:24:03Z by om-developer target infra on 472f21e
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (init -backend=false and validate on core, dev, prd)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-23T09:24:03Z by om-developer target workflows on 472f21e
+- lint: pass exit 0 (pnpm lint:workflows)
+- typecheck: n/a
+- unit: n/a
+- e2e: n/a
+

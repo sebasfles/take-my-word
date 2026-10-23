@@ -13,7 +13,10 @@
     "build": "pnpm -r build",
     "format": "prettier --write .",
     "lint:workflows": "github-actionlint",
-    "release:desktop": "node apps/desktop/scripts/release.ts"
+    "release:desktop": "node apps/desktop/scripts/release.ts",
+    "tf": "node packages/deployment/src/tf.ts",
+    "deploy:api": "node packages/deployment/src/deploy.ts api",
+    "deploy:web": "node packages/deployment/src/deploy.ts web"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

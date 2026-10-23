@@ -44,8 +44,8 @@ output "dictionary_usage_function_name" {
 }
 
 output "deploy_role_arn" {
-  description = "Role the deploy workflow assumes over OIDC"
-  value       = aws_iam_role.deploy.arn
+  description = "Role the deploy workflow assumes over OIDC, null without CI"
+  value       = one(aws_iam_role.deploy[*].arn)
 }
 
 output "debug_bucket" {

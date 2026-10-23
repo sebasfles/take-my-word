@@ -81,8 +81,9 @@ impl Shell {
             windows::MAIN,
             "microphone-level",
         );
+        let server = env::official_server()?;
         let provider = CognitoProvider {
-            cognito: Cognito::for_environment(env::CURRENT)?,
+            cognito: Cognito::for_server(&server)?,
             device_name: device_name(app),
         };
         let keychain = SystemKeychain::new(env::CURRENT.identifier)?;
@@ -92,7 +93,7 @@ impl Shell {
             keychain,
             Box::new(move |signed_in| account::changed(&listener_app, signed_in)),
         ));
-        let api = AuthedApi::new(HttpApi::new(env::CURRENT.api_url)?, Arc::clone(&account));
+        let api = AuthedApi::new(HttpApi::new(server.api_url)?, Arc::clone(&account));
         let rules = Arc::new(RuleCache::default());
         let dictation_api = api.clone();
         #[cfg(debug_assertions)]

@@ -1,13 +1,18 @@
 module "app" {
   source = "../../stacks/app"
 
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+    github        = github
+  }
+
+  deployment   = var.deployment
   env          = local.env
   api_hostname = local.api_hostname
   web_hostname = local.web_hostname
-  hosted_zone  = local.hosted_zone
-
-  github_owner      = local.github_owner
-  github_repository = local.github_repository
+  hosted_zone  = var.hosted_zone
+  github       = var.github
 
   debug_bucket = local.debug_bucket
 

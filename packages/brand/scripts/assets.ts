@@ -129,9 +129,6 @@ function ogSvg() {
   const line1 = text(display, "Say it once.", 128, pad, 330);
   const line2 = text(displayItalic, "It’s written.", 128, pad, 470);
   const tagline = text(sans, "Your Word, Our Command.", 34, pad, 560);
-  const url = text(sans, "takemyword.fless.dev", 26, 0, 0);
-  const urlWidth = url.end;
-  const urlLine = text(sans, "takemyword.fless.dev", 26, w - pad - urlWidth, 560);
   const bars = [0.42, 0.7, 1, 0.78, 0.5, 0.86, 0.34];
   const barWidth = 20;
   const gap = 16;
@@ -153,7 +150,6 @@ function ogSvg() {
     `<path d="${line1.d}" fill="${light.text}"/>`,
     `<path d="${line2.d}" fill="${light.accentText}"/>`,
     `<path d="${tagline.d}" fill="${light.muted}"/>`,
-    `<path d="${urlLine.d}" fill="${light.muted}"/>`,
     "</svg>",
   ].join("\n");
 }

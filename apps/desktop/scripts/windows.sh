@@ -10,7 +10,7 @@ repo="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 checkout="${TMW_WINDOWS_CHECKOUT:-/mnt/c/dev/take-my-word}"
 
 mkdir -p "$checkout"
-rsync -a --delete --exclude=.git --filter=':- .gitignore' "$repo/" "$checkout/"
+rsync -a --delete --exclude=.git --include=/deployment.json --filter=':- .gitignore' "$repo/" "$checkout/"
 commit="$(git -C "$repo" rev-parse HEAD)"
 if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
   commit="$commit-dirty"

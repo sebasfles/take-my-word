@@ -1,5 +1,5 @@
 {
-  "userPoolId": "us-east-1_9g4xiMUfJ",
+  "userPoolId": "us-east-1_ExAmPlE01",
   "userIdForSrp": "2448e4f8-2081-70f1-5c1b-1f2e3d4c5b6a",
   "password": "Correct horse 1!",
   "a": "80a5caef14395e83a8cdf2173c6186abd0f51a3f6489aed3f81d42678cb1d6fb20456a8fb4d9fe23486d92b7dc01264b7095badf04294e7398bde2072c51769bc0e50a2f54799ec3e80d32577ca1c6eb10355a7fa4c9ee13385d82a7ccf1163b6085aacff4193e6388add2f71c41668bb0d5fa1f44698eb3d8fd22476c91b6db",
@@ -10,12 +10,12 @@
   "signatures": [
     {
       "unixSeconds": 1792609503,
-      "signature": "KUwVQ35Yqpe5yNgKC8mCMe0TOwIu/haZM7Dh0Tp15b4=",
+      "signature": "viPhOLOk5LwrfyHlvhLpK5vdfSJQiNQmF7KATqeS9zo=",
       "timestamp": "Wed Oct 21 19:05:03 UTC 2026"
     },
     {
       "unixSeconds": 1793678409,
-      "signature": "TV30FUvnvSazhidq7eZqgwN8rWEHUH99tZKfs7+lx1M=",
+      "signature": "5OcEBjCTyLwotHC5vbR/Zj/W6eTXd4Z8gk5HKHALHVQ=",
       "timestamp": "Tue Nov 3 04:00:09 UTC 2026"
     }
   ],

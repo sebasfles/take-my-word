@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "default": "take-my-word",
+      "description": "Prefix of every AWS resource name, as <name>-<env>-...; changing it later replaces the whole deployment.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}[a-z0-9]$"
+    },
+    "aws": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "description": "AWS CLI profile every command runs with."
+        },
+        "accountId": {
+          "type": "string",
+          "pattern": "^\\d{12}$",
+          "description": "Account the profile must resolve to; Terraform refuses any other."
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z]{2}(-[a-z]+)+-\\d{1,2}$",
+          "description": "Region of everything but the web's certificate, which CloudFront needs in us-east-1."
+        }
+      },
+      "required": ["profile", "accountId", "region"],
+      "additionalProperties": false
+    },
+    "domain": {
+      "type": "string",
+      "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+      "description": "Host of the prd web; dev answers on dev.<domain> and each API on api.<web host>."
+    },
+    "hostedZone": {
+      "description": "Public Route 53 hosted zone that holds the domain, read and never owned; defaults to the domain.",
+      "type": "string",
+      "pattern": "^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+    },
+    "stateBucket": {
+      "description": "S3 bucket of the Terraform state, in the deployment's region; defaults to <name>-terraform-state-<accountId>.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    },
+    "environments": {
+      "default": ["prd"],
+      "description": "Environments this deployment runs.",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["dev", "prd"]
+      }
+    },
+    "releases": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9._-]+$",
+      "description": "GitHub repository, as owner/name, whose releases hold the desktop app the web links to."
+    },
+    "github": {
+      "description": "Optional CI: the repository whose Actions deploy the code, and the GitHub App Terraform manages it as (its private key is GITHUB_APP_PEM in .env). Without it there is no core, no deploy role and no Actions variable.",
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]+$"
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "appId": {
+          "type": "string",
+          "pattern": "^\\d+$"
+        },
+        "appInstallationId": {
+          "type": "string",
+          "pattern": "^\\d+$"
+        }
+      },
+      "required": ["owner", "repository", "appId", "appInstallationId"],
+      "additionalProperties": false
+    },
+    "desktop": {
+      "description": "Optional: only for building and releasing the desktop app.",
+      "type": "object",
+      "properties": {
+        "updaterPublicKey": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Public half of the minisign key the desktop releases are signed with."
+        },
+        "servers": {
+          "type": "object",
+          "properties": {
+            "dev": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "number",
+                  "const": 1
+                },
+                "apiUrl": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2}(-[a-z]+)+-\\d{1,2}$"
+                },
+                "userPoolId": {
+                  "type": "string",
+                  "pattern": "^([a-z]{2}(-[a-z]+)+-\\d{1,2})_[A-Za-z0-9]{1,55}$"
+                },
+                "clientId": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]{1,128}$"
+                }
+              },
+              "required": ["version", "apiUrl", "region", "userPoolId", "clientId"]
+            },
+            "prd": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "number",
+                  "const": 1
+                },
+                "apiUrl": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2}(-[a-z]+)+-\\d{1,2}$"
+                },
+                "userPoolId": {
+                  "type": "string",
+                  "pattern": "^([a-z]{2}(-[a-z]+)+-\\d{1,2})_[A-Za-z0-9]{1,55}$"
+                },
+                "clientId": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9]{1,128}$"
+                }
+              },
+              "required": ["version", "apiUrl", "region", "userPoolId", "clientId"]
+            }
+          },
+          "additionalProperties": false,
+          "description": "The server each desktop build signs in to, as its /.well-known/take-my-word.json serves it."
+        }
+      },
+      "required": ["updaterPublicKey", "servers"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["aws", "domain", "releases"],
+  "additionalProperties": false
+}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Wordmark } from "@take-my-word/brand";
 import type { Dictionary } from "@/lib/i18n.ts";
-import { releasesUrl } from "@/lib/links.ts";
+import { links as releaseLinks } from "@/lib/links.ts";
 import type { Theme } from "@/lib/theme.ts";
 import { ThemeSwitch } from "./theme-switch.tsx";
 
@@ -25,7 +25,7 @@ export function SiteFooter({ t, theme }: { t: Dictionary; theme: Theme }) {
               {link.text}
             </Link>
           ))}
-          <a href={releasesUrl}>{t.landing.footer.releases}</a>
+          <a href={releaseLinks.releases}>{t.landing.footer.releases}</a>
         </nav>
         <ThemeSwitch initial={theme} t={t.theme} />
       </div>

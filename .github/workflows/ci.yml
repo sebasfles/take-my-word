@@ -48,6 +48,8 @@ jobs:
         run: pnpm test
 
       - name: Build the web with OpenNext
+        env:
+          RELEASES_REPOSITORY: ${{ github.repository }}
         run: pnpm --filter @take-my-word/web bundle
 
       - uses: hashicorp/setup-terraform@v4

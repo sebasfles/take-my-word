@@ -8,7 +8,7 @@ const fixtures = join(import.meta.dirname, "fixtures");
 const signerKey = readFileSync(join(fixtures, "signer.pub"), "utf8");
 const otherKey = readFileSync(join(fixtures, "other.pub"), "utf8");
 const signature = readFileSync(join(fixtures, "payload.bin.sig"), "utf8");
-const repo = "sebasfles/take-my-word";
+const repo = "owner/take-my-word";
 const asset = "Take.My.Word_1.2.3_x64-setup.exe";
 const assets = [
   { id: 101, name: asset },

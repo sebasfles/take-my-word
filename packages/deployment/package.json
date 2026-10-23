@@ -1,0 +1,19 @@
+{
+  "name": "@take-my-word/deployment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . && prettier --check --ignore-path ../../.gitignore --ignore-path ../../.prettierignore .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --no-file-parallelism",
+    "schema": "node src/schema.ts"
+  },
+  "dependencies": {
+    "@take-my-word/shared": "workspace:*",
+    "zod": "4.6.7"
+  }
+}
