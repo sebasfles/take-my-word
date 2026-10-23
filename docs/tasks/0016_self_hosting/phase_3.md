@@ -185,4 +185,6 @@ Terraform on the rebased branch (`.verify/plan-*.out`, `apply-*-moves.out`, `rep
 
 The branch was rebased, so it needs `--force-with-lease` (no tag exists).
 
+Dev after the rebase ("dev available" to "dev free"): the branch's api and web (7fb63f8, code 4af31fd) built and swapped with `pnpm deploy:<api|web> build|swap`, 15:34:36 to 15:35:07 UTC, discovery 200; api e2e 37 passed, web integration 4 passed, web e2e 16 passed; develop 7ae8a05 redeployed from a clean clone with develop's own api and web steps, 15:38:33 to 15:39:32 UTC, exit 0 (`.verify/dev-redeploy-develop.out`); `/` 200 with develop's landing, `/en` and discovery 404 again.
+
 ## Result

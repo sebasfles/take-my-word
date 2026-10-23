@@ -218,3 +218,8 @@
 - typecheck: n/a
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-23T15:39:46Z by om-developer targets api and web on 4af31fd (deployed to dev from 7fb63f8, which adds only task docs)
+- api e2e: pass exit 0 (37 tests, pnpm e2e against dev, AWS_PROFILE=fless-takemyword)
+- web integration: pass exit 0 (4 tests, pnpm integration against dev)
+- web e2e: pass exit 0 (16 tests, pnpm e2e against dev)
