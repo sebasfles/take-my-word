@@ -158,3 +158,9 @@
 - typecheck: pass exit 0 (pnpm typecheck)
 - unit: pass exit 0 (252 tests, pnpm test)
 - e2e: n/a (pnpm integration and pnpm e2e need dev, held by 0015; run when the om-reviewer passes "dev available")
+
+## 2026-10-23T12:57:36Z by om-developer target web on bc0f15f (deployed to dev from 564a511, which adds only task docs)
+- lint: pass exit 0 (pnpm lint, block above)
+- typecheck: pass exit 0 (pnpm typecheck, block above)
+- unit: pass exit 0 (252 tests, block above)
+- e2e: pass exit 0 (pnpm integration: 4 tests, exit 0; pnpm e2e: 16 tests, exit 0; against dev, AWS_PROFILE=fless-takemyword)

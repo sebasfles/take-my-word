@@ -85,4 +85,16 @@ Done, one per finding:
 
 Evidence refreshed: `seo/opennext-invoke.txt` (the `/` 307 without noindex on the indexed origin, noindex on dev's).
 
+### Dev evidence
+
+Dev held from "dev available" to "dev free"; nothing else changed there.
+
+- Web of 564a511 (code bc0f15f) built like CI will build it (official `RELEASES_REPOSITORY`, `WEB_INDEXED_ORIGIN` set to the official prd origin) and swapped into dev with `pnpm deploy:web build|swap`, 12:51:42 to 12:51:55 UTC; the api was not touched.
+- `seo/dev-headers.txt`: `/` 307 to `/en`, to `/es` for Accept-Language es and for `tmw-lang=es` over an English browser, `Vary: Cookie, Accept-Language`; `/en`, `/es`, `/sign-in`, `/app`, `/gallery`, `/fr` and discovery all `X-Robots-Tag: noindex` with meta `noindex` (dev is not the indexed origin although the build names one); `/sign-in?lang=es` 307 to `/sign-in` with `tmw-lang=es`.
+- `seo/dev-robots.txt.txt` and `seo/dev-sitemap.xml.txt`: robots allows all but `/api/` and links the dev sitemap; the sitemap lists `/en` and `/es` with en, es and x-default alternates and the build's `lastmod`.
+- `seo/schema-validator-dev-{en,es}.json`: validator.schema.org on the dev URLs, 0 errors and 0 warnings for `SoftwareApplication` (with `softwareVersion` 0.2.0 from the latest release), `WebSite` and `FAQPage`.
+- `lighthouse/dev-{en,es}-run-{1,2,3}.json` and `dev-summary.txt`: mobile preset after a warm-up; SEO 66 with `is-crawlable` the only miss (the intended noindex), accessibility and best practices 100, performance 96 to 100, CLS 0.
+- Web `integration` 4 passed and `e2e` 16 passed, the three new ones included (`/` to a language page with its alternates and JSON-LD, sign-in from `/es` in Spanish for an English browser, dev and private pages noindex).
+- Develop 61be296 redeployed from a clean clone with develop's own workflow steps, 12:56:33 to 12:57:11 UTC, exit 0 (`.verify/dev-redeploy-develop.out`); `/` serves develop's landing again and `/en` and `/robots.txt` are 404.
+
 ## Result
