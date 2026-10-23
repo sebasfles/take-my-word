@@ -162,9 +162,9 @@ describe("AWS rules of the setup and the removal", () => {
 
   it("recognizes the user pools whose tag index can outlive them", () => {
     expect(
-      userPoolOf("arn:aws:cognito-idp:us-east-2:115891590483:userpool/us-east-2_F86wSZwly"),
-    ).toEqual({ region: "us-east-2", id: "us-east-2_F86wSZwly" });
-    expect(userPoolOf("arn:aws:dynamodb:us-east-2:115891590483:table/tmw-scratch-prd")).toBeNull();
+      userPoolOf("arn:aws:cognito-idp:us-east-2:123456789012:userpool/us-east-2_AbC123xyZ"),
+    ).toEqual({ region: "us-east-2", id: "us-east-2_AbC123xyZ" });
+    expect(userPoolOf("arn:aws:dynamodb:us-east-2:123456789012:table/tmw-scratch-prd")).toBeNull();
   });
 
   it("generates temporary passwords Cognito's policy accepts", () => {
