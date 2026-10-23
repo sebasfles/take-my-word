@@ -67,4 +67,15 @@ Deferred:
 
 - `pnpm screenshots` in `apps/web` needs a build made with `RELEASES_REPOSITORY`; worth a line in the web TRD at the docs pass.
 
+### Round 2
+
+Done, one per finding:
+
+1. `deploy.ts` runs `<api|web> <build|swap>`: build makes the bundles, or the OpenNext output plus `apps/web/.open-next/server-function.zip`, with no AWS call; swap only uploads, swaps, waits and invalidates. `reusable-deploy*` build before `configure-aws-credentials` and swap after; the step tests assert that no build step calls AWS and no swap step builds.
+2. The web e2e compares the installer link with `releaseLinks(RELEASES_REPOSITORY).windowsInstaller`; `.env` now needs `WEB_URL` and `RELEASES_REPOSITORY` for `pnpm integration` and `pnpm e2e`.
+3. `tauriOverlay` is exported from `scripts/tauri.ts` and its exact shape is tested (prd `plugins.updater.pubkey` and `endpoints`, dev `{}`); `updater.rs` reads only the committed configs (updater only in prd, `requireSignedVersion`, `createUpdaterArtifacts`).
+4. The verify.log block of this round names the round's commit; it is appended after that commit and travels in the next one, since a commit cannot name itself.
+
+Still pending before phase 1 closes: Windows `rust:lint` and `rust:test`, web `integration` and `e2e`, and the core, dev and prd plans after the rebase on 0015 and the SSO login.
+
 ## Result

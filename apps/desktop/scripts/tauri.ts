@@ -75,6 +75,10 @@ export function buildInputs(flavor: Flavor, env: Env, config: () => DeploymentCo
   };
 }
 
+export function tauriOverlay(inputs: BuildInputs): object {
+  return inputs.updater === null ? {} : { plugins: { updater: inputs.updater } };
+}
+
 function main(args: string[]): number {
   const [flavor, ...tauriArgs] = args;
   if ((flavor !== "dev" && flavor !== "prd") || tauriArgs.length === 0) {
@@ -85,10 +89,7 @@ function main(args: string[]): number {
   const scratch = mkdtempSync(join(tmpdir(), "take-my-word-tauri-"));
   try {
     const overlay = join(scratch, "tauri.flavor.conf.json");
-    writeFileSync(
-      overlay,
-      JSON.stringify(inputs.updater === null ? {} : { plugins: { updater: inputs.updater } }),
-    );
+    writeFileSync(overlay, JSON.stringify(tauriOverlay(inputs)));
     const tauri = join(import.meta.dirname, "..", "node_modules", "@tauri-apps", "cli", "tauri.js");
     const result = spawnSync(
       process.execPath,

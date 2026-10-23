@@ -276,23 +276,11 @@ mod tests {
         serde_json::from_value(config).unwrap()
     }
 
-    const RELEASE_OVERLAY: &str = r#"{"plugins":{"updater":{"pubkey":"a2V5","endpoints":["https://github.com/owner/take-my-word/releases/latest/download/latest.json"]}}}"#;
-
-    fn prd_release() -> tauri::Config {
-        let mut config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
-        merge(
-            &mut config,
-            serde_json::from_str(include_str!("../tauri.prd.conf.json")).unwrap(),
-        );
-        merge(&mut config, serde_json::from_str(RELEASE_OVERLAY).unwrap());
-        serde_json::from_value(config).unwrap()
-    }
-
     #[test]
     fn only_the_prd_build_carries_the_updater() {
         let debug = build_config(None);
         let dev = build_config(Some(include_str!("../tauri.dev.conf.json")));
-        let prd = prd_release();
+        let prd = build_config(Some(include_str!("../tauri.prd.conf.json")));
         assert!(!configured(&debug));
         assert!(!configured(&dev));
         assert!(configured(&prd));
@@ -302,20 +290,12 @@ mod tests {
     }
 
     #[test]
-    fn the_prd_release_updater_config_is_what_the_plugin_reads() {
-        let prd = prd_release();
-        let config: tauri_plugin_updater::Config =
-            serde_json::from_value(prd.plugins.0[CONFIG_KEY].clone()).unwrap();
+    fn the_prd_build_requires_signed_versions_and_makes_updater_artifacts() {
+        let prd = build_config(Some(include_str!("../tauri.prd.conf.json")));
         assert_eq!(
-            config
-                .endpoints
-                .iter()
-                .map(|url| url.as_str())
-                .collect::<Vec<_>>(),
-            ["https://github.com/owner/take-my-word/releases/latest/download/latest.json"]
+            prd.plugins.0[CONFIG_KEY]["requireSignedVersion"],
+            Value::Bool(true)
         );
-        assert!(config.require_signed_version);
-        assert_eq!(config.pubkey, "a2V5");
         assert!(matches!(
             prd.bundle.create_updater_artifacts,
             tauri::utils::config::Updater::Bool(true)

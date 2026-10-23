@@ -1,6 +1,4 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repositoryRoot, requiredEnv } from "./workspace.ts";
 
@@ -23,11 +21,18 @@ export const webTargets = [
   "WEB_FUNCTION_NAME",
   "WEB_ASSETS_BUCKET",
   "WEB_DISTRIBUTION_ID",
-  "RELEASES_REPOSITORY",
 ] as const;
 
 type ApiTargets = Record<(typeof apiFunctions)[number][0], string>;
 type WebTargets = Record<(typeof webTargets)[number], string>;
+
+function openNext(root: string): string {
+  return join(root, "apps", "web", ".open-next");
+}
+
+function serverZip(root: string): string {
+  return join(openNext(root), "server-function.zip");
+}
 
 function swapCode(functionName: string, zip: string): Step[] {
   return [
@@ -56,7 +61,7 @@ function swapCode(functionName: string, zip: string): Step[] {
   ];
 }
 
-export function apiDeploySteps(root: string, targets: ApiTargets): Step[] {
+export function apiBuildSteps(root: string): Step[] {
   return [
     {
       name: "build the Lambda bundles",
@@ -64,31 +69,37 @@ export function apiDeploySteps(root: string, targets: ApiTargets): Step[] {
       args: ["--filter", "@take-my-word/api", "build"],
       cwd: root,
     },
-    ...apiFunctions.flatMap(([variable, bundle]) =>
-      swapCode(targets[variable], join(root, "apps", "api", "dist", `${bundle}.zip`)),
-    ),
   ];
 }
 
-export function webDeploySteps(root: string, targets: WebTargets, scratch: string): Step[] {
-  const openNext = join(root, "apps", "web", ".open-next");
-  const assets = join(openNext, "assets");
-  const zip = join(scratch, "web.zip");
-  const bucket = `s3://${targets.WEB_ASSETS_BUCKET}`;
+export function apiSwapSteps(root: string, targets: ApiTargets): Step[] {
+  return apiFunctions.flatMap(([variable, bundle]) =>
+    swapCode(targets[variable], join(root, "apps", "api", "dist", `${bundle}.zip`)),
+  );
+}
+
+export function webBuildSteps(root: string, releasesRepository: string): Step[] {
   return [
     {
       name: "build the web with OpenNext",
       command: "pnpm",
       args: ["--filter", "@take-my-word/web", "bundle"],
       cwd: root,
-      env: { RELEASES_REPOSITORY: targets.RELEASES_REPOSITORY },
+      env: { RELEASES_REPOSITORY: releasesRepository },
     },
     {
       name: "package the server function",
       command: "zip",
-      args: ["-qry", zip, "."],
-      cwd: join(openNext, "server-functions", "default"),
+      args: ["-qry", serverZip(root), "."],
+      cwd: join(openNext(root), "server-functions", "default"),
     },
+  ];
+}
+
+export function webSwapSteps(root: string, targets: WebTargets): Step[] {
+  const assets = join(openNext(root), "assets");
+  const bucket = `s3://${targets.WEB_ASSETS_BUCKET}`;
+  return [
     {
       name: "upload the immutable assets",
       command: "aws",
@@ -107,7 +118,7 @@ export function webDeploySteps(root: string, targets: WebTargets, scratch: strin
       ],
       cwd: assets,
     },
-    ...swapCode(targets.WEB_FUNCTION_NAME, zip),
+    ...swapCode(targets.WEB_FUNCTION_NAME, serverZip(root)),
     {
       name: "upload the remaining assets",
       command: "aws",
@@ -155,24 +166,27 @@ export function run(steps: Step[]): void {
   }
 }
 
-function main(side: string | undefined): number {
-  if (side === "api") {
-    run(apiDeploySteps(repositoryRoot, requiredEnv(apiFunctions.map(([name]) => name))));
-    return 0;
+export function deploySteps(side: string | undefined, phase: string | undefined): Step[] | null {
+  if (side === "api" && phase === "build") return apiBuildSteps(repositoryRoot);
+  if (side === "api" && phase === "swap") {
+    return apiSwapSteps(repositoryRoot, requiredEnv(apiFunctions.map(([name]) => name)));
   }
-  if (side === "web") {
-    const scratch = mkdtempSync(join(tmpdir(), "take-my-word-web-"));
-    try {
-      run(webDeploySteps(repositoryRoot, requiredEnv(webTargets), scratch));
-    } finally {
-      rmSync(scratch, { recursive: true, force: true });
-    }
-    return 0;
+  if (side === "web" && phase === "build") {
+    return webBuildSteps(repositoryRoot, requiredEnv(["RELEASES_REPOSITORY"]).RELEASES_REPOSITORY);
   }
-  console.error("usage: node packages/deployment/src/deploy.ts <api|web>");
-  return 2;
+  if (side === "web" && phase === "swap")
+    return webSwapSteps(repositoryRoot, requiredEnv(webTargets));
+  return null;
 }
 
 if (import.meta.main) {
-  process.exitCode = main(process.argv[2]);
+  const steps = deploySteps(process.argv[2], process.argv[3]);
+  if (steps === null) {
+    console.error(
+      "usage: pnpm deploy:<api|web> <build|swap>; build needs no AWS credentials, swap needs the deploy role",
+    );
+    process.exitCode = 2;
+  } else {
+    run(steps);
+  }
 }

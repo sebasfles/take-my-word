@@ -1,6 +1,6 @@
 import { ConfigError, parseConfig } from "@take-my-word/deployment";
 import { describe, expect, it } from "vitest";
-import { buildInputs } from "./tauri.ts";
+import { buildInputs, tauriOverlay } from "./tauri.ts";
 
 const server = (name: string) => ({
   version: 1,
@@ -72,5 +72,17 @@ describe("desktop build inputs", () => {
   it("refuses a server clients would refuse", () => {
     const env = { TAKE_MY_WORD_SERVER: JSON.stringify({ ...server("x"), region: "x.evil" }) };
     expect(() => buildInputs("dev", env, noConfig)).toThrow();
+  });
+
+  it("hands the prd build exactly the updater keys the Tauri plugin reads, and dev nothing", () => {
+    expect(tauriOverlay(buildInputs("prd", {}, fromConfig))).toEqual({
+      plugins: {
+        updater: {
+          pubkey: "config-key",
+          endpoints: ["https://github.com/owner/take-my-word/releases/latest/download/latest.json"],
+        },
+      },
+    });
+    expect(tauriOverlay(buildInputs("dev", {}, fromConfig))).toEqual({});
   });
 });

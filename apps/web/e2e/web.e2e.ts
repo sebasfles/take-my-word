@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { tokens } from "@take-my-word/brand";
+import { releaseLinks } from "../src/lib/links.ts";
 
 function env(name: string): string {
   const value = process.env[name];
@@ -9,8 +10,7 @@ function env(name: string): string {
 
 const username = env("CREW_E2E_USERNAME");
 const password = env("CREW_E2E_PASSWORD");
-const installer =
-  /^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/latest\/download\/take-my-word-windows-x64-setup\.exe$/;
+const installer = releaseLinks(env("RELEASES_REPOSITORY")).windowsInstaller;
 
 async function signIn(page: Page, options: { remember: boolean }): Promise<void> {
   await page.goto("/sign-in");

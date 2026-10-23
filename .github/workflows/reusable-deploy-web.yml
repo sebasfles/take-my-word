@@ -29,15 +29,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build with OpenNext and package the server function
+        env:
+          RELEASES_REPOSITORY: ${{ github.repository }}
+        run: pnpm deploy:web build
+
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Build and deploy the web
+      - name: Upload the assets, swap the code and invalidate
         env:
           WEB_FUNCTION_NAME: ${{ vars.WEB_FUNCTION_NAME }}
           WEB_ASSETS_BUCKET: ${{ vars.WEB_ASSETS_BUCKET }}
           WEB_DISTRIBUTION_ID: ${{ vars.WEB_DISTRIBUTION_ID }}
-          RELEASES_REPOSITORY: ${{ github.repository }}
-        run: pnpm deploy:web
+        run: pnpm deploy:web swap

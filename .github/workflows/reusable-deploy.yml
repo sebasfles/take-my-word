@@ -29,15 +29,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build the Lambda bundles
+        run: pnpm deploy:api build
+
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Build and swap the function code
+      - name: Swap the function code
         env:
           DICTATE_FUNCTION_NAME: ${{ vars.DICTATE_FUNCTION_NAME }}
           AUTHORIZER_FUNCTION_NAME: ${{ vars.AUTHORIZER_FUNCTION_NAME }}
           API_FUNCTION_NAME: ${{ vars.API_FUNCTION_NAME }}
           DICTIONARY_USAGE_FUNCTION_NAME: ${{ vars.DICTIONARY_USAGE_FUNCTION_NAME }}
-        run: pnpm deploy:api
+        run: pnpm deploy:api swap
