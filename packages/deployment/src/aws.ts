@@ -3,6 +3,7 @@ import { CloudWatchLogsClient, DescribeLogGroupsCommand } from "@aws-sdk/client-
 import {
   AdminCreateUserCommand,
   CognitoIdentityProviderClient,
+  DescribeUserPoolCommand,
   ListUsersCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { IAMClient, ListRolesCommand } from "@aws-sdk/client-iam";
@@ -350,7 +351,28 @@ async function taggedResources(region: string, project: string): Promise<string[
     arns.push(...(page.ResourceTagMappingList ?? []).flatMap((r) => r.ResourceARN ?? []));
     PaginationToken = page.PaginationToken || undefined;
   } while (PaginationToken !== undefined);
-  return arns;
+  const live: string[] = [];
+  for (const arn of arns) if (await stillExists(arn)) live.push(arn);
+  return live;
+}
+
+export function userPoolOf(arn: string): { region: string; id: string } | null {
+  const match = /^arn:aws:cognito-idp:([a-z0-9-]+):\d{12}:userpool\/([\w-]+)$/.exec(arn);
+  return match === null ? null : { region: match[1] ?? "", id: match[2] ?? "" };
+}
+
+async function stillExists(arn: string): Promise<boolean> {
+  const pool = userPoolOf(arn);
+  if (pool === null) return true;
+  try {
+    await new CognitoIdentityProviderClient({ region: pool.region }).send(
+      new DescribeUserPoolCommand({ UserPoolId: pool.id }),
+    );
+    return true;
+  } catch (error) {
+    if (isNamed(error, "ResourceNotFoundException")) return false;
+    throw error;
+  }
 }
 
 export async function leftovers(config: DeploymentConfig): Promise<string[]> {

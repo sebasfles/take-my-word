@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isDeploymentRecord, stateBucketUse, temporaryPassword, zoneFor } from "./aws.ts";
+import {
+  isDeploymentRecord,
+  stateBucketUse,
+  temporaryPassword,
+  userPoolOf,
+  zoneFor,
+} from "./aws.ts";
 import { ConfigError, parseConfig } from "./config.ts";
 import {
   accountToUse,
@@ -152,6 +158,13 @@ describe("AWS rules of the setup and the removal", () => {
       expect(() => stateBucketUse(foreign, "tmw-other", "b")).toThrow(ConfigError);
     }
     expect(() => stateBucketUse([], "tmw-mine", "b")).toThrow(/another deployment's state/);
+  });
+
+  it("recognizes the user pools whose tag index can outlive them", () => {
+    expect(
+      userPoolOf("arn:aws:cognito-idp:us-east-2:115891590483:userpool/us-east-2_F86wSZwly"),
+    ).toEqual({ region: "us-east-2", id: "us-east-2_F86wSZwly" });
+    expect(userPoolOf("arn:aws:dynamodb:us-east-2:115891590483:table/tmw-scratch-prd")).toBeNull();
   });
 
   it("generates temporary passwords Cognito's policy accepts", () => {
