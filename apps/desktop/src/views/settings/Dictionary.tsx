@@ -40,43 +40,49 @@ export function Dictionary({ focusAdd }: { focusAdd: number }) {
   const terms = state.kind === "ready" ? state.data : null;
 
   return (
-    <SectionPage title="settings.dictionary" intro="dictionary.intro">
-      <AddTerm
-        focus={focusAdd}
-        count={terms?.length ?? 0}
-        disabled={terms === null}
-        onAdded={(term) => {
-          update((current) => sorted([...current, term]));
-        }}
-      />
-      <LoadState state={state} onRetry={retry} />
-      {terms && (
-        <section className="list-section">
-          <p className="muted">
-            {t("common.count", { count: terms.length, max: dictionaryLimits.terms })}
-          </p>
-          {terms.length === 0 ? (
-            <Empty title="dictionary.emptyTitle" body="dictionary.empty" />
-          ) : (
-            <ul className="list">
-              {terms.map((term) => (
-                <TermRow
-                  key={term.id}
-                  term={term}
-                  onChanged={(changed) => {
-                    update((current) =>
-                      current.map((item) => (item.id === changed.id ? changed : item)),
-                    );
-                  }}
-                  onDeleted={() => {
-                    update((current) => current.filter((item) => item.id !== term.id));
-                  }}
-                />
-              ))}
-            </ul>
+    <SectionPage title="settings.dictionary" intro="dictionary.intro" wide>
+      <div className="editor">
+        <div className="editor-form">
+          <AddTerm
+            focus={focusAdd}
+            count={terms?.length ?? 0}
+            disabled={terms === null}
+            onAdded={(term) => {
+              update((current) => sorted([...current, term]));
+            }}
+          />
+        </div>
+        <div className="editor-list">
+          <LoadState state={state} onRetry={retry} />
+          {terms && (
+            <section className="list-section">
+              <p className="muted">
+                {t("common.count", { count: terms.length, max: dictionaryLimits.terms })}
+              </p>
+              {terms.length === 0 ? (
+                <Empty title="dictionary.emptyTitle" body="dictionary.empty" />
+              ) : (
+                <ul className="list">
+                  {terms.map((term) => (
+                    <TermRow
+                      key={term.id}
+                      term={term}
+                      onChanged={(changed) => {
+                        update((current) =>
+                          current.map((item) => (item.id === changed.id ? changed : item)),
+                        );
+                      }}
+                      onDeleted={() => {
+                        update((current) => current.filter((item) => item.id !== term.id));
+                      }}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
           )}
-        </section>
-      )}
+        </div>
+      </div>
     </SectionPage>
   );
 }
@@ -94,6 +100,7 @@ function AddTerm({
 }) {
   const [term, setTerm] = useState("");
   const [aliases, setAliases] = useState("");
+  const [advanced, setAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Note | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -108,6 +115,7 @@ function AddTerm({
     const parsed = splitAliases(aliases);
     const problem = checkTerm(term, parsed, count);
     setError(problem);
+    if (problem && checkAliases(parsed)) setAdvanced(true);
     if (problem) return;
     setBusy(true);
     api
@@ -128,38 +136,50 @@ function AddTerm({
 
   return (
     <form className="form card" onSubmit={submit} noValidate>
-      <div className="form-row">
-        <label className="field">
-          <span>{t("dictionary.term")}</span>
-          <input
-            ref={input}
-            className="tmw-input"
-            name="term"
-            autoComplete="off"
-            value={term}
-            onChange={(event) => {
-              setTerm(event.target.value);
-            }}
-          />
-        </label>
+      <div className="field">
+        <label htmlFor={`${id}-term`}>{t("dictionary.term")}</label>
+        <input
+          ref={input}
+          id={`${id}-term`}
+          className="tmw-input"
+          name="term"
+          autoComplete="off"
+          aria-describedby={`${id}-term-hint`}
+          value={term}
+          onChange={(event) => {
+            setTerm(event.target.value);
+          }}
+        />
+        <span id={`${id}-term-hint`} className="hint">
+          {t("dictionary.termHint")}
+        </span>
+      </div>
+      <details
+        className="advanced"
+        open={advanced}
+        onToggle={(event) => {
+          setAdvanced(event.currentTarget.open);
+        }}
+      >
+        <summary>{t("dictionary.advanced")}</summary>
         <div className="field">
-          <label htmlFor={`${id}-field`}>{t("dictionary.aliases")}</label>
+          <label htmlFor={`${id}-aliases`}>{t("dictionary.aliases")}</label>
           <input
-            id={`${id}-field`}
+            id={`${id}-aliases`}
             className="tmw-input"
             name="aliases"
             autoComplete="off"
-            aria-describedby={`${id}-hint`}
+            aria-describedby={`${id}-aliases-hint`}
             value={aliases}
             onChange={(event) => {
               setAliases(event.target.value);
             }}
           />
-          <span id={`${id}-hint`} className="hint">
+          <span id={`${id}-aliases-hint`} className="hint">
             {t("dictionary.aliasesHint", { max: dictionaryLimits.aliasesPerTerm })}
           </span>
         </div>
-      </div>
+      </details>
       <ErrorLine message={error} />
       <div className="form-actions">
         <button type="submit" className={buttonClass()} disabled={busy || disabled}>
@@ -214,17 +234,16 @@ function TermRow({
       <div className="item-main">
         <p className="item-title">{term.term}</p>
         {editing === null ? (
-          <p className="chips">
-            {term.aliases.length === 0 ? (
-              <span className="muted">{t("dictionary.noAliases")}</span>
-            ) : (
-              term.aliases.map((alias) => (
+          term.aliases.length > 0 && (
+            <p className="chips">
+              <span className="chips-label">{t("dictionary.soundsLike")}</span>
+              {term.aliases.map((alias) => (
                 <span key={alias} className="chip">
                   {alias}
                 </span>
-              ))
-            )}
-          </p>
+              ))}
+            </p>
+          )
         ) : (
           <form className="inline-form" onSubmit={save} noValidate>
             <input

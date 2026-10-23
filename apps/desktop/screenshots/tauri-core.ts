@@ -149,15 +149,32 @@ function route(request: Record<string, unknown>): Promise<unknown> {
   }
 }
 
+const appStates: Record<string, object> = {
+  fresh: { signedIn: false, username: null, firstRunDone: false, onboarded: false },
+  "signed-out": { signedIn: false, username: null, firstRunDone: true, onboarded: true },
+  "new-user": { signedIn: true, username: "sebastian", firstRunDone: true, onboarded: false },
+};
+
 export function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const answer = (value: unknown) => Promise.resolve(value as T);
   switch (command) {
+    case "app_state":
+      return answer({
+        signedIn: true,
+        username: "sebastian",
+        firstRunDone: true,
+        onboarded: true,
+        handsFreeNote: params.get("note") === "1",
+        ...appStates[params.get("state") ?? ""],
+      });
+    case "check_microphone":
+      return answer(params.get("mic") ?? "ready");
     case "overview":
       return answer({
         hotkey: params.get("build") === "dev" ? ["Ctrl", "Alt", "Win"] : ["Ctrl", "Win"],
         autostart: params.get("autostart") !== "off",
         microphone: params.get("mic") ?? "ready",
-        version: "0.2.0",
+        version: "0.3.0",
       });
     case "theme":
       return answer(null);
@@ -188,10 +205,16 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
         ? problem("account.unreachable")
         : answer({
             styles: [
-              { id: "plain", name: "Plain", builtin: true },
-              { id: "casual", name: "Casual", builtin: true },
-              { id: "formal", name: "Formal", builtin: true },
-              { id: "c7d1", name: "Client emails", builtin: false },
+              { id: "plain", name: "Plain", prompt: "", builtin: true },
+              { id: "casual", name: "Casual", prompt: "Write casually.", builtin: true },
+              { id: "formal", name: "Formal", prompt: "Write formally.", builtin: true },
+              {
+                id: "c7d1",
+                name: "Correos a clientes",
+                prompt:
+                  "Trato de usted, frases cortas y un cierre cordial. Sin emojis ni signos de exclamación dobles.",
+                builtin: false,
+              },
             ],
             selected: "plain",
             dictationLanguages: [params.get("lang") === "es" ? "es" : "en"],

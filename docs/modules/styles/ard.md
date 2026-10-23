@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0009_web_account
+updated: 2026-10-23
+source: 0014_desktop_ux
 ---
 
 # Styles: architecture and debt
@@ -58,3 +58,12 @@ source: 0009_web_account
 - Debt created: a change to a built-in prompt does not update its web description.
 - Revisit when: a built-in style's prompt changes its intent, or a fourth built-in arrives.
 - Source: 0009_web_account
+
+## 2026-10-23: Desktop shows built-in styles through fixed examples from the v1 prompts
+
+- Decision: the desktop's onboarding and Styles show one sample per language as the dev refiner rendered it in each built-in style (run once through `POST /dictations` with the v1 prompts, picked among nine samples for visible differences) and committed as static text; changed words are marked by a word diff against the raw transcript.
+- Alternatives rejected: refining the sample on each view, which costs a dictation and a wait; invented examples.
+- Reason: the user picks a style by seeing what it does, with no API call and nothing made up.
+- Debt created: the examples do not follow prompt changes, like the web's descriptions; on the nine samples `casual` differed from `plain` only by punctuation or a sentence split.
+- Revisit when: a built-in prompt changes, or `casual` is retuned to read more casual.
+- Source: 0014_desktop_ux

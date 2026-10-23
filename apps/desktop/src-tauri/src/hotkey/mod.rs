@@ -1,4 +1,5 @@
 mod chord;
+mod gesture;
 mod hook;
 mod keys;
 #[cfg(not(windows))]
@@ -12,8 +13,11 @@ use crate::env::{self, Environment};
 use crate::i18n::Message;
 
 pub use chord::ChordEvent;
-pub use hook::{KeyEvent, KeyHook, OWN_INJECTION_TAG, install};
-pub use keys::{CAPTURE_TIMEOUT, Keys};
+pub use gesture::{Command, Gesture};
+pub use hook::{KeyEvent, KeyHook, OWN_INJECTION_TAG, install, swallow_escape};
+pub use keys::{CAPTURE_TIMEOUT, Keys, Source};
+
+pub const ESCAPE: Key = Key::Other(0x1B);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Side {

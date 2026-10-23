@@ -17,6 +17,7 @@ import {
   type Theme,
 } from "../bridge.ts";
 import { type MessageId, t } from "../i18n.ts";
+import { Gestures } from "../Gestures.tsx";
 import { Keys } from "../Keys.tsx";
 import { focusAddFromSearch, type SettingsSection, settingsSectionFromSearch } from "../view.ts";
 import { AppRules } from "./settings/AppRules.tsx";
@@ -39,7 +40,15 @@ const sections: { id: SettingsSection; label: MessageId; icon: IconName }[] = [
   { id: "account", label: "settings.account", icon: "account" },
 ];
 
-export function Settings() {
+export function Settings({
+  handsFreeNote,
+  onDismissNote,
+  onRerun,
+}: {
+  handsFreeNote: boolean;
+  onDismissNote: () => void;
+  onRerun: () => void;
+}) {
   const [section, setSection] = useState<SettingsSection>(() =>
     settingsSectionFromSearch(window.location.search),
   );
@@ -50,7 +59,7 @@ export function Settings() {
   useEffect(
     () =>
       keepListening(() =>
-        bridge.onSettingsNavigate((query) => {
+        bridge.onMainNavigate((query) => {
           setSection(settingsSectionFromSearch(query));
           if (focusAddFromSearch(query)) setFocusAdd((count) => count + 1);
         }),
@@ -82,7 +91,9 @@ export function Settings() {
           </ul>
         </div>
       </nav>
-      {section === "general" && <General />}
+      {section === "general" && (
+        <General handsFreeNote={handsFreeNote} onDismissNote={onDismissNote} onRerun={onRerun} />
+      )}
       {section === "dictionary" && <Dictionary focusAdd={focusAdd} />}
       {section === "styles" && <Styles />}
       {section === "appRules" && <AppRules />}
@@ -92,7 +103,15 @@ export function Settings() {
   );
 }
 
-function General() {
+function General({
+  handsFreeNote,
+  onDismissNote,
+  onRerun,
+}: {
+  handsFreeNote: boolean;
+  onDismissNote: () => void;
+  onRerun: () => void;
+}) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [autostartError, setAutostartError] = useState(false);
 
@@ -113,42 +132,79 @@ function General() {
   };
 
   return (
-    <SectionPage title="settings.general" intro="settings.general.intro">
-      <div className="panel">
-        <ShortcutRow
-          hotkey={overview?.hotkey ?? null}
-          onSaved={(hotkey) => {
-            setOverview((current) => current && { ...current, hotkey });
-          }}
-        />
-
-        <section className="setting">
-          <div className="setting-text">
-            <h2 className="setting-title">{t("settings.autostart")}</h2>
-            <p className="setting-note">{t("settings.autostart.note")}</p>
-            {autostartError && (
-              <p className="tmw-error" role="alert">
-                {t("settings.autostart.failed")}
-              </p>
-            )}
-          </div>
-          <Toggle
-            label={<span className="visually-hidden">{t("settings.autostart")}</span>}
-            checked={overview?.autostart ?? false}
-            disabled={!overview}
-            onChange={toggleAutostart}
+    <SectionPage title="settings.general" intro="settings.general.intro" wide>
+      {handsFreeNote && <HandsFreeNote onDismiss={onDismissNote} />}
+      <div className="general">
+        <div className="panel general-main">
+          <ShortcutRow
+            hotkey={overview?.hotkey ?? null}
+            onSaved={(hotkey) => {
+              setOverview((current) => current && { ...current, hotkey });
+            }}
           />
-        </section>
 
-        <ThemeRow />
+          <section className="setting">
+            <div className="setting-text">
+              <h2 className="setting-title">{t("settings.autostart")}</h2>
+              <p className="setting-note">{t("settings.autostart.note")}</p>
+              {autostartError && (
+                <p className="tmw-error" role="alert">
+                  {t("settings.autostart.failed")}
+                </p>
+              )}
+            </div>
+            <Toggle
+              label={<span className="visually-hidden">{t("settings.autostart")}</span>}
+              checked={overview?.autostart ?? false}
+              disabled={!overview}
+              onChange={toggleAutostart}
+            />
+          </section>
 
-        <UiLanguageRow />
+          <ThemeRow />
 
-        <DictationLanguagesRow />
+          <UiLanguageRow />
+
+          <DictationLanguagesRow />
+        </div>
+
+        <aside className="general-aside">
+          <section className="panel aside-card" aria-labelledby="how-to-dictate">
+            <h2 id="how-to-dictate" className="aside-title">
+              {t("settings.howTo")}
+            </h2>
+            <Gestures hotkey={overview?.hotkey ?? null} />
+          </section>
+          <section className="panel aside-card">
+            <div className="setting-text">
+              <h2 className="setting-title">{t("settings.setup")}</h2>
+              <p className="setting-note">{t("settings.setup.note")}</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={onRerun}>
+              {t("settings.setup.start")}
+            </Button>
+          </section>
+          <About version={overview?.version ?? null} />
+        </aside>
       </div>
-
-      <About version={overview?.version ?? null} />
     </SectionPage>
+  );
+}
+
+function HandsFreeNote({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <section className="news" aria-labelledby="hands-free-news">
+      <span className="news-badge">{t("settings.news")}</span>
+      <div className="news-text">
+        <h2 id="hands-free-news" className="setting-title">
+          {t("settings.handsFreeNote.title")}
+        </h2>
+        <p>{t("settings.handsFreeNote.body")}</p>
+      </div>
+      <Button variant="secondary" size="sm" onClick={onDismiss}>
+        {t("settings.handsFreeNote.dismiss")}
+      </Button>
+    </section>
   );
 }
 
@@ -391,9 +447,11 @@ function ShortcutRow({
   };
 
   return (
-    <section className="setting">
+    <section className="setting" aria-labelledby="shortcut-title">
       <div className="setting-text">
-        <h2 className="setting-title">{t("settings.shortcut")}</h2>
+        <h2 className="setting-title" id="shortcut-title">
+          {t("settings.shortcut")}
+        </h2>
         {capture.step === "listening" && (
           <p className="setting-note" role="status">
             {t("settings.shortcut.listening")}
@@ -408,7 +466,12 @@ function ShortcutRow({
             </span>
           </p>
         )}
-        {capture.step === "idle" && <p>{hotkey && <Keys keys={hotkey} />}</p>}
+        {capture.step === "idle" && (
+          <>
+            <p>{hotkey && <Keys keys={hotkey} />}</p>
+            <p className="setting-note">{t("settings.shortcut.gesture")}</p>
+          </>
+        )}
         {error && (
           <p className="tmw-error" role="alert">
             {t(error)}

@@ -26,10 +26,10 @@ describe("language", () => {
   });
 
   it("follows the shell and falls back to English", () => {
-    expect(languageFromSearch("?view=settings&lang=en")).toBe("en");
-    expect(languageFromSearch("?view=settings&lang=es")).toBe("es");
-    expect(languageFromSearch("?view=settings&lang=fr")).toBe("en");
-    expect(languageFromSearch("?view=settings")).toBe("en");
+    expect(languageFromSearch("?view=main&lang=en")).toBe("en");
+    expect(languageFromSearch("?view=main&lang=es")).toBe("es");
+    expect(languageFromSearch("?view=main&lang=fr")).toBe("en");
+    expect(languageFromSearch("?view=main")).toBe("en");
   });
 
   it("fills placeholders in the chosen language", () => {

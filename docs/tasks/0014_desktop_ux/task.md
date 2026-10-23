@@ -92,11 +92,12 @@ None to start. The release waits for 0013 on `develop`.
 Consolidated 2026-10-22; the om-manager decides (design and merges delegated by Sebastian); details marked (om-reviewer) are mine.
 These override Scope, Acceptance and Approach above where they differ.
 
-- Spinner (om-manager, adjusts Acceptance 2): the host has Windows "Animation effects" off, so WebView2 reports reduced motion and `packages/brand/src/ui/ui.css` stops `.tmw-spinner`; confirm that cause on the host in round 1 before changing code. The processing spinner always rotates, slow and small, no travel or scaling (essential motion); the two-capture check applies with and without reduced motion; the waveform keeps honoring reduced motion as today.
+- Motion (Sebastian through the om-manager, replaces Acceptance 2's reduced-motion clause with "animates even with Windows animations off"): the host has Windows "Animation effects" off, so WebView2 reports reduced motion and `packages/brand/src/ui/ui.css` stops `.tmw-spinner`; confirm that cause on the host in round 1 before changing code. In the desktop app every animation (spinner, waveform, transitions) runs regardless of `prefers-reduced-motion` or the Windows setting, through one desktop-level override; the web's reduced-motion behavior and `packages/brand` defaults stay unchanged; the two-capture check runs with Windows animations off; recorded in `desktop/ard.md` during the task.
 - Esc (om-manager): only while hands-free listens, the hook swallows a physical Esc and cancels; the ARD entry "Native Windows key hook" is amended. Other keys never cancel hands-free; a chord press followed by another key is a shortcut and leaves hands-free running; the stop tap counts at its release.
 - Target (om-manager): the paste goes to the window focused when hands-free starts; if focus changed, the text stays in the clipboard with today's notification.
 - Timing (om-manager): first release to second press within 300 ms, each tap under 0.5 s; a second press held past 0.5 s is a normal hold; tap timings logged at info, never audio; Sebastian tunes from the PR installer.
-- Practice box (om-manager, open): a real dictation pasted into a text box of the main window, skippable; chord logic only in Rust, events from the hook or forwarded by the page behind one interface, since `desktop/ard.md` "Shortcut capture" found no hook sees injected keys with the app's WebView in front. Sebastian's physical check on 0.2.0 picks the path; his physical try from the PR installer is offered, not awaited.
+- Practice box (om-manager): a real dictation pasted into a text box of the main window, skippable; his physical try from the PR installer is offered, not awaited.
+- Keys in the app's own windows (Sebastian through the om-manager, 2026-10-22, adds to Scope): on prd 0.2.0 holding Ctrl+Win with a Take My Word window focused shows no overlay, so the hook does not see it there. While any app window is focused, its page forwards key down and up events to the same Rust chord state machine as the hook; no gesture logic in TS. Hold, hands-free and Esc then work with the app in front (practice box, dictionary editor); forwarding pauses during hotkey capture, as the hook path does, and an event seen by both paths counts once. Recorded in `desktop/ard.md` (amends "Shortcut capture" and "Native Windows key hook").
 - Upgrade (om-manager, adjusts Scope): upgraded 0.2.0 users (`firstRunDone`, their `sub` in `onboardedUsers`) see no onboarding; General shows one dismissible "new: hands-free" note once after the update; release notes and "rerun onboarding" in Settings.
 - Launch (om-manager, adjusts Scope): a user launch, cold or second instance, opens and foregrounds the main window; autostart passes an argument and stays in the tray; the 0.2.0 Run entry is rewritten at start.
 - Hands-free is always on, no toggle; it holds the in-flight guard and the tray's recording state from start to paste (om-reviewer).
@@ -104,7 +105,7 @@ These override Scope, Acceptance and Approach above where they differ.
 - Mic check (om-reviewer): audio never leaves the process or is stored; capture runs only while the step is visible; blocked and missing microphone states kept; a hold during it still dictates.
 - Design checkpoint (om-reviewer, as 0011): round 1 code is reviewed as usual and I send its screenshot paths (overlay hands-free and processing, onboarding steps, History and General at 1920) to the om-manager for one design answer before the rest is restyled.
 - Screenshots (om-reviewer): 1280x800, 1920x1080, 2560x1440 and the minimum 380x480, device scale 1, light and dark, es and en; fixed windows at their real size; in `.workspaces/0014_desktop_ux/`.
-- Release (om-manager, as 0012): clean review, PR, "awaiting release go"; rebase on `develop` once 0013 is merged; I run `pnpm release:desktop 0.3.0 --notes {{file}}` on the om-developer's prepared notes (short, English then Spanish); merge commit, never rebase at or below the tag. Update evidence (Acceptance 8): Sebastian's own prd app updating after publish; the run only reads `DisplayVersion` and the prd log; prd landing checked after publish.
+- No release (Sebastian through the om-manager, 2026-10-22, replaces Scope "Release" and Acceptance 8's release part): 0014 merges to `develop` with no tag; desktop 0.3.0, the update check and the landing check move to 0015 (a "What do you do?" onboarding step and setting), which starts after 0013 and 0014 merge. Acceptance 8 is now `ci`, `desktop-ci` windows and linux-check green. The onboarding plan stays easy to extend: one more step after languages is one entry in `plan.ts` plus its view, with no other step or the resume and rerun logic edited. Rebase on `develop` if 0013 merges first.
 - Acceptance 7 (om-reviewer): 0011's method (private working set of app plus WebView2 after opening and closing the main window; CPU seconds over 5 idle minutes) on dev release builds of the `develop` head and the final commit, same session; pass at RAM ≤ base + 10 MB, CPU ≤ base + 1.0 s.
 - Windows runs (om-reviewer): crew-e2e-b from the root `.env`, its settings saved and restored, its dictations deleted, signed out; the dev config folder and credentials snapshotted and restored around the fresh-install run; injected chords press Alt before Win so prd's Ctrl+Win never fires; Acceptance 5 launches the way a user does, with another window the run opened in front and the app minimized. Choose-password covered by tests and screenshots.
 - One PR, no phases (Sebastian's global rule).
@@ -113,6 +114,126 @@ Constraints: `desktop/ard.md` "Updates wait for no dictation in flight" and "Ove
 
 Review focus beyond the Pipeline: chord state machine tests (double tap, stop at release, shortcut during hands-free, held second press, Esc swallow only while hands-free); no gesture logic in TS; nothing stretched or half-empty at 1920 and 2560; closing the main window frees it; onboarding resume and rerun paths.
 
-clearance: full: GitHub as sebasfles (push, PR, the `desktop-v0.3.0` tag on my hand-off, the release), the Windows host under the machine rules, dev sign-in as crew-e2e-b; Sebastian's prd install only read; no AWS profile, no Terraform, no deploys.
+clearance: full: GitHub as sebasfles (push, PR; no tag, no release), the Windows host under the machine rules, dev sign-in as crew-e2e-b; Sebastian's prd install untouched; no AWS profile, no Terraform, no deploys.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+- Hands-free in Rust: `hotkey/gesture.rs` is the state machine (hold, first tap, second press within 300 ms, hands-free, stop tap at its release, shortcut during hands-free, Esc), driven by the session thread with its gap deadline next to the 2-minute cap; the recording starts at the first press and continues through the double tap, so the overlay never flickers and the audio has no gap. Tap timings logged at info.
+- Esc: the tracker reports a fresh Esc outside a hold; the hook holds back Esc (down and its up) only while hands-free listens (`holds_back`, tested); own injections pass.
+- Keys in the app's own windows: every non-overlay window forwards `KeyboardEvent.code` down and up (no repeats) through `forward_key` into the same `Keys`; `Keys` admits each event from either source once (an unmatched twin from the other source within 250 ms is dropped), and ignores both during a capture.
+- Overlay: listening and processing show no visible label (kept for screen readers), the pill keeps one width, hands-free adds a stop button that stops and pastes through the session.
+- Motion: confirmed on the host (`SPI_GETCLIENTAREAANIMATION=False`; headless Edge reports `prefers-reduced-motion: reduce` true, false with `--force-prefers-no-reduced-motion`). The override is that switch in one `BROWSER_ARGS` for every WebView window; brand CSS untouched. The two-capture check in the app is pending the Windows run.
+- One main window (`main`): opens maximized with no saved placement, then restores the last normal placement and the maximized flag from `settings.json` (`mainWindow`), saved on close and exit, reused only while its title bar is on a screen; min 380x480; the account and first-run windows and `fit_account` are gone; closing destroys it.
+- Onboarding in the main window: welcome, sign in (choose password), microphone check (live level from a monitor-only capture that buffers nothing, runs only while the step is shown, a hold during it still dictates), shortcut with both gestures and a practice box, languages, style with examples, ready. The plan is derived from `app_state`; a sign-in that finds the user onboarded skips languages and style; Settings > General reruns it; upgraded 0.2.0 users see none and get a dismissible hands-free note once.
+- Launch: autostart passes `--autostart` and stays in the tray unless sign-in or setup is needed; a 0.2.0 Run entry is rewritten at start; any user launch, cold or second instance, opens and focuses the main window (the plugin already grants foreground to the first instance).
+- Style examples: TTS of one sample per language on the host (SAPI, Sabina es-MX, Zira en-US), three dictations per language through the dev API as crew-e2e-b with `styleId` per style; outputs committed as `src/styleExamples.ts`; settings saved and restored, the 6 dictations deleted. Styles view and onboarding share `StyleExamples`; custom styles show their prompt.
+- Dictionary: the add form leads with the written word and an example; "sounds like" sits under a closed Advanced disclosure with the Kubernetes "cuberneti" example; rows show "Sounds like" only when there are variants.
+- Layout: sections center in the content area; General and History are wide (two columns: settings beside a how-to, setup guide and About aside; History as two columns of cards).
+- Screenshots: `pnpm screenshots` now renders the main window at 380x480, 1280x800, 1920x1080 and 2560x1440, fixed windows at their size; round 1 set in `.workspaces/0014_desktop_ux/screenshots/round-1`.
+
+Decisions not in the plan:
+- During hands-free any clean press and release of the shortcut stops at the release, whatever its length; only the start gesture has the 0.5 s tap rule, so a slow stop tap never leaves the user stuck.
+- A second press held past 0.5 s sends audio from the first press (a few hundred ms of extra lead), since the recording is one.
+- Injected Esc from other processes is held back like a physical one, consistent with how the hook treats other injected input.
+- Autostart opens the main window anyway when signed out, before first run is done, or when the user still needs languages and style.
+- `app_state` treats a signed-in user it cannot look up (offline) as onboarded, so an outage never forces setup.
+- The microphone gained a monitor mode (stream plays, nothing buffered) instead of reusing a recording, so the check never holds up to 120 s of audio.
+
+Pending:
+- Windows run (needs `computer available`): two-capture spinner check with animations off, hands-free and Esc with injected chords (Alt before Win), practice box paste, Acceptance 5 foreground, fresh-install onboarding run, maximized first launch and restore, Acceptance 7 RAM and CPU.
+- Restyling Dictionary, Styles, App rules and Account for wide screens after the design answer; they are centered at prose width for now.
+
+Deferred:
+- With a user's dictation languages set to Spanish only, English speech dictated with casual or formal comes back translated to Spanish while plain keeps English (seen with crew-e2e-b before setting both languages); a dictation or styles task should look at it.
+
+### Round 2
+
+Findings:
+1. Dictionary: Advanced opens and closes only by the user's toggle; it opens on its own when a "sounds like" it holds is refused. Tests: clearing the field keeps it open; a refused variant opens it.
+2. Microphone check: Rust runs it only while the step wants it and the main window is shown (not minimized or hidden), through `CheckGate` in the shell, fed by the window's resize events and reset when the window opens; unit test over the gate.
+3. Hands-free note: the dismissal lives in Main's phase, so the note stays gone across sections; test in `Main.test.tsx` (dismiss, History, back to General).
+4. Styles view tests: the built-ins show "what you said" and each output with only changed words marked; a custom style is a card in the same grid described by its prompt.
+
+Design answer:
+- Onboarding steps are components in a registry keyed by the catalog in `plan.ts` (`steps`, each with a scope: machine, account or user). A new step is one catalog entry plus its view in the registry; the plan, resume after sign-in, rerun and the save on leaving the last user step derive from scopes. A plan test inserts a "role" user step after languages and checks order, resume, rerun and where the save happens.
+- Frame: centered at `--size-content`, two columns above 1280 (content beside a sunken visual panel), one column at 1280 and below with the visual on top; headline at `--text-4xl`. Visuals: mark and waveform demo (welcome), mark and tagline (sign in), the live level (microphone), large keycaps animating hold and double tap plus Esc (hotkey), the tray menu over a taskbar corner (ready). Languages and style stay full width.
+- Style examples: new samples run through the dev API as before (crew-e2e-b settings saved and restored, 33 dictations deleted across the candidate runs); picked the Spanish and English samples where all three outputs differ. Changed words are marked against "what you said" with a word-level diff that treats curly and straight quotes as equal; custom styles share the grid.
+- History is one centered list at about 896 px; Dictionary, App rules and Styles' own styles put the form beside the list above 56rem of content, sticky; Account stays one centered panel.
+- Scope change applied: no release work in this task.
+
+Observed: across nine samples the refiner's casual output differs from plain only by punctuation or sentence splits; recorded for the dictation or styles owner, not changed here (prompts are out of scope).
+
+Pending: the Windows run, on `computer available`.
+
+### Round 3
+
+Idle guard: a separate process with low-level keyboard and mouse hooks (`evidence/windows-run-0014/Guard.cs`); an event is ignored only when it carries `LLKHF_INJECTED` or `LLMHF_INJECTED`, anything else is real input and aborts the run before its next injected step; no time window and no key class is exempt. It logs only "real key" or "real mouse" with a timestamp, never key codes.
+Proof: the flag rule on its values (injected 0x10, 0x90 and mouse 0x1, 0x3 ignored; 0, 0x80 and mouse 0 real); live on the host, an injected F13 and injected mouse moves left only the ready line; live, real mouse and keyboard input at 19:49 host time was detected (attempt 4's guard, left running after its startup failure).
+Removed: `C:\dev\tmw-0014-run\out\guard.log` (attempt 4), which held key codes of that real input; replaced by `out\guard.log.summary` (420 events, first at 19:49:18, no codes). No other file on the host or in the workspace held codes (searched both).
+Startup check fixed: the guard starts inside the run's `try`, so a failure stops it, and its ready probe returns a string; checked passively on the host (ready, stopped).
+
+Windows evidence (host runs 2026-10-23 01:00 and 01:31, dev debug build with embedded assets and dev release builds at 5bb3113, base at the `develop` head; evidence in `.workspaces/0014_desktop_ux/evidence/windows-run-0014/` and `C:\dev\tmw-0014-run\out-*`; guard saw 0 real inputs in both):
+- Acceptance 3: first launch maximized and in front; after restore and a move, closing and reopening gave 140,120 1001x700, not maximized; maximized, closed and reopened, maximized again; closing the main window destroys it and the app stays in the tray.
+- Acceptance 4: a fresh install went welcome, sign in as crew-e2e-b, microphone, shortcut, languages, style, ready in the main window; `settings.json` then held `firstRunDone`, the user's sub and `handsFreeNoteSeen`.
+- Acceptance 5: with the release build minimized and the scratch window in front, a second launch from the scratch window brought the app's main window to the foreground, restored.
+- Acceptance 1 in another app: a double tap started hands-free, a chord plus F13 left it listening, a tap pasted the stub text, a hold still pasted; Esc, recorded at the scratch window's message loop (an `IMessageFilter` logging `WM_KEYDOWN` of `VK_ESCAPE`), arrived while idle (01:32:39.2), never arrived while hands-free listened and cancelled it (app log 06:32:42.9 UTC), and arrived again after (01:32:46.0).
+- Motion: the WebView2 browser process ran with `--embedded-browser-webview=1 --webview-exe-name=take-my-word.exe --webview-exe-version=0.2.0 --user-data-dir=...\dev.fless.takemyword.dev\EBWebView --noerrdialogs --embedded-browser-webview-dpi-awareness=2 --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --force-prefers-no-reduced-motion --remote-debugging-port=9222 --lang=es-MX` (plus its pipe and host ids); the port came only from `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` on that launch, holding the shipped string plus the port; the page read `prefers-reduced-motion: reduce` false with Windows animations off.
+- Acceptance 7 (no 0013 build process before either measurement): base 168.2 MB private after closing the window, 167.2 MB after 5 idle minutes, 1.8 CPU s; head 167.3 MB, 166.0 MB, 0.33 CPU s: pass.
+- Not yet proven, for the next slot: the spinner (the probe ran while a stuck hold kept the overlay on listening, see below) and the practice paste.
+
+Finding (round 3, fixed): in the app's own window the chord's key-downs reached Rust through the page and started a recording, but no key-up arrived from either source, so the hold stayed open (log: "kept the overlay on listening during a hold") until an Esc elsewhere cancelled it. Fix: while the gesture holds the chord, the session asks every 100 ms whether the chord keys still read held through the hook's `is_held` (`GetAsyncKeyState`) and releases the chord when they do not (`Keys::release_if_up`, logged); the page also forwards a release for every key still down when its window blurs. Tests: a page-only press with no key-up releases once the keys read up (tracker and `Keys`), a hold and a hands-free stop tap with lost key-ups end in the session, a blur releases what the page saw pressed. The root cause of the lost key-ups is still to be read from the next slot's page key log.
+
+Harness lessons: `GetLastInputInfo` counts injected input, so the guard is a hook that tells injected from real; injected keys need scan codes or Chromium reports an empty `KeyboardEvent.code`; the Alt trick for `SetForegroundWindow` puts an already-foreground window into menu mode, which stalls its UI thread (UI Automation and the debugging port both timed out), so it runs only when the target is not in front; UI Automation calls into this WebView timed out on the host; `PrintWindow` returns black for the transparent overlay and a screen copy needs `CAPTUREBLT` to include it; a debug build needs `tauri build --debug` to embed its UI; the dev app's local data folder can be 0013's, so both dev folders are snapshotted and restored, and the run refuses to start with dev credentials present or a 0013 or other dev process running.
+
+Incident, clipboard: the 01:31 run kept its clipboard snapshot only in memory and its cleanup failed before the restore, so nothing could be restored or hash-compared. Without writing, the clipboard then held 8 formats (the same count the run saved at its start), sequence 16400, did not hold the run's dictation, and the app had restored after its only paste. Fixed for every later run: `clip.ps1` writes the snapshot to a DPAPI-encrypted file before any injection and logs its formats, sequence and hash; the restore is one clipboard write followed by a hash comparison, run in the run's `finally` and again by the caller whenever the file still exists.
+
+Slot of 02:06 on 0bdf25a (clipboard snapshot file first; restored at the end with one write: match, sha256 DDD1D896741888117F00816AFC25202E852BC06CD9E75F6FB135E462FC115004 before and after, same 8 formats; guard saw 0 real inputs; dev folders, credentials and crew-e2e-b restored):
+- Acceptance 2, proven: with Windows animations off the CDP probe on the overlay page read `tmw-spin` running (currentTime 250 then 467 ms) with the spinner's computed transform changing between samples, `prefers-reduced-motion: reduce` false; the two `CAPTUREBLT` screen captures of the processing pill differ in 167 pixels; the dictation then pasted into the scratch window.
+- Root cause of the lost key-ups, from the page's key log: about 20 ms after the chord's key-downs the main window blurred and got focus back about 400 ms later. Showing the overlay took activation: tao shows a window without activating it only on its first show (`MARKER_DONT_FOCUS` is cleared after creation), so every later `show()` is `SW_SHOW`. In another app this is a focus flicker; in the app's own window the key-ups were lost.
+- The page's release on blur, added in 0bdf25a, made it worse: it ended holds the user was still making (logged "first press held 41 ms", taps lost behind the 400 ms refocus), so practice hold and hands-free did not paste in this slot.
+- UI Automation: `FocusedElement` on the WebView returned an element with no AutomationId and no ValuePattern, so the practice value is read from the page and shown in a PrintWindow capture instead.
+
+Fix (round 3, after the slot): the overlay is shown with `ShowWindow(SW_SHOWNOACTIVATE)` and hidden with `SW_HIDE` on its handle, never through `show()`, so it never takes activation from any app; the page no longer releases on blur (a test keeps it that way); the session's physical-state check stays as the safety net for a key-up lost any other way. `RELEASE_CHECK` moved below the imports.
+
+Slot of 02:13 on 02da746 (verify green on 02da746 first; clipboard snapshot file first and restored with one write: match, sha256 2E3786AC81FF39314F11968A8EC82801138DAA0D1EA2945C5F90C856C279DFCC before and after, sequence 16565 then 16655; guard 0 real inputs; host restored):
+- Overlay after hide and show: listening captures differ on dictations 1 (36 px) and 3 (140 px, with the sample WAV playing during the hold); spinner captures differ on dictations 2 (185 px) and 3 (188 px), and the CDP probe read `tmw-spin` running with the transform changing on both.
+- Foreground unchanged: the scratch window 0x1280D66 before, while the overlay showed and after each of dictations 1 to 3 (each pasted); the main window 0x2670212 before, during and after the practice hold and hands-free; the page logged no blur, and every key-up arrived.
+- Stuck hold: the practice hold (1608 ms) and the hands-free stop tap ended on their key-ups; the physical-state check stayed silent, as it should when key-ups arrive.
+- Practice paste: still empty. Dictating into the app's own window went through the clipboard paste of 0012, whose reader is the app's own WebView2 process without a window; Wait Chain Traversal spent its 200 ms budget on 15 and 17 GUI threads, so both attempts were withheld as unproven.
+
+Decision (round 3): a dictation whose target is the app's main window is inserted by the page at the caret of the focused field (`setRangeText` and an `input` event, so React state follows) instead of pasted through the clipboard; with no editable field focused the text goes to the clipboard through the History copy path with today's "not pasted" notice. Tested in `insert.test.tsx`. Alternatives rejected: raising the proof budget for WebView2 (slower for every paste, still a race) and treating the app's own processes as proven readers (would hand the text to any of our processes on a contended clipboard).
+Clipboard snapshots now hash entries in sorted format-name order, so the same clipboard gives the same hash across runs. Before staging, the run scripts were checked: no shell tracing or transcripts, and the clipboard script logs formats, sequence and hash only.
+
+Round 3 findings on 514833e, fixed:
+1. The page inserts only into a textarea or an input that supports a caret (text, search, url, tel; never email or password), and any exception counts as not inserted. Tests: an email input and a throwing `setRangeText` both answer not inserted.
+2. The insert is acknowledged: Rust sends `insert-text` with an id, the page answers `insert_ack(id, inserted)`, and Rust waits up to 1 s (`own_window.rs`). Only an inserted ack counts as pasted; a refusal or no answer keeps the text in the clipboard (the History copy owner) and the worker shows the "not pasted" notice once, since Rust, not the page, keeps it. Tests in Rust: inserted ack, refusal and timeout, another window still pasting through the clipboard, a late ack ignored; in `insert.test.tsx` the page's ack for each case.
+
+Slot of 02:35 on 2eb7b2d (verify green on 2eb7b2d first, after rustfmt on 166ceed; clipboard snapshot file first, sorted-name hash, restored with one write: match, sha256 EC4B1F814E1B87298798769AE064EE496504B8DB5B2BA99DAF5A8203F03C502E before and after, sequence 16856 then 16877; guard 0 real inputs; host restored):
+- Practice hold in the main window: inserted into the practice box (page value is the stub dictation; log "inserted a dictation into the main window", "pasted a dictation").
+- Practice hands-free (double tap, stop tap) in the main window: inserted the same way after clearing the box.
+- Hold with the focus on a button in the main window: the page refused, the text stayed in the clipboard (checked by comparison only) and the worker logged "left a dictation in the clipboard: NotRead", which shows the "not pasted" notice; the practice box kept its earlier text.
+- The foreground stayed the main window (0x1650C9E) before, during and after each, and the overlay was hidden at the end.
+
+Round 3 evidence complete: Acceptance 1 (hold, hands-free, stop, Esc, shortcut, own window), 2 (spinner with animations off, after every show), 3, 4, 5 and 7 on the host; the stuck-hold and own-window paste findings fixed and shown. Screenshots for this round in `.workspaces/0014_desktop_ux/screenshots/round-3`.
+
+### Round 4
+
+1. The main window's handle now comes through `foreground::handle_of` (Windows `hwnd()`, other platforms `None`), so non-Windows builds compile without any `allow` and the main-window comparison never matches there.
+2. `apps/desktop/scripts/linux.sh` (`pnpm rust:lint:linux`, chained at the end of `rust:lint`) builds the UI and runs `linux-check`'s `cargo clippy --all-targets --locked -- -D warnings` in an `ubuntu:24.04` container with the job's apt packages; it failed with E0599 on the previous `shell.rs` and passes on 820c32e; the desktop row of the TRD's verification targets says so.
+
+### Round 5
+
+Flaky test on the windows runner: `Onboarding.test.tsx` asserted `checkMicrophone(true)` right after the microphone heading appeared, but that heading renders when the sign-in promise resolves outside `act`, so the step's mount effect could still be pending. Both microphone assertions now wait for the call itself. Audit of the onboarding, Main, Settings, Overlay, Root and insert tests: every other bridge assertion follows a `fireEvent` handler that calls the bridge synchronously or flushes its effects inside `act`, so no other change. Proof: the file ran 50 times locally in a row, 50 passed, 0 failed.
+
+### Rebase on develop after 0013 (36d789a)
+
+Plain rebase, no tag on the branch. Every code commit applied without conflict: 0013 changed the clipboard thread, the stub, `config.rs` tests (a self-deleting `Scratch`, which derefs to the path, so 0014's settings test compiles unchanged) and `Cargo.toml`, and did not touch `paste.rs`, the `Paste` trait or `Paster`, so `own_window.rs` needed no change.
+Conflicts, all in the docs commit:
+- `docs/modules/desktop/ard.md`: frontmatter `source` to 0014_desktop_ux; 0013's four new entries (threads that ran probed first, the clipboard thread answering while it waits, multi-line text in Windows Terminal, config test folders) kept in full, then 0014's three new entries after them.
+- `docs/modules/desktop/prd.md`: `source` to 0014_desktop_ux; Rules: 0014's wording for starting a dictation during processing and for the target window (with the own-window insert), 0013's terminal, Windows PowerShell 5.1 and administrator-terminal rules kept.
+- `docs/modules/desktop/trd.md`: `source` to 0014_desktop_ux; Structure: 0014's session, `own_window.rs`, `account.rs`, `windows.rs` and `src` rows, 0013's paste row (threads that ran first) and scripts row (terminal smoke); Testing: 0014's screenshot sizes, 0013's terminal smoke lines, and the Windows checks line carrying both 0013's and 0014's runs.
+- `docs/ARD.md` debt index: 0013's rows (the paste retry row as 0013 rewrote it, the PowerShell 5.1 row, the config folders row) kept, 0014's two desktop rows and its styles row added; checked against the module ARDs.
+WSL checks on the rebased head: typecheck, eslint and prettier, 164 vitest, and the Linux clippy (all targets) green; the Windows cargo waits for host time.

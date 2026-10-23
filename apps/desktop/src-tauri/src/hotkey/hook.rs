@@ -29,6 +29,10 @@ pub fn install(sink: KeySink) -> Result<Arc<dyn KeyHook + Send + Sync>, HookErro
     platform::install(sink)
 }
 
+pub fn swallow_escape(on: bool) {
+    platform::swallow_escape(on);
+}
+
 pub fn key_name(code: u32) -> String {
     platform::key_name(code)
 }

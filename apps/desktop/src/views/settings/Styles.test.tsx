@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { setLanguage } from "../../i18n.ts";
 import { builtins, failure, serve, settings } from "../../testing/api.ts";
 import { fakeBridge } from "../../testing/bridge.ts";
+import { styleExamples } from "../../styleExamples.ts";
 import { Styles } from "./Styles.tsx";
 
 vi.mock("../../bridge.ts", async (importOriginal) => ({
@@ -93,6 +94,38 @@ describe("Styles", () => {
     );
   });
 
+  it("shows what you said and each built-in style's output, marking only the changed words", async () => {
+    serve({ listStyles: () => ({ styles: builtins }), getSettings: () => settings });
+    render(<Styles />);
+    const example = styleExamples.en;
+    await screen.findByText(example.said);
+    for (const [id, name] of [
+      ["plain", "Plain"],
+      ["casual", "Casual"],
+      ["formal", "Formal"],
+    ] as const) {
+      const card = screen.getByRole("radio", { name }).closest("label") as HTMLElement;
+      const text = card.querySelector(".example-text") as HTMLElement;
+      expect(text.textContent).toBe(example.styles[id]);
+      for (const mark of text.querySelectorAll("mark")) {
+        expect(example.said.split(/\s+/)).not.toContain(mark.textContent.trim());
+      }
+    }
+    const formal = screen.getByRole("radio", { name: "Formal" }).closest("label") as HTMLElement;
+    expect(formal.querySelectorAll("mark").length).toBeGreaterThan(0);
+  });
+
+  it("shows a custom style as a card in the same grid, described by its prompt", async () => {
+    serve({ listStyles: () => ({ styles: [...builtins, mail] }), getSettings: () => settings });
+    render(<Styles />);
+    const card = (await screen.findByRole("radio", { name: "Client email" })).closest(
+      "label",
+    ) as HTMLElement;
+    expect(within(card).getByText("Formal, short.")).toBeTruthy();
+    const grid = screen.getByRole("radio", { name: "Plain" }).closest(".example-grid");
+    expect(grid?.contains(card)).toBe(true);
+  });
+
   it("deleting the default style moves the picker back to Plain", async () => {
     serve({
       listStyles: () => ({ styles: [...builtins, mail] }),
@@ -101,7 +134,7 @@ describe("Styles", () => {
     render(<Styles />);
     const picked = await screen.findByRole("radio", { name: "Client email" });
     expect((picked as HTMLInputElement).checked).toBe(true);
-    const row = screen.getByText("Formal, short.").closest("li") as HTMLElement;
+    const row = within(screen.getByRole("list")).getByRole("listitem");
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
     await vi.waitFor(() => {

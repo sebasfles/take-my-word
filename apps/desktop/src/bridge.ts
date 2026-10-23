@@ -17,12 +17,21 @@ export type Theme = "light" | "dark";
 export type OverlayState =
   | { state: "hidden" }
   | { state: "listening" }
+  | { state: "handsFree" }
   | { state: "processing" }
   | { state: "error"; message: MessageId; action: "microphoneSettings" | null };
 
 export interface AccountView {
   signedIn: boolean;
   username: string | null;
+}
+
+export interface AppState {
+  signedIn: boolean;
+  username: string | null;
+  firstRunDone: boolean;
+  onboarded: boolean;
+  handsFreeNote: boolean;
 }
 
 export type AccountStep = "choosePassword" | "onboarding" | "done";
@@ -35,6 +44,7 @@ export interface Problem {
 export interface StyleOption {
   id: string;
   name: string;
+  prompt: string;
   builtin: boolean;
 }
 
@@ -77,7 +87,13 @@ export const bridge = {
   setAutostart: (enabled: boolean) => invoke<boolean>("set_autostart", { enabled }),
   openMicrophoneSettings: () => invoke<undefined>("open_microphone_settings"),
   dismissOverlay: () => invoke<undefined>("dismiss_overlay"),
-  finishFirstRun: () => invoke<undefined>("finish_first_run"),
+  stopDictation: () => invoke<undefined>("stop_dictation"),
+  insertAck: (id: number, inserted: boolean) => invoke<undefined>("insert_ack", { id, inserted }),
+  forwardKey: (code: string, down: boolean) => invoke<undefined>("forward_key", { code, down }),
+  checkMicrophone: (on: boolean) => invoke<MicStatus>("check_microphone", { on }),
+  appState: () => invoke<AppState>("app_state"),
+  finishOnboarding: () => invoke<undefined>("finish_onboarding"),
+  dismissHandsFreeNote: () => invoke<undefined>("dismiss_hands_free_note"),
   accountStatus: () => invoke<AccountView>("account_status"),
   signIn: (username: string, password: string) =>
     invoke<AccountStep>("sign_in", { username, password }),
@@ -89,8 +105,6 @@ export const bridge = {
   setUiLanguage: (choice: Language | null) => invoke<UiLanguage>("set_ui_language", { choice }),
   theme: () => invoke<Theme | null>("theme"),
   setTheme: (choice: Theme | null) => invoke<Theme | null>("set_theme", { choice }),
-  fitAccount: (onboarding: boolean, contentHeight: number, recenter: boolean) =>
-    invoke<undefined>("fit_account", { onboarding, contentHeight, recenter }),
   fitUpdate: (contentHeight: number, recenter: boolean) =>
     invoke<undefined>("fit_update", { contentHeight, recenter }),
   openSignIn: () => invoke<undefined>("open_sign_in"),
@@ -114,6 +128,18 @@ export const bridge = {
     listen<number>("overlay-level", (event) => {
       handler(event.payload);
     }),
+  onInsertText: (handler: (insert: { id: number; text: string }) => void): Promise<UnlistenFn> =>
+    listen<{ id: number; text: string }>("insert-text", (event) => {
+      handler(event.payload);
+    }),
+  onMicrophoneStatus: (handler: (status: MicStatus) => void): Promise<UnlistenFn> =>
+    listen<MicStatus>("microphone-status", (event) => {
+      handler(event.payload);
+    }),
+  onMicrophoneLevel: (handler: (level: number) => void): Promise<UnlistenFn> =>
+    listen<number>("microphone-level", (event) => {
+      handler(event.payload);
+    }),
   onUiLanguage: (handler: (language: Language) => void): Promise<UnlistenFn> =>
     listen<Language>("ui-language", (event) => {
       handler(event.payload);
@@ -126,8 +152,8 @@ export const bridge = {
     listen<boolean>("account-changed", (event) => {
       handler(event.payload);
     }),
-  onSettingsNavigate: (handler: (query: string) => void): Promise<UnlistenFn> =>
-    listen<string>("settings-navigate", (event) => {
+  onMainNavigate: (handler: (query: string) => void): Promise<UnlistenFn> =>
+    listen<string>("main-navigate", (event) => {
       handler(event.payload);
     }),
   onHotkeyCaptureCancelled: (handler: () => void): Promise<UnlistenFn> =>

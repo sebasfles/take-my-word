@@ -2,10 +2,14 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 use crate::audio::{AudioError, Capture, Captured, MAX_RECORDING, MIN_RECORDING};
-use crate::hotkey::ChordEvent;
+use crate::hotkey::{ChordEvent, Command, Gesture};
+
+const RELEASE_CHECK: Duration = Duration::from_millis(100);
 
 pub enum Input {
     Chord { event: ChordEvent, at: Instant },
+    Stop { at: Instant },
+    MicrophoneCheck(bool),
 }
 
 #[derive(Debug)]
@@ -19,13 +23,18 @@ pub enum Take {
 pub trait Sink {
     fn may_record(&mut self) -> bool;
     fn listening(&mut self);
+    fn hands_free(&mut self);
+    fn chord_released(&mut self) -> bool;
     fn finished(&mut self, take: Take);
 }
 
 pub struct Session<C, S> {
     capture: C,
     sink: S,
+    gesture: Gesture,
     recording_since: Option<Instant>,
+    release_check: Option<Instant>,
+    checking: bool,
 }
 
 impl<C: Capture, S: Sink> Session<C, S> {
@@ -33,7 +42,10 @@ impl<C: Capture, S: Sink> Session<C, S> {
         Self {
             capture,
             sink,
+            gesture: Gesture::default(),
             recording_since: None,
+            release_check: None,
+            checking: false,
         }
     }
 
@@ -60,27 +72,76 @@ impl<C: Capture, S: Sink> Session<C, S> {
     }
 
     fn deadline(&self) -> Option<Instant> {
-        self.recording_since.map(|since| since + MAX_RECORDING)
+        let cap = self.recording_since.map(|since| since + MAX_RECORDING);
+        [cap, self.gesture.deadline(), self.release_check]
+            .into_iter()
+            .flatten()
+            .min()
     }
 
     fn handle(&mut self, input: Input) {
         match input {
-            Input::Chord { event, at } => match event {
-                ChordEvent::Pressed => self.begin(at),
-                ChordEvent::Released => self.end(at),
-                ChordEvent::Cancelled => self.cancel(),
-            },
+            Input::Chord { event, at } => self.chord(event, at),
+            Input::Stop { at } => {
+                if self.gesture.is_hands_free() {
+                    log::info!("hotkey: hands-free stopped from the overlay");
+                    self.gesture.reset();
+                    self.release_check = None;
+                    self.end(at);
+                }
+            }
+            Input::MicrophoneCheck(on) => {
+                self.checking = on;
+                if self.recording_since.is_none() {
+                    self.capture.monitor(on);
+                }
+            }
+        }
+    }
+
+    fn chord(&mut self, event: ChordEvent, at: Instant) {
+        for command in self.gesture.on_chord(event, at) {
+            self.apply(command, at);
+        }
+        self.release_check = self.gesture.holds_keys().then(|| at + RELEASE_CHECK);
+    }
+
+    fn apply(&mut self, command: Command, at: Instant) {
+        match command {
+            Command::Start => self.begin(at),
+            Command::HandsFree => self.sink.hands_free(),
+            Command::Stop => self.end(at),
+            Command::Discard => self.finish(Take::TooShort),
+            Command::Cancel => self.finish(Take::Cancelled),
         }
     }
 
     fn on_deadline(&mut self, now: Instant) {
-        if self.deadline().is_some_and(|deadline| now >= deadline) {
+        if let Some(command) = self.gesture.on_deadline(now) {
+            self.apply(command, now);
+        }
+        if self.release_check.is_some_and(|check| now >= check) {
+            self.release_check = None;
+            if self.sink.chord_released() {
+                log::info!("hotkey: the chord keys read up with no key-up seen, released");
+                self.chord(ChordEvent::Released, now);
+            } else if self.gesture.holds_keys() {
+                self.release_check = Some(now + RELEASE_CHECK);
+            }
+        }
+        let capped = self
+            .recording_since
+            .is_some_and(|since| now >= since + MAX_RECORDING);
+        if capped {
+            self.gesture.reset();
+            self.release_check = None;
             self.end(now);
         }
     }
 
     fn begin(&mut self, at: Instant) {
         if self.recording_since.is_some() || !self.sink.may_record() {
+            self.gesture.reset();
             return;
         }
         self.sink.listening();
@@ -94,13 +155,21 @@ impl<C: Capture, S: Sink> Session<C, S> {
         };
         let held = at.saturating_duration_since(since).min(MAX_RECORDING);
         let captured = self.capture.stop();
+        self.resume_check();
         self.sink.finished(take(held, captured));
     }
 
-    fn cancel(&mut self) {
+    fn finish(&mut self, take: Take) {
         if self.recording_since.take().is_some() {
             let _ = self.capture.stop();
-            self.sink.finished(Take::Cancelled);
+            self.resume_check();
+            self.sink.finished(take);
+        }
+    }
+
+    fn resume_check(&mut self) {
+        if self.checking {
+            self.capture.monitor(true);
         }
     }
 }
@@ -134,6 +203,7 @@ mod tests {
         mic_open: bool,
         zeros: bool,
         signed_out: bool,
+        keys_up: bool,
     }
 
     struct FakeMic {
@@ -147,6 +217,11 @@ mod tests {
             let mut log = self.log.borrow_mut();
             log.mic_open = true;
             log.events.push("start".into());
+        }
+
+        fn monitor(&mut self, on: bool) {
+            let event = if on { "monitor on" } else { "monitor off" };
+            self.log.borrow_mut().events.push(event.into());
         }
 
         fn stop(&mut self) -> Result<Captured, AudioError> {
@@ -173,6 +248,14 @@ mod tests {
 
         fn listening(&mut self) {
             self.0.borrow_mut().events.push("listening".into());
+        }
+
+        fn hands_free(&mut self) {
+            self.0.borrow_mut().events.push("hands-free".into());
+        }
+
+        fn chord_released(&mut self) -> bool {
+            self.0.borrow().keys_up
         }
 
         fn finished(&mut self, take: Take) {
@@ -216,6 +299,20 @@ mod tests {
         fn hold(&mut self, press_ms: u64, release_ms: u64) {
             self.send(ChordEvent::Pressed, press_ms);
             self.send(ChordEvent::Released, release_ms);
+        }
+
+        fn tick(&mut self, at_ms: u64) {
+            let at = self.t0 + Duration::from_millis(at_ms);
+            self.session.on_deadline(at);
+        }
+
+        fn double_tap(&mut self) {
+            self.hold(0, 150);
+            self.hold(350, 480);
+        }
+
+        fn events(&self) -> Vec<String> {
+            self.log.borrow().events.clone()
         }
 
         fn takes(&self) -> Vec<String> {
@@ -286,11 +383,115 @@ mod tests {
     }
 
     #[test]
-    fn a_press_under_half_a_second_is_discarded_and_releases_the_microphone() {
-        let mut harness = Harness::new(Ok(Duration::from_millis(400)), Duration::ZERO);
+    fn a_press_under_half_a_second_is_discarded_once_no_second_tap_follows() {
+        let mut harness = Harness::new(Ok(Duration::from_millis(700)), Duration::ZERO);
         harness.hold(0, 450);
+        assert!(harness.takes().is_empty());
+        assert!(harness.log.borrow().mic_open);
+        harness.tick(750);
         assert_eq!(harness.takes(), vec!["too short"]);
         assert!(!harness.log.borrow().mic_open);
+    }
+
+    #[test]
+    fn a_double_tap_records_hands_free_from_the_first_press_until_the_stop_tap() {
+        let mut harness = Harness::new(Ok(Duration::from_millis(5050)), Duration::ZERO);
+        harness.double_tap();
+        harness.tick(10_000);
+        assert!(harness.takes().is_empty());
+        assert!(harness.log.borrow().mic_open);
+        assert_eq!(
+            harness.events(),
+            vec!["may record", "listening", "start", "hands-free"]
+        );
+        harness.hold(5000, 5100);
+        assert_eq!(harness.takes(), vec!["recorded 5100ms of 5050ms"]);
+        assert!(!harness.log.borrow().mic_open);
+    }
+
+    #[test]
+    fn hands_free_is_cancelled_by_esc_and_stopped_from_the_overlay() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(3)), Duration::ZERO);
+        harness.double_tap();
+        harness.send(ChordEvent::Escape, 3000);
+        assert_eq!(harness.takes(), vec!["cancelled"]);
+        let stop = Input::Stop {
+            at: harness.t0 + Duration::from_millis(3500),
+        };
+        harness.session.handle(stop);
+        assert_eq!(harness.takes().len(), 1);
+        harness.hold(10_000, 10_100);
+        harness.hold(10_300, 10_400);
+        harness.session.handle(Input::Stop {
+            at: harness.t0 + Duration::from_millis(13_400),
+        });
+        assert_eq!(
+            harness.takes(),
+            vec!["cancelled", "recorded 3400ms of 3000ms"]
+        );
+    }
+
+    #[test]
+    fn a_hold_whose_key_up_never_arrives_ends_once_the_keys_read_up() {
+        let mut harness = Harness::new(Ok(Duration::from_millis(1950)), Duration::ZERO);
+        harness.send(ChordEvent::Pressed, 0);
+        assert_eq!(
+            harness.session.deadline(),
+            Some(harness.t0 + Duration::from_millis(100))
+        );
+        harness.tick(100);
+        harness.tick(1900);
+        assert!(harness.takes().is_empty());
+        harness.log.borrow_mut().keys_up = true;
+        harness.tick(2000);
+        assert_eq!(harness.takes(), vec!["recorded 2000ms of 1950ms"]);
+        assert_eq!(harness.session.deadline(), None);
+    }
+
+    #[test]
+    fn a_stop_tap_whose_key_up_is_lost_still_stops_hands_free() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(4)), Duration::ZERO);
+        harness.double_tap();
+        harness.send(ChordEvent::Pressed, 4000);
+        harness.log.borrow_mut().keys_up = true;
+        harness.tick(4100);
+        assert_eq!(harness.takes(), vec!["recorded 4100ms of 4000ms"]);
+    }
+
+    #[test]
+    fn hands_free_stops_at_two_minutes_and_a_later_tap_does_not_resume_it() {
+        let mut harness = Harness::new(Ok(MAX_RECORDING), Duration::ZERO);
+        harness.double_tap();
+        harness.tick(MAX_RECORDING.as_millis() as u64);
+        assert_eq!(harness.takes(), vec!["recorded 120000ms of 120000ms"]);
+        harness.hold(130_000, 130_100);
+        harness.tick(130_400);
+        assert_eq!(harness.takes()[1], "too short");
+    }
+
+    #[test]
+    fn the_microphone_check_monitors_only_while_shown_and_a_hold_still_dictates() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(2)), Duration::ZERO);
+        harness.session.handle(Input::MicrophoneCheck(true));
+        harness.hold(0, 2000);
+        harness.session.handle(Input::MicrophoneCheck(false));
+        assert_eq!(
+            harness.events(),
+            vec![
+                "monitor on",
+                "may record",
+                "listening",
+                "start",
+                "monitor on",
+                "monitor off"
+            ]
+        );
+        assert_eq!(harness.takes(), vec!["recorded 2000ms of 2000ms"]);
+        harness.session.handle(Input::MicrophoneCheck(true));
+        harness.send(ChordEvent::Pressed, 3000);
+        harness.session.handle(Input::MicrophoneCheck(false));
+        harness.send(ChordEvent::Released, 5000);
+        assert_eq!(harness.events().last().map(String::as_str), Some("start"));
     }
 
     #[test]
@@ -314,7 +515,6 @@ mod tests {
     fn holding_past_two_minutes_stops_and_sends_once() {
         let mut harness = Harness::new(Ok(MAX_RECORDING), Duration::ZERO);
         harness.send(ChordEvent::Pressed, 0);
-        assert_eq!(harness.session.deadline(), Some(harness.t0 + MAX_RECORDING));
         harness
             .session
             .on_deadline(harness.t0 + MAX_RECORDING - Duration::from_millis(1));
