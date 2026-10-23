@@ -194,19 +194,6 @@ public static class TmwSmoke
         finally { CloseClipboard(); }
     }
 
-    public static string ClipboardFormats()
-    {
-        if (!Open()) throw new Exception("the clipboard stayed busy");
-        try
-        {
-            var formats = new List<string>();
-            uint format = 0;
-            while ((format = EnumClipboardFormats(format)) != 0) formats.Add(format.ToString());
-            return string.Join(",", formats);
-        }
-        finally { CloseClipboard(); }
-    }
-
     static void Put(uint format, byte[] bytes)
     {
         var memory = GlobalAlloc(2, new UIntPtr((uint)Math.Max(bytes.Length, 1)));
@@ -417,37 +404,123 @@ public static class TmwSmoke
         while (GetMessage(out message, IntPtr.Zero, 0, 0)) { TranslateMessage(ref message); DispatchMessage(ref message); }
     }
 
+    [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32.dll")] static extern void PostQuitMessage(int code);
+    [DllImport("kernel32.dll")] static extern UIntPtr GlobalSize(IntPtr memory);
+
     static string guardFile;
     static HookProc keyboard;
     static HookProc mouse;
+    static IntPtr keyboardHook;
+    static IntPtr mouseHook;
+    static bool tripped;
+
+    static void Trip(string kind)
+    {
+        if (tripped) return;
+        tripped = true;
+        UnhookWindowsHookEx(keyboardHook);
+        UnhookWindowsHookEx(mouseHook);
+        File.WriteAllText(guardFile, DateTime.UtcNow.ToString("o") + " real " + kind + " input\n");
+        PostQuitMessage(0);
+    }
 
     public static void Guard(string file)
     {
         guardFile = file;
         keyboard = (code, wparam, lparam) =>
         {
-            if (code >= 0)
-            {
-                var data = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lparam, typeof(KBDLLHOOKSTRUCT));
-                if ((data.flags & 0x10) == 0) File.AppendAllText(guardFile, DateTime.UtcNow.ToString("o") + " key " + data.vkCode + "\n");
-            }
+            if (code >= 0 && (((KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lparam, typeof(KBDLLHOOKSTRUCT))).flags & 0x10) == 0) Trip("keyboard");
             return CallNextHookEx(IntPtr.Zero, code, wparam, lparam);
         };
         mouse = (code, wparam, lparam) =>
         {
-            if (code >= 0)
-            {
-                var data = (MSLLHOOKSTRUCT)Marshal.PtrToStructure(lparam, typeof(MSLLHOOKSTRUCT));
-                if ((data.flags & 0x1) == 0) File.AppendAllText(guardFile, DateTime.UtcNow.ToString("o") + " mouse " + wparam.ToInt64() + "\n");
-            }
+            if (code >= 0 && (((MSLLHOOKSTRUCT)Marshal.PtrToStructure(lparam, typeof(MSLLHOOKSTRUCT))).flags & 0x1) == 0) Trip("mouse");
             return CallNextHookEx(IntPtr.Zero, code, wparam, lparam);
         };
         var module = GetModuleHandle(null);
-        SetWindowsHookEx(13, keyboard, module, 0);
-        SetWindowsHookEx(14, mouse, module, 0);
+        keyboardHook = SetWindowsHookEx(13, keyboard, module, 0);
+        mouseHook = SetWindowsHookEx(14, mouse, module, 0);
         File.WriteAllText(guardFile + ".ready", "ready");
         MSG message;
         while (GetMessage(out message, IntPtr.Zero, 0, 0)) { TranslateMessage(ref message); DispatchMessage(ref message); }
+    }
+
+    static readonly HashSet<uint> GdiFormats = new HashSet<uint> { 2, 3, 9, 14, 0x80, 0x82, 0x83, 0x8E };
+
+    static byte[] SerializeClipboard(out string formats)
+    {
+        var list = new List<string>();
+        var stream = new MemoryStream();
+        var writer = new BinaryWriter(stream);
+        if (!Open()) throw new Exception("the clipboard stayed busy");
+        try
+        {
+            uint format = 0;
+            while ((format = EnumClipboardFormats(format)) != 0)
+            {
+                if (GdiFormats.Contains(format) || (format >= 0x200 && format <= 0x3FF)) { list.Add(format + "(not saved)"); continue; }
+                var handle = GetClipboardData(format);
+                if (handle == IntPtr.Zero) { list.Add(format + "(empty)"); continue; }
+                var size = (int)GlobalSize(handle).ToUInt64();
+                var pointer = GlobalLock(handle);
+                if (pointer == IntPtr.Zero) { list.Add(format + "(not saved)"); continue; }
+                var bytes = new byte[size];
+                Marshal.Copy(pointer, bytes, 0, size);
+                GlobalUnlock(handle);
+                writer.Write(format);
+                writer.Write(size);
+                writer.Write(bytes);
+                list.Add(format + ":" + size);
+            }
+        }
+        finally { CloseClipboard(); }
+        formats = string.Join(",", list);
+        return stream.ToArray();
+    }
+
+    static string Sha256(byte[] data)
+    {
+        return BitConverter.ToString(System.Security.Cryptography.SHA256.Create().ComputeHash(data)).Replace("-", "").ToLowerInvariant();
+    }
+
+    public static string ClipboardHash()
+    {
+        string formats;
+        var data = SerializeClipboard(out formats);
+        return "formats=" + formats + " sha256=" + Sha256(data);
+    }
+
+    public static string SealClipboard(string file)
+    {
+        string formats;
+        var data = SerializeClipboard(out formats);
+        File.WriteAllBytes(file, System.Security.Cryptography.ProtectedData.Protect(data, null, System.Security.Cryptography.DataProtectionScope.CurrentUser));
+        return "sealed formats=" + formats + " sha256=" + Sha256(data);
+    }
+
+    public static string RestoreSealed(string file)
+    {
+        var data = System.Security.Cryptography.ProtectedData.Unprotect(File.ReadAllBytes(file), null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+        var reader = new BinaryReader(new MemoryStream(data));
+        if (!Open()) throw new Exception("the clipboard stayed busy");
+        try
+        {
+            EmptyClipboard();
+            while (reader.BaseStream.Position < reader.BaseStream.Length)
+            {
+                var format = reader.ReadUInt32();
+                var bytes = reader.ReadBytes(reader.ReadInt32());
+                Put(format, bytes);
+            }
+        }
+        finally { CloseClipboard(); }
+        string formats;
+        var now = Sha256(SerializeClipboard(out formats));
+        var saved = Sha256(data);
+        if (now != saved) return "MISMATCH sealed sha256=" + saved + " now sha256=" + now + " formats=" + formats;
+        File.Delete(file);
+        return "restored and verified sha256=" + now;
     }
 }
 '@
@@ -456,7 +529,7 @@ $cache = $PSScriptRoot
 $hash = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($source))).Replace('-', '').Substring(0, 16)
 $assembly = Join-Path $cache "TmwSmoke-$hash.dll"
 if (-not (Test-Path $assembly)) {
-    Add-Type -TypeDefinition $source -ReferencedAssemblies UIAutomationClient, UIAutomationTypes, WindowsBase, System.Windows.Forms -OutputAssembly $assembly -OutputType Library
+    Add-Type -TypeDefinition $source -ReferencedAssemblies UIAutomationClient, UIAutomationTypes, WindowsBase, System.Windows.Forms, System.Security -OutputAssembly $assembly -OutputType Library
 }
 Add-Type -Path $assembly
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -476,8 +549,10 @@ switch ($Command) {
     'hold' { [TmwSmoke]::Hold([uint16[]]($Rest | Select-Object -Skip 1 | ForEach-Object { $keys[$_] }), [int]$Rest[0]) }
     'type-env' { [TmwSmoke]::Type([Environment]::GetEnvironmentVariable($Rest[0])) }
     'clipboard' { $text = [TmwSmoke]::ClipboardText(); if ($null -eq $text) { '<none>' } else { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($text)) } }
-    'clipboard-formats' { [TmwSmoke]::ClipboardFormats() }
-    'set-clipboard' { if ($Rest[0] -eq '<none>') { [TmwSmoke]::SetClipboardText($null) } else { [TmwSmoke]::SetClipboardText([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Rest[0]))) } }
+    'clipboard-hash' { [TmwSmoke]::ClipboardHash() }
+    'seal-clipboard' { [TmwSmoke]::SealClipboard($Rest[0]) }
+    'restore-sealed' { $result = [TmwSmoke]::RestoreSealed($Rest[0]); $result; if ($result -like 'MISMATCH*') { exit 3 } }
+    'set-clipboard' { [TmwSmoke]::SetClipboardText([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Rest[0]))) }
     'dialog' { $found = [TmwSmoke]::Dialog([long]$Rest[0], $Rest[1]); if ($found) { $found } else { '<none>' } }
     'start' { [TmwSmoke]::Start($Rest[0], [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Rest[1])), $false) }
     'start-console' { [TmwSmoke]::Start($Rest[0], [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Rest[1])), $true) }

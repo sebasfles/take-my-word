@@ -92,6 +92,8 @@ These override Scope, Acceptance and Approach above where they differ.
 - Windows slots (om-manager): no run starts without the om-manager's `computer available`, given to one task at a time (0014 shares the host). The om-developer sends me `computer needed: {{what}}, {{estimate}}` and `computer free`; I relay both.
 - Shared dev identity (om-manager, 2026-10-23): 0013 and 0014 debug builds share `%LOCALAPPDATA%\dev.fless.takemyword.dev`, the roaming config and the dev credentials. Before `computer free`, the dev app is stopped and signed out, its credentials are removed and those folders are as found. While 0014 is busy, no 0013 dev build runs on the host, not even passive ones.
 - Clipboard snapshot (om-manager, 2026-10-23): before any run injects input or touches the clipboard, the clipboard is saved to a DPAPI-encrypted file, with its formats and hash logged (never content), then restored and verified by hash at the end.
+  No shell tracing (`set -x`) around clipboard code; the snapshot never reaches logs, command lines or evidence, only the DPAPI file (om-manager, 2026-10-23, after the round 1 trace incident).
+- Config test temp folders (om-reviewer, 2026-10-23, out of Scope on purpose): config.rs's tests leave a `%TEMP%\tmw-config-*` folder per run (6951 on the host). Round 2 makes them clean up after themselves. The leftover folders are not deleted, since only folders a run's own tests created may go (om-manager); the PR lists them for Sebastian.
 - Replication (om-reviewer): the classic window is launched explicitly as `conhost.exe powershell.exe` (and `pwsh.exe`), since Windows 11 may hand consoles to WT. Each target also gets a multi-line dictation, which may come from a debug-only stub mode with a fixed two-line text.
 - Isolation (om-reviewer): tmux runs on its own socket (`tmux -L tmw-0013-{{n}}`), never on the default server where the crew lives, and only that server is killed. WindowsTerminal.exe, OpenConsole and conhost processes the run did not start are never killed; the run's WT window (`wt -w tmw-0013-{{n}}`) closes by ending its own shells. Before every dictation the run checks that the foreground window is its own and aborts otherwise.
 - Claude Code in the smoke (om-reviewer): throwaway directory, no prompt ever submitted, no Enter sent, exited by the run; skip user hooks and MCP servers where the CLI allows.
@@ -157,7 +159,7 @@ Decisions the plan did not record (ARD entries in `document-task`):
 
 1. The proof probes the threads that ran since the attempt's keystroke first; it supersedes the order part of the 2026-10-22 entry ("probed in depth order from the target, main threads first").
    A thread that ran is not trusted more: it only gets its wait chain looked at sooner, and a reader outside the target's tree is still never proven.
-2. The target's threads are held open by handle from the offer to the end of the paste, which also keeps their ids from being reused while the paste lasts.
+2. The target's threads are held open by handle from the snapshot taken at an offer until the next offer replaces it, which also keeps their ids from being reused while the paste lasts (corrected in round 2).
 3. While it waits to open the clipboard, the clipboard thread answers the render requests sent to it.
 
 Debt (for the ARD and the PR):
@@ -166,3 +168,31 @@ Debt (for the ARD and the PR):
 - Confirming Windows Terminal's multi-line warning in a Windows PowerShell 5.1 tab runs every line but the last (Context & decisions, multi-line adjusted).
 
 Deferred: the app log rotates (`KeepOne`), which lost one paste's lines in fix4; the smoke now reads across a rotation, the rotation itself is untouched (already deferred by 0012).
+
+### Round 2
+
+Findings applied, all five:
+
+1. The five `trace.log` files of fix8 to fix12 were shredded unopened (the om-manager had shredded them first) and the guard files under `C:\dev\tmw-0013-run` deleted; nothing on the Windows side holds a clipboard copy or a trace.
+   `TMW_SMOKE_TRACE` is gone from the smoke, so no run can trace it.
+2. The smoke seals every memory-based clipboard format into a DPAPI file (CurrentUser) in its scratch folder before it touches the clipboard, logs only the formats and a SHA-256, and in `cleanup` restores from that file and verifies the hash, deleting the file only after a verified restore; on a mismatch it keeps the file and says where.
+   No clipboard content goes on a command line, into a log or into a trace; the only text the run itself puts on the clipboard is its own sentinel.
+3. The guard records only the time and kind of the first real input (keyboard or mouse, no key codes), unhooks both hooks and ends.
+4. Every injected step checks the guard right before it runs (focus, every chord, the hold, the UI Automation fill and invoke, the dialog press, each launch through `act`), and the foreground is checked again right before each `--dictate-wav`; a positive guard aborts before the next injection.
+   During `cleanup` after an abort, the run sends no keys: targets close through `WM_CLOSE`, and only the sign-out goes through the app's own Settings window with UI Automation.
+5. The run keeps the PID that `start` returns for the app it launched and stops, finds and checks only that PID with `--app`'s path; refusing to start while another dev instance runs stays.
+
+Also, on the om-reviewer's decision (outside the task's scope, on purpose): `config.rs`'s tests left a `%TEMP%\tmw-config-<name>-<pid>` folder behind on every run (6951 on the host); their scratch path is now a guard that removes its folder on drop, so also when a test fails.
+The leftovers already on the host stay (6964 on 2026-10-23, from every task's runs); they are debt for the PR, their cleanup is Sebastian's call.
+
+Checks on the host (`evidence/round2`), with Sebastian's clipboard sealed first and restored with the same hash at the end (sha256 85f98cac…3b345, 10 formats):
+
+- An HTML-only clipboard set by the run survived seal, overwrite and restore with an equal hash, so a clipboard without text is no longer lost.
+- `config` tests: 9 passed, and the `tmw-config-*` count stayed at 6964 (0 new).
+- The reworked smoke, targets 3 and 6 with the update race reader: 2 of 2 each plus the two-line dictation landed, the previous clipboard came back each time, the race reader got 0 dictations, cleanup stopped only the app the run started and restored the clipboard with a verified hash.
+- `rust:test` 176 passed, 9 ignored.
+
+Decisions the plan did not record (ARD entries in `document-task`, or the smoke's own docs in `trd.md` Testing):
+
+4. The smoke's clipboard safety, guard and process rules as listed under findings 2 to 5.
+

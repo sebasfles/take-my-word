@@ -80,12 +80,6 @@ fi
 
 [[ -n "$app" ]] || usage
 
-if [[ -n "${TMW_SMOKE_TRACE:-}" ]]; then
-  exec {trace_fd}>"$TMW_SMOKE_TRACE"
-  BASH_XTRACEFD=$trace_fd
-  set -x
-fi
-
 psw() {
   local output attempt
   local status
@@ -102,6 +96,7 @@ psw() {
 }
 
 act() {
+  [[ -n "${in_cleanup:-}" ]] || guard_ok
   local output
   if ! output="$(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$ps1" "$@" 2>/dev/null)"; then
     log "WARNING: the host did not answer '$1' (WSL interop); it may or may not have run"
@@ -137,16 +132,15 @@ mkdir -p "$linux_scratch"
 opened_targets=()
 cleanup() {
   set +e
+  in_cleanup=1
   for target in "${opened_targets[@]:-}"; do
     [[ -n "$target" ]] && close_target "$target"
   done
   if [[ -n "${signed_in:-}" ]]; then
     sign_out
   fi
-  if [[ -n "${app_started:-}" ]]; then
-    for pid in $(dev_instances); do
-      powershell.exe -NoProfile -Command "Stop-Process -Id $pid" >/dev/null 2>&1 && log "stopped the app ($pid)"
-    done
+  if [[ -n "${app_pid:-}" ]] && app_alive; then
+    powershell.exe -NoProfile -Command "Stop-Process -Id $app_pid" >/dev/null 2>&1 && log "stopped the app the run started ($app_pid)"
   fi
   if [[ -n "${race_pid:-}" ]]; then
     kill "$race_pid" 2>/dev/null
@@ -154,17 +148,35 @@ cleanup() {
   fi
   if [[ -n "${guard_pid:-}" ]]; then
     kill "$guard_pid" 2>/dev/null
+    [[ -s "$scratch/guard" ]] && log "the guard saw $(cut -d' ' -f2- "$scratch/guard")"
+    rm -f "$scratch/guard" "$scratch/guard.ready"
   fi
-  if [[ -n "${saved_clipboard:-}" ]]; then
-    psw set-clipboard "$saved_clipboard" >/dev/null && log "restored the clipboard the run found"
+  if [[ -n "${sealed:-}" && -e "$sealed" ]]; then
+    local restored
+    restored="$(psw restore-sealed "$(wslpath -w "$sealed")")"
+    if [[ "$restored" == "restored and verified"* ]]; then
+      log "clipboard $restored, sealed file deleted"
+    else
+      log "WARNING: the clipboard was not restored ($restored); the sealed copy stays at $(wslpath -w "$sealed")"
+    fi
   fi
 }
 trap cleanup EXIT
 set -E
 trap 'log "failed at line $LINENO: $BASH_COMMAND"' ERR
 
+guard_clear() {
+  [[ ! -s "$scratch/guard" ]]
+}
+
 guard_ok() {
-  [[ ! -s "$scratch/guard" ]] || fail "real input during the run: $(head -1 "$scratch/guard")"
+  guard_clear || fail "real input during the run: $(head -1 "$scratch/guard")"
+}
+
+app_alive() {
+  local path
+  path="$(powershell.exe -NoProfile -NonInteractive -Command "Get-Process -Id $app_pid -ErrorAction SilentlyContinue | ForEach-Object Path" | tr -d '\r')"
+  [[ -n "$path" && "${path,,}" == "${app,,}" ]]
 }
 
 dev_instances() {
@@ -288,6 +300,7 @@ window_of() { cat "$(state_dir "$1")/window"; }
 focus_target() {
   local n="$1" window
   window="$(window_of "$n")"
+  guard_ok
   psw focus "$window" >/dev/null || fail "could not focus target $n"
   [[ "$(psw is-foreground "$window")" == yes ]] || fail "the foreground is not target $n: $(psw foreground)"
 }
@@ -353,7 +366,7 @@ close_target() {
       local window class
       window="$(window_of "$n")"
       class="$(class_of "$n")"
-      if psw focus "$window" >/dev/null && [[ "$(psw is-foreground "$window")" == yes ]]; then
+      if guard_clear && psw focus "$window" >/dev/null && [[ "$(psw is-foreground "$window")" == yes ]] && guard_clear; then
         act chord ctrl f11 >/dev/null
         sleep 1.5
       else
@@ -369,10 +382,9 @@ close_target() {
 }
 
 app_window() {
-  local pid deadline=$((SECONDS + 20)) window=0
-  pid="$(dev_instances | head -1)"
+  local deadline=$((SECONDS + 20)) window=0
   while (( SECONDS < deadline )); do
-    window="$(psw find-process "$pid")"
+    window="$(psw find-process "$app_pid")"
     [[ "$window" != 0 ]] && break
     sleep 0.5
   done
@@ -380,16 +392,6 @@ app_window() {
 }
 
 sign_in() {
-  local tracing=0
-  [[ $- == *x* ]] && tracing=1
-  { set +x; } 2>/dev/null
-  sign_in_steps
-  local status=$?
-  (( tracing )) && set -x
-  return "$status"
-}
-
-sign_in_steps() {
   set -a
   # shellcheck disable=SC1090
   source <(grep -E '^CREW_E2E_B_(USERNAME|PASSWORD)=' "$sign_in_env")
@@ -403,10 +405,12 @@ sign_in_steps() {
   offset="$(app_log_size)"
   local filled=no
   for _ in $(seq 10); do
+    guard_ok
     if psw fill-env "$window" 0 TMW_SMOKE_USERNAME >/dev/null 2>&1; then filled=yes; break; fi
     sleep 1
   done
   [[ "$filled" == yes ]] || { log "WARNING: the sign-in window has no username field: $(psw describe "$window")"; return 1; }
+  guard_ok
   psw fill-env "$window" 1 TMW_SMOKE_PASSWORD >/dev/null || { log "WARNING: the sign-in window has no password field"; return 1; }
   act invoke "$window" 'Entrar|Sign in' >/dev/null
   unset TMW_SMOKE_PASSWORD CREW_E2E_B_PASSWORD
@@ -483,6 +487,8 @@ one_try() {
     act hold 2500 alt ctrl win >/dev/null
     wait_for_outcome "$offset" || true
   else
+    guard_ok
+    [[ "$(psw is-foreground "$(window_of "$n")")" == yes ]] || fail "the foreground is not target $n before the dictation: $(psw foreground)"
     send_to_app --dictate-wav "$wav"
     wait_for_outcome "$offset" || true
   fi
@@ -492,6 +498,7 @@ one_try() {
   if (( n <= 4 )); then
     local press='Cancel|Cancelar'
     [[ "$kind" == multiline ]] && press='Paste anyway|Pegar de todos modos'
+    guard_ok
     dialog="$(psw dialog "$(window_of "$n")" "$press" || echo '<dialog check failed>')"
     [[ "$dialog" == *"pressed Paste"* || "$dialog" == *"pressed Pegar"* ]] && sleep 1
   fi
@@ -524,13 +531,15 @@ one_try() {
     echo "$lines"
   } >> "$out/pastes.log"
   log "target $n try $try ($kind): $outcome, landed $landed, ran $ran, clipboard back $restored"
-  [[ -n "$(dev_instances)" ]] || fail "the app is no longer running"
+  app_alive || fail "the app the run started is no longer running"
 }
 
 [[ -z "$(dev_instances)" ]] || fail "a dev instance of the app is already running; close it first"
 (( $(psw idle) >= 300 )) || fail "someone used the machine in the last 5 minutes"
-saved_clipboard="$(psw clipboard)"
-log "run $run_id, app $app, out $out, clipboard formats $(psw clipboard-formats)"
+sealed="$scratch/clipboard.sealed"
+sealing="$(psw seal-clipboard "$(wslpath -w "$sealed")")"
+[[ "$sealing" == sealed* ]] || fail "could not seal the clipboard before the run: $sealing"
+log "run $run_id, app $app, out $out, clipboard $sealing"
 
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$ps1" guard "$(wslpath -w "$scratch/guard")" >/dev/null 2>&1 &
 guard_pid=$!
@@ -538,10 +547,10 @@ for _ in $(seq 50); do [[ -e "$scratch/guard.ready" ]] && break; sleep 0.2; done
 [[ -e "$scratch/guard.ready" ]] || fail "the input guard did not start"
 
 offset="$(app_log_size)"
-send_to_app
-app_started=1
+app_pid="$(start "$app" | tail -1)"
+[[ "$app_pid" =~ ^[0-9]+$ ]] || fail "the app did not start"
 sleep 8
-[[ -n "$(dev_instances)" ]] || fail "the app did not start"
+app_alive || fail "the app did not start"
 send_to_app --stub-mode stub-normal
 sleep 1
 if [[ -n "${sign_in_env:-}" ]] && ! sign_in; then
