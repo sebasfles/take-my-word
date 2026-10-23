@@ -140,11 +140,23 @@ const shots: Shot[] = [
   },
   { name: "onboarding-hotkey", query: fresh, act: onboardTo("hotkey.title", 1) },
   { name: "onboarding-languages", query: fresh, act: onboardTo("languages.title", 2) },
+  { name: "onboarding-context", query: fresh, act: onboardTo("context.title", 3) },
+  {
+    name: "onboarding-context-full",
+    query: fresh,
+    act: async (page, text) => {
+      await onboardTo("context.title", 3)(page, text);
+      for (const pick of ["software-development", "data-ai", "research-academia"] as const) {
+        await page.getByRole("checkbox", { name: text(`context.pick.${pick}`) }).check();
+      }
+      await page.getByLabel(text("context.detail")).fill(text("context.detail.placeholder"));
+    },
+  },
   {
     name: "onboarding-style",
     query: fresh,
     act: async (page, text) => {
-      await onboardTo("style.title", 3)(page, text);
+      await onboardTo("style.title", 4)(page, text);
       await page.getByRole("radio", { name: text("style.formal.name") }).check();
     },
   },
@@ -163,7 +175,7 @@ const shots: Shot[] = [
     name: "onboarding-ready",
     query: fresh,
     act: async (page, text) => {
-      await onboardTo("style.title", 3)(page, text);
+      await onboardTo("style.title", 4)(page, text);
       await page.getByRole("button", { name: text("onboarding.next") }).click();
       await page.getByRole("heading", { name: text("ready.title") }).waitFor();
     },
@@ -178,11 +190,19 @@ const shots: Shot[] = [
     query: "view=main&state=new-user",
     act: async (page, text) => {
       await page.getByRole("button", { name: text("onboarding.next") }).click();
+      await page.getByRole("heading", { name: text("context.title") }).waitFor();
+      await page.getByRole("button", { name: text("onboarding.next") }).click();
       await page.getByRole("heading", { name: text("style.title") }).waitFor();
     },
   },
   { name: "settings-idle", query: "view=main", act: general },
   { name: "settings-hands-free-note", query: "view=main&note=1", act: general },
+  {
+    name: "settings-context-empty-no-usage",
+    query: "view=main&context=empty&usage=none",
+    act: general,
+  },
+  { name: "settings-usage-over", query: "view=main&usage=over", act: general },
   {
     name: "settings-idle-dev",
     query: "view=main&build=dev",
@@ -214,7 +234,10 @@ const shots: Shot[] = [
     act: async (page, text) => {
       await general(page);
       await pressShortcut(page, text);
-      await page.getByRole("button", { name: text("common.save") }).waitFor();
+      await page
+        .getByRole("region", { name: text("settings.shortcut") })
+        .getByRole("button", { name: text("common.save") })
+        .waitFor();
     },
   },
   {

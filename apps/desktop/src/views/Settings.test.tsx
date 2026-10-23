@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setLanguage } from "../i18n.ts";
+import { failure, serve, settings } from "../testing/api.ts";
 import { fakeBridge, listeners } from "../testing/bridge.ts";
 import { Settings } from "./Settings.tsx";
 
@@ -50,7 +51,7 @@ describe("Settings", () => {
     await startCapture();
     chord(ctrl, shift);
     expect(fakeBridge.proposeHotkey).toHaveBeenCalledWith(["ControlLeft", "ShiftLeft"]);
-    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    fireEvent.click(await within(await shortcut()).findByRole("button", { name: "Save" }));
     expect(fakeBridge.confirmHotkey).toHaveBeenCalledOnce();
     await screen.findByRole("button", { name: "Change" });
     expect(keys()).toEqual(["Ctrl", "Shift"]);
@@ -59,7 +60,7 @@ describe("Settings", () => {
   it("drops a proposed shortcut on cancel", async () => {
     await startCapture();
     chord(ctrl, shift);
-    await screen.findByRole("button", { name: "Save" });
+    await within(await shortcut()).findByRole("button", { name: "Save" });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(fakeBridge.cancelHotkeyCapture).toHaveBeenCalledOnce();
     expect(fakeBridge.confirmHotkey).not.toHaveBeenCalled();
@@ -239,7 +240,10 @@ describe("Settings", () => {
 
   it("announces hands-free to an upgraded user and hands the dismissal up", async () => {
     render(<Settings handsFreeNote onDismissNote={dismiss} onRerun={rerun} />);
-    await screen.findByText("Hands-free dictation");
+    await screen.findByText("Hands-free dictation and what you do");
+    expect(
+      screen.getByText(/tell Take My Word what you do below; it is kept with your settings/),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Got it" }));
     expect(dismiss).toHaveBeenCalledOnce();
   });
@@ -250,6 +254,69 @@ describe("Settings", () => {
     expect(screen.getByRole("heading", { name: "Hands-free" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Open the guide" }));
     expect(rerun).toHaveBeenCalledOnce();
+  });
+
+  it("edits what the user does in General and saves it with the rest of the settings", async () => {
+    const seen = serve({
+      getSettings: () => ({ ...settings, context: { picks: ["law"], detail: "" } }),
+      replaceSettings: (route) => (route.route === "replaceSettings" ? route.body : null),
+      getUsage: () => ({ usedSeconds: 0, capSeconds: 3600, resetsAt: "2026-10-24T00:00:00.000Z" }),
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    const row = await screen.findByRole("heading", { name: "What you do" });
+    const section = row.closest("section") as HTMLElement;
+    const save = await within(section).findByRole("button", { name: "Save" });
+    expect(within(section).getByRole<HTMLInputElement>("checkbox", { name: "Law" }).checked).toBe(
+      true,
+    );
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(section).getByRole("checkbox", { name: "Law" }));
+    fireEvent.click(within(section).getByRole("checkbox", { name: "Software development" }));
+    fireEvent.change(within(section).getByLabelText("Anything more specific? (optional)"), {
+      target: { value: "  kubectl and Helm  " },
+    });
+    fireEvent.click(save);
+    await within(section).findByText("Saved.");
+    expect(seen.at(-1)).toEqual({
+      route: "replaceSettings",
+      body: {
+        ...settings,
+        context: { picks: ["software-development"], detail: "kubectl and Helm" },
+      },
+    });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows today's audio against the daily cap, clamped, with the local reset time", async () => {
+    const resetsAt = "2026-10-24T00:00:00.000Z";
+    const time = new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(new Date(resetsAt));
+    serve({
+      getSettings: () => settings,
+      getUsage: () => ({ usedSeconds: 3725, capSeconds: 3600, resetsAt }),
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    const card = (await screen.findByRole("heading", { name: "Today" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(card).getByText("60 of 60 minutes of audio used")).toBeTruthy();
+    expect(within(card).getByText(`Resets at ${time}.`)).toBeTruthy();
+    expect((card.querySelector("meter") as HTMLMeterElement).value).toBe(3600);
+  });
+
+  it("hides the quota when the server has no usage route", async () => {
+    serve({
+      getSettings: () => settings,
+      getUsage: () => {
+        throw failure(404, "not_found");
+      },
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    await screen.findByRole("heading", { name: "What you do" });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("heading", { name: "Today" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("shows the installed version in About", async () => {

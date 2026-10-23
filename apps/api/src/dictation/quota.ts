@@ -14,6 +14,7 @@ export interface QuotaStore {
 
 export interface QuotaWindow {
   day: string;
+  resetsAt: string;
   expiresAt: number;
 }
 
@@ -21,6 +22,7 @@ export function quotaWindow(now: Date): QuotaWindow {
   const dayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000;
   return {
     day: now.toISOString().slice(0, 10),
+    resetsAt: new Date((dayStart + secondsPerDay) * 1000).toISOString(),
     expiresAt: dayStart + 2 * secondsPerDay,
   };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AppState } from "../../bridge.ts";
-import { afterSignIn, isLastUserStep, planFor, type Step, steps } from "./plan.ts";
+import { afterSignIn, isLastUserStep, planFor, steps } from "./plan.ts";
 
 const state = (change: Partial<AppState>): AppState => ({
   signedIn: true,
@@ -21,6 +21,7 @@ describe("the onboarding plan", () => {
       "microphone",
       "hotkey",
       "languages",
+      "context",
       "style",
       "ready",
     ]);
@@ -34,9 +35,14 @@ describe("the onboarding plan", () => {
     expect(planFor(steps, state({ signedIn: false }), false)).toEqual([
       "signIn",
       "languages",
+      "context",
       "style",
     ]);
-    expect(planFor(steps, state({ onboarded: false }), false)).toEqual(["languages", "style"]);
+    expect(planFor(steps, state({ onboarded: false }), false)).toEqual([
+      "languages",
+      "context",
+      "style",
+    ]);
   });
 
   it("skips the personal steps after a sign-in that finds them done", () => {
@@ -51,36 +57,17 @@ describe("the onboarding plan", () => {
       "microphone",
       "hotkey",
       "languages",
+      "context",
       "style",
       "ready",
     ]);
   });
 
-  it("takes one more personal step as a single catalog entry, in order, resumed and rerun alike", () => {
-    const withRole: Step[] = [
-      ...steps.slice(0, 5),
-      { id: "role", scope: "user" },
-      ...steps.slice(5),
-    ];
-    expect(planFor(withRole, fresh, false)).toEqual([
-      "welcome",
-      "signIn",
-      "microphone",
-      "hotkey",
-      "languages",
-      "role",
-      "style",
-      "ready",
-    ]);
-    expect(planFor(withRole, state({ onboarded: false }), false)).toEqual([
-      "languages",
-      "role",
-      "style",
-    ]);
-    expect(planFor(withRole, state({}), true)).toContain("role");
-    const signedOut = planFor(withRole, state({ signedIn: false }), false);
-    expect(afterSignIn(withRole, signedOut, true)).toEqual(["signIn"]);
-    expect(isLastUserStep(withRole, signedOut, "style")).toBe(true);
-    expect(isLastUserStep(withRole, signedOut, "role")).toBe(false);
+  it("asks what the user does as a personal step, resumed and rerun alike, saved with the style", () => {
+    expect(planFor(steps, state({}), true)).toContain("context");
+    const signedOut = planFor(steps, state({ signedIn: false }), false);
+    expect(afterSignIn(steps, signedOut, true)).toEqual(["signIn"]);
+    expect(isLastUserStep(steps, signedOut, "style")).toBe(true);
+    expect(isLastUserStep(steps, signedOut, "context")).toBe(false);
   });
 });

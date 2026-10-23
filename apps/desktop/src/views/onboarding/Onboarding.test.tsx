@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setLanguage } from "../../i18n.ts";
 import { styleExamples } from "../../styleExamples.ts";
-import { fakeBridge, listeners } from "../../testing/bridge.ts";
+import { fakeBridge, listeners, onboarding } from "../../testing/bridge.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import type { StepId } from "./plan.ts";
 
@@ -19,6 +19,7 @@ const everything: StepId[] = [
   "microphone",
   "hotkey",
   "languages",
+  "context",
   "style",
   "ready",
 ];
@@ -42,7 +43,7 @@ describe("Onboarding", () => {
   it("takes a fresh install through every step in one window and ends set up", async () => {
     const done = vi.fn();
     render(<Onboarding plan={everything} onDone={done} />);
-    expect(screen.getByText("Step 1 of 7")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 8")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Get started" }));
     signIn();
     await screen.findByRole("heading", { name: "Check your microphone" });
@@ -58,6 +59,13 @@ describe("Onboarding", () => {
     next();
     fireEvent.click(await screen.findByRole("checkbox", { name: "English" }));
     next();
+    await screen.findByRole("heading", { name: "What do you do?" });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Software development" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Data and AI" }));
+    fireEvent.change(screen.getByLabelText("Anything more specific? (optional)"), {
+      target: { value: "backend with AWS" },
+    });
+    next();
     const example = styleExamples.en;
     expect(screen.getByText(example.said)).toBeTruthy();
     const shown = Array.from(
@@ -68,7 +76,10 @@ describe("Onboarding", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Formal" }));
     next();
     await screen.findByRole("heading", { name: "You're ready" });
-    expect(fakeBridge.saveOnboarding).toHaveBeenCalledWith("formal", ["es", "en"]);
+    expect(fakeBridge.saveOnboarding).toHaveBeenCalledWith("formal", ["es", "en"], {
+      picks: ["software-development", "data-ai"],
+      detail: "backend with AWS",
+    });
     fireEvent.click(screen.getByRole("button", { name: "Start dictating" }));
     await vi.waitFor(() => {
       expect(done).toHaveBeenCalledOnce();
@@ -116,6 +127,30 @@ describe("Onboarding", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Open microphone settings" }));
     expect(fakeBridge.openMicrophoneSettings).toHaveBeenCalledOnce();
+  });
+
+  it("takes at most three picks and keeps the stored context when skipped", async () => {
+    fakeBridge.onboarding.mockResolvedValueOnce({
+      ...onboarding,
+      context: { picks: ["law"], detail: "contracts" },
+    });
+    render(<Onboarding plan={["languages", "context", "style"]} onDone={vi.fn()} />);
+    await screen.findByRole("checkbox", { name: "Español" });
+    next();
+    expect(screen.getByRole<HTMLInputElement>("checkbox", { name: "Law" }).checked).toBe(true);
+    expect(screen.getByDisplayValue("contracts")).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Sales" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Design" }));
+    expect(screen.getByText("3 of 3 chosen")).toBeTruthy();
+    expect(screen.getByRole<HTMLInputElement>("checkbox", { name: "Student" }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Finish" }));
+    await vi.waitFor(() => {
+      expect(fakeBridge.saveOnboarding).toHaveBeenCalledWith("plain", ["es"], {
+        picks: ["law"],
+        detail: "contracts",
+      });
+    });
   });
 
   it("goes back to sign-in when the session ends while saving the style", async () => {

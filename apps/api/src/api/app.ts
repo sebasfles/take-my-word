@@ -14,6 +14,8 @@ import { settingsRoutes } from "../settings/routes.ts";
 import type { SettingsStore } from "../settings/store.ts";
 import { styleRoutes } from "../styles/routes.ts";
 import type { StyleStore } from "../styles/store.ts";
+import { usageRoutes } from "../usage/routes.ts";
+import type { UsageStore } from "../usage/store.ts";
 import type { ApiContext, ApiEnv } from "./context.ts";
 
 export interface ApiDeps {
@@ -22,6 +24,8 @@ export interface ApiDeps {
   appRules: AppRuleStore;
   settings: SettingsStore;
   history: HistoryStore;
+  usage: UsageStore;
+  dailyQuotaMinutes: number;
   newId: () => string;
   now: () => Date;
   log: Logger;
@@ -44,6 +48,7 @@ export function createApi(deps: ApiDeps) {
     .route("/styles", styleRoutes(deps))
     .route("/app-rules", appRuleRoutes(deps))
     .route("/me/settings", settingsRoutes(deps))
+    .route("/me/usage", usageRoutes(deps))
     .route("/dictations", historyRoutes(deps))
     .notFound((c) => failure(c, "not_found", "No such route."))
     .onError((error, c) => {

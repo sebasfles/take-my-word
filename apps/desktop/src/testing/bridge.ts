@@ -1,3 +1,4 @@
+import type { UserContext } from "@take-my-word/shared";
 import { vi } from "vitest";
 import type { Route } from "../api.ts";
 import type { Language } from "../i18n.ts";
@@ -54,6 +55,7 @@ export const onboarding: Onboarding = {
   ],
   selected: "plain",
   dictationLanguages: ["es"],
+  context: { picks: [], detail: "" },
 };
 
 export const storedSettings = {
@@ -61,6 +63,13 @@ export const storedSettings = {
   locale: "es",
   dictationLanguages: ["es"],
   providers: { transcriber: "groq-whisper", refiner: "openai" },
+  context: { picks: [], detail: "" },
+};
+
+export const usage = {
+  usedSeconds: 754,
+  capSeconds: 3600,
+  resetsAt: "2026-10-24T00:00:00.000Z",
 };
 
 export const uiLanguage: UiLanguage = { choice: null, windows: "es" };
@@ -104,9 +113,9 @@ export const fakeBridge = {
     Promise.resolve("onboarding"),
   ),
   onboarding: vi.fn(() => Promise.resolve(structuredClone(onboarding))),
-  saveOnboarding: vi.fn<(styleId: string, dictationLanguages: Language[]) => Promise<undefined>>(
-    () => Promise.resolve(undefined),
-  ),
+  saveOnboarding: vi.fn<
+    (styleId: string, dictationLanguages: Language[], context: UserContext) => Promise<undefined>
+  >(() => Promise.resolve(undefined)),
   uiLanguage: vi.fn(() => Promise.resolve({ ...uiLanguage })),
   setUiLanguage: vi.fn((choice: Language | null) => Promise.resolve({ ...uiLanguage, choice })),
   theme: vi.fn((): Promise<Theme | null> => Promise.resolve(null)),
@@ -119,6 +128,7 @@ export const fakeBridge = {
   apiRequest: vi.fn<(route: Route) => Promise<unknown>>((route) => {
     if (route.route === "getSettings") return Promise.resolve(structuredClone(storedSettings));
     if (route.route === "replaceSettings") return Promise.resolve(route.body);
+    if (route.route === "getUsage") return Promise.resolve({ ...usage });
     return Promise.resolve(null);
   }),
   runningApps: vi.fn(() => Promise.resolve(["notepad.exe", "outlook.exe"])),

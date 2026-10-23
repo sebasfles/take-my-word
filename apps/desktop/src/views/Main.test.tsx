@@ -31,14 +31,14 @@ describe("Main", () => {
     });
     render(<Main />);
     await screen.findByRole("heading", { name: "Talk instead of typing, in any app" });
-    expect(screen.getByText("Step 1 of 7")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 8")).toBeTruthy();
   });
 
   it("reruns the guide from General without asking to sign in", async () => {
     render(<Main />);
     fireEvent.click(await screen.findByRole("button", { name: "Open the guide" }));
     await screen.findByRole("heading", { name: "Talk instead of typing, in any app" });
-    expect(screen.getByText("Step 1 of 6")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 7")).toBeTruthy();
   });
 
   it("keeps the hands-free note gone after it is dismissed, across sections", async () => {
@@ -49,7 +49,7 @@ describe("Main", () => {
     fireEvent.click(screen.getByRole("button", { name: "History" }));
     fireEvent.click(screen.getByRole("button", { name: "General" }));
     await screen.findByRole("heading", { name: "General" });
-    expect(screen.queryByText("Hands-free dictation")).toBeNull();
+    expect(screen.queryByText("Hands-free dictation and what you do")).toBeNull();
   });
 
   it("returns to sign-in when the session ends while the app is open", async () => {

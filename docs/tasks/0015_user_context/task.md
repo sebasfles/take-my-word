@@ -97,6 +97,121 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
   - a unit test proving that with empty context the transcriber prompt and the refiner instructions are byte-identical to today (Acceptance 3);
   - the fixture commit precedes the first with-context results;
   - the prd plan output is in the PR before the apply.
+- Round 1 (om-reviewer, 2026-10-23), Scope adjusted: the STT hint is dropped entirely, so Whisper's prompt stays the ranked terms only, whatever the context. Why: on the frozen fixtures, raw term errors were equal with and without the hint wherever it fit. Under both languages, a Spanish hint on English audio lost bio-en-1 whole ("y", 3 of 3 runs) and lost CRISPR-Cas9 and GAPDH. The alternative (hint only on fixed-language passes) keeps a hint with no measured gain that perturbed English spellings. The context reaches the refiner only.
+- Round 2 (om-reviewer, 2026-10-23): Acceptance 2 is not met and goes to the PR as measured, not tuned further. Totals without/with: one language 35/34, both 34/34. Raw was identical in every run, so every difference is the refiner. With context there were 3 Spanish meaning changes in 12 runs, against 1 without. The terms that fail are STT errors ("QB de GetPods", "Coupé CR", "Gapy") that domain labels cannot recover. The fix the data points to (domain vocabularies in the Whisper prompt) reverses this section's consolidation choice, so Sebastian picks the direction from the PR.
+- Reiteration 1 (2026-10-23, retake 1 on PR #22, Sebastian chose option B). Acceptance 2 is replaced by: the measured result is reported in the PR, and the context does not change dictation. Acceptance 3 holds for any context. Option A (per-field vocabulary measured on held-out fixtures) is the next task, not this one. Findings:
+  1. `apps/api/src/dictation/dictate.ts:26` and `instructions.ts:6-37`: the context leaves dictation. Remove `describeUserContext` (`user-context.ts`), the background headings and the `background` parameter, and the `contextPicks` log field, so `dictate.ts` and `instructions.ts` match develop. Expected: a test that the transcriber prompt and the refiner instructions are identical with and without a context.
+  2. `apps/desktop/src/i18n/{en,es}.json:209,238,258`: `context.intro`, `settings.context.note` and the hands-free note promise results. Expected: copy that says what is kept and that it does not change dictations today, with no accuracy claim; the note may still name the new field.
+  3. `apps/desktop/src/views/onboarding/steps.tsx:215` and `i18n:216-220`: the before/after example shows a benefit dictation no longer has. Expected: drop `ContextVisual` and the `context.example.*` keys; the step uses an existing neutral visual of the 0014 frame.
+  4. Evaluation harness and fixtures stay as the next task's tool. Expected: the dictation trd Testing says that with the context out of dictation both conditions run the same pipeline, and keeps round 2's numbers as the reason.
+  5. Docs:
+     - rewrite `docs/modules/dictation/ard.md:182` as "the context is stored and shown, not used by dictation until a follow-up proves a gain", with round 2 as the reason;
+     - fix the dictation prd's "Say what you do" step 2 and its rules;
+     - remove the desktop ard entry at `:404` and its Debt index row;
+     - the dictation debt row becomes "context collected but unused", revisited when the per-field vocabulary task lands.
+  6. Screenshots: refresh the context onboarding step, Settings > General and the hands-free note, in es and en, light and dark, at the 0014 sizes.
+  7. Verify: api e2e against the branch on dev (ask for "dev available"); no Terraform change; no new evaluation run.
 - clearance: full: dev `infra/scripts/tf dev apply`; prd plan and the additive apply above; `update-function-code` on the four dev Lambdas and the web deploy steps; `pnpm e2e` and `pnpm integration` with throwaway users and Polly; the Windows host. No `pnpm release:desktop`.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+- Contract in `packages/shared/src/settings.ts`: `userContextPicks` (16 stable ids), `userContextSchema` (`picks` unique, at most 3; `detail` trimmed, at most 200), `context` required on `settingsSchema` and optional on `settingsUpdateSchema`; `usageSchema` in `usage.ts`.
+- API: `SETTINGS` reads `context` with per-field fallback; `PUT` keeps the stored context when absent; `GET /me/usage` in `apps/api/src/usage/` reads `QUOTA#day` through `quotaWindow`, which now also returns `resetsAt`; the `api` handler requires `DAILY_QUOTA_MINUTES` at cold start.
+- Dictation: `dictation/user-context.ts` holds the es and en domain phrase per pick id; `withHint` appends the hint after the ranked terms only when it fits whole in the byte budget; the hint is always in the first dictation language (detection pass and retry alike); the refiner gets a `<background>`/`<contexto>` block in the language used, placed after the editing contract and before style and dictionary; logs carry only `promptHint` and `contextPicks` counts.
+- Terraform: `GET /me/usage` route and `DAILY_QUOTA_MINUTES` on `api_function`; not applied yet.
+- Desktop: `context` onboarding step (user scope, after `languages`, Skip restores the loaded context), `UserContextChoices` shared with Settings > General (`UserContextRow`, explicit Save), `UsageCard` in the General aside, `getUsage` forwarder variant, Rust `UserContext` mirror carried through `onboarding`/`save_onboarding`, contract regenerated; hands-free note and setup guide copy name the context.
+- Web: Account shows `What you do` and `Audio today` (used versus cap, reset in local time).
+- Evaluation: fixture `apps/api/evaluation/user-context.samples.json` and runner `pnpm eval:context <report.md>`, committed in this round before any run.
+- Screenshots: desktop at the 0014 sizes and web Account at 390, 768 and 1280 in `{{workspace}}/screenshots/`.
+
+Decisions not in the plan:
+- Field name `context` in settings; pick ids are kebab-case versions of the labels (`engineering` for Engineering (non-software)).
+- The hint reads "Phrase, phrase. detail" with only the first phrase capitalized; separator from the terms is ". ".
+- A stored context with an unknown pick falls back to no picks (per-field fallback), keeping the detail.
+- Clients show used minutes rounded up (started minutes) and clamped to the cap.
+- Desktop hides the quota on 404 and shows an error line on other failures; the web hides it on any failure, so the read-only page never fails over the quota.
+- Evaluation contexts: developer `software-development` with detail "backend, DevOps"; biology `biology-life-sciences` and `research-academia` with no detail, to measure picks alone; "both" languages is `["es", "en"]` for every sample, so English samples also run with a Spanish hint.
+
+External actions (clearance full):
+- `infra/scripts/tf dev init -reconfigure`, then `tf dev plan` and `apply` of that plan on dev: 2 added (route and integration `GET /me/usage`), 1 changed (`api` env `DAILY_QUOTA_MINUTES = 60`), 0 destroyed.
+- Branch build deployed to dev with `update-function-code` on authorizer, dictate, api, dictionary-usage and web, assets synced to `take-my-word-dev-web-assets-115891590483`, CloudFront invalidated; afterwards develop `61be296` redeployed the same way and dev handed back.
+- `pnpm e2e` (api), `pnpm integration` and `pnpm e2e` (web) against dev with throwaway users and Polly.
+- `pnpm eval:context` against dev: 240 dictations with a throwaway user, deleted afterwards.
+- `rust:lint` and `rust:test` on the Windows host, cargo only.
+
+Evaluation, 2026-10-23, 3 runs per sample and condition, domain-term errors in the clean text, without / with context:
+
+| Group | one language | both (es, en) |
+|---|---|---|
+| dev-en | 6/48 / 9/48 | 9/48 / 8/48 |
+| dev-es | 12/48 / 7/48 | 12/48 / 7/48 |
+| bio-en | 3/36 / 4/36 | 3/36 / 14/36 |
+| bio-es | 12/36 / 9/36 | 12/36 / 10/36 |
+| total | 33 / 29 | 36 / 39 |
+
+- No language flips anywhere; controls gained no words.
+- Acceptance 2 is not met as built: with "both", bio-en-1 came back as the single word "y" in all 3 runs with context (the whole sentence lost), and bio-en-2 and bio-en-3 lost CRISPR-Cas9 and GAPDH; the Spanish hint (first dictation language) on English audio derails Whisper without flipping the detected language.
+- The STT hint barely helps where it fits: raw term errors are equal with and without context in dev-en, dev-es and bio-es, and in English it perturbs spellings (GAPDH to "GAPe", "kubectl get" to "kubechtelgit").
+- The refiner background is where the gain is: dev-es 12 to 7 and bio-es 12 to 9 with identical raw errors; one English regression (dev-en-1, "CI/CD" to "C-slash-CD" in the refiner).
+- Full report with every output: `{{workspace}}/evaluation/report.md`, for the PR.
+
+Pending:
+- Answered in round 2.
+
+Deferred: none.
+
+### Round 2
+
+Findings applied, all six:
+1. STT hint removed: `withHint`, its tests, the hint cases and `promptHint` are gone; Whisper gets the ranked terms only. New test: the transcriber prompt is identical with and without context, under one language and both. `describeUserContext` remains for the refiner only.
+2. Evaluation re-run on dev at `98e1920`, frozen fixtures, results below.
+3. The report prints raw and text for every run, missed terms per stage, and a JSON of all runs; typographic apostrophes and quotes are normalized before comparing words and terms.
+4. The empty-context test asserts literals of develop's output (plain contract, dictionary heading and table, and the English plain contract), produced by running develop's `instructions.ts` at `origin/develop`.
+5. Web Account: picks as brand badges with their own labels, the detail on its own line as typed; `contextText` replaced by `contextLabels`; e2e asserts badges and detail separately.
+6. Onboarding example now quotes real round 2 pairs, verbatim clean text without and with context: en `dev-en-1` (languages one, run 2 without, run 2 with: "C slash CD" to "CI/CD"); es `bio-es-2` (languages both, run 1 without, run 1 with: "P-Zebra" to "pez cebra"), so the Spanish label names biology.
+
+Evaluation round 2 (`{{workspace}}/evaluation/round-2/report.md` and `report.json`), domain-term errors in the clean text, without / with context; raw errors are identical in every condition because Whisper no longer sees the context:
+
+| Group | one language | both (es, en) |
+|---|---|---|
+| dev-en | 8/48 / 5/48 | 8/48 / 6/48 |
+| dev-es | 12/48 / 12/48 | 11/48 / 12/48 |
+| bio-en | 4/36 / 5/36 | 3/36 / 5/36 |
+| bio-es | 11/36 / 12/36 | 12/36 / 11/36 |
+| total | 35 / 34 | 34 / 34 |
+
+- Acceptance 2 is not met: the totals do not move. Reported as measured; no prompt wording changed after seeing results.
+- Raw transcripts were the same string in all 12 runs of each sample, so every difference comes from the refiner, which varies run to run (for example dev-en-1 without context restored "CI/CD" in 2 of 6 runs).
+- Gains with context: dev-en-1 "CI/CD" 6 of 6 (2 of 6 without); dev-en-3 "Lambo" to "Lambda" once.
+- Regressions with context, all in the text stage with raw equal: bio-en-3 raw "gapey" became "GAPey", "GAPeY" and "GADPH" (without context it lowercased to "gapdh", which matches); dev-es-1 raw "C-CD" became "CD" once (a fragment dropped); bio-es-2 "P-zebra" casing noise.
+- Meaning changes with context, Spanish only: "Corre" became "Corrige" (dev-es-2, bio-es-3) and "Copia" (bio-es-3) in 3 of the 12 with-context runs of those two samples; without context the same verb became "Correr" once. Controls gained no content; one run turned "después de almuerzo" into "después de almorzar".
+- Round 1's dev-en-1 "C-slash-CD" cannot be attributed to a stage, because round 1 did not record raw; in round 2, with the refiner as the only context consumer, dev-en-1 is the clearest gain.
+- dev-es moved from 12 to 7 in round 1 but not in round 2; with the hint gone, that round 1 gain came from the hint path or from refiner variance, not from the background block alone.
+
+Decisions not in the plan:
+- The Spanish onboarding example uses biology (`bio-es-2`), since no Spanish developer sample showed a clean refiner fix.
+
+Pending:
+- Acceptance 2 decision: as measured, user context gives no reliable gain with the current refiner, and it causes occasional meaning changes in Spanish.
+
+### Documentation
+
+- Updated: dictation (README, prd, trd with the evaluation harness and result under Testing, database, ard with two entries and `Resolved by` on 0009's quota debt), desktop (prd, trd, ard), `docs/ARD.md` Debt index.
+- Not changed: dictionary (its ranking and projections are unchanged; the round 1 hint was removed again), auth (no change), infra (route and env lists live in Terraform, and the change was planned in Context & decisions).
+- External actions after the clean signal: `infra/scripts/tf prd init -reconfigure`, `tf prd plan` (full output in `{{workspace}}/tf-prd-plan.txt`: 2 added, the `GET /me/usage` route and integration; 1 changed, `api` env `DAILY_QUOTA_MINUTES = 60`; nothing destroyed or replaced), then `apply` of that saved plan: 2 added, 1 changed, 0 destroyed.
+
+### Round 3 (reiteration 1)
+
+Findings applied, all seven:
+1. `dictate.ts` and `instructions.ts` are back to develop byte for byte; `user-context.ts` and `contextPicks` are gone. Tests: the develop literals hold with a context set, and Whisper and the refiner get the same input with and without a context, under one language and both.
+2. Desktop copy promises nothing: the step intro and the Settings note say the context is kept with the settings and does not change dictations today; the hands-free note still names the field.
+3. `ContextVisual`, its CSS and the `context.example.*` keys are removed; the step uses `BrandVisual`; `visuals.tsx` and `onboarding.css` match develop.
+4. Dictation trd Testing: both evaluation conditions now run the same pipeline, with round 2's numbers as the reason dictation ignores the context.
+5. Docs: the dictation ard entry now reads "stored and shown, not used by dictation until a follow-up proves a gain"; the prd's "Say what you do" and its rule follow; the desktop ard entry and its Debt index row are removed; the dictation debt row reads "collected but unused", revisited when the per-field vocabulary task lands.
+6. Screenshots refreshed for the context step, Settings > General and the hands-free note, es and en, light and dark, at the 0014 sizes.
+7. api e2e on dev at `71e3f24`'s code: green; no Terraform change, no evaluation run; develop redeployed afterwards.
+
+`retakes.md` travels in this commit.

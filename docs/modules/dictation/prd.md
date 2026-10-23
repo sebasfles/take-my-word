@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0015_user_context
 ---
 
 # Dictation: product
@@ -31,6 +31,20 @@ If a provider fails the user sees an error and nothing is pasted.
 
 Errors and empty states: at least one language stays chosen.
 
+### Say what you do
+
+1. During the desktop's onboarding, or later in its General settings, the user picks up to three fields from a fixed list (software development, biology and life sciences, law...) and may add a short detail in their own words.
+2. The context is kept with the user's settings and shown on the web account; dictations do not use it yet.
+
+Errors and empty states: the step can be skipped and the context changed or cleared at any time.
+
+### See today's allowance
+
+1. The user opens General on desktop or the account page on the web.
+2. They see the minutes of audio used today against the daily allowance and the local time it resets.
+
+Errors and empty states: a server that does not report usage shows no allowance at all.
+
 ### Review history
 
 1. The user opens history on the web or in the desktop settings.
@@ -56,6 +70,8 @@ Errors and empty states: with no dictations, the list is empty.
 - The language comes from the user's settings, never from the device; older clients that still send one are ignored.
 - The transcription and cleanup providers follow the user's settings; a dictation may override them.
 - The result is the cleaned text and nothing else.
+- The user's context never changes a dictation until a follow-up proves it helps.
+- Used minutes are shown rounded up and never above the allowance.
 
 ## Out of scope
 

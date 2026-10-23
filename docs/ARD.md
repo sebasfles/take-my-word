@@ -69,8 +69,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | dictation | 2026-10-21 | Loud noise can make Whisper loop on mixed hallucinations that get refined | A hallucination loop gets pasted in real use |
 | dictation | 2026-10-21 | A history page over many expired items costs one Query per batch until TTL deletes them | TTL lag leaves more than a page of expired items in a partition |
 | dictation | 2026-10-21 | Dictations past the newest 1000 are not reachable on the web | A user keeps more than 1000 dictations in 90 days |
-| dictation | 2026-10-21 | Users cannot see how much of the daily allowance is left | `GET /me/usage` lands |
 | dictation | 2026-10-21 | With several dictation languages, a dictation detected as neither costs a second transcription | Re-transcriptions show up in cost or latency |
+| dictation | 2026-10-23 | The user's context is collected but unused | The per-field vocabulary task lands |
 | dictionary | 2026-10-21 | Folding merges ñ and umlauts with their base letter; such terms cannot coexist | A user needs two terms that differ only by ñ or an umlaut |
 | dictionary | 2026-10-21 | The byte budget leaves part of Whisper's 224 prompt tokens unused | Users keep more top terms than fit and transcription misses them |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |

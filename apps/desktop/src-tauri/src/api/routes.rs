@@ -22,6 +22,7 @@ pub enum Route {
     DeleteAppRule { id: String },
     GetSettings {},
     ReplaceSettings { body: Body },
+    GetUsage {},
     ListDictations { cursor: Option<String> },
     DeleteDictation { id: String },
 }
@@ -45,6 +46,7 @@ const DICTIONARY: &str = "/dictionary";
 const STYLES: &str = "/styles";
 const APP_RULES: &str = "/app-rules";
 const SETTINGS: &str = "/me/settings";
+const USAGE: &str = "/me/usage";
 const DICTATIONS: &str = "/dictations";
 
 impl Route {
@@ -64,6 +66,7 @@ impl Route {
             Self::DeleteAppRule { .. } => "deleteAppRule",
             Self::GetSettings {} => "getSettings",
             Self::ReplaceSettings { .. } => "replaceSettings",
+            Self::GetUsage {} => "getUsage",
             Self::ListDictations { .. } => "listDictations",
             Self::DeleteDictation { .. } => "deleteDictation",
         }
@@ -94,6 +97,7 @@ impl Route {
             Self::DeleteAppRule { id } => request(Delete, item(APP_RULES, id)?, None),
             Self::GetSettings {} => request(Get, SETTINGS.into(), None),
             Self::ReplaceSettings { body } => request(Put, SETTINGS.into(), Some(body)),
+            Self::GetUsage {} => request(Get, USAGE.into(), None),
             Self::ListDictations { cursor } => {
                 let path = match cursor {
                     Some(cursor) => format!("{DICTATIONS}?cursor={}", encode(cursor)),
@@ -197,6 +201,16 @@ mod tests {
         ] {
             assert!(route(refused.clone()).is_err(), "accepted {refused}");
         }
+    }
+
+    #[test]
+    fn usage_is_a_plain_get_without_parameters() {
+        let usage = route(json!({"route": "getUsage"})).unwrap();
+        let request = usage.request().unwrap();
+        assert_eq!(request.method, Method::Get);
+        assert_eq!(request.path, "/me/usage");
+        assert!(request.body.is_none());
+        assert!(route(json!({"route": "getUsage", "day": "2026-10-23"})).is_err());
     }
 
     #[test]

@@ -13,6 +13,15 @@ describe("quotaWindow", () => {
     expect(after.day).not.toBe(before.day);
   });
 
+  it("resets at the next UTC midnight", () => {
+    expect(quotaWindow(new Date("2026-10-20T23:59:59.999-05:00")).resetsAt).toBe(
+      "2026-10-22T00:00:00.000Z",
+    );
+    expect(quotaWindow(new Date("2026-10-21T00:00:00.000Z")).resetsAt).toBe(
+      "2026-10-22T00:00:00.000Z",
+    );
+  });
+
   it("expires the counter two days after its day starts", () => {
     const { expiresAt } = quotaWindow(new Date("2026-10-20T15:30:00Z"));
     expect(new Date(expiresAt * 1000).toISOString()).toBe("2026-10-22T00:00:00.000Z");

@@ -9,6 +9,7 @@ const settings = {
   locale: "es",
   dictationLanguages: ["es"],
   providers: { transcriber: "groq-whisper", refiner: "openai" },
+  context: { picks: ["law"], detail: "contratos" },
 };
 
 interface Seen {
@@ -98,6 +99,27 @@ describe("accountApi reads", () => {
       const { fetcher } = fakeFetch(answer);
       expect(await accountApi(apiUrl, "token", fetcher).settings()).toEqual({ kind: "failed" });
     }
+  });
+});
+
+describe("accountApi.usage", () => {
+  it("reads today's usage, and nothing from a server without the route", async () => {
+    const usage = { usedSeconds: 61.5, capSeconds: 3600, resetsAt: "2026-10-24T00:00:00.000Z" };
+    const present = fakeFetch(() => Response.json(usage));
+    expect(await accountApi(apiUrl, "token", present.fetcher).usage()).toEqual({
+      kind: "ok",
+      value: usage,
+    });
+    expect(present.seen[0]?.url.href).toBe(`${apiUrl}/me/usage`);
+    const absent = fakeFetch(() =>
+      Response.json({ error: { code: "not_found", message: "No such route." } }, { status: 404 }),
+    );
+    expect(await accountApi(apiUrl, "token", absent.fetcher).usage()).toEqual({
+      kind: "ok",
+      value: null,
+    });
+    const broken = fakeFetch(() => new Response("", { status: 500 }));
+    expect(await accountApi(apiUrl, "token", broken.fetcher).usage()).toEqual({ kind: "failed" });
   });
 });
 
