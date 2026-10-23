@@ -65,8 +65,8 @@ impl<G: Page, K: Keeper, P: Paste> Paste for OwnWindowFirst<G, K, P> {
         self.next_id += 1;
         let id = self.next_id;
         let answer = self.acks.expect(id);
-        let inserted = self.page.insert(id, text)
-            && answer.recv_timeout(self.timeout).unwrap_or(false);
+        let inserted =
+            self.page.insert(id, text) && answer.recv_timeout(self.timeout).unwrap_or(false);
         self.acks.forget(id);
         if inserted {
             log::info!("inserted a dictation into the main window");

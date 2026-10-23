@@ -536,8 +536,6 @@ impl Modifiers for HeldModifiers {
 #[derive(Clone)]
 pub struct TrayNotifier(AppHandle);
 
-
-
 impl Notifier for TrayNotifier {
     fn notify(&self, sentence: &[Message]) {
         let shown = self
