@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-22
-source: 0012_fix_lost_paste
+updated: 2026-10-23
+source: 0014_desktop_ux
 ---
 
 # Desktop: architecture and debt
@@ -55,6 +55,7 @@ source: 0012_fix_lost_paste
 ## 2026-10-21: Native Windows key hook instead of rdev
 
 - Decision: Windows hold to talk uses a `WH_KEYBOARD_LL` hook written with the `windows` crate behind `KeyHook`; the callback only forwards events, a key-events thread detects the chord at event time, an injected unassigned key (0xE8) keeps Start closed while Win is down in the chord, and the app's own injections carry a `dwExtraInfo` tag so they are ignored while other injected input still counts.
+- Amended by 0014_desktop_ux: while hands-free listens, and only then, the callback holds back Esc (its down and its up) from other apps and the key-events thread turns it into a cancel.
 - Alternatives rejected: `rdev`, as the setup entry planned.
 - Reason: rdev 0.5 calls `ToUnicodeEx` and `AttachThreadInput` inside the hook, which breaks Spanish dead keys and risks Windows dropping the hook, always adds a mouse hook, and hides the injected flag.
 - Debt created: macOS and Linux have no hook yet; their builds compile with an unsupported implementation.
@@ -68,6 +69,7 @@ source: 0012_fix_lost_paste
 - Reason: recordings now match the hold within 40 ms, and the prepared stream's session stays inactive, so Windows shows no microphone in use while idle.
 - Debt created: a prepared stream on a Bluetooth headset may switch it to the hands-free profile or hold the device; untested.
 - Revisit when: someone uses a Bluetooth headset with the app, or audio quality drops on one.
+- Amended by 0014_desktop_ux: the stream also has a monitor mode that plays and meters without buffering, used only while the onboarding's microphone step is shown in a visible window, so Windows shows the microphone in use then; a hold during the check takes the stream over and the check resumes after; monitoring never buffers, so a check left open holds no audio, where reusing a recording would keep up to 120 s.
 - Source: 0002_desktop_shell
 
 ## 2026-10-21: Rust mirrors the shared contract by hand
@@ -97,6 +99,7 @@ source: 0012_fix_lost_paste
 - Reason: with one of the app's WebView windows in the foreground no low-level hook (not even an unrelated process's) saw injected keys, and Tauri reports a blur whenever the WebView child takes focus.
 - Debt created: none.
 - Revisit when: physical keys turn out to reach the hook in the app's own windows.
+- Amended by 0014_desktop_ux: met the other way, Sebastian found on 0.2.0 that the hook does not see the shortcut in the app's own windows; every app window now forwards `KeyboardEvent.code` down and up to the same chord machine, an event seen by both sources within 250 ms counts once, page keys pause during a capture like hook keys, and while a chord is held the session checks every 100 ms that its keys still read held (`GetAsyncKeyState`) and releases it when they do not.
 - Source: 0002_desktop_shell
 
 ## 2026-10-21: In-process API stub until 0007
@@ -116,6 +119,7 @@ source: 0012_fix_lost_paste
 - Reason: the overlay shows within the hold's first frames, idle memory stays at 75.5 MB, and a finishing dictation never hides the overlay of the next one.
 - Debt created: none.
 - Revisit when: idle memory passes 100 MB.
+- Amended by 0014_desktop_ux: the gate also covers the hands-free state; the overlay is shown with `ShowWindow(SW_SHOWNOACTIVATE)` and hidden with `SW_HIDE` on its handle, because tao shows a window without activation only the first time, so every later `show()` took focus from the app being dictated into (a focus flicker since 0.2.0, and lost key-ups in the app's own window).
 - Source: 0002_desktop_shell
 
 ## 2026-10-21: Recordings capped at two minutes
@@ -208,6 +212,7 @@ source: 0012_fix_lost_paste
 - Reason: an update window that takes focus, or an install that quits the app, between key up and the paste would send the text to the wrong window or lose it; on Windows the dialog appeared with the user's window still in the foreground.
 - Debt created: none.
 - Revisit when: dictations can run without a hold, such as a toggle mode.
+- Met by 0014_desktop_ux: hands-free records without a hold, and the guard spans it from the first press to the paste, so the rule holds unchanged.
 - Source: 0005_desktop_release
 
 ## 2026-10-21: Releases are verified against the committed key before they are published
@@ -295,12 +300,12 @@ source: 0012_fix_lost_paste
 
 ## 2026-10-22: Window sizes in one file, content-fitted where content varies
 
-- Decision: `src/windows.json` holds every window's size, read by Rust and by the screenshot script; sign-in and choose password share one fixed size, while onboarding and the update window are sized to their measured content through `fit_account` and `fit_update`, centered on their first fit only and kept inside the work area after.
-- Alternatives rejected: a fixed size per window, which either scrolls or leaves dead space as content varies.
-- Reason: a screenshot can never show a size the app does not use, and onboarding grows with the user's custom styles.
+- Decision: `src/windows.json` holds the main window's first size and minimum (380x480), the update window's width and minimum height and the overlay's size, read by Rust and by the screenshot script; the main window opens maximized until the user changes it, then reopens at the last normal placement and maximized flag kept in `settings.json`, reused only while its title bar is on a screen; sign-in, onboarding and first run live in the main window, so the account and first-run windows are gone; the update window is still sized to its content.
+- Alternatives rejected: a window-state plugin, which cannot tell a first launch from a saved state; one small window per step, which floated in empty space at 1920 and closed on its own.
+- Reason: Sebastian works maximized, and a screenshot can never show a size the app does not use.
 - Debt created: none.
 - Revisit when: a window needs a size that depends on the display.
-- Source: 0011_desktop_rebrand
+- Source: 0011_desktop_rebrand, rewritten by 0014_desktop_ux
 
 ## 2026-10-22: The tray paints its state on the main thread from live state
 
@@ -330,3 +335,68 @@ source: 0012_fix_lost_paste
 - Debt created: the retry can paste twice if the target keeps retrying to open the clipboard for longer than the settle after a contention; a thread or process the target creates after the offer is never proven, so its read leaves the text with a notification; a monitor that wins the race on both attempts leaves the text with a notification; proving a Chromium read costs about 65 to 190 ms.
 - Revisit when: a paste lands twice, a target's read is reported unproven in the log, or the share of pastes left in the clipboard grows on machines with such a monitor.
 - Source: 0012_fix_lost_paste
+- Superseded by 2026-10-23: Threads that ran since the keystroke are probed first
+
+## 2026-10-23: Threads that ran since the keystroke are probed first
+
+- Decision: the proof of a read without a window stays the 2026-10-22 one (a wait chain shows a thread of the target's process tree blocked sending this render request to the clipboard thread; only the first read after the keystroke counts; one retry), with a new order: each attempt reads the cycle time of every target thread at its keystroke, and a read without a window probes first the threads whose cycle time grew since then, in the old order (depth from the target, main threads first), then the rest, under the same 200 ms budget.
+  The snapshot taken at an offer keeps a query handle per target thread, and the handles live until the next offer replaces the snapshot; a thread that ran gets its wait chain looked at sooner and is not trusted more.
+- Alternatives rejected: a larger budget (Windows Terminal hosts about 110 threads, 44 to 46 of them GUI, at about 12 ms per wait chain); a fresh thread snapshot inside the render request (about 40 ms); recognizing terminals by executable name (no reader rule may depend on one).
+- Reason: Windows Terminal reads without a window from one of its own GUI threads, 25th to 28th in the old order, so the budget ran out after 15 to 19 threads and every paste into it stayed in the clipboard (24 of 24 on the base build); with this order 48 of 48 of its reads were proven after 3 or 4 threads in 31 to 81 ms, and reading the cycle times costs 10 to 165 us.
+- Debt created: the 2026-10-22 entry's debt stands: the retry can paste twice, a thread or process created after the offer is never proven, and a monitor that wins both attempts leaves the text with a notification; one that opens the clipboard on every Ctrl+V, faster than the target, wins every time (6 of 6 left in the clipboard in a text box, and the monitor never got the text).
+- Revisit when: a paste lands twice, a target's read is reported unproven in the log, or the share of pastes left in the clipboard grows on machines with such a monitor.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: The clipboard thread answers render requests while it waits to open the clipboard
+
+- Decision: between `OpenClipboard` retries (offer, restore, keep, put, and the History copy owner), the clipboard thread waits on its sent-message queue and answers what arrives instead of sleeping.
+- Alternatives rejected: a longer patience, which only stretches the stall.
+- Reason: a reader that already holds the clipboard open and asks for the text waits on the clipboard thread, which was asleep until that reader let go, so the restore gave up after 3 s and the app said the clipboard was lost; a test that holds the clipboard open through a restore fails on the old loop after 3.25 s and passes in 0.36 s.
+- Debt created: none.
+- Revisit when: a restore or an offer fails with the clipboard busy in the log.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: Multi-line text goes to Windows Terminal as dictated
+
+- Decision: the paste never joins lines and never adds a line break or Enter; in Windows Terminal the lines arrive as one block where the shell supports bracketed paste (bash, tmux, Claude Code), and in a Windows PowerShell 5.1 tab the terminal shows its own multi-line warning first.
+- Alternatives rejected: joining lines for every Windows Terminal paste, which would break the one-block paste in bash, tmux and Claude Code, since the app cannot tell the tabs apart and no rule may depend on an executable name; a per-app rule option.
+- Reason: Windows PowerShell 5.1 ships PSReadLine 2.0.0 without bracketed paste, so a line break in a paste is an Enter there; that is the terminal's behavior, and its warning is the guard.
+- Debt created: confirming the warning in a Windows PowerShell 5.1 tab runs every line but the last.
+- Revisit when: Windows PowerShell ships a PSReadLine with bracketed paste, or users ask for joined lines.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: Config tests remove their scratch folders
+
+- Decision: the config tests' scratch path is a guard that deletes its folder on drop, also when a test fails.
+- Alternatives rejected: a new dependency for temporary folders.
+- Reason: every test run left a `tmw-config-<name>-<pid>` folder in the temp directory.
+- Debt created: the folders earlier runs left stay on Sebastian's machine (6964 in `%TEMP%` on 2026-10-23); removing them is his call.
+- Revisit when: Sebastian clears them.
+- Source: 0013_fix_terminal_paste
+
+## 2026-10-23: Animations run in the desktop WebView whatever the Windows setting
+
+- Decision: every WebView window is created with `--force-prefers-no-reduced-motion` in one shared browser argument string, so the spinner, waveform and transitions run with Windows "Animation effects" off; `packages/brand` and the web keep honoring reduced motion.
+- Alternatives rejected: per-rule CSS overrides that restore each animation, which duplicate the brand's keyframes; a slow essential-motion spinner only.
+- Reason: Sebastian's machine has animations off, WebView2 then reported reduced motion and the processing spinner froze, which read as a hang; Sebastian chose motion everywhere in the desktop app.
+- Debt created: users who need reduced motion get the desktop animations anyway.
+- Revisit when: a user asks for reduced motion in the desktop app.
+- Source: 0014_desktop_ux
+
+## 2026-10-23: Dictations into the app's own main window are inserted by the page
+
+- Decision: when the window focused at the first press is the app's main window, Rust sends the text to the page with an id instead of pasting; the page inserts it at the caret of a focused textarea or caret-capable input and answers `insert_ack`; only an inserted ack counts as pasted, and a refusal or no answer within 1 s keeps the text in the clipboard through the History copy owner with the "not pasted" notice.
+- Alternatives rejected: raising the Wait Chain Traversal budget for the app's own WebView2 process, which slows every paste and stays a race; trusting the app's own processes as readers, which hands the text to any of them on a contended clipboard.
+- Reason: the clipboard paste could not prove the WebView2 reader within 200 ms (15 to 17 GUI threads), so both attempts were withheld and the practice box stayed empty.
+- Debt created: a page that inserts after the 1 s timeout leaves the text in the field and in the clipboard with the notice.
+- Revisit when: a dictation shows up twice in the app's own window.
+- Source: 0014_desktop_ux
+
+## 2026-10-23: A user launch opens the main window and autostart stays in the tray
+
+- Decision: autostart passes `--autostart` and stays in the tray unless sign-in or setup is needed; any other launch, cold or a second instance, opens the main window and brings it to the front through the single-instance callback, whose launcher grants the foreground; the 0.2.0 Run entry without the argument is rewritten at start when autostart is on.
+- Alternatives rejected: opening nothing on a user launch, which left the app invisible in the tray.
+- Reason: launching the app from Start must show it.
+- Debt created: none.
+- Revisit when: Windows refuses the foreground to a second launch.
+- Source: 0014_desktop_ux

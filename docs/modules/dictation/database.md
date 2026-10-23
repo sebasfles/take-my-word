@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0015_user_context
 ---
 
 # Dictation: database
@@ -14,7 +14,7 @@ Everything lives in the single DynamoDB table `take-my-word-{env}`, no ORM, no m
 |---|---|
 | `take-my-word-{env}`, `DICTATION#ts` | One saved dictation per user: raw and clean text, the style used, providers, latency per stage, tokens; TTL 90 days |
 | `take-my-word-{env}`, `QUOTA#date` | Audio seconds charged to a user on one UTC day; TTL two days after the day starts |
-| `take-my-word-{env}`, `SETTINGS` | The user's default style, dictation languages and default providers; created on the first `GET /me/settings`; no TTL |
+| `take-my-word-{env}`, `SETTINGS` | The user's default style, dictation languages, default providers and context (picks and detail); created on the first `GET /me/settings`; no TTL |
 
 ## Tables referenced
 
@@ -35,6 +35,8 @@ Everything lives in the single DynamoDB table `take-my-word-{env}`, no ORM, no m
 - The quota is charged with one atomic conditional update on `QUOTA#date` before any provider is called; the condition allows it while the day is under the cap.
 - Dictations skipped as silence are not saved.
 - A `SETTINGS` item written before dictation languages reads as the language of its `locale`; `locale` is always derived from the first dictation language.
+- A `SETTINGS` item without a context reads as an empty one; a stored pick list or detail that no longer parses falls back to empty on its own, so a retired pick id empties the picks and keeps the detail.
+- `GET /me/usage` only reads `QUOTA#date`; a missing item reads as zero seconds.
 - A `DICTATION#ts` item's `locale` is the language the audio was transcribed in, not the device's.
 - The stream also carries `QUOTA#date` writes and every TTL removal, so its consumers filter on the `DICTATION#` sort key prefix and on inserts.
 

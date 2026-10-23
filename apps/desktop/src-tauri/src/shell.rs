@@ -14,13 +14,16 @@ use crate::audio::{Microphone, MicrophoneStatus};
 use crate::auth::account::{Account, CognitoProvider};
 use crate::auth::cognito::Cognito;
 use crate::clipboard::{self, Clipboard, ClipboardError};
-use crate::config::{self, Settings};
+use crate::config::{self, Placement, Settings};
 use crate::dictation::{Job, Notifier, Worker};
 use crate::foreground::{self, ActiveWindow, ForegroundApp, SystemWindow};
-use crate::hotkey::{self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyHook, Keys, Side};
+use crate::hotkey::{
+    self, CAPTURE_TIMEOUT, Hotkey, HotkeyKey, Key, KeyEvent, KeyHook, Keys, Side, Source,
+};
 use crate::i18n::{self, Message};
 use crate::keychain::SystemKeychain;
 use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverlay};
+use crate::own_window::{ACK_TIMEOUT, Acks, Keeper, OwnWindowFirst, Page};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
 use crate::session::{Input, Session, Sink, Take};
@@ -42,10 +45,14 @@ pub struct Shell {
     pub overlay: GatedOverlay<WindowOverlay, TrayNotifier>,
     pub microphone: MicrophoneStatus,
     pub activity: Activity,
+    pub acks: Acks,
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
     keys: Arc<Mutex<Keys>>,
+    keyboard: Arc<dyn KeyHook + Send + Sync>,
     session: mpsc::Sender<Input>,
+    microphone_check: Mutex<(CheckGate, Waveform)>,
+    main_window: Mutex<Option<Placement>>,
     settings: Mutex<Settings>,
     settings_path: PathBuf,
     proposed: Mutex<Option<Hotkey>>,
@@ -62,7 +69,18 @@ impl Shell {
         let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
-        let waveform = Waveform::new(app.clone(), microphone.level());
+        let waveform = Waveform::new(
+            app.clone(),
+            microphone.level(),
+            windows::OVERLAY,
+            "overlay-level",
+        );
+        let microphone_check = Waveform::new(
+            app.clone(),
+            microphone.level(),
+            windows::MAIN,
+            "microphone-level",
+        );
         let provider = CognitoProvider {
             cognito: Cognito::for_environment(env::CURRENT)?,
             device_name: device_name(app),
@@ -91,10 +109,19 @@ impl Shell {
             keystroke: EnigoKeystroke,
             window: SystemWindow,
             modifiers: HeldModifiers {
-                keyboard,
+                keyboard: keyboard.clone(),
                 keys: Arc::clone(&keys),
             },
             timing: Timing::default(),
+        };
+        let acks = Acks::default();
+        let paste = OwnWindowFirst {
+            page: AppPage(app.clone()),
+            keeper: AppKeeper(app.clone()),
+            acks: acks.clone(),
+            others: paste,
+            timeout: ACK_TIMEOUT,
+            next_id: 0,
         };
         let mut worker = Worker {
             api: dictation_api,
@@ -118,6 +145,8 @@ impl Shell {
             waveform,
             activity: activity.clone(),
             busy: None,
+            keys: Arc::clone(&keys),
+            keyboard: keyboard.clone().unwrap_or_else(|| Arc::new(NoHook)),
         };
         thread::Builder::new()
             .name("session".into())
@@ -132,10 +161,14 @@ impl Shell {
             overlay,
             microphone: microphone_status,
             activity,
+            acks,
             #[cfg(debug_assertions)]
             jobs,
             keys,
+            keyboard: keyboard.unwrap_or_else(|| Arc::new(NoHook)),
             session,
+            microphone_check: Mutex::new((CheckGate::default(), microphone_check)),
+            main_window: Mutex::new(settings.main_window),
             settings: Mutex::new(settings),
             settings_path,
             proposed: Mutex::new(None),
@@ -155,6 +188,21 @@ impl Shell {
         }
     }
 
+    pub fn remember_main_window(&self, normal: Option<Placement>, maximized: bool) {
+        let mut remembered = lock(&self.main_window);
+        *remembered = normal.or(*remembered).map(|placement| Placement {
+            maximized,
+            ..placement
+        });
+    }
+
+    pub fn save_main_window(&self) {
+        let placement = *lock(&self.main_window);
+        if placement.is_some() && placement != self.settings().main_window {
+            self.update_settings(|settings| settings.main_window = placement);
+        }
+    }
+
     pub fn copy(&self, text: &str) -> Result<(), ClipboardError> {
         let copies = self.copies.get_or_init(|| Mutex::new(clipboard::system()));
         lock(copies).put_text(text)
@@ -162,6 +210,45 @@ impl Shell {
 
     pub fn reload_rules(&self) {
         self.rules.load(&self.api);
+    }
+
+    pub fn forward_key(&self, code: &str, down: bool) {
+        let Some(key) = Key::from_dom(code) else {
+            return;
+        };
+        let at = Instant::now();
+        let event = KeyEvent { key, down };
+        if let Some(event) = lock(&self.keys).on_key(event, Source::Page, at, &*self.keyboard) {
+            let _ = self.session.send(Input::Chord { event, at });
+        }
+    }
+
+    pub fn stop_dictation(&self) {
+        let _ = self.session.send(Input::Stop { at: Instant::now() });
+    }
+
+    pub fn check_microphone(&self, on: bool) {
+        let mut check = lock(&self.microphone_check);
+        let change = check.0.want(on);
+        self.apply_check(&mut check.1, change);
+    }
+
+    pub fn main_window_shown(&self, shown: bool) {
+        let mut check = lock(&self.microphone_check);
+        let change = check.0.show(shown);
+        self.apply_check(&mut check.1, change);
+    }
+
+    fn apply_check(&self, waveform: &mut Waveform, change: Option<bool>) {
+        let Some(on) = change else {
+            return;
+        };
+        if on {
+            waveform.start();
+        } else {
+            waveform.stop();
+        }
+        let _ = self.session.send(Input::MicrophoneCheck(on));
     }
 
     pub fn hotkey(&self) -> Hotkey {
@@ -247,11 +334,9 @@ fn install_hook(
     let keys = Arc::clone(keys);
     let session = session.clone();
     let installed = hotkey::install(Box::new(move |event, keyboard| {
-        if let Some(event) = lock(&keys).on_key(event, keyboard) {
-            let _ = session.send(Input::Chord {
-                event,
-                at: Instant::now(),
-            });
+        let at = Instant::now();
+        if let Some(event) = lock(&keys).on_key(event, Source::Hook, at, keyboard) {
+            let _ = session.send(Input::Chord { event, at });
         }
     }));
     installed.inspect_err(|error| log::error!("{error}")).ok()
@@ -259,7 +344,7 @@ fn install_hook(
 
 pub fn capture_cancelled(app: &AppHandle) {
     log::info!("hotkey capture cancelled");
-    let _ = app.emit_to(windows::SETTINGS, "hotkey-capture-cancelled", ());
+    let _ = app.emit_to(windows::MAIN, "hotkey-capture-cancelled", ());
 }
 
 fn device_name(app: &AppHandle) -> String {
@@ -287,6 +372,8 @@ struct ShellSink {
     waveform: Waveform,
     activity: Activity,
     busy: Option<Busy>,
+    keys: Arc<Mutex<Keys>>,
+    keyboard: Arc<dyn KeyHook + Send + Sync>,
 }
 
 impl Sink for ShellSink {
@@ -303,7 +390,7 @@ impl Sink for ShellSink {
             message: Message::SignInToDictate,
             action: None,
         });
-        windows::open_account(&self.app, false);
+        windows::open_main(&self.app, "");
         false
     }
 
@@ -315,7 +402,17 @@ impl Sink for ShellSink {
         self.target = SystemWindow.foreground();
     }
 
+    fn hands_free(&mut self) {
+        hotkey::swallow_escape(true);
+        self.overlay.hands_free();
+    }
+
+    fn chord_released(&mut self) -> bool {
+        lock(&self.keys).release_if_up(&*self.keyboard).is_some()
+    }
+
     fn finished(&mut self, take: Take) {
+        hotkey::swallow_escape(false);
         self.waveform.stop();
         self.overlay.end_recording();
         crate::tray::show_listening(&self.app, false);
@@ -324,6 +421,80 @@ impl Sink for ShellSink {
             target: std::mem::take(&mut self.target),
             busy: self.busy.take().unwrap_or_else(|| self.activity.start()),
         });
+    }
+}
+
+#[derive(Debug)]
+struct CheckGate {
+    wanted: bool,
+    shown: bool,
+}
+
+impl Default for CheckGate {
+    fn default() -> Self {
+        Self {
+            wanted: false,
+            shown: true,
+        }
+    }
+}
+
+impl CheckGate {
+    fn running(&self) -> bool {
+        self.wanted && self.shown
+    }
+
+    fn change(&mut self, update: impl FnOnce(&mut Self)) -> Option<bool> {
+        let before = self.running();
+        update(self);
+        let after = self.running();
+        (before != after).then_some(after)
+    }
+
+    fn want(&mut self, wanted: bool) -> Option<bool> {
+        self.change(|gate| gate.wanted = wanted)
+    }
+
+    fn show(&mut self, shown: bool) -> Option<bool> {
+        self.change(|gate| gate.shown = shown)
+    }
+}
+
+struct AppPage(AppHandle);
+
+impl Page for AppPage {
+    fn main_window(&self) -> Option<isize> {
+        foreground::handle_of(&self.0.get_webview_window(windows::MAIN)?)
+    }
+
+    fn insert(&self, id: u64, text: &str) -> bool {
+        let payload = serde_json::json!({ "id": id, "text": text });
+        self.0
+            .emit_to(windows::MAIN, "insert-text", payload)
+            .inspect_err(|error| log::warn!("inserting into the main window failed: {error}"))
+            .is_ok()
+    }
+}
+
+struct AppKeeper(AppHandle);
+
+impl Keeper for AppKeeper {
+    fn keep(&self, text: &str) -> bool {
+        self.0
+            .state::<Shell>()
+            .copy(text)
+            .inspect_err(|error| log::warn!("keeping a dictation in the clipboard failed: {error}"))
+            .is_ok()
+    }
+}
+
+struct NoHook;
+
+impl KeyHook for NoHook {
+    fn guard_start_menu(&self) {}
+
+    fn is_held(&self, _key: Key) -> bool {
+        true
     }
 }
 
@@ -376,5 +547,23 @@ impl Notifier for TrayNotifier {
         if let Err(error) = shown {
             log::warn!("showing a notification failed: {error}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_microphone_check_runs_only_while_its_step_is_shown_in_a_visible_window() {
+        let mut gate = CheckGate::default();
+        assert_eq!(gate.want(true), Some(true));
+        assert_eq!(gate.show(false), Some(false));
+        assert_eq!(gate.show(false), None);
+        assert_eq!(gate.show(true), Some(true));
+        assert_eq!(gate.want(false), Some(false));
+        assert_eq!(gate.show(false), None);
+        assert_eq!(gate.want(true), None);
+        assert_eq!(gate.show(true), Some(true));
     }
 }

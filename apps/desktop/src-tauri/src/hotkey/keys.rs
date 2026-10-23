@@ -4,6 +4,35 @@ use super::chord::ChordTracker;
 use super::{ChordEvent, Hotkey, KeyEvent, KeyHook};
 
 pub const CAPTURE_TIMEOUT: Duration = Duration::from_secs(15);
+const TWIN_WINDOW: Duration = Duration::from_millis(250);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    Hook,
+    Page,
+}
+
+#[derive(Debug, Default)]
+struct Twins {
+    unmatched: Vec<(Source, KeyEvent, Instant)>,
+}
+
+impl Twins {
+    fn admit(&mut self, source: Source, event: KeyEvent, at: Instant) -> bool {
+        self.unmatched
+            .retain(|(_, _, seen)| at.saturating_duration_since(*seen) < TWIN_WINDOW);
+        let twin = self
+            .unmatched
+            .iter()
+            .position(|(other, seen, _)| *other != source && *seen == event);
+        if let Some(index) = twin {
+            self.unmatched.remove(index);
+            return false;
+        }
+        self.unmatched.push((source, event, at));
+        true
+    }
+}
 
 #[derive(Debug)]
 struct Capture {
@@ -14,6 +43,7 @@ struct Capture {
 pub struct Keys {
     tracker: ChordTracker,
     capture: Option<Capture>,
+    twins: Twins,
 }
 
 impl Keys {
@@ -21,6 +51,7 @@ impl Keys {
         Self {
             tracker: ChordTracker::new(hotkey),
             capture: None,
+            twins: Twins::default(),
         }
     }
 
@@ -28,11 +59,24 @@ impl Keys {
         self.tracker.hotkey()
     }
 
-    pub fn on_key(&mut self, event: KeyEvent, keyboard: &dyn KeyHook) -> Option<ChordEvent> {
-        if self.capture.is_some() {
+    pub fn on_key(
+        &mut self,
+        event: KeyEvent,
+        source: Source,
+        at: Instant,
+        keyboard: &dyn KeyHook,
+    ) -> Option<ChordEvent> {
+        if !self.twins.admit(source, event, at) || self.capture.is_some() {
             return None;
         }
         self.tracker.on_key(event, keyboard)
+    }
+
+    pub fn release_if_up(&mut self, keyboard: &dyn KeyHook) -> Option<ChordEvent> {
+        if self.capture.is_some() {
+            return None;
+        }
+        self.tracker.release_if_up(keyboard)
     }
 
     pub fn start_capture(&mut self, now: Instant) -> Option<ChordEvent> {
@@ -108,8 +152,106 @@ mod tests {
         });
         downs
             .chain(ups)
-            .filter_map(|event| keys.on_key(event, &Keyboard))
+            .filter_map(|event| keys.on_key(event, Source::Hook, Instant::now(), &Keyboard))
             .collect()
+    }
+
+    fn event(key: Key, down: bool) -> KeyEvent {
+        KeyEvent { key, down }
+    }
+
+    #[test]
+    fn a_key_seen_by_the_hook_and_the_page_counts_once() {
+        let t0 = Instant::now();
+        let at = |ms| t0 + Duration::from_millis(ms);
+        let mut keys = Keys::new(Hotkey::ctrl_win());
+        let mut seen = Vec::new();
+        for (source, key, down, ms) in [
+            (Source::Hook, CTRL, true, 0),
+            (Source::Hook, WIN, true, 10),
+            (Source::Page, CTRL, true, 30),
+            (Source::Hook, WIN, false, 100),
+            (Source::Page, WIN, true, 110),
+            (Source::Page, WIN, false, 120),
+            (Source::Hook, WIN, true, 200),
+            (Source::Page, WIN, true, 230),
+            (Source::Hook, WIN, false, 300),
+            (Source::Page, WIN, false, 320),
+        ] {
+            seen.extend(keys.on_key(event(key, down), source, at(ms), &Keyboard));
+        }
+        assert_eq!(
+            seen,
+            vec![
+                ChordEvent::Pressed,
+                ChordEvent::Released,
+                ChordEvent::Pressed,
+                ChordEvent::Released
+            ]
+        );
+    }
+
+    #[test]
+    fn the_page_alone_drives_the_chord_when_the_hook_sees_nothing() {
+        let t0 = Instant::now();
+        let mut keys = Keys::new(Hotkey::ctrl_win());
+        let seen: Vec<_> = [(CTRL, true), (WIN, true), (WIN, false), (CTRL, false)]
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, (key, down))| {
+                let at = t0 + Duration::from_millis(index as u64 * 40);
+                keys.on_key(event(key, down), Source::Page, at, &Keyboard)
+            })
+            .collect();
+        assert_eq!(seen, vec![ChordEvent::Pressed, ChordEvent::Released]);
+        let later = t0 + TWIN_WINDOW * 4;
+        assert_eq!(
+            keys.on_key(event(CTRL, true), Source::Hook, later, &Keyboard),
+            None
+        );
+        assert_eq!(
+            keys.on_key(event(WIN, true), Source::Hook, later, &Keyboard),
+            Some(ChordEvent::Pressed)
+        );
+    }
+
+    struct Released;
+
+    impl KeyHook for Released {
+        fn guard_start_menu(&self) {}
+
+        fn is_held(&self, _key: Key) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn a_page_only_press_with_no_key_up_releases_once_the_keys_read_up() {
+        let t0 = Instant::now();
+        let mut keys = Keys::new(Hotkey::ctrl_win());
+        keys.on_key(event(CTRL, true), Source::Page, t0, &Keyboard);
+        assert_eq!(
+            keys.on_key(event(WIN, true), Source::Page, t0, &Keyboard),
+            Some(ChordEvent::Pressed)
+        );
+        assert_eq!(keys.release_if_up(&Keyboard), None);
+        assert_eq!(keys.release_if_up(&Released), Some(ChordEvent::Released));
+        assert_eq!(keys.release_if_up(&Released), None);
+    }
+
+    #[test]
+    fn page_keys_are_ignored_during_a_capture_like_hook_keys() {
+        let now = Instant::now();
+        let mut keys = Keys::new(Hotkey::ctrl_win());
+        keys.start_capture(now);
+        assert_eq!(
+            keys.on_key(event(CTRL, true), Source::Page, now, &Keyboard),
+            None
+        );
+        assert_eq!(
+            keys.on_key(event(WIN, true), Source::Page, now, &Keyboard),
+            None
+        );
     }
 
     #[test]
@@ -177,7 +319,12 @@ mod tests {
     fn starting_a_capture_mid_dictation_cancels_it() {
         let mut keys = Keys::new(Hotkey::ctrl_win());
         for key in [CTRL, WIN] {
-            keys.on_key(KeyEvent { key, down: true }, &Keyboard);
+            keys.on_key(
+                KeyEvent { key, down: true },
+                Source::Hook,
+                Instant::now(),
+                &Keyboard,
+            );
         }
         assert_eq!(
             keys.start_capture(Instant::now()),

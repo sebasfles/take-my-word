@@ -1,22 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { accountScreenFromSearch, viewFromSearch } from "./view.ts";
+import { viewFromSearch } from "./view.ts";
 
 describe("viewFromSearch", () => {
   it("reads the view the shell asked for", () => {
     expect(viewFromSearch("?view=overlay")).toBe("overlay");
-    expect(viewFromSearch("?view=first-run")).toBe("first-run");
+    expect(viewFromSearch("?view=update")).toBe("update");
   });
 
-  it("falls back to settings for unknown or missing views", () => {
-    expect(viewFromSearch("?view=nope")).toBe("settings");
-    expect(viewFromSearch("")).toBe("settings");
-  });
-});
-
-describe("accountScreenFromSearch", () => {
-  it("opens onboarding only when the shell asks for it", () => {
-    expect(accountScreenFromSearch("?view=account&step=onboarding")).toBe("onboarding");
-    expect(accountScreenFromSearch("?view=account")).toBe("sign-in");
-    expect(accountScreenFromSearch("?view=account&step=choose-password")).toBe("sign-in");
+  it("falls back to the main window for unknown, retired or missing views", () => {
+    expect(viewFromSearch("?view=nope")).toBe("main");
+    expect(viewFromSearch("?view=first-run")).toBe("main");
+    expect(viewFromSearch("")).toBe("main");
   });
 });

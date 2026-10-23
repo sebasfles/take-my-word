@@ -5,11 +5,13 @@ import {
   historyPageSchema,
   settingsSchema,
   styleListSchema,
+  usageSchema,
   type AppRule,
   type DictionaryTerm,
   type HistoryItem,
   type Settings,
   type Style,
+  type Usage,
 } from "@take-my-word/shared";
 import type { z } from "zod";
 
@@ -25,6 +27,7 @@ export interface HistorySlice {
 export interface AccountApi {
   settings(): Promise<Loaded<Settings>>;
   styles(): Promise<Loaded<Style[]>>;
+  usage(): Promise<Loaded<Usage | null>>;
   appRules(): Promise<Loaded<AppRule[]>>;
   dictionary(): Promise<Loaded<DictionaryTerm[]>>;
   history(shown: number): Promise<Loaded<HistorySlice>>;
@@ -45,9 +48,16 @@ export function accountApi(
       cache: "no-store",
     });
 
-  async function read<S extends z.ZodType>(path: string, schema: S): Promise<Loaded<z.infer<S>>> {
+  async function read<S extends z.ZodType, A = never>(
+    path: string,
+    schema: S,
+    absent?: { status: number; value: A },
+  ): Promise<Loaded<z.infer<S> | A>> {
     try {
       const response = await call(path);
+      if (absent !== undefined && response.status === absent.status) {
+        return { kind: "ok", value: absent.value };
+      }
       if (!response.ok) return { kind: "failed" };
       const parsed = schema.safeParse(await response.json());
       return parsed.success ? { kind: "ok", value: parsed.data } : { kind: "failed" };
@@ -61,6 +71,7 @@ export function accountApi(
 
   return {
     settings: () => read("/me/settings", settingsSchema),
+    usage: () => read("/me/usage", usageSchema, { status: 404, value: null }),
     styles: async () => mapped(await read("/styles", styleListSchema), (list) => list.styles),
     appRules: async () => mapped(await read("/app-rules", appRuleListSchema), (list) => list.rules),
     dictionary: async () =>

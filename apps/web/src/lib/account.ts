@@ -9,6 +9,8 @@ import {
   type RefinerId,
   type Style,
   type TranscriberId,
+  type Usage,
+  type UserContext,
 } from "@take-my-word/shared";
 import { maxHistoryShown, type Loaded } from "./api.ts";
 import type { Dictionary } from "./i18n.ts";
@@ -89,6 +91,19 @@ export function formatDateTime(iso: string, locale: string, timeZone: string): s
     timeStyle: "short",
     timeZone,
   }).format(new Date(iso));
+}
+
+export function formatTime(iso: string, locale: string, timeZone: string): string {
+  return new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone }).format(new Date(iso));
+}
+
+export function contextLabels(context: UserContext, t: Dictionary["account"]): string[] {
+  return context.picks.map((pick) => t.contextPicks[pick]);
+}
+
+export function usageMinutes(usage: Usage): { used: string; cap: string } {
+  const used = Math.min(usage.usedSeconds, usage.capSeconds);
+  return { used: String(Math.ceil(used / 60)), cap: String(Math.round(usage.capSeconds / 60)) };
 }
 
 export function formatSeconds(seconds: number, locale: string): string {

@@ -59,14 +59,41 @@ export function Overlay() {
     );
   }
 
-  const listening = overlay.state === "listening";
+  if (overlay.state === "processing") {
+    return (
+      <div className="overlay">
+        <OverlayPill
+          state="processing"
+          indicator="state"
+          className="overlay-quiet"
+          label={t("overlay.processing")}
+        />
+      </div>
+    );
+  }
+
+  const handsFree = overlay.state === "handsFree";
   return (
     <div className="overlay">
       <OverlayPill
-        state={overlay.state}
+        state="listening"
         indicator="state"
-        label={t(listening ? "overlay.listening" : "overlay.processing")}
-        {...(listening && { levels })}
+        className={handsFree ? "overlay-quiet overlay-hands-free" : "overlay-quiet"}
+        label={t(handsFree ? "overlay.handsFree" : "overlay.listening")}
+        levels={levels}
+        action={
+          handsFree && (
+            <button
+              type="button"
+              className="overlay-stop"
+              title={t("overlay.stop")}
+              aria-label={t("overlay.stop")}
+              onClick={() => void bridge.stopDictation()}
+            >
+              <span className="overlay-stop-glyph" aria-hidden="true" />
+            </button>
+          )
+        }
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   settingsSchema,
   styleListSchema,
   styleSchema,
+  usageSchema,
   type DictionaryTerm,
 } from "@take-my-word/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -70,6 +71,7 @@ const defaults = (defaultStyleId: string) => ({
   defaultStyleId,
   dictationLanguages: ["es"],
   providers: { transcriber: "groq-whisper", refiner: "openai" },
+  context: { picks: [], detail: "" },
 });
 
 async function cleanUp(token: string) {
@@ -119,6 +121,7 @@ describe("api routes in a deployed environment", () => {
     ["DELETE", "/app-rules/eA"],
     ["GET", "/me/settings"],
     ["PUT", "/me/settings"],
+    ["GET", "/me/usage"],
     ["GET", "/dictations"],
     ["DELETE", "/dictations/eA"],
   ])("%s %s answers 401 without a token", async (method, path) => {
@@ -346,6 +349,33 @@ describe("styles, app rules and settings in a deployed environment", () => {
       );
       expect((await dictate(informalSpeech)).styleId).toBe("formal");
       expect((await call("PUT", "/me/settings", { body: defaults("nope") })).status).toBe(400);
+    },
+    dictationTimeout,
+  );
+});
+
+describe("user context and usage in a deployed environment", () => {
+  it(
+    "keeps the context across a client that leaves it out and counts today's audio",
+    async () => {
+      const context = { picks: ["software-development"], detail: "backend con AWS" };
+      const older = { defaultStyleId: "plain", providers: defaults("plain").providers };
+      expect(
+        (await call("PUT", "/me/settings", { body: { ...defaults("plain"), context } })).status,
+      ).toBe(200);
+      expect((await call("PUT", "/me/settings", { body: older })).status).toBe(200);
+      expect(settingsSchema.parse((await call("GET", "/me/settings")).json).context).toEqual(
+        context,
+      );
+
+      const before = usageSchema.parse((await call("GET", "/me/usage")).json);
+      expect(before.capSeconds).toBeGreaterThan(0);
+      expect(Date.parse(before.resetsAt)).toBeGreaterThan(Date.now());
+      expect(Date.parse(before.resetsAt) - Date.now()).toBeLessThanOrEqual(86_400_000);
+      expect((await dictate(rareSpeech)).text).not.toBe("");
+      const after = usageSchema.parse((await call("GET", "/me/usage")).json);
+      expect(after.usedSeconds).toBeGreaterThan(before.usedSeconds + 1);
+      await call("PUT", "/me/settings", { body: defaults("plain") });
     },
     dictationTimeout,
   );

@@ -1,0 +1,154 @@
+{
+  "contexts": {
+    "developer": {
+      "picks": ["software-development"],
+      "detail": "backend, DevOps"
+    },
+    "biology": {
+      "picks": ["biology-life-sciences", "research-academia"],
+      "detail": ""
+    }
+  },
+  "samples": [
+    {
+      "id": "dev-en-1",
+      "language": "en",
+      "context": "developer",
+      "text": "I opened a PR to fix the CI/CD pipeline, can you review it before the deploy?",
+      "terms": ["PR", "CI/CD", "pipeline", "deploy"]
+    },
+    {
+      "id": "dev-en-2",
+      "language": "en",
+      "context": "developer",
+      "text": "Run kubectl get pods in the staging namespace and send me the logs.",
+      "terms": ["kubectl", "pods", "staging", "namespace", "logs"]
+    },
+    {
+      "id": "dev-en-3",
+      "language": "en",
+      "context": "developer",
+      "text": "The Terraform plan shows the Lambda will be replaced, so let's not merge yet.",
+      "terms": ["Terraform", "Lambda", "merge"]
+    },
+    {
+      "id": "dev-en-4",
+      "language": "en",
+      "context": "developer",
+      "text": "Rebase on main, push the hotfix and tell me when the build is green.",
+      "terms": ["Rebase", "main", "hotfix", "build"]
+    },
+    {
+      "id": "dev-es-1",
+      "language": "es",
+      "context": "developer",
+      "text": "Abrí un PR para arreglar el pipeline de CI/CD, ¿lo puedes revisar antes del deploy?",
+      "terms": ["PR", "pipeline", "CI/CD", "deploy"]
+    },
+    {
+      "id": "dev-es-2",
+      "language": "es",
+      "context": "developer",
+      "text": "Corre kubectl get pods en el namespace de staging y mándame los logs.",
+      "terms": ["kubectl", "pods", "namespace", "staging", "logs"]
+    },
+    {
+      "id": "dev-es-3",
+      "language": "es",
+      "context": "developer",
+      "text": "El plan de Terraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía.",
+      "terms": ["Terraform", "Lambda", "merge"]
+    },
+    {
+      "id": "dev-es-4",
+      "language": "es",
+      "context": "developer",
+      "text": "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde.",
+      "terms": ["rebase", "main", "hotfix", "build"]
+    },
+    {
+      "id": "bio-en-1",
+      "language": "en",
+      "context": "biology",
+      "text": "We transfected the HEK293 cells and ran a Western blot after forty-eight hours.",
+      "terms": ["transfected", "HEK293", "Western blot"]
+    },
+    {
+      "id": "bio-en-2",
+      "language": "en",
+      "context": "biology",
+      "text": "The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish.",
+      "terms": ["CRISPR-Cas9", "knockout", "p53", "zebrafish"]
+    },
+    {
+      "id": "bio-en-3",
+      "language": "en",
+      "context": "biology",
+      "text": "Run the qPCR with the new primers and normalize against GAPDH.",
+      "terms": ["qPCR", "primers", "GAPDH"]
+    },
+    {
+      "id": "bio-en-4",
+      "language": "en",
+      "context": "biology",
+      "text": "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress.",
+      "terms": ["Arabidopsis thaliana", "chlorophyll"]
+    },
+    {
+      "id": "bio-es-1",
+      "language": "es",
+      "context": "biology",
+      "text": "Transfectamos las células HEK293 e hicimos un Western blot a las cuarenta y ocho horas.",
+      "terms": ["Transfectamos", "HEK293", "Western blot"]
+    },
+    {
+      "id": "bio-es-2",
+      "language": "es",
+      "context": "biology",
+      "text": "El knockout con CRISPR-Cas9 redujo la expresión del gen p53 en el pez cebra.",
+      "terms": ["knockout", "CRISPR-Cas9", "p53", "pez cebra"]
+    },
+    {
+      "id": "bio-es-3",
+      "language": "es",
+      "context": "biology",
+      "text": "Corre la qPCR con los nuevos primers y normaliza contra GAPDH.",
+      "terms": ["qPCR", "primers", "GAPDH"]
+    },
+    {
+      "id": "bio-es-4",
+      "language": "es",
+      "context": "biology",
+      "text": "Las mutantes de Arabidopsis thaliana mostraron menos clorofila bajo estrés hídrico.",
+      "terms": ["Arabidopsis thaliana", "clorofila"]
+    },
+    {
+      "id": "control-en-1",
+      "language": "en",
+      "context": "developer",
+      "text": "Let's meet tomorrow at three in the office, and bring the report.",
+      "terms": []
+    },
+    {
+      "id": "control-en-2",
+      "language": "en",
+      "context": "biology",
+      "text": "I'll call my mother after lunch to plan the weekend trip.",
+      "terms": []
+    },
+    {
+      "id": "control-es-1",
+      "language": "es",
+      "context": "developer",
+      "text": "Nos vemos mañana a las tres en la oficina, y trae el informe.",
+      "terms": []
+    },
+    {
+      "id": "control-es-2",
+      "language": "es",
+      "context": "biology",
+      "text": "Voy a llamar a mi mamá después de almuerzo para planear el viaje del fin de semana.",
+      "terms": []
+    }
+  ]
+}

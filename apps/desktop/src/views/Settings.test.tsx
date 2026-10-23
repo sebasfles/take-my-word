@@ -1,6 +1,7 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setLanguage } from "../i18n.ts";
+import { failure, serve, settings } from "../testing/api.ts";
 import { fakeBridge, listeners } from "../testing/bridge.ts";
 import { Settings } from "./Settings.tsx";
 
@@ -11,13 +12,19 @@ vi.mock("../bridge.ts", async (importOriginal) => ({
 
 setLanguage("en");
 
+const rerun = vi.fn();
+const dismiss = vi.fn();
+
+const shortcut = () => screen.findByRole("region", { name: "Shortcut" });
+
 function keys() {
-  return Array.from(document.querySelectorAll("kbd"), (key) => key.textContent);
+  const row = screen.getByRole("region", { name: "Shortcut" });
+  return Array.from(row.querySelectorAll("kbd"), (key) => key.textContent);
 }
 
 async function startCapture() {
-  render(<Settings />);
-  await screen.findByText("Win");
+  render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+  await within(await shortcut()).findByText("Win");
   fireEvent.click(screen.getByRole("button", { name: "Change" }));
   await screen.findByText("Press the new shortcut, then release it.");
 }
@@ -44,7 +51,7 @@ describe("Settings", () => {
     await startCapture();
     chord(ctrl, shift);
     expect(fakeBridge.proposeHotkey).toHaveBeenCalledWith(["ControlLeft", "ShiftLeft"]);
-    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    fireEvent.click(await within(await shortcut()).findByRole("button", { name: "Save" }));
     expect(fakeBridge.confirmHotkey).toHaveBeenCalledOnce();
     await screen.findByRole("button", { name: "Change" });
     expect(keys()).toEqual(["Ctrl", "Shift"]);
@@ -53,7 +60,7 @@ describe("Settings", () => {
   it("drops a proposed shortcut on cancel", async () => {
     await startCapture();
     chord(ctrl, shift);
-    await screen.findByRole("button", { name: "Save" });
+    await within(await shortcut()).findByRole("button", { name: "Save" });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(fakeBridge.cancelHotkeyCapture).toHaveBeenCalledOnce();
     expect(fakeBridge.confirmHotkey).not.toHaveBeenCalled();
@@ -98,8 +105,8 @@ describe("Settings", () => {
   });
 
   it("leaves Rust alone when the user leaves the section without capturing", async () => {
-    render(<Settings />);
-    await screen.findByText("Win");
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    await within(await shortcut()).findByText("Win");
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     expect(fakeBridge.cancelHotkeyCapture).not.toHaveBeenCalled();
   });
@@ -128,15 +135,15 @@ describe("Settings", () => {
       message: "hotkey.notInSettings",
       backToSignIn: false,
     });
-    render(<Settings />);
-    await screen.findByText("Win");
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    await within(await shortcut()).findByText("Win");
     fireEvent.click(screen.getByRole("button", { name: "Change" }));
     expect((await screen.findByRole("alert")).textContent).toContain("settings window");
     expect(screen.getByRole("button", { name: "Change" })).toBeTruthy();
   });
 
   it("turns autostart off and reflects what Windows reports", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     const toggle = await screen.findByRole("switch", { name: "Start with Windows" });
     await vi.waitFor(() => {
       expect(toggle.getAttribute("aria-checked")).toBe("true");
@@ -149,7 +156,7 @@ describe("Settings", () => {
   });
 
   it("signs out and then offers to sign in again", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
     fakeBridge.accountStatus.mockResolvedValue({ signedIn: false, username: null });
@@ -162,14 +169,14 @@ describe("Settings", () => {
   });
 
   it("opens on the section the shell asks for and moves between sections", async () => {
-    window.history.replaceState(null, "", "?view=settings&section=account");
-    render(<Settings />);
+    window.history.replaceState(null, "", "?view=main&section=account");
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     await screen.findByText("Signed in as sebastian");
     expect(screen.getByRole("button", { name: "Account" }).getAttribute("aria-current")).toBe(
       "page",
     );
     fireEvent.click(screen.getByRole("button", { name: "General" }));
-    await screen.findByText("Win");
+    await within(await shortcut()).findByText("Win");
     expect(screen.queryByText("Signed in as sebastian")).toBeNull();
     window.history.replaceState(null, "", "/");
   });
@@ -178,20 +185,20 @@ describe("Settings", () => {
     fakeBridge.apiRequest.mockImplementation((route) =>
       Promise.resolve(route.route === "listTerms" ? { terms: [] } : null),
     );
-    render(<Settings />);
-    await screen.findByText("Win");
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    await within(await shortcut()).findByText("Win");
     act(() => {
-      listeners.settingsNavigate?.("&section=dictionary&focus=add");
+      listeners.mainNavigate?.("&section=dictionary&focus=add");
     });
     await screen.findByRole("heading", { name: "Dictionary" });
     await vi.waitFor(() => {
-      expect(document.activeElement).toBe(screen.getByLabelText("Term"));
+      expect(document.activeElement).toBe(screen.getByLabelText("Word as it must be written"));
     });
     fakeBridge.apiRequest.mockRestore();
   });
 
   it("adds a dictation language by reading the settings again and replacing them whole", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     const english = await screen.findByRole("checkbox", { name: "English" });
     fireEvent.click(english);
     await screen.findByText("Saved.");
@@ -204,7 +211,7 @@ describe("Settings", () => {
   });
 
   it("offers Windows' language, English and Spanish for the app and saves the choice", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     const select = await screen.findByLabelText("App language");
     await vi.waitFor(() => {
       expect((select as HTMLSelectElement).disabled).toBe(false);
@@ -217,7 +224,7 @@ describe("Settings", () => {
   });
 
   it("saves the theme and offers Windows' choice back", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     const windows = await screen.findByRole<HTMLInputElement>("radio", { name: "Windows" });
     await vi.waitFor(() => {
       expect(windows.checked).toBe(true);
@@ -231,14 +238,95 @@ describe("Settings", () => {
     expect(fakeBridge.setTheme).toHaveBeenLastCalledWith(null);
   });
 
+  it("announces hands-free to an upgraded user and hands the dismissal up", async () => {
+    render(<Settings handsFreeNote onDismissNote={dismiss} onRerun={rerun} />);
+    await screen.findByText("Hands-free dictation and what you do");
+    expect(
+      screen.getByText(/tell Take My Word what you do below; it is kept with your settings/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+    expect(dismiss).toHaveBeenCalledOnce();
+  });
+
+  it("explains both gestures and reruns the setup guide from General", async () => {
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    await screen.findByText("Hold it to talk, or tap it twice for hands-free.");
+    expect(screen.getByRole("heading", { name: "Hands-free" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open the guide" }));
+    expect(rerun).toHaveBeenCalledOnce();
+  });
+
+  it("edits what the user does in General and saves it with the rest of the settings", async () => {
+    const seen = serve({
+      getSettings: () => ({ ...settings, context: { picks: ["law"], detail: "" } }),
+      replaceSettings: (route) => (route.route === "replaceSettings" ? route.body : null),
+      getUsage: () => ({ usedSeconds: 0, capSeconds: 3600, resetsAt: "2026-10-24T00:00:00.000Z" }),
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    const row = await screen.findByRole("heading", { name: "What you do" });
+    const section = row.closest("section") as HTMLElement;
+    const save = await within(section).findByRole("button", { name: "Save" });
+    expect(within(section).getByRole<HTMLInputElement>("checkbox", { name: "Law" }).checked).toBe(
+      true,
+    );
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(section).getByRole("checkbox", { name: "Law" }));
+    fireEvent.click(within(section).getByRole("checkbox", { name: "Software development" }));
+    fireEvent.change(within(section).getByLabelText("Anything more specific? (optional)"), {
+      target: { value: "  kubectl and Helm  " },
+    });
+    fireEvent.click(save);
+    await within(section).findByText("Saved.");
+    expect(seen.at(-1)).toEqual({
+      route: "replaceSettings",
+      body: {
+        ...settings,
+        context: { picks: ["software-development"], detail: "kubectl and Helm" },
+      },
+    });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows today's audio against the daily cap, clamped, with the local reset time", async () => {
+    const resetsAt = "2026-10-24T00:00:00.000Z";
+    const time = new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(new Date(resetsAt));
+    serve({
+      getSettings: () => settings,
+      getUsage: () => ({ usedSeconds: 3725, capSeconds: 3600, resetsAt }),
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    const card = (await screen.findByRole("heading", { name: "Today" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(card).getByText("60 of 60 minutes of audio used")).toBeTruthy();
+    expect(within(card).getByText(`Resets at ${time}.`)).toBeTruthy();
+    expect((card.querySelector("meter") as HTMLMeterElement).value).toBe(3600);
+  });
+
+  it("hides the quota when the server has no usage route", async () => {
+    serve({
+      getSettings: () => settings,
+      getUsage: () => {
+        throw failure(404, "not_found");
+      },
+    });
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
+    await screen.findByRole("heading", { name: "What you do" });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("heading", { name: "Today" })).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("shows the installed version in About", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     await screen.findByText("Version 0.2.0");
     expect(screen.getByRole("region", { name: "About Take My Word" })).toBeTruthy();
   });
 
   it("follows a session that ends elsewhere", async () => {
-    render(<Settings />);
+    render(<Settings handsFreeNote={false} onDismissNote={dismiss} onRerun={rerun} />);
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
     await screen.findByText("Signed in as sebastian");
     fakeBridge.accountStatus.mockResolvedValueOnce({ signedIn: false, username: null });

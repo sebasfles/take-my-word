@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0015_user_context
 ---
 
 # Dictation: architecture and debt
@@ -157,6 +157,7 @@ source: 0008_desktop_features
 - Alternatives rejected: hardcoding the cap in the web; reading `QUOTA#date` from the web function.
 - Reason: the web reads only through the API and its shared contracts.
 - Debt created: users cannot see how much of the day's allowance is left.
+- Resolved by: 0015_user_context, 2026-10-23
 - Revisit when: the follow-up adds `GET /me/usage`.
 - Source: 0009_web_account
 
@@ -177,3 +178,21 @@ source: 0008_desktop_features
 - Debt created: none.
 - Revisit when: every client sends `dictationLanguages`.
 - Source: 0008_desktop_features
+
+## 2026-10-23: The user's context is stored and shown, not used by dictation until a follow-up proves a gain
+
+- Decision: settings hold up to three pick ids and a detail, captured by the desktop and shown on the web; neither the Whisper prompt nor the refiner instructions read them, so `dictate` behaves the same with any context.
+- Alternatives rejected: a short hint after the terms in the Whisper prompt (0015 round 1); the context as a tagged background block for the refiner (0015 round 2).
+- Reason: on frozen fixtures, the hint left raw errors unchanged where it fit and, with both languages, lost a whole English sentence under a Spanish hint; the refiner block moved domain-term errors from 35 to 34 under one language and 34 to 34 under both, and changed 3 Spanish verbs' meaning in 12 runs; the failing terms are recognition errors that field labels cannot recover.
+- Debt created: the context is collected but unused.
+- Revisit when: the per-field vocabulary task lands, measured on held-out fixtures.
+- Source: 0015_user_context
+
+## 2026-10-23: Clients show usage rounded up, clamped, and only when the server reports it
+
+- Decision: `usedSeconds` may pass the cap; clients show started minutes (rounded up) capped at the allowance and the reset in local time; desktop hides the card on a 404 and shows an error line on other failures, while the web hides the row on any failure.
+- Alternatives rejected: rounding to the nearest minute, which shows 0 after a short dictation; failing the web account page when usage fails.
+- Reason: a user who just dictated should see the allowance move; the web account is read-only and must not fail over an informational row; older or self-hosted servers answer 404.
+- Debt created: none.
+- Revisit when: per-user caps arrive, or users ask for seconds.
+- Source: 0015_user_context

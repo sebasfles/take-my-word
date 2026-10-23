@@ -14,6 +14,7 @@ locals {
     "DELETE /app-rules/{id}",
     "GET /me/settings",
     "PUT /me/settings",
+    "GET /me/usage",
     "GET /dictations",
     "DELETE /dictations/{id}",
   ]

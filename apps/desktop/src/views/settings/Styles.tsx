@@ -10,8 +10,7 @@ import { type SubmitEvent, useId, useState } from "react";
 import { api } from "../../api.ts";
 import { apiProblem, type Note, note } from "../../editing.ts";
 import { t } from "../../i18n.ts";
-import { StyleChoices } from "../../StyleChoices.tsx";
-import { styleDescription, styleName } from "../../styleNames.ts";
+import { StyleExamples } from "../../StyleExamples.tsx";
 import { ConfirmDelete, Empty, ErrorLine, LoadState, SectionPage, useLoaded } from "./parts.tsx";
 
 interface Data {
@@ -49,7 +48,7 @@ export function Styles() {
   const custom = data?.styles.filter((style) => !style.builtin) ?? [];
 
   return (
-    <SectionPage title="settings.styles" intro="styles.intro">
+    <SectionPage title="settings.styles" intro="styles.intro" wide>
       <LoadState state={state} onRetry={retry} />
       {data && (
         <>
@@ -62,66 +61,56 @@ export function Styles() {
           />
 
           <section className="list-section">
-            <h2>{t("styles.builtin")}</h2>
-            <ul className="list">
-              {data.styles
-                .filter((style) => style.builtin)
-                .map((style) => (
-                  <li key={style.id} className="item">
-                    <div className="item-main">
-                      <p className="item-title">{styleName(style)}</p>
-                      <p className="muted">{styleDescription(style)}</p>
-                    </div>
-                  </li>
-                ))}
-            </ul>
-          </section>
-
-          <section className="list-section">
             <div className="list-heading">
               <h2>{t("styles.custom")}</h2>
               <p className="muted">
                 {t("common.count", { count: custom.length, max: styleLimits.customStyles })}
               </p>
             </div>
-            <StyleForm
-              submitLabel="styles.create"
-              check={(style) => checkStyle(style, custom.length)}
-              save={(style) => api.createStyle(style)}
-              expected={{ limit: full }}
-              onSaved={(created) => {
-                update((current) => ({ ...current, styles: [...current.styles, created] }));
-              }}
-            />
-            {custom.length === 0 ? (
-              <Empty title="styles.customEmptyTitle" body="styles.customEmpty" />
-            ) : (
-              <ul className="list">
-                {custom.map((style) => (
-                  <CustomStyleRow
-                    key={style.id}
-                    style={style}
-                    onChanged={(changed) => {
-                      update((current) => ({
-                        ...current,
-                        styles: current.styles.map((item) =>
-                          item.id === changed.id ? changed : item,
-                        ),
-                      }));
-                    }}
-                    onDeleted={() => {
-                      update((current) => ({
-                        styles: current.styles.filter((item) => item.id !== style.id),
-                        settings:
-                          current.settings.defaultStyleId === style.id
-                            ? { ...current.settings, defaultStyleId: fallbackStyleId }
-                            : current.settings,
-                      }));
-                    }}
-                  />
-                ))}
-              </ul>
-            )}
+            <div className="editor">
+              <div className="editor-form">
+                <StyleForm
+                  submitLabel="styles.create"
+                  check={(style) => checkStyle(style, custom.length)}
+                  save={(style) => api.createStyle(style)}
+                  expected={{ limit: full }}
+                  onSaved={(created) => {
+                    update((current) => ({ ...current, styles: [...current.styles, created] }));
+                  }}
+                />
+              </div>
+              <div className="editor-list">
+                {custom.length === 0 ? (
+                  <Empty title="styles.customEmptyTitle" body="styles.customEmpty" />
+                ) : (
+                  <ul className="list">
+                    {custom.map((style) => (
+                      <CustomStyleRow
+                        key={style.id}
+                        style={style}
+                        onChanged={(changed) => {
+                          update((current) => ({
+                            ...current,
+                            styles: current.styles.map((item) =>
+                              item.id === changed.id ? changed : item,
+                            ),
+                          }));
+                        }}
+                        onDeleted={() => {
+                          update((current) => ({
+                            styles: current.styles.filter((item) => item.id !== style.id),
+                            settings:
+                              current.settings.defaultStyleId === style.id
+                                ? { ...current.settings, defaultStyleId: fallbackStyleId }
+                                : current.settings,
+                          }));
+                        }}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           </section>
         </>
       )}
@@ -170,7 +159,7 @@ function DefaultStyle({
         <h2 className="setting-title">{t("styles.default")}</h2>
         <p className="setting-note">{t("styles.defaultNote")}</p>
       </div>
-      <StyleChoices
+      <StyleExamples
         styles={styles}
         selected={selected}
         onSelect={(id) => {

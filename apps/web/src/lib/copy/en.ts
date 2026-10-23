@@ -1,3 +1,5 @@
+import type { UserContextPick } from "@take-my-word/shared";
+
 export interface DemoSegment {
   text: string;
   kind?: "filler" | "fixed";
@@ -222,6 +224,29 @@ export const en = {
     dictationLanguages: "Dictation languages",
     transcriber: "Transcription",
     refiner: "Text cleanup",
+    context: "What you do",
+    contextEmpty: "Not set",
+    contextPicks: {
+      "software-development": "Software development",
+      "data-ai": "Data and AI",
+      design: "Design",
+      "product-management": "Product management",
+      marketing: "Marketing",
+      sales: "Sales",
+      "customer-support": "Customer support",
+      "writing-content": "Writing and content",
+      "research-academia": "Research and academia",
+      "biology-life-sciences": "Biology and life sciences",
+      "medicine-health": "Medicine and health",
+      law: "Law",
+      "finance-accounting": "Finance and accounting",
+      "education-teaching": "Education and teaching",
+      engineering: "Engineering (non-software)",
+      student: "Student",
+    } satisfies Record<UserContextPick, string>,
+    usage: "Audio today",
+    usageValue: "{used} of {cap} minutes",
+    usageResets: "Resets at",
   },
   dictionary: {
     title: "Dictionary",

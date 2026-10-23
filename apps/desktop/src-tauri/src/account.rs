@@ -1,7 +1,7 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::api::ApiFailure;
+use crate::api::{ApiFailure, UserContext};
 use crate::auth::Secret;
 use crate::auth::account::{AccountError, SignInStep, User};
 use crate::commands::blocking;
@@ -15,6 +15,16 @@ use crate::{tray, windows};
 pub struct AccountView {
     signed_in: bool,
     username: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppState {
+    signed_in: bool,
+    username: Option<String>,
+    first_run_done: bool,
+    onboarded: bool,
+    hands_free_note: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -79,6 +89,7 @@ impl From<ApiFailure> for Problem {
 pub struct StyleOption {
     id: String,
     name: String,
+    prompt: String,
     builtin: bool,
 }
 
@@ -88,6 +99,7 @@ pub struct Onboarding {
     styles: Vec<StyleOption>,
     selected: String,
     dictation_languages: Vec<Language>,
+    context: UserContext,
 }
 
 #[tauri::command]
@@ -107,12 +119,31 @@ pub async fn account_status(app: AppHandle) -> AccountView {
 }
 
 #[tauri::command]
+pub async fn app_state(app: AppHandle) -> AppState {
+    blocking(app, |_, shell| {
+        let settings = shell.settings();
+        let signed_in = shell.account.is_signed_in();
+        let user = signed_in.then(|| shell.account.user().ok()).flatten();
+        AppState {
+            signed_in,
+            onboarded: user
+                .as_ref()
+                .is_none_or(|user| settings.onboarded_users.contains(&user.sub)),
+            username: user.map(|user| user.username),
+            first_run_done: settings.first_run_done,
+            hands_free_note: settings.first_run_done && !settings.hands_free_note_seen,
+        }
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn sign_in(app: AppHandle, username: String, password: String) -> Result<Step, Problem> {
     let password = Secret::new(password);
-    blocking(app, move |app, shell| {
+    blocking(app, move |_, shell| {
         match shell.account.sign_in(username.trim(), password)? {
             SignInStep::NewPasswordRequired => Ok(Step::ChoosePassword),
-            SignInStep::SignedIn(user) => Ok(after_sign_in(app, shell, &user)),
+            SignInStep::SignedIn(user) => Ok(after_sign_in(shell, &user)),
         }
     })
     .await
@@ -121,9 +152,9 @@ pub async fn sign_in(app: AppHandle, username: String, password: String) -> Resu
 #[tauri::command]
 pub async fn choose_password(app: AppHandle, password: String) -> Result<Step, Problem> {
     let password = Secret::new(password);
-    blocking(app, move |app, shell| {
+    blocking(app, move |_, shell| {
         let user = shell.account.complete_new_password(password)?;
-        Ok(after_sign_in(app, shell, &user))
+        Ok(after_sign_in(shell, &user))
     })
     .await
 }
@@ -132,18 +163,26 @@ pub async fn choose_password(app: AppHandle, password: String) -> Result<Step, P
 pub async fn onboarding(app: AppHandle) -> Result<Onboarding, Problem> {
     blocking(app, |_, shell| {
         let styles = shell.api.styles()?.styles;
-        let selected = shell.api.settings()?.default_style_id;
+        let settings = shell.api.settings()?;
+        let user = shell.account.user()?;
+        let dictation_languages = if shell.settings().onboarded_users.contains(&user.sub) {
+            settings.dictation_languages
+        } else {
+            vec![locale::system_language()]
+        };
         Ok(Onboarding {
             styles: styles
                 .into_iter()
                 .map(|style| StyleOption {
                     id: style.id,
                     name: style.name,
+                    prompt: style.prompt,
                     builtin: style.builtin,
                 })
                 .collect(),
-            selected,
-            dictation_languages: vec![locale::system_language()],
+            selected: settings.default_style_id,
+            dictation_languages,
+            context: settings.context,
         })
     })
     .await
@@ -154,14 +193,16 @@ pub async fn save_onboarding(
     app: AppHandle,
     style_id: String,
     dictation_languages: Vec<Language>,
+    context: UserContext,
 ) -> Result<(), Problem> {
     if dictation_languages.is_empty() {
         return Err(Message::Generic.into());
     }
-    blocking(app, move |app, shell| {
+    blocking(app, move |_, shell| {
         let mut settings = shell.api.settings()?;
         settings.default_style_id = style_id;
         settings.dictation_languages = dictation_languages;
+        settings.context = context;
         shell.api.replace_settings(&settings)?;
         let user = shell.account.user()?;
         shell.update_settings(|settings| {
@@ -169,15 +210,32 @@ pub async fn save_onboarding(
                 settings.onboarded_users.push(user.sub.clone());
             }
         });
-        finish(app, shell);
         Ok(())
     })
     .await
 }
 
 #[tauri::command]
-pub fn open_sign_in(app: AppHandle) {
-    windows::open_account(&app, false);
+pub fn finish_onboarding(shell: State<'_, Shell>) {
+    shell.update_settings(|settings| {
+        settings.first_run_done = true;
+        settings.hands_free_note_seen = true;
+    });
+}
+
+#[tauri::command]
+pub fn dismiss_hands_free_note(shell: State<'_, Shell>) {
+    shell.update_settings(|settings| settings.hands_free_note_seen = true);
+}
+
+#[tauri::command]
+pub fn open_sign_in(app: AppHandle, shell: State<'_, Shell>) {
+    windows::open_main(&app, "");
+    let _ = app.emit_to(
+        windows::MAIN,
+        "account-changed",
+        shell.account.is_signed_in(),
+    );
 }
 
 #[tauri::command]
@@ -185,22 +243,12 @@ pub async fn sign_out(app: AppHandle) {
     blocking(app, |_, shell| shell.account.sign_out()).await;
 }
 
-fn after_sign_in(app: &AppHandle, shell: &Shell, user: &User) -> Step {
+fn after_sign_in(shell: &Shell, user: &User) -> Step {
     log::info!("signed in");
     if shell.settings().onboarded_users.contains(&user.sub) {
-        finish(app, shell);
         return Step::Done;
     }
     Step::Onboarding
-}
-
-fn finish(app: &AppHandle, shell: &Shell) {
-    if let Some(window) = app.get_webview_window(windows::ACCOUNT) {
-        let _ = window.close();
-    }
-    if !shell.settings().first_run_done {
-        windows::open_first_run(app);
-    }
 }
 
 pub fn changed(app: &AppHandle, signed_in: bool) {
@@ -216,24 +264,28 @@ pub fn changed(app: &AppHandle, signed_in: bool) {
     tray::show_signed_in(app, signed_in);
     let _ = app.emit("account-changed", signed_in);
     if !signed_in {
-        windows::open_account(app, false);
+        windows::open_main(app, "");
     }
 }
 
-pub fn on_startup(app: &AppHandle) {
+pub fn on_startup(app: &AppHandle, launched_by_user: bool) {
     let shell = app.state::<Shell>();
-    if !shell.account.is_signed_in() {
-        windows::open_account(app, false);
+    if launched_by_user || !shell.account.is_signed_in() || !shell.settings().first_run_done {
+        windows::open_main(app, "");
+        if shell.account.is_signed_in() {
+            let app = app.clone();
+            std::thread::spawn(move || app.state::<Shell>().reload_rules());
+        }
         return;
     }
     let app = app.clone();
     std::thread::spawn(move || {
         let shell = app.state::<Shell>();
-        let onboarded = |user: &User| shell.settings().onboarded_users.contains(&user.sub);
-        match shell.account.user() {
-            Ok(user) if !onboarded(&user) => windows::open_account(&app, true),
-            _ if !shell.settings().first_run_done => windows::open_first_run(&app),
-            _ => {}
+        if let Ok(user) = shell.account.user()
+            && !shell.settings().onboarded_users.contains(&user.sub)
+        {
+            let main = app.clone();
+            let _ = app.run_on_main_thread(move || windows::open_main(&main, ""));
         }
         shell.reload_rules();
     });
@@ -242,7 +294,7 @@ pub fn on_startup(app: &AppHandle) {
 pub fn toggle_from_tray(app: &AppHandle) {
     let shell = app.state::<Shell>();
     if !shell.account.is_signed_in() {
-        windows::open_account(app, false);
+        windows::open_main(app, "");
         return;
     }
     let app = app.clone();

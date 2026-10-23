@@ -1,10 +1,8 @@
 import "@take-my-word/brand/index.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Account } from "./views/Account.tsx";
-import { FirstRun } from "./views/FirstRun.tsx";
+import { Main } from "./views/Main.tsx";
 import { Overlay } from "./views/Overlay.tsx";
-import { Settings } from "./views/Settings.tsx";
 import { languageFromSearch } from "./i18n.ts";
 import { Root } from "./Root.tsx";
 import { applyTheme, themeFromSearch } from "./theme.ts";
@@ -13,9 +11,7 @@ import { viewFromSearch } from "./view.ts";
 import "./styles.css";
 
 const screens = {
-  settings: Settings,
-  "first-run": FirstRun,
-  account: Account,
+  main: Main,
   overlay: Overlay,
   update: Update,
 };
@@ -31,7 +27,13 @@ applyTheme(theme);
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <Root language={language} theme={theme} followsTheme={!overlay} screen={Screen} />
+      <Root
+        language={language}
+        theme={theme}
+        followsTheme={!overlay}
+        forwardsKeys={!overlay}
+        screen={Screen}
+      />
     </StrictMode>,
   );
 }

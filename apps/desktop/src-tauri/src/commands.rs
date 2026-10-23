@@ -46,7 +46,7 @@ pub fn overview(app: AppHandle, shell: State<'_, Shell>) -> Overview {
 #[tauri::command]
 pub fn capture_hotkey(app: AppHandle, shell: State<'_, Shell>) -> Result<(), Problem> {
     let visible = app
-        .get_webview_window(windows::SETTINGS)
+        .get_webview_window(windows::MAIN)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
     if !visible || !foreground::foreground_is_this_process() {
@@ -105,11 +105,24 @@ pub fn dismiss_overlay(shell: State<'_, Shell>) {
 }
 
 #[tauri::command]
-pub fn finish_first_run(app: AppHandle, shell: State<'_, Shell>) {
-    shell.update_settings(|settings| settings.first_run_done = true);
-    if let Some(window) = app.get_webview_window(windows::FIRST_RUN) {
-        let _ = window.close();
-    }
+pub fn forward_key(shell: State<'_, Shell>, code: String, down: bool) {
+    shell.forward_key(&code, down);
+}
+
+#[tauri::command]
+pub fn insert_ack(shell: State<'_, Shell>, id: u64, inserted: bool) {
+    shell.acks.answer(id, inserted);
+}
+
+#[tauri::command]
+pub fn stop_dictation(shell: State<'_, Shell>) {
+    shell.stop_dictation();
+}
+
+#[tauri::command]
+pub fn check_microphone(shell: State<'_, Shell>, on: bool) -> MicStatus {
+    shell.check_microphone(on);
+    shell.microphone.get()
 }
 
 #[tauri::command]
@@ -142,7 +155,6 @@ pub fn set_ui_language(
     let language = i18n::choose(choice);
     log::info!("ui language: {}", language.code());
     tray::relabel(&app, shell.account.is_signed_in());
-    windows::retitle(&app);
     if let Err(error) = app.emit("ui-language", language) {
         log::warn!("announcing the ui language failed: {error}");
     }

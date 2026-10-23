@@ -10,6 +10,16 @@ use crate::theme::Theme;
 
 pub const FILE_NAME: &str = "settings.json";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Placement {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub maximized: bool,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
@@ -20,6 +30,9 @@ pub struct Settings {
     pub ui_language: Option<Language>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub theme: Option<Theme>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub main_window: Option<Placement>,
+    pub hands_free_note_seen: bool,
 }
 
 pub fn load(path: &Path) -> Settings {
@@ -51,7 +64,31 @@ mod tests {
     use super::*;
     use crate::hotkey::HotkeyKey;
 
-    fn scratch(name: &str, contents: Option<&str>) -> std::path::PathBuf {
+    struct Scratch(std::path::PathBuf);
+
+    impl std::ops::Deref for Scratch {
+        type Target = Path;
+
+        fn deref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl AsRef<Path> for Scratch {
+        fn as_ref(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            if let Some(dir) = self.0.parent() {
+                let _ = fs::remove_dir_all(dir);
+            }
+        }
+    }
+
+    fn scratch(name: &str, contents: Option<&str>) -> Scratch {
         let dir = std::env::temp_dir().join(format!("tmw-config-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -59,7 +96,7 @@ mod tests {
         if let Some(contents) = contents {
             fs::write(&path, contents).unwrap();
         }
-        path
+        Scratch(path)
     }
 
     #[test]
@@ -129,6 +166,18 @@ mod tests {
     }
 
     #[test]
+    fn a_0_2_0_settings_file_reads_as_an_upgraded_user_who_has_not_seen_hands_free() {
+        let path = scratch(
+            "upgraded",
+            Some(r#"{"hotkey":["ctrl","meta"],"firstRunDone":true,"onboardedUsers":["a"]}"#),
+        );
+        let settings = load(&path);
+        assert!(settings.first_run_done);
+        assert!(!settings.hands_free_note_seen);
+        assert_eq!(settings.main_window, None);
+    }
+
+    #[test]
     fn saved_settings_survive_a_restart() {
         let path = scratch("saved", None);
         let settings = Settings {
@@ -137,6 +186,14 @@ mod tests {
             onboarded_users: vec!["2448e4f8-2081-70f1-5c1b-1f2e3d4c5b6a".into()],
             ui_language: Some(Language::En),
             theme: Some(Theme::Light),
+            main_window: Some(Placement {
+                x: -1200,
+                y: 40,
+                width: 1100,
+                height: 760,
+                maximized: true,
+            }),
+            hands_free_note_seen: true,
         };
         save(&path, &settings).unwrap();
         assert_eq!(load(&path), settings);

@@ -4,6 +4,7 @@ import type { DictionaryStore, TermRecord } from "../dictionary/store.ts";
 import type { DictationEntry, HistoryStore } from "../history/store.ts";
 import type { SettingsStore } from "../settings/store.ts";
 import type { StyleRecord, StyleStore } from "../styles/store.ts";
+import type { UsageStore } from "../usage/store.ts";
 
 class Partitions<T> {
   private readonly users = new Map<string, Map<string, T>>();
@@ -25,6 +26,7 @@ export function memoryStores() {
   const settingsItems = new Map<string, Settings>();
   const dictations = new Partitions<DictationEntry>();
   const expiries = new Partitions<number>();
+  const quotas = new Partitions<number>();
 
   const dictionary: DictionaryStore = {
     list: (userId) => Promise.resolve([...terms.of(userId).values()]),
@@ -130,12 +132,20 @@ export function memoryStores() {
     remove: (userId, sk) => Promise.resolve(dictations.of(userId).delete(sk)),
   };
 
+  const usage: UsageStore = {
+    usedSeconds: (userId, day) => Promise.resolve(quotas.of(userId).get(day) ?? 0),
+  };
+
   return {
     dictionary,
     styles,
     appRules,
     settings,
     history,
+    usage,
+    seedQuota(userId: string, day: string, seconds: number) {
+      quotas.of(userId).set(day, seconds);
+    },
     seedDictation(userId: string, entry: DictationEntry, expiresAt: number) {
       dictations.of(userId).set(entry.sk, entry);
       expiries.of(userId).set(entry.sk, expiresAt);

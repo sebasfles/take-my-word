@@ -2,4 +2,5 @@
 @import "./styles/window.css";
 @import "./styles/settings.css";
 @import "./styles/editors.css";
+@import "./styles/onboarding.css";
 @import "./styles/overlay.css";

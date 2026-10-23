@@ -43,48 +43,56 @@ export function AppRules() {
   const data = state.kind === "ready" ? state.data : null;
 
   return (
-    <SectionPage title="settings.appRules" intro="appRules.intro">
-      {data && (
-        <AddRule
-          data={data}
-          onAdded={(rule) => {
-            update((current) => ({ ...current, rules: sorted([...current.rules, rule]) }));
-          }}
-        />
-      )}
-      <LoadState state={state} onRetry={retry} />
-      {data && (
-        <section className="list-section">
-          <p className="muted">
-            {t("common.count", { count: data.rules.length, max: appRuleLimits.rules })}
-          </p>
-          {data.rules.length === 0 ? (
-            <Empty title="appRules.emptyTitle" body="appRules.empty" />
-          ) : (
-            <ul className="list">
-              {data.rules.map((rule) => (
-                <RuleRow
-                  key={rule.id}
-                  rule={rule}
-                  styles={data.styles}
-                  onChanged={(changed) => {
-                    update((current) => ({
-                      ...current,
-                      rules: current.rules.map((item) => (item.id === changed.id ? changed : item)),
-                    }));
-                  }}
-                  onDeleted={() => {
-                    update((current) => ({
-                      ...current,
-                      rules: current.rules.filter((item) => item.id !== rule.id),
-                    }));
-                  }}
-                />
-              ))}
-            </ul>
+    <SectionPage title="settings.appRules" intro="appRules.intro" wide>
+      <div className="editor">
+        <div className="editor-form">
+          {data && (
+            <AddRule
+              data={data}
+              onAdded={(rule) => {
+                update((current) => ({ ...current, rules: sorted([...current.rules, rule]) }));
+              }}
+            />
           )}
-        </section>
-      )}
+        </div>
+        <div className="editor-list">
+          <LoadState state={state} onRetry={retry} />
+          {data && (
+            <section className="list-section">
+              <p className="muted">
+                {t("common.count", { count: data.rules.length, max: appRuleLimits.rules })}
+              </p>
+              {data.rules.length === 0 ? (
+                <Empty title="appRules.emptyTitle" body="appRules.empty" />
+              ) : (
+                <ul className="list">
+                  {data.rules.map((rule) => (
+                    <RuleRow
+                      key={rule.id}
+                      rule={rule}
+                      styles={data.styles}
+                      onChanged={(changed) => {
+                        update((current) => ({
+                          ...current,
+                          rules: current.rules.map((item) =>
+                            item.id === changed.id ? changed : item,
+                          ),
+                        }));
+                      }}
+                      onDeleted={() => {
+                        update((current) => ({
+                          ...current,
+                          rules: current.rules.filter((item) => item.id !== rule.id),
+                        }));
+                      }}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+        </div>
+      </div>
     </SectionPage>
   );
 }

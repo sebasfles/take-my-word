@@ -25,17 +25,30 @@ describe("Overlay", () => {
     vi.clearAllMocks();
   });
 
-  it("follows the shell from listening to processing to hidden", async () => {
+  it("follows the shell from listening to processing to hidden with no visible label", async () => {
     await showing({ state: "listening" });
     expect(screen.getByRole("status").textContent).toBe("Listening");
+    expect(document.querySelector(".overlay-quiet .tmw-overlay-label")).not.toBeNull();
     act(() => {
       listeners.overlay?.({ state: "processing" });
     });
     expect(screen.getByRole("status").textContent).toBe("Cleaning up");
+    expect(document.querySelector(".overlay-quiet .tmw-spinner")).not.toBeNull();
     act(() => {
       listeners.overlay?.({ state: "hidden" });
     });
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("offers a stop only while hands-free, and stopping goes to the shell", async () => {
+    await showing({ state: "listening" });
+    expect(screen.queryByRole("button")).toBeNull();
+    act(() => {
+      listeners.overlay?.({ state: "handsFree" });
+    });
+    expect(document.querySelectorAll(".waveform-bar")).toHaveLength(9);
+    fireEvent.click(screen.getByRole("button", { name: "Stop and paste" }));
+    expect(fakeBridge.stopDictation).toHaveBeenCalledOnce();
   });
 
   it("shows the shell's message ids in the chosen language", async () => {

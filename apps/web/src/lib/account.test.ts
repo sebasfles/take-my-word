@@ -1,7 +1,8 @@
-import type { DictionaryTerm, Style } from "@take-my-word/shared";
+import type { DictionaryTerm, Style, UserContextPick } from "@take-my-word/shared";
 import { describe, expect, it } from "vitest";
 import {
   bothLoaded,
+  contextLabels,
   formatDate,
   formatDateTime,
   formatSeconds,
@@ -12,6 +13,7 @@ import {
   sortTerms,
   styleLabel,
   termSort,
+  usageMinutes,
 } from "./account.ts";
 import { dictionary } from "./i18n.ts";
 
@@ -171,5 +173,30 @@ describe("languageList", () => {
     expect(languageList(["es"], "en")).toBe("Spanish");
     expect(languageList(["es", "en"], "en")).toBe("Spanish and English");
     expect(languageList(["en", "es"], "es")).toBe("Inglés y español");
+  });
+});
+
+describe("the user's context and usage", () => {
+  it("labels the picks in the reader's language, in the order chosen", () => {
+    const context = { picks: ["law", "data-ai"] as UserContextPick[], detail: "contratos" };
+    expect(contextLabels(context, dictionary("es").account)).toEqual(["Derecho", "Datos e IA"]);
+    expect(contextLabels(context, dictionary("en").account)).toEqual(["Law", "Data and AI"]);
+    expect(contextLabels({ picks: [], detail: "x" }, dictionary("en").account)).toEqual([]);
+  });
+
+  it("counts started minutes and never shows more than the cap", () => {
+    const resetsAt = "2026-10-24T00:00:00.000Z";
+    expect(usageMinutes({ usedSeconds: 61, capSeconds: 3600, resetsAt })).toEqual({
+      used: "2",
+      cap: "60",
+    });
+    expect(usageMinutes({ usedSeconds: 3725, capSeconds: 3600, resetsAt })).toEqual({
+      used: "60",
+      cap: "60",
+    });
+    expect(usageMinutes({ usedSeconds: 0, capSeconds: 1800, resetsAt })).toEqual({
+      used: "0",
+      cap: "30",
+    });
   });
 });

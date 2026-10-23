@@ -24,10 +24,14 @@ use windows::Win32::System::Memory::{
     GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
 };
 use windows::Win32::System::Ole::CF_UNICODETEXT;
-use windows::Win32::System::Threading::GetCurrentThreadId;
+use windows::Win32::System::Threading::{
+    GetCurrentThreadId, OpenThread, THREAD_QUERY_LIMITED_INFORMATION,
+};
+use windows::Win32::System::WindowsProgramming::QueryThreadCycleTime;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GUITHREADINFO, GetGUIThreadInfo,
-    GetMessageW, GetWindowThreadProcessId, HWND_MESSAGE, MSG, PostMessageW, RegisterClassW,
+    GetMessageW, GetWindowThreadProcessId, HWND_MESSAGE, MSG, MsgWaitForMultipleObjects,
+    PM_NOREMOVE, PM_QS_SENDMESSAGE, PeekMessageW, PostMessageW, QS_SENDMESSAGE, RegisterClassW,
     WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_DESTROYCLIPBOARD, WM_RENDERALLFORMATS,
     WM_RENDERFORMAT, WNDCLASSW,
 };
@@ -35,7 +39,7 @@ use windows::core::{BOOL, HSTRING, PCWSTR, w};
 
 use super::{
     Clipboard, ClipboardError, Ignored, ReadActivity, ReadOrder, ReadOutcome, Reader, WaitNode,
-    depth_below, probe_order, renders_for, sends_to,
+    depth_below, probe_order, ran_first, renders_for, sends_to,
 };
 
 const WM_COMMANDS: u32 = WM_APP + 1;
@@ -63,10 +67,37 @@ struct Activity {
     order: ReadOrder,
     attempt: u32,
     parents: HashMap<u32, u32>,
-    threads: Vec<(u32, u32)>,
+    threads: Arc<Vec<TargetThread>>,
+    cycles_at_arm: Vec<Option<u64>>,
 }
 
-type TargetSnapshot = (HashMap<u32, u32>, Vec<(u32, u32)>);
+struct TargetThread {
+    process: u32,
+    thread: u32,
+    handle: Option<ThreadHandle>,
+}
+
+impl TargetThread {
+    fn cycles(&self) -> Option<u64> {
+        let handle = self.handle.as_ref()?;
+        let mut cycles = 0;
+        unsafe { QueryThreadCycleTime(handle.0, &mut cycles) }.ok()?;
+        Some(cycles)
+    }
+}
+
+struct ThreadHandle(HANDLE);
+
+unsafe impl Send for ThreadHandle {}
+unsafe impl Sync for ThreadHandle {}
+
+impl Drop for ThreadHandle {
+    fn drop(&mut self) {
+        let _ = unsafe { CloseHandle(self.0) };
+    }
+}
+
+type TargetSnapshot = (HashMap<u32, u32>, Vec<TargetThread>);
 
 type SharedActivity = Arc<Mutex<Activity>>;
 
@@ -168,8 +199,15 @@ impl Clipboard for SystemClipboard {
             while self.reads.try_recv().is_ok() {}
             if let Some((parents, threads)) = snapshot {
                 activity.parents = parents;
-                activity.threads = threads;
+                activity.threads = Arc::new(threads);
             }
+            let reading = Instant::now();
+            activity.cycles_at_arm = activity.threads.iter().map(TargetThread::cycles).collect();
+            log::info!(
+                "cycle times of {} target threads read for attempt {attempt} in {} us",
+                activity.threads.len(),
+                reading.elapsed().as_micros()
+            );
             activity.order.arm();
             activity.attempt = attempt;
         }
@@ -370,14 +408,17 @@ fn answer_render_request() {
     }) else {
         return;
     };
-    let Ok((mut order, attempt, parents, threads)) = activity.lock().map(|activity| {
-        (
-            activity.order,
-            activity.attempt,
-            activity.parents.clone(),
-            activity.threads.clone(),
-        )
-    }) else {
+    let Ok((mut order, attempt, parents, threads, cycles_at_arm)) =
+        activity.lock().map(|activity| {
+            (
+                activity.order,
+                activity.attempt,
+                activity.parents.clone(),
+                Arc::clone(&activity.threads),
+                activity.cycles_at_arm.clone(),
+            )
+        })
+    else {
         return;
     };
     let opener = unsafe { GetOpenClipboardWindow() }
@@ -396,7 +437,7 @@ fn answer_render_request() {
     let outcome = order.read(
         || {
             if opener_pid == 0 {
-                let probed = probe_sender(&threads);
+                let probed = probe_sender(&threads, &cycles_at_arm);
                 reader = probed.sender.map_or(Reader::Unproven, Reader::Sender);
                 probe = Some(probed);
             }
@@ -430,8 +471,9 @@ fn answer_render_request() {
     };
     let proof = probe.map_or_else(String::new, |probe| {
         format!(
-            ", wait chains of {} target GUI threads in {} ms, {} failed{}",
+            ", wait chains of {} target GUI threads ({} ran since the keystroke) in {} ms, {} failed{}",
             probe.threads,
+            probe.ran,
             probe.took.as_millis(),
             probe.failures,
             if probe.exhausted {
@@ -472,23 +514,26 @@ fn answer_render_request() {
 struct Probe {
     sender: Option<u32>,
     threads: usize,
+    ran: usize,
     failures: usize,
     exhausted: bool,
     took: Duration,
 }
 
-fn probe_sender(threads: &[(u32, u32)]) -> Probe {
+fn probe_sender(threads: &[TargetThread], cycles_at_arm: &[Option<u64>]) -> Probe {
     let started = Instant::now();
+    let (ordered, ran) = ran_since_arm_first(threads, cycles_at_arm);
     let mut probe = Probe {
         sender: None,
         threads: 0,
+        ran,
         failures: 0,
         exhausted: false,
         took: Duration::ZERO,
     };
     let receiver = unsafe { GetCurrentThreadId() };
     match wait_chains() {
-        Some(session) => probe_threads(session.0, receiver, threads, started, &mut probe),
+        Some(session) => probe_threads(session.0, receiver, &ordered, started, &mut probe),
         None => probe.failures = 1,
     }
     probe.took = started.elapsed();
@@ -522,7 +567,27 @@ fn probe_threads(
     }
 }
 
-fn target_threads(targets: &[u32], parents: &HashMap<u32, u32>) -> Vec<(u32, u32)> {
+fn ran_since_arm_first(
+    threads: &[TargetThread],
+    cycles_at_arm: &[Option<u64>],
+) -> (Vec<(u32, u32)>, usize) {
+    let ran = threads
+        .iter()
+        .zip(cycles_at_arm)
+        .map(|(thread, at_arm)| match (thread.cycles(), at_arm) {
+            (Some(now), Some(at_arm)) => now > *at_arm,
+            _ => false,
+        })
+        .collect::<Vec<_>>();
+    let pairs = threads
+        .iter()
+        .map(|thread| (thread.process, thread.thread))
+        .collect::<Vec<_>>();
+    let ordered = ran_first(&pairs, |index| ran.get(index).copied().unwrap_or(false));
+    (ordered, ran.iter().filter(|ran| **ran).count())
+}
+
+fn target_threads(targets: &[u32], parents: &HashMap<u32, u32>) -> Vec<TargetThread> {
     let depths = parents
         .keys()
         .filter_map(|pid| {
@@ -535,6 +600,15 @@ fn target_threads(targets: &[u32], parents: &HashMap<u32, u32>) -> Vec<(u32, u32
     probe_order(&threads, |pid| {
         depths.get(&pid).copied().unwrap_or(usize::MAX)
     })
+    .into_iter()
+    .map(|(process, thread)| TargetThread {
+        process,
+        thread,
+        handle: unsafe { OpenThread(THREAD_QUERY_LIMITED_INFORMATION, false, thread) }
+            .ok()
+            .map(ThreadHandle),
+    })
+    .collect()
 }
 
 fn threads_of(processes: &HashSet<u32>) -> Option<Vec<(u32, u32)>> {
@@ -717,11 +791,18 @@ fn with_open_clipboard<T>(
         if Instant::now() >= deadline {
             return Err(win_error(error));
         }
-        thread::sleep(OPEN_RETRY);
+        answer_sent_messages(OPEN_RETRY);
     }
     let result = work();
     let _ = unsafe { CloseClipboard() };
     result
+}
+
+fn answer_sent_messages(wait: Duration) {
+    let millis = u32::try_from(wait.as_millis()).unwrap_or(u32::MAX);
+    let _ = unsafe { MsgWaitForMultipleObjects(None, false, millis, QS_SENDMESSAGE) };
+    let mut message = MSG::default();
+    let _ = unsafe { PeekMessageW(&mut message, None, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE) };
 }
 
 fn snapshot() -> Vec<(u32, Vec<u8>)> {
@@ -803,6 +884,7 @@ fn win_error(error: windows::core::Error) -> ClipboardError {
 #[cfg(test)]
 mod tests {
     use windows::Win32::System::DataExchange::IsClipboardFormatAvailable;
+    use windows::Win32::UI::WindowsAndMessaging::{PostThreadMessageW, WM_QUIT};
 
     use super::*;
 
@@ -857,15 +939,17 @@ mod tests {
     fn two_threads_probing_at_once_neither_crash_nor_block_each_other() {
         let _paste = SystemClipboard::spawn().unwrap();
         let _copy = SystemClipboard::spawn().unwrap();
-        let own = HashSet::from([std::process::id()]);
-        let threads = threads_of(&own).unwrap();
+        let threads = Arc::new(target_threads(
+            &[std::process::id()],
+            &crate::foreground::parent_processes(),
+        ));
         let (done, finished) = mpsc::channel();
         for _ in 0..2 {
-            let threads = threads.clone();
+            let threads = Arc::clone(&threads);
             let done = done.clone();
             thread::spawn(move || {
                 let probed = (0..20)
-                    .map(|_| probe_sender(&threads))
+                    .map(|_| probe_sender(&threads, &[]))
                     .filter(|probe| probe.sender.is_none())
                     .map(|probe| probe.threads)
                     .sum::<usize>();
@@ -878,6 +962,136 @@ mod tests {
                 .expect("a probe never finished");
             assert!(probed > 0, "no GUI thread was probed");
         }
+    }
+
+    struct IdleGuiThreads(Vec<(u32, thread::JoinHandle<()>)>);
+
+    impl IdleGuiThreads {
+        fn spawn(count: usize) -> Self {
+            let (ready, started) = mpsc::channel();
+            let threads = (0..count)
+                .map(|_| {
+                    let ready = ready.clone();
+                    let handle = thread::spawn(move || {
+                        let _window = create_window().unwrap();
+                        ready.send(unsafe { GetCurrentThreadId() }).unwrap();
+                        let mut message = MSG::default();
+                        while unsafe { GetMessageW(&mut message, None, 0, 0) }.0 > 0 {
+                            unsafe { DispatchMessageW(&message) };
+                        }
+                    });
+                    (started.recv().unwrap(), handle)
+                })
+                .collect();
+            Self(threads)
+        }
+
+        fn ids(&self) -> Vec<u32> {
+            self.0.iter().map(|(id, _)| *id).collect()
+        }
+    }
+
+    impl Drop for IdleGuiThreads {
+        fn drop(&mut self) {
+            for (id, handle) in self.0.drain(..) {
+                let _ = unsafe { PostThreadMessageW(id, WM_QUIT, WPARAM(0), LPARAM(0)) };
+                let _ = handle.join();
+            }
+        }
+    }
+
+    #[test]
+    fn a_target_thread_that_ran_since_the_keystroke_is_probed_before_idle_gui_threads() {
+        let idle = IdleGuiThreads::spawn(12);
+        let (go, wait) = mpsc::channel::<()>();
+        let (id_sender, id) = mpsc::channel();
+        let busy = thread::spawn(move || {
+            id_sender.send(unsafe { GetCurrentThreadId() }).unwrap();
+            wait.recv().unwrap();
+            let until = Instant::now() + Duration::from_millis(20);
+            while Instant::now() < until {
+                std::hint::spin_loop();
+            }
+        });
+        let busy_id = id.recv().unwrap();
+        thread::sleep(Duration::from_millis(50));
+        let threads = target_threads(
+            &[std::process::id()],
+            &crate::foreground::parent_processes(),
+        );
+        let at_arm = threads.iter().map(TargetThread::cycles).collect::<Vec<_>>();
+        go.send(()).unwrap();
+        busy.join().unwrap();
+        let (ordered, ran) = ran_since_arm_first(&threads, &at_arm);
+        let position = |id: u32| ordered.iter().position(|(_, thread)| *thread == id);
+        let busy_at = position(busy_id).expect("the busy thread was not in the snapshot");
+        assert!(ran >= 1);
+        for idle in idle.ids() {
+            assert!(busy_at < position(idle).expect("an idle thread was not in the snapshot"));
+        }
+    }
+
+    #[test]
+    #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
+    fn a_windowless_read_behind_many_idle_gui_threads_is_proven_within_the_budget() {
+        let mut clipboard = SystemClipboard::spawn().unwrap();
+        let _idle = IdleGuiThreads::spawn(80);
+        let (go, wait) = mpsc::channel::<()>();
+        let reader = thread::spawn(move || {
+            wait.recv().unwrap();
+            read_text_as(None)
+        });
+        clipboard
+            .offer("dictado detrás de otros hilos", &[std::process::id()])
+            .unwrap();
+        clipboard.arm(1);
+        go.send(()).unwrap();
+        assert_eq!(
+            reader.join().unwrap().as_deref(),
+            Some("dictado detrás de otros hilos [private]")
+        );
+        assert!(clipboard.wait_for_read(Duration::from_secs(2)));
+        clipboard.restore().unwrap();
+    }
+
+    #[test]
+    #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
+    fn a_reader_holding_the_clipboard_open_during_the_restore_is_answered_and_the_restore_lands() {
+        let mut clipboard = SystemClipboard::spawn().unwrap();
+        clipboard
+            .offer("dictado retenido", &[std::process::id().wrapping_add(4)])
+            .unwrap();
+        clipboard.arm(1);
+        let (opened, is_open) = mpsc::channel();
+        let (go, read_now) = mpsc::channel::<()>();
+        let reader = thread::spawn(move || {
+            let mut attempt = 0;
+            while unsafe { OpenClipboard(None) }.is_err() {
+                attempt += 1;
+                assert!(attempt < 50, "the clipboard stayed busy");
+                thread::sleep(OPEN_RETRY);
+            }
+            opened.send(()).unwrap();
+            read_now.recv().unwrap();
+            let got = unsafe { GetClipboardData(u32::from(CF_UNICODETEXT.0)) }.is_ok();
+            let _ = unsafe { CloseClipboard() };
+            got
+        });
+        is_open.recv().unwrap();
+        let restoring = thread::spawn(move || {
+            let started = Instant::now();
+            let restored = clipboard.restore();
+            (restored.is_ok(), started.elapsed())
+        });
+        thread::sleep(Duration::from_millis(100));
+        go.send(()).unwrap();
+        assert!(
+            !reader.join().unwrap(),
+            "a reader outside the target got the text"
+        );
+        let (restored, took) = restoring.join().unwrap();
+        assert!(restored, "the restore gave up");
+        assert!(took < Duration::from_secs(2), "the restore waited {took:?}");
     }
 
     #[test]

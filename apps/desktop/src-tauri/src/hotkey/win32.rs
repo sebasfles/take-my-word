@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, mpsc};
 use std::thread;
 
@@ -6,8 +7,8 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, GetKeyNameTextW, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS,
     KEYBDINPUT, KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, MapVirtualKeyW, SendInput, VIRTUAL_KEY,
-    VK_CONTROL, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU,
-    VK_RSHIFT, VK_RWIN, VK_SHIFT,
+    VK_CONTROL, VK_ESCAPE, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL,
+    VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_EXTENDED,
@@ -32,6 +33,12 @@ struct RawKey {
 }
 
 static RAW_KEYS: OnceLock<mpsc::Sender<RawKey>> = OnceLock::new();
+static SWALLOW_ESCAPE: AtomicBool = AtomicBool::new(false);
+static ESCAPE_HELD_BACK: AtomicBool = AtomicBool::new(false);
+
+pub fn swallow_escape(on: bool) {
+    SWALLOW_ESCAPE.store(on, Ordering::SeqCst);
+}
 
 unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code == HC_ACTION as i32
@@ -39,15 +46,32 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     {
         let info = unsafe { *(lparam.0 as *const KBDLLHOOKSTRUCT) };
         let message = wparam.0 as u32;
-        let _ = sender.send(RawKey {
+        let raw = RawKey {
             vk: info.vkCode,
             scan: info.scanCode,
             flags: info.flags.0,
             extra: info.dwExtraInfo,
             up: message == WM_KEYUP || message == WM_SYSKEYUP,
-        });
+        };
+        let _ = sender.send(raw);
+        if holds_back(raw, &SWALLOW_ESCAPE, &ESCAPE_HELD_BACK) {
+            return LRESULT(1);
+        }
     }
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
+}
+
+fn holds_back(raw: RawKey, swallow: &AtomicBool, held_back: &AtomicBool) -> bool {
+    let own = raw.flags & LLKHF_INJECTED.0 != 0 && raw.extra == OWN_INJECTION_TAG;
+    if raw.vk != u32::from(VK_ESCAPE.0) || own {
+        return false;
+    }
+    if raw.up {
+        return held_back.swap(false, Ordering::SeqCst);
+    }
+    let swallowed = swallow.load(Ordering::SeqCst);
+    held_back.store(swallowed, Ordering::SeqCst);
+    swallowed
 }
 
 pub fn install(mut sink: KeySink) -> Result<Arc<dyn KeyHook + Send + Sync>, HookError> {
@@ -282,6 +306,31 @@ mod tests {
                 down: true
             })
         );
+    }
+
+    #[test]
+    fn esc_is_held_back_from_other_apps_only_while_hands_free_listens() {
+        let swallow = AtomicBool::new(false);
+        let held_back = AtomicBool::new(false);
+        let escape = |up: bool| RawKey {
+            up,
+            ..raw(VK_ESCAPE, 0x01, 0, 0)
+        };
+        assert!(!holds_back(escape(false), &swallow, &held_back));
+        assert!(!holds_back(escape(true), &swallow, &held_back));
+        swallow.store(true, Ordering::SeqCst);
+        assert!(holds_back(escape(false), &swallow, &held_back));
+        assert!(!holds_back(
+            raw(VK_LCONTROL, 0x1D, 0, 0),
+            &swallow,
+            &held_back
+        ));
+        let own = raw(VK_ESCAPE, 0x01, LLKHF_INJECTED.0, OWN_INJECTION_TAG);
+        assert!(!holds_back(own, &swallow, &held_back));
+        swallow.store(false, Ordering::SeqCst);
+        assert!(holds_back(escape(true), &swallow, &held_back));
+        assert!(!holds_back(escape(false), &swallow, &held_back));
+        assert!(!holds_back(escape(true), &swallow, &held_back));
     }
 
     #[test]

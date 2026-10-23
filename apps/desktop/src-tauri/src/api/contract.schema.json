@@ -193,13 +193,53 @@
           "refiner"
         ],
         "additionalProperties": false
+      },
+      "context": {
+        "type": "object",
+        "properties": {
+          "picks": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "software-development",
+                "data-ai",
+                "design",
+                "product-management",
+                "marketing",
+                "sales",
+                "customer-support",
+                "writing-content",
+                "research-academia",
+                "biology-life-sciences",
+                "medicine-health",
+                "law",
+                "finance-accounting",
+                "education-teaching",
+                "engineering",
+                "student"
+              ]
+            }
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "picks",
+          "detail"
+        ],
+        "additionalProperties": false
       }
     },
     "required": [
       "defaultStyleId",
       "locale",
       "dictationLanguages",
-      "providers"
+      "providers",
+      "context"
     ],
     "additionalProperties": false
   },
