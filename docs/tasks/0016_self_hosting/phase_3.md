@@ -187,4 +187,17 @@ The branch was rebased, so it needs `--force-with-lease` (no tag exists).
 
 Dev after the rebase ("dev available" to "dev free"): the branch's api and web (7fb63f8, code 4af31fd) built and swapped with `pnpm deploy:<api|web> build|swap`, 15:34:36 to 15:35:07 UTC, discovery 200; api e2e 37 passed, web integration 4 passed, web e2e 16 passed; develop 7ae8a05 redeployed from a clean clone with develop's own api and web steps, 15:38:33 to 15:39:32 UTC, exit 0 (`.verify/dev-redeploy-develop.out`); `/` 200 with develop's landing, `/en` and discovery 404 again.
 
+### Release 0.3.0
+
+On the om-manager's go. The notes were written by the om-developer, uncommitted, in the 0.2.0 form (English, then neutral Spanish).
+`pnpm release:desktop 0.3.0` was run by the om-reviewer, because the script pushes branch and tag and the remote stays the om-reviewer's: tag `desktop-v0.3.0` at 76dc174 ("chore(desktop): release 0.3.0"), on top of 8862e98.
+The branch is never rebased or force-pushed from here.
+
+- desktop-release run 39982887012: success in 7 min. Every step passed: draft created, prd installer built, signed and uploaded, fixed-name installer uploaded, `latest.json` and the installers verified against `DESKTOP_UPDATER_PUBKEY`, published as latest, and the public links serve this version.
+- `gh release view desktop-v0.3.0`: "Take My Word 0.3.0", not draft, not prerelease, published 2026-10-23T16:05:37Z; assets `latest.json`, `take-my-word-windows-x64-setup.exe`, `Take.My.Word_0.3.0_x64-setup.exe` and its `.sig`; `releases/latest` is `desktop-v0.3.0`.
+- Local re-check (`.workspaces/0016_self_hosting/release-check-local.txt`): `latest.json` from the public `releases/latest/download/` URL announces 0.3.0 (pub_date 2026-10-23T16:05:32Z); `release-check.ts` with the updater public key: the windows-x86_64 and windows-x86_64-nsis entries verify, signed for 0.3.0 (installer sha256 be739f3f...1c6a), and the fixed-name installer matches the signed one; exit 0.
+- prd landing, 16:06:38 UTC: `https://<prd domain>/` 200, "Version 0.3.0 for Windows 10 and 11." in both download notes.
+- PR #23 on 76dc174: ci, linux-check, windows and release all pass.
+- Sebastian's update, read-only: at 16:07 UTC his installed app is still 0.2.0 (`HKCU\...\Uninstall` DisplayVersion 0.2.0, running since 2026-10-22 14:09 local). Its log shows the 6-hour checks ("no update available" at 01:09, 07:09 and 13:09, before the release); the next check comes at about 19:09 in the log's clock, or at his next start. Pending until he accepts the update; nothing of his was touched.
+
 ## Result
