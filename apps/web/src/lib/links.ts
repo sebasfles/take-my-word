@@ -1,4 +1,30 @@
-export const windowsDownloadUrl =
-  "https://github.com/sebasfles/take-my-word/releases/latest/download/take-my-word-windows-x64-setup.exe";
+const repositoryPattern = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
 
-export const releasesUrl = "https://github.com/sebasfles/take-my-word/releases";
+export interface ReleaseLinks {
+  repository: string;
+  selfHostGuide: string;
+  license: string;
+  releases: string;
+  windowsInstaller: string;
+  latestManifest: string;
+}
+
+export function releaseLinks(repository: string | undefined): ReleaseLinks {
+  if (repository === undefined || !repositoryPattern.test(repository)) {
+    throw new Error(
+      `RELEASES_REPOSITORY must name the GitHub repository whose releases hold the desktop app, as owner/name; got ${JSON.stringify(repository)}`,
+    );
+  }
+  const source = `https://github.com/${repository}`;
+  const releases = `${source}/releases`;
+  return {
+    repository: source,
+    selfHostGuide: `${source}/tree/HEAD/self-host`,
+    license: `${source}/blob/HEAD/LICENSE`,
+    releases,
+    windowsInstaller: `${releases}/latest/download/take-my-word-windows-x64-setup.exe`,
+    latestManifest: `${releases}/latest/download/latest.json`,
+  };
+}
+
+export const links = releaseLinks(process.env.RELEASES_REPOSITORY);

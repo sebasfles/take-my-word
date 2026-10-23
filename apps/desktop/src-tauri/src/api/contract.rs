@@ -67,6 +67,9 @@ fn shape(schema: &Value, root: &Value) -> Shape {
         return Shape::Text(Some(union));
     }
     if let Some(value) = schema.get("const") {
+        if value.is_u64() {
+            return Shape::Integer;
+        }
         return texts(std::slice::from_ref(value));
     }
     if let Some(values) = schema.get("enum").and_then(Value::as_array) {
@@ -135,6 +138,7 @@ fn the_rust_mirror_matches_the_shared_contract() {
         ("settings", rust::<UserSettings>()),
         ("styleList", rust::<StyleList>()),
         ("appRuleList", rust::<AppRuleList>()),
+        ("discovery", rust::<crate::server::Server>()),
     ]);
     let drifted = contract
         .as_object()

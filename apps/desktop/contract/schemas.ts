@@ -3,6 +3,7 @@ import {
   appRuleListSchema,
   dictationMetaSchema,
   dictationResponseSchema,
+  discoverySchema,
   settingsSchema,
   styleListSchema,
 } from "@take-my-word/shared";
@@ -19,5 +20,6 @@ export function contractSchemas(): Record<string, unknown> {
     settings: z.toJSONSchema(settingsSchema),
     styleList: z.toJSONSchema(styleListSchema),
     appRuleList: z.toJSONSchema(appRuleListSchema),
+    discovery: z.toJSONSchema(discoverySchema),
   };
 }

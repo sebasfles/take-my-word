@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { latestManifestUrl, releaseVersionReader } from "./release.ts";
+import { releaseVersionReader } from "./release.ts";
+
+const manifestUrl = "https://releases.example/latest.json";
 
 function reader(responses: (() => Promise<Response>)[], clock = { now: 0 }) {
   const fetch = vi.fn(() => (responses.shift() ?? (() => Promise.reject(new Error("none"))))());
   const read = releaseVersionReader({
+    manifestUrl,
     fetch,
     now: () => clock.now,
     timeoutMs: 50,
@@ -19,7 +22,7 @@ describe("releaseVersionReader", () => {
   it("reads the version from the latest release manifest", async () => {
     const { read, fetch } = reader([manifest("0.1.1")]);
     expect(await read()).toBe("0.1.1");
-    expect(fetch).toHaveBeenCalledWith(latestManifestUrl, expect.anything());
+    expect(fetch).toHaveBeenCalledWith(manifestUrl, expect.anything());
   });
 
   it("serves the cached version until it expires, sharing one request", async () => {
@@ -58,6 +61,7 @@ describe("releaseVersionReader", () => {
         });
       });
     const read = releaseVersionReader({
+      manifestUrl,
       fetch: slow as typeof fetch,
       now: () => 0,
       timeoutMs: 20,

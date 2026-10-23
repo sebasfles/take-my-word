@@ -1,6 +1,6 @@
 provider "aws" {
-  region              = local.aws_region
-  allowed_account_ids = [local.aws_account_id]
+  region              = var.aws_region
+  allowed_account_ids = [var.aws_account_id]
 
   default_tags {
     tags = local.tags
@@ -8,11 +8,11 @@ provider "aws" {
 }
 
 provider "github" {
-  owner = local.github_owner
+  owner = var.github.owner
 
   app_auth {
-    id              = local.github_app_id
-    installation_id = local.github_app_installation_id
+    id              = var.github.app_id
+    installation_id = var.github.app_installation_id
     pem_file        = var.github_app_pem
   }
 }

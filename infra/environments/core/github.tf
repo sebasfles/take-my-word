@@ -1,5 +1,5 @@
 resource "github_workflow_repository_permissions" "this" {
-  repository                       = local.github_repository
+  repository                       = var.github.repository
   default_workflow_permissions     = "read"
   can_approve_pull_request_reviews = true
 }
@@ -7,7 +7,7 @@ resource "github_workflow_repository_permissions" "this" {
 resource "github_repository_environment" "this" {
   for_each = local.environments
 
-  repository  = local.github_repository
+  repository  = var.github.repository
   environment = each.key
 
   deployment_branch_policy {
@@ -19,7 +19,7 @@ resource "github_repository_environment" "this" {
 resource "github_repository_environment_deployment_policy" "this" {
   for_each = local.environments
 
-  repository     = local.github_repository
+  repository     = var.github.repository
   environment    = github_repository_environment.this[each.key].environment
   branch_pattern = each.value
 }
@@ -27,7 +27,7 @@ resource "github_repository_environment_deployment_policy" "this" {
 resource "github_repository_ruleset" "this" {
   for_each = local.protected_branches
 
-  repository  = local.github_repository
+  repository  = var.github.repository
   name        = "protect-${each.key}"
   target      = "branch"
   enforcement = "active"

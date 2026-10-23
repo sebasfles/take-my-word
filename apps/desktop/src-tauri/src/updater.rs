@@ -290,20 +290,12 @@ mod tests {
     }
 
     #[test]
-    fn the_prd_updater_config_is_what_the_plugin_reads() {
+    fn the_prd_build_requires_signed_versions_and_makes_updater_artifacts() {
         let prd = build_config(Some(include_str!("../tauri.prd.conf.json")));
-        let config: tauri_plugin_updater::Config =
-            serde_json::from_value(prd.plugins.0[CONFIG_KEY].clone()).unwrap();
         assert_eq!(
-            config
-                .endpoints
-                .iter()
-                .map(|url| url.as_str())
-                .collect::<Vec<_>>(),
-            ["https://github.com/sebasfles/take-my-word/releases/latest/download/latest.json"]
+            prd.plugins.0[CONFIG_KEY]["requireSignedVersion"],
+            Value::Bool(true)
         );
-        assert!(config.require_signed_version);
-        assert!(!config.pubkey.is_empty());
         assert!(matches!(
             prd.bundle.create_updater_artifacts,
             tauri::utils::config::Updater::Bool(true)

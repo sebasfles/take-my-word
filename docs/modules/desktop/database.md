@@ -1,11 +1,11 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Desktop: database
 
-The item schema of `take-my-word-{env}` will live in `packages/shared` and `apps/api` once written; desktop never touches the table directly, only through the API.
+The item schema of `<deployment>-{env}` will live in `packages/shared` and `apps/api` once written; desktop never touches the table directly, only through the API.
 
 ## Tables owned
 
@@ -16,11 +16,11 @@ On the machine it keeps the refresh token, `DeviceKey` and `DeviceGroupKey` in W
 
 | Table | Owner module | Relationship |
 |---|---|---|
-| `take-my-word-{env}`, `APPRULE#appId` | styles | Edited in settings; read to map the focused app to a paste keystroke. |
-| `take-my-word-{env}`, `STYLE#id` | styles | Custom styles edited in settings. |
-| `take-my-word-{env}`, `DICT#term` | dictionary | Terms edited in settings. |
-| `take-my-word-{env}`, `SETTINGS` | dictation | Default style and dictation languages, read and replaced whole through `/me/settings`. |
-| `take-my-word-{env}`, `DICTATION#ts` | dictation | Created by each dictation; paged and deleted from History. |
+| `<deployment>-{env}`, `APPRULE#appId` | styles | Edited in settings; read to map the focused app to a paste keystroke. |
+| `<deployment>-{env}`, `STYLE#id` | styles | Custom styles edited in settings. |
+| `<deployment>-{env}`, `DICT#term` | dictionary | Terms edited in settings. |
+| `<deployment>-{env}`, `SETTINGS` | dictation | Default style and dictation languages, read and replaced whole through `/me/settings`. |
+| `<deployment>-{env}`, `DICTATION#ts` | dictation | Created by each dictation; paged and deleted from History. |
 
 ## Invariants kept in code
 

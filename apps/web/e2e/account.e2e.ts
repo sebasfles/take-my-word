@@ -141,7 +141,7 @@ test("shows the seeded account on every page, without a token reaching the brows
   await expect(raw).toBeVisible();
   await expect(raw).toHaveText(newest.raw);
 
-  await page.getByRole("button", { name: "Ver en español" }).click();
+  await page.getByRole("button", { name: "ES, ver en español" }).click();
   await expect(page.getByRole("heading", { name: "Historial" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Reglas por app" })).toBeVisible();
   await page.getByRole("link", { name: "Cuenta" }).click();
@@ -151,7 +151,7 @@ test("shows the seeded account on every page, without a token reaching the brows
     "Derecho",
     "Estudiante",
   ]);
-  await page.getByRole("button", { name: "Ver en inglés" }).click();
+  await page.getByRole("button", { name: "EN, view in English" }).click();
   await expect(page.getByRole("heading", { name: `Hi, ${seeded.username}` })).toBeVisible();
 
   await verifyTraffic();

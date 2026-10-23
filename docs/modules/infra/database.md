@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0006_prd_release
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Infra: database
@@ -12,7 +12,7 @@ Infra owns the table as a resource, not the items in it.
 
 | Table | Purpose |
 |---|---|
-| `take-my-word-{env}` | The single table per env: keys, TTL, stream, capacity mode; on-demand capacity. |
+| `<deployment>-{env}` | The single table per env: keys, TTL, stream, capacity mode; on-demand capacity. |
 | Secrets Manager blob per env | Groq and OpenAI keys. |
 | S3 debug bucket, dev only | Optional raw audio, deleted after one day. |
 
@@ -22,10 +22,10 @@ Infra owns no item kind.
 
 | Table | Owner module | Relationship |
 |---|---|---|
-| `take-my-word-{env}`, `SETTINGS`, `QUOTA#date` | dictation | User settings and the daily quota under each user's partition. |
-| `take-my-word-{env}`, `DICTATION#ts` | dictation | Relies on the table's TTL; its inserts feed the stream. |
-| `take-my-word-{env}`, `DICT#term` | dictionary | Counted by `dictionary-usage` from the stream. |
-| `take-my-word-{env}`, `STYLE#id`, `APPRULE#appId` | styles | Plain CRUD through `api`. |
+| `<deployment>-{env}`, `SETTINGS`, `QUOTA#date` | dictation | User settings and the daily quota under each user's partition. |
+| `<deployment>-{env}`, `DICTATION#ts` | dictation | Relies on the table's TTL; its inserts feed the stream. |
+| `<deployment>-{env}`, `DICT#term` | dictionary | Counted by `dictionary-usage` from the stream. |
+| `<deployment>-{env}`, `STYLE#id`, `APPRULE#appId` | styles | Plain CRUD through `api`. |
 
 ## Invariants kept in code
 

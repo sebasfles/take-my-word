@@ -11,20 +11,23 @@ mod dev_pool {
 
     use super::Secret;
     use super::cognito::{Cognito, SignIn};
-    use crate::env::DEV;
+    use crate::env::official_server;
 
     #[test]
     #[ignore = "signs in to the dev pool with TMW_DEV_USERNAME and TMW_DEV_PASSWORD"]
     fn the_dev_pool_signs_in_confirms_refreshes_forgets_and_revokes() {
-        let (Ok(username), Ok(password)) = (
+        let (Ok(username), Ok(password), Ok(server)) = (
             std::env::var("TMW_DEV_USERNAME"),
             std::env::var("TMW_DEV_PASSWORD"),
+            official_server(),
         ) else {
-            eprintln!("skipped: TMW_DEV_USERNAME and TMW_DEV_PASSWORD are not set");
+            eprintln!(
+                "skipped: TMW_DEV_USERNAME, TMW_DEV_PASSWORD and the build's TAKE_MY_WORD_SERVER are not all set"
+            );
             return;
         };
         let password = Secret::new(password);
-        let cognito = Cognito::for_environment(&DEV).unwrap();
+        let cognito = Cognito::for_server(&server).unwrap();
         let SignIn::Done(signed_in) = cognito
             .sign_in(&username, &password, OffsetDateTime::now_utc())
             .unwrap()
@@ -83,18 +86,21 @@ mod dev_pool {
         use crate::api::{AuthedApi, HttpApi};
         use crate::keychain::{Keychain, SystemKeychain};
 
-        let (Ok(username), Ok(password)) = (
+        let (Ok(username), Ok(password), Ok(server)) = (
             std::env::var("TMW_DEV_USERNAME"),
             std::env::var("TMW_DEV_PASSWORD"),
+            official_server(),
         ) else {
-            eprintln!("skipped: TMW_DEV_USERNAME and TMW_DEV_PASSWORD are not set");
+            eprintln!(
+                "skipped: TMW_DEV_USERNAME, TMW_DEV_PASSWORD and the build's TAKE_MY_WORD_SERVER are not all set"
+            );
             return;
         };
         let service = format!("dev.fless.takemyword.test.api.{}", std::process::id());
-        let provider = CognitoProvider {
-            cognito: Cognito::for_environment(&DEV).unwrap(),
-            device_name: "Take My Word cargo test".into(),
-        };
+        let provider = CognitoProvider::new(
+            Cognito::for_server(&server).unwrap(),
+            "Take My Word cargo test",
+        );
         let account = Arc::new(Account::restore(
             provider,
             SystemKeychain::new(&service).unwrap(),
@@ -102,7 +108,10 @@ mod dev_pool {
         ));
         let step = account.sign_in(&username, Secret::new(password)).unwrap();
         assert!(matches!(step, SignInStep::SignedIn(_)));
-        let api = AuthedApi::new(HttpApi::new(DEV.api_url).unwrap(), Arc::clone(&account));
+        let api = AuthedApi::new(
+            HttpApi::new(server.api_url.clone()).unwrap(),
+            Arc::clone(&account),
+        );
         let styles = api.styles().unwrap().styles;
         assert!(styles.iter().any(|style| style.id == "casual"));
         let settings = api.settings().unwrap();

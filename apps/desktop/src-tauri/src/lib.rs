@@ -20,6 +20,7 @@ mod overlay;
 mod own_window;
 mod paste;
 mod rules;
+mod server;
 mod session;
 mod shell;
 mod theme;
@@ -87,6 +88,9 @@ pub fn run() {
             commands::check_microphone,
             account::app_state,
             account::account_status,
+            account::server,
+            account::use_server,
+            account::use_official_server,
             account::sign_in,
             account::choose_password,
             account::onboarding,

@@ -24,4 +24,186 @@ updated: 2026-10-23
 
 ## om-developer notes
 
+### Round 1
+
+Code is commit 8f3a3c4, which the verify blocks name; this commit carries only these notes and verify.log.
+
+Done:
+
+- Routes: `app/en` and `app/es` are static segments, each with a small root layout, sharing `components/landing/landing.tsx`; sign-in, account and gallery moved to the route group `app/(account)` with today's cookie-then-Accept-Language root layout and `noindex, follow` metadata.
+  `app/global-not-found.tsx` (`experimental.globalNotFound`) and `(account)/not-found.tsx` render one bilingual 404, since there is no single root layout any more.
+- `src/proxy.ts` (`lib/site-proxy.ts`): `/` answers 307 to `/en` or `/es` by `tmw-lang`, then Accept-Language, keeping the query, with `Vary: Cookie, Accept-Language`; every response except `/en` and `/es` on the indexed origin gets `X-Robots-Tag: noindex`.
+- Indexing: the build bakes `WEB_INDEXED_ORIGIN` (empty means none); a page is indexed only when the runtime `WEB_ORIGIN` equals it, so one build serves dev and prd and a copy of the official build elsewhere stays noindex. Meta robots follows the same rule.
+  `deployment.json` gains `indexed` (default false; `https://<domain>` when true), passed by `pnpm selfhost` and `pnpm deploy:web build`; CI reads the repository variable `WEB_INDEXED_ORIGIN`.
+- `robots.txt` (allow all but `/api/`, sitemap link) and `sitemap.xml` (`/en` and `/es`, hreflang alternates with x-default, `lastmod` from the build time in `WEB_BUILT_AT`), both from the runtime origin.
+- Metadata: per-locale title "Take My Word · Voice dictation for Windows", description, canonical, hreflang en, es and x-default, Open Graph with `alternateLocale`, Twitter card.
+  JSON-LD `@graph` with `WebSite`, `Person` (Sebastian Flores), `SoftwareApplication` (Windows 10 and 11, price 0, installer URL, latest release version when readable, MIT license) and `FAQPage` built from the visible FAQ copy, escaped against `</script>`, streamed in a Suspense boundary so the release lookup never blocks the page.
+- Landing: "Run your own" (open source, MIT, four steps with the skill recommended, guide link to `self-host/` on GitHub and the license, the cost card with dated prices and links) and a four-question FAQ, es and en, in the 0010 design; "Run your own" joins the header and footer navigation, the footer links the source code.
+  A test holds every number the landing quotes to `self-host/README.md`, and both locales to the same numbers.
+- Language switch on the landing is a real link to the other language page (crawlable, `hreflang`) that still stores `tmw-lang`; its accessible name now starts with the visible text ("ES, ver en español", "EN, view in English"), which Lighthouse flagged on `/en` (WCAG 2.5.3).
+- `pnpm selfhost` redeploys when `releases` or `indexed` change, not only the commit: the deployed marker records the web build inputs. Before, a changed `releases` was never deployed.
+- Root `README.md` with two screenshots in `.github/readme/`, the "Run your own" part recommending the skill, and the license.
+
+Evidence (workspace, outside the repo):
+
+- `screenshots/{en,es}/{light,dark}/landing-{390,768,1280}.png` and the crops `landing-self-host-*` and `landing-faq-*`, plus every other page refreshed.
+- `lighthouse/local-{en,es}-run-{1,2,3}.json` and `summary.txt`: local production build with indexing on, mobile preset, Lighthouse 13.5.0, after a warm-up: SEO, accessibility and best practices 100 on every run, performance 97 to 99, CLS 0; the only miss is bf-cache (Next's `no-store`, not actionable).
+- `seo/schema-validator-local-{en,es}.json`: validator.schema.org, 0 errors and 0 warnings for `SoftwareApplication`, `WebSite` and `FAQPage`.
+- `seo/opennext-invoke.txt`: the OpenNext server function invoked locally with Function URL events: the 307s, indexed `/en` and `/es` on the indexed origin, noindex on dev's origin with the same build, noindex on private pages, robots, sitemap, the 404.
+- `seo/local-robots.txt.txt`, `seo/local-sitemap.xml.txt`.
+
+Pending:
+
+- Acceptance 2 on dev (robots and sitemap responses, the validator on the dev URL, Lighthouse with crawlability as the only miss) and web `integration` and `e2e` (updated for `/en` and `/es` and a new SEO test): dev is held by 0015 until the om-reviewer passes "dev available".
+- The core, dev and prd plans after the rebase on 0015, once it merges.
+
+Actions variable for the om-manager before merge (repository level): `WEB_INDEXED_ORIGIN` = `https://<official prd domain>`; dev builds read it too and stay noindex because their origin differs.
+
+Decisions not in the plan:
+
+- Static `en/` and `es/` segments with their own root layouts instead of a dynamic `[lang]`: Next renders a 404 under a dynamic root segment as an empty client shell, so `/fr` served a blank page.
+- Indexing decided by comparing a build-time origin with the runtime `WEB_ORIGIN`, not by a Lambda variable, so the Terraform plans stay empty and the one-build-many-envs selfhost path works.
+- robots.txt does not disallow the private pages, so crawlers can read their noindex.
+- `/` is a 307 from the proxy rather than a page, and the landing switch is a link, so both language pages are reachable without cookies or JS.
+
+Deferred:
+
+- None.
+
+### Round 2
+
+Code is commit bc0f15f, which the verify block names; this commit carries only these notes and verify.log.
+Only `apps/web` changed, so web is the only target re-run.
+
+Done, one per finding:
+
+1. `robotsTag` lets `/` through on the indexed origin, so the x-default's 307 carries no noindex there; dev and self-hosted still answer noindex on `/`. Covered in `seo.test.ts` and `site-proxy.test.ts`.
+2. The landing's sign-in links (header, "Already have an account?") and the footer's go to `/sign-in?lang=<page language>`; the proxy stores `tmw-lang` with the same cookie as the switch (`lib/preference.ts`, now shared with `localeHandler`) and answers 307 to `/sign-in` without `lang`, keeping any other parameter; an unknown language is dropped without a cookie.
+   Those links are plain anchors now, since they cross root layouts and the proxy redirects them.
+   Unit tests in `site-proxy.test.ts`; a new e2e ("signs in from /es in Spanish for an English browser with no language cookie") runs on dev; the same flow passed locally on a production build: `/es`, header sign-in, `/sign-in` with `lang="es"` and "Inicia sesión".
+3. Landing inline code keeps `white-space: nowrap` (applied after round 1's screenshots were taken); every page screenshot is refreshed, including the 390 crops.
+
+Evidence refreshed: `seo/opennext-invoke.txt` (the `/` 307 without noindex on the indexed origin, noindex on dev's).
+
+### Dev evidence
+
+Dev held from "dev available" to "dev free"; nothing else changed there.
+
+- Web of 564a511 (code bc0f15f) built like CI will build it (official `RELEASES_REPOSITORY`, `WEB_INDEXED_ORIGIN` set to the official prd origin) and swapped into dev with `pnpm deploy:web build|swap`, 12:51:42 to 12:51:55 UTC; the api was not touched.
+- `seo/dev-headers.txt`: `/` 307 to `/en`, to `/es` for Accept-Language es and for `tmw-lang=es` over an English browser, `Vary: Cookie, Accept-Language`; `/en`, `/es`, `/sign-in`, `/app`, `/gallery`, `/fr` and discovery all `X-Robots-Tag: noindex` with meta `noindex` (dev is not the indexed origin although the build names one); `/sign-in?lang=es` 307 to `/sign-in` with `tmw-lang=es`.
+- `seo/dev-robots.txt.txt` and `seo/dev-sitemap.xml.txt`: robots allows all but `/api/` and links the dev sitemap; the sitemap lists `/en` and `/es` with en, es and x-default alternates and the build's `lastmod`.
+- `seo/schema-validator-dev-{en,es}.json`: validator.schema.org on the dev URLs, 0 errors and 0 warnings for `SoftwareApplication` (with `softwareVersion` 0.2.0 from the latest release), `WebSite` and `FAQPage`.
+- `lighthouse/dev-{en,es}-run-{1,2,3}.json` and `dev-summary.txt`: mobile preset after a warm-up; SEO 66 with `is-crawlable` the only miss (the intended noindex), accessibility and best practices 100, performance 96 to 100, CLS 0.
+- Web `integration` 4 passed and `e2e` 16 passed, the three new ones included (`/` to a language page with its alternates and JSON-LD, sign-in from `/es` in Spanish for an English browser, dev and private pages noindex).
+- Develop 61be296 redeployed from a clean clone with develop's own workflow steps, 12:56:33 to 12:57:11 UTC, exit 0 (`.verify/dev-redeploy-develop.out`); `/` serves develop's landing again and `/en` and `/robots.txt` are 404.
+
+### Docs (document-task, whole task)
+
+Done on "round 3 clean, document", for all three phases:
+
+- infra: `trd.md` (deployment config, `pnpm tf`, `pnpm deploy:*`, `pnpm selfhost`, optional CI, the new Actions variables, official values removed), `prd.md` (the "Run your own" flow, indexing and no-official-values rules), `README.md` (owns `packages/deployment` and `self-host/`), `flows.md` (build before credentials; the self-host sequence), `ard.md` (six entries: deployment config, optional CI with `moved`, shared deploy scripts, `pnpm selfhost` boundaries with the leftovers debt, build-time links and indexed origin, `/en` and `/es` root layouts).
+- desktop: `trd.md` (`server.rs`, discovery, the build-time official server, the server in `settings.json`, the updater key from the variable, discovery vectors), `prd.md` ("Use your own server"; updates always from the official releases), `README.md`, `ard.md` (five entries, the first superseding "Dev and prd are separate apps chosen at build time" (2026-10-21) for the server only; the older-server debt).
+- auth: `trd.md` (the discovery route, languages by path, `?lang=` on sign-in), `ard.md` (discovery by well-known file).
+- `docs/ARD.md` Debt index: two rows (infra leftovers check, desktop older self-hosted server); `updated` bumped.
+- Outside `document-task`'s own scope, as the om-reviewer asked: `docs/TRD.md` (the deployment package and its verification target, web layout and build values, desktop build inputs, infra stack, environments) and `docs/PRD.md` (landing and run your own) corrected where they were wrong after this task.
+- D8 scrub: in earlier ARD entries (`docs/ARD.md` and the infra and mobile `ard.md`) only the official value was replaced by a neutral name (the account, its zone, the state bucket, the monorepo, `api.` hosts); the decisions are untouched.
+  This is the one edit to existing ARD entries, for Acceptance 1.
+- Not touched: dictation, dictionary, styles and mobile docs (no behavior change); infra and desktop `database.md` (no data change).
+
+`git grep -n -F` for the account id, the domain (`fless.dev`), the GitHub owner, the SSO profile, the zone id, the App id and installation id, the GitHub user and repository ids, the dev and prd pool and client ids, the state bucket prefix and the updater key (its key line and its base64 form), outside `docs/tasks/`:
+
+```
+$ git grep -n -F -f patterns -- . ':!docs/tasks'
+exit 1
+```
+
+No output, exit 1: no match.
+
+The same grep across the repo, files per folder (only `docs/tasks/`):
+
+```
+2 docs/tasks/0001_platform_skeleton
+1 docs/tasks/0002_desktop_shell
+1 docs/tasks/0003_api_features
+2 docs/tasks/0004_web_landing
+2 docs/tasks/0005_desktop_release
+1 docs/tasks/0006_prd_release
+1 docs/tasks/0007_desktop_integration
+1 docs/tasks/0008_desktop_features
+1 docs/tasks/0009_web_account
+2 docs/tasks/0010_brand_web
+1 docs/tasks/0011_desktop_rebrand
+1 docs/tasks/0012_fix_lost_paste
+1 docs/tasks/0013_fix_terminal_paste
+1 docs/tasks/0014_desktop_ux
+3 docs/tasks/0016_self_hosting
+```
+
+The desktop identifier stays as the documented exception, in `apps/desktop` only.
+
+Docs findings, one per finding:
+
+1. The desktop entry "Dev and prd are separate apps chosen at build time" (2026-10-21) carries `Superseded by 2026-10-23: ... (the server only)` in the file's marker form.
+2. `take-my-word-{env}` is `<deployment>-{env}` in the infra `trd.md` and `database.md`, the desktop `database.md` and the auth `trd.md` and `database.md`; the two left are inside dated ARD entries (infra table, auth cookie key), true when written and true for the official deployment.
+
+### Round 4
+
+Code is commit 4af31fd (rebased on develop 7ae8a05, 0015 merged), which the verify blocks name; this commit carries only these notes and verify.log.
+
+Clipboard flake, outside scope (om-manager, Sebastian's rule on flaky tests):
+
+- Failure: PR #22 desktop-ci, run 39974182496 attempt 1, `a_reader_outside_the_target_app_gets_nothing_and_does_not_count_as_the_paste` panicked at `win32.rs:1124`, left `Some("dictado privado [private]")`, right `None`; attempt 2 passed.
+- Cause: the test offered the text to `own pid + 4` as a process "elsewhere", but a read is allowed for the target or any process below it (`depth_below` walks the reader's ancestors). Windows reuses freed pids, so a child often has a lower pid than its parent; when an ancestor of the test process (cargo, the shell, node, the runner) held exactly `pid + 4`, the test process counted as a descendant of the target and the read rendered. The production rule is right; the test's guess was not. `a_reader_holding_the_clipboard_open_during_the_restore_is_answered_and_the_restore_lands` made the same guess.
+- Fix: both tests offer to `NO_PROCESS_HAS_THIS_ID` (2); Windows process ids are multiples of 4, so no reader or ancestor can match it, whatever the runner's tree or pid reuse. No sleep, retry or ignore. New real-clipboard test `a_reader_below_the_target_app_gets_the_text_and_counts_as_the_paste` targets the test process's own parent and expects the read to render: the exact condition that failed the old test, now deterministic.
+- Evidence on the Windows host (`computer available` to `computer free`), in `.workspaces/0016_self_hosting/flake/`: idle gate (600 s idle at start), clipboard sealed with DPAPI (sha256 83c76b16...e305); the new test passed; 20 serial runs of `clipboard::win32 --include-ignored --test-threads=1` from the built test binary, 11 passed in each, 0 failed, no real input in any run (`guard.log`); clipboard restored and verified with the same sha256; the sealed file deleted. No abort happened, so no restart. `ancestry.txt`: a chain on the host (57908 powershell, 60520 cmd, 61204 powershell, ... explorer, then an exited parent) shows children with lower pids than their parents, and a root whose parent pid is free for reuse.
+- desktop-ci on this branch (run 39958142927) had passed all 227 tests and failed only on the dev installer step for lack of `DESKTOP_DEV_SERVER`, now set by the om-manager.
+
+Web lint on a fresh clone (finding on PR #23, run 39958142873):
+
+- Reproduced on a fresh clone of 309e960: "route.ts was not found by the project service"; TypeScript's include globs skip dot folders, and the worktree passed only through its generated `.next` types.
+- Fix: `apps/web/tsconfig.json` includes `src/app/.well-known/**/*.ts`. From now on every round is verified from a fresh clone.
+
+Rebase on develop 7ae8a05 (0015), four conflicts, each kept both tasks' behavior:
+
+1. `apps/desktop/src-tauri/src/api/contract.schema.json` (generated): regenerated with `pnpm contract` from the merged `packages/shared`, so it carries 0015's new usage contract and everything else unchanged.
+2. `apps/web/e2e/account.e2e.ts`: kept 0015's context-badge assertion and 0016's switch label "EN, view in English" (formatted after the merge).
+3. `docs/modules/desktop/prd.md` and `trd.md` frontmatter: `source: 0016_self_hosting`, the later task.
+4. `docs/modules/desktop/trd.md` calls line: kept 0015's line with `GET /me/usage` and added 0016's discovery line.
+
+0015 also changed Rust (`account.rs`, `api/mod.rs`, `api/routes.rs`) without conflicts; Windows `rust:lint` and `rust:test` ran on the rebased commit while the host was still held: both exit 0, 219 passed, 10 ignored.
+The D8 grep after the rebase still finds nothing outside `docs/tasks/` (exit 1).
+
+Verify: every target of the TRD table on a fresh clone of 4af31fd with no `deployment.json`, `.env` or `.next`, all exit 0 (api 200, web 255 plus the OpenNext bundle, desktop 235, shared 46, brand 58, deployment 42 tests; infra fmt and validate for core, dev and prd; actionlint). Web integration and e2e and the api e2e need dev, not held this round.
+
+Terraform on the rebased branch (`.verify/plan-*.out`, `apply-*-moves.out`, `replan-*.out`):
+
+- `pnpm tf core plan`: No changes.
+- `pnpm tf dev plan` and `pnpm tf prd plan`: only `module.app.aws_iam_role.deploy has moved to module.app.aws_iam_role.deploy[0]` and `module.app.aws_iam_role_policy.deploy has moved to module.app.aws_iam_role_policy.deploy[0]`; Plan: 0 to add, 0 to change, 0 to destroy.
+- Guard met, so the saved plans were applied: dev and prd "Apply complete! Resources: 0 added, 0 changed, 0 destroyed."
+- Re-plan of core, dev and prd with `-detailed-exitcode`: exit 0, "No changes. Your infrastructure matches the configuration." for all three.
+- Phase 1 Acceptance 2 is met.
+
+The branch was rebased, so it needs `--force-with-lease` (no tag exists).
+
+Dev after the rebase ("dev available" to "dev free"): the branch's api and web (7fb63f8, code 4af31fd) built and swapped with `pnpm deploy:<api|web> build|swap`, 15:34:36 to 15:35:07 UTC, discovery 200; api e2e 37 passed, web integration 4 passed, web e2e 16 passed; develop 7ae8a05 redeployed from a clean clone with develop's own api and web steps, 15:38:33 to 15:39:32 UTC, exit 0 (`.verify/dev-redeploy-develop.out`); `/` 200 with develop's landing, `/en` and discovery 404 again.
+
+### Release 0.3.0
+
+On the om-manager's go. The notes were written by the om-developer, uncommitted, in the 0.2.0 form (English, then neutral Spanish).
+`pnpm release:desktop 0.3.0` was run by the om-reviewer, because the script pushes branch and tag and the remote stays the om-reviewer's: tag `desktop-v0.3.0` at 76dc174 ("chore(desktop): release 0.3.0"), on top of 8862e98.
+The branch is never rebased or force-pushed from here.
+
+- desktop-release run 39982887012: success in 7 min. Every step passed: draft created, prd installer built, signed and uploaded, fixed-name installer uploaded, `latest.json` and the installers verified against `DESKTOP_UPDATER_PUBKEY`, published as latest, and the public links serve this version.
+- `gh release view desktop-v0.3.0`: "Take My Word 0.3.0", not draft, not prerelease, published 2026-10-23T16:05:37Z; assets `latest.json`, `take-my-word-windows-x64-setup.exe`, `Take.My.Word_0.3.0_x64-setup.exe` and its `.sig`; `releases/latest` is `desktop-v0.3.0`.
+- Local re-check (`.workspaces/0016_self_hosting/release-check-local.txt`): `latest.json` from the public `releases/latest/download/` URL announces 0.3.0 (pub_date 2026-10-23T16:05:32Z); `release-check.ts` with the updater public key: the windows-x86_64 and windows-x86_64-nsis entries verify, signed for 0.3.0 (installer sha256 be739f3f...1c6a), and the fixed-name installer matches the signed one; exit 0.
+- prd landing, 16:06:38 UTC: `https://<prd domain>/` 200, "Version 0.3.0 for Windows 10 and 11." in both download notes.
+- PR #23 on 76dc174: ci, linux-check, windows and release all pass.
+- Sebastian's update, read-only: at 16:07 UTC his installed app is still 0.2.0 (`HKCU\...\Uninstall` DisplayVersion 0.2.0, running since 2026-10-22 14:09 local). Its log shows the 6-hour checks ("no update available" at 01:09, 07:09 and 13:09, before the release); the next check comes at about 19:09 in the log's clock, or at his next start. Pending until he accepts the update; nothing of his was touched.
+- Sebastian's upgrade, done by the om-manager with the 0.3.0 release installer (`/S`, quit and relaunch), read-only at about 16:15 UTC:
+  - `HKCU\...\Uninstall`, "Take My Word": DisplayVersion 0.3.0; the process runs from the installed path since 2026-10-23 11:13 local (16:13 UTC).
+  - Log since the relaunch: 16:13:01 updater "no update available" (nothing newer than 0.3.0); 16:13:03 `api getSettings: ok` (twice), 16:13:04 "loaded 0 app rules", 16:13:04 `api getUsage: ok`.
+    These are bearer-token calls, so the keychain session was restored; `getUsage` is read only when Settings, General opens, so the relaunch landed on settings, not on a sign-in window.
+  - The app logs no version line and writes `server:` only when the server is switched (`shell.rs`), so neither appears on a plain relaunch; the version is the DisplayVersion above.
+  - `settings.json` is still in place, unchanged since 2026-10-22 14:16, with keys `firstRunDone`, `hotkey`, `onboardedUsers` (values not read). No `server` key, so the app uses the official server, as a 0.2.0 file reads in 0.3.0.
+
 ## Result

@@ -72,29 +72,20 @@ export function checkRelease({ dir, assets, publicKey, repo, version }: ReleaseC
   return evidence;
 }
 
-export function updaterPublicKey(configPath: string): string {
-  const config = JSON.parse(readFileSync(configPath, "utf8")) as {
-    plugins?: { updater?: { pubkey?: unknown } };
-  };
-  const pubkey = config.plugins?.updater?.pubkey;
-  if (typeof pubkey !== "string") throw new Error(`${configPath} has no updater pubkey`);
-  return pubkey;
-}
-
 if (import.meta.main) {
   const { values } = parseArgs({
     options: {
       dir: { type: "string" },
-      config: { type: "string" },
+      pubkey: { type: "string" },
       repo: { type: "string" },
       tag: { type: "string" },
       assets: { type: "string" },
     },
   });
-  const { dir, config, repo, tag, assets } = values;
-  if (!dir || !config || !repo || !assets || !tag?.startsWith("desktop-v")) {
+  const { dir, pubkey, repo, tag, assets } = values;
+  if (!dir || !pubkey || !repo || !assets || !tag?.startsWith("desktop-v")) {
     console.error(
-      "usage: node scripts/release-check.ts --dir <downloads> --assets <assets.json> --config <tauri.prd.conf.json> --repo <owner/name> --tag desktop-vX.Y.Z",
+      "usage: node scripts/release-check.ts --dir <downloads> --assets <assets.json> --pubkey <updater public key> --repo <owner/name> --tag desktop-vX.Y.Z",
     );
     process.exit(2);
   }
@@ -102,7 +93,7 @@ if (import.meta.main) {
   for (const line of checkRelease({
     dir,
     assets: JSON.parse(readFileSync(assets, "utf8")) as ReleaseAsset[],
-    publicKey: updaterPublicKey(config),
+    publicKey: pubkey,
     repo,
     version,
   })) {

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hotkey::Hotkey;
 use crate::locale::Language;
+use crate::server::SelfHosted;
 use crate::theme::Theme;
 
 pub const FILE_NAME: &str = "settings.json";
@@ -33,6 +34,8 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub main_window: Option<Placement>,
     pub hands_free_note_seen: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<SelfHosted>,
 }
 
 pub fn load(path: &Path) -> Settings {
@@ -63,6 +66,7 @@ pub fn save(path: &Path, settings: &Settings) -> io::Result<()> {
 mod tests {
     use super::*;
     use crate::hotkey::HotkeyKey;
+    use crate::server::Server;
 
     struct Scratch(std::path::PathBuf);
 
@@ -175,6 +179,7 @@ mod tests {
         assert!(settings.first_run_done);
         assert!(!settings.hands_free_note_seen);
         assert_eq!(settings.main_window, None);
+        assert_eq!(settings.server, None);
     }
 
     #[test]
@@ -194,6 +199,16 @@ mod tests {
                 maximized: true,
             }),
             hands_free_note_seen: true,
+            server: Some(SelfHosted {
+                domain: "dictation.example.com".into(),
+                server: Server {
+                    version: 1,
+                    api_url: "https://api.dictation.example.com".into(),
+                    region: "eu-west-2".into(),
+                    user_pool_id: "eu-west-2_AbC123xyZ".into(),
+                    client_id: "1example23client45id6789ab".into(),
+                },
+            }),
         };
         save(&path, &settings).unwrap();
         assert_eq!(load(&path), settings);

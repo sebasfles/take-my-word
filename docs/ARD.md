@@ -12,7 +12,7 @@ Module-level decisions live in `modules/{{module}}/ard.md`.
 
 ## 2026-10-20: One public monorepo for every app, the infrastructure and the docs
 
-- Decision: `sebasfles/take-my-word` holds `apps/api`, `apps/web`, `apps/desktop`, `apps/mobile`, `packages/shared`, `infra/` and `docs/`, as a pnpm workspace.
+- Decision: the one public monorepo holds `apps/api`, `apps/web`, `apps/desktop`, `apps/mobile`, `packages/shared`, `infra/` and `docs/`, as a pnpm workspace.
 - Alternatives rejected: a docs root plus three code repositories (the first proposal).
 - Reason: one set of contracts shared by every client, one place for tasks and docs, one CI with path filters; nothing here deploys separately enough to earn its own repository.
 - Debt created: desktop (Rust) and mobile (EAS) tooling live next to Node tooling, and path filters must keep each app's CI independent.
@@ -97,6 +97,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-23 | 6964 `tmw-config-*` folders from earlier test runs stay in Sebastian's `%TEMP%` | Sebastian clears them |
 | desktop | 2026-10-23 | Desktop animations run even for users who need reduced motion | A user asks for reduced motion in the desktop app |
 | desktop | 2026-10-23 | A main-window insert answered after 1 s leaves the text in the field and in the clipboard | A dictation shows up twice in the app's own window |
+| desktop | 2026-10-23 | An app newer than a self-hosted server can call a route that server lacks; discovery carries no API version | A release adds or changes a route the app depends on |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |
@@ -105,3 +106,4 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | infra | 2026-10-21 | The web's CSP restricts framing only, no `script-src` | The web renders others' content or adds third-party scripts |
 | infra | 2026-10-21 | Updater key secrets sit outside Terraform and the key has no rotation path | The key leaks or must change, or the repository gains other maintainers |
 | infra | 2026-10-22 | Two font-loading paths for the brand fonts: next/font on the web, @font-face on desktop | The desktop needs preloading, or next/font changes how it resolves outside files |
+| infra | 2026-10-23 | The self-host leftovers check confirms only user pools against their service; other tagged resources may be reported until the tag index catches up | A removal reports a leftover that is already gone |

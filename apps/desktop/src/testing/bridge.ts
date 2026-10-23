@@ -31,7 +31,7 @@ export const listeners: {
 
 export const pendingUpdate: { view: UpdateView | null } = { view: null };
 
-export const signedIn: AccountView = { signedIn: true, username: "sebastian" };
+export const signedIn: AccountView = { signedIn: true, username: "sebastian", server: null };
 
 export const appState: AppState = {
   signedIn: true,
@@ -106,6 +106,9 @@ export const fakeBridge = {
   finishOnboarding: vi.fn(() => Promise.resolve(undefined)),
   dismissHandsFreeNote: vi.fn(() => Promise.resolve(undefined)),
   accountStatus: vi.fn(() => Promise.resolve({ ...signedIn })),
+  server: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+  useServer: vi.fn((domain: string): Promise<string | null> => Promise.resolve(domain)),
+  useOfficialServer: vi.fn(() => Promise.resolve(undefined)),
   signIn: vi.fn<(username: string, password: string) => Promise<AccountStep>>(() =>
     Promise.resolve("onboarding"),
   ),

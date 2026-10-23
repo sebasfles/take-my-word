@@ -36,7 +36,7 @@ jobs:
           fi
 
           files="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
-          common='^(packages/shared/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'
+          common='^(packages/shared/|packages/deployment/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'
           touches() {
             if grep -Eq -e "$1" -e "$common" <<< "$files"; then echo true; else echo false; fi
           }

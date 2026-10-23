@@ -9,6 +9,7 @@ on:
       - apps/desktop/**
       - packages/shared/**
       - packages/brand/**
+      - packages/deployment/**
       - .github/workflows/desktop-ci.yml
 
 permissions:
@@ -71,6 +72,8 @@ jobs:
 
       - name: Build the dev NSIS installer
         working-directory: apps/desktop
+        env:
+          TAKE_MY_WORD_SERVER: ${{ vars.DESKTOP_DEV_SERVER }}
         run: pnpm tauri:build:dev
 
       - uses: actions/upload-artifact@v7.0.2

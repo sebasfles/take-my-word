@@ -10,6 +10,7 @@ on:
       - packages/shared/**
       - packages/cognito/**
       - packages/brand/**
+      - packages/deployment/**
       - .github/workflows/**
       - package.json
       - pnpm-lock.yaml

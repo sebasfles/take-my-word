@@ -5,7 +5,7 @@ import { Gallery } from "@/components/gallery.tsx";
 import { SiteHeader } from "@/components/site-header.tsx";
 import { galleryEnabled } from "@/lib/gallery.ts";
 import { currentDictionary, currentLocale, currentTheme } from "@/lib/server/request.ts";
-import "../../styles/gallery.css";
+import "@/styles/gallery.css";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 

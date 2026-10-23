@@ -888,6 +888,8 @@ mod tests {
 
     use super::*;
 
+    const NO_PROCESS_HAS_THIS_ID: u32 = 2;
+
     fn read_text() -> Option<String> {
         read_text_as(None)
     }
@@ -1059,7 +1061,7 @@ mod tests {
     fn a_reader_holding_the_clipboard_open_during_the_restore_is_answered_and_the_restore_lands() {
         let mut clipboard = SystemClipboard::spawn().unwrap();
         clipboard
-            .offer("dictado retenido", &[std::process::id().wrapping_add(4)])
+            .offer("dictado retenido", &[NO_PROCESS_HAS_THIS_ID])
             .unwrap();
         clipboard.arm(1);
         let (opened, is_open) = mpsc::channel();
@@ -1117,13 +1119,32 @@ mod tests {
     #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
     fn a_reader_outside_the_target_app_gets_nothing_and_does_not_count_as_the_paste() {
         let mut clipboard = SystemClipboard::spawn().unwrap();
-        let elsewhere = std::process::id().wrapping_add(4);
-        clipboard.offer("dictado privado", &[elsewhere]).unwrap();
+        clipboard
+            .offer("dictado privado", &[NO_PROCESS_HAS_THIS_ID])
+            .unwrap();
         clipboard.arm(1);
         let reader = create_window().unwrap();
         assert_eq!(read_text_as(Some(reader)), None);
         assert!(!clipboard.wait_for_read(Duration::from_millis(300)));
         assert!(clipboard.contended());
+        clipboard.restore().unwrap();
+    }
+
+    #[test]
+    #[ignore = "drives the real system clipboard; runs in desktop-ci and in announced smoke runs"]
+    fn a_reader_below_the_target_app_gets_the_text_and_counts_as_the_paste() {
+        let parent = *crate::foreground::parent_processes()
+            .get(&std::process::id())
+            .expect("the test process has no parent in the snapshot");
+        let mut clipboard = SystemClipboard::spawn().unwrap();
+        clipboard.offer("dictado heredado", &[parent]).unwrap();
+        clipboard.arm(1);
+        let reader = create_window().unwrap();
+        assert_eq!(
+            read_text_as(Some(reader)).as_deref(),
+            Some("dictado heredado [private]")
+        );
+        assert!(clipboard.wait_for_read(Duration::from_secs(2)));
         clipboard.restore().unwrap();
     }
 

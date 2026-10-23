@@ -1,3 +1,8 @@
+variable "deployment" {
+  description = "Name of the deployment, the first part of every resource name"
+  type        = string
+}
+
 variable "env" {
   description = "Environment name, part of every resource name"
   type        = string
@@ -18,14 +23,13 @@ variable "hosted_zone" {
   type        = string
 }
 
-variable "github_owner" {
-  description = "Owner of the repository the deploy role trusts"
-  type        = string
-}
-
-variable "github_repository" {
-  description = "Repository the deploy role trusts"
-  type        = string
+variable "github" {
+  description = "Repository whose Actions deploy the code; null leaves out the deploy role and the Actions variables"
+  type = object({
+    owner      = string
+    repository = string
+  })
+  default = null
 }
 
 variable "daily_quota_minutes" {

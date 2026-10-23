@@ -1,0 +1,27 @@
+{
+  "name": "@take-my-word/deployment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . && prettier --check --ignore-path ../../.gitignore --ignore-path ../../.prettierignore .",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --no-file-parallelism",
+    "schema": "node src/schema.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "3.1154.0",
+    "@aws-sdk/client-cognito-identity-provider": "3.1154.0",
+    "@aws-sdk/client-iam": "3.1154.0",
+    "@aws-sdk/client-resource-groups-tagging-api": "3.1154.0",
+    "@aws-sdk/client-route-53": "3.1154.0",
+    "@aws-sdk/client-s3": "3.1154.0",
+    "@aws-sdk/client-secrets-manager": "3.1154.0",
+    "@aws-sdk/client-sts": "3.1154.0",
+    "@take-my-word/shared": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

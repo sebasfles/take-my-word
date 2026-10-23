@@ -1,11 +1,11 @@
 ---
-updated: 2026-10-21
-source: 0003_api_features
+updated: 2026-10-23
+source: 0016_self_hosting
 ---
 
 # Auth: database
 
-Identities live in the Cognito user pool, not in DynamoDB; the item schema of `take-my-word-{env}` will live in `packages/shared` and `apps/api` once written.
+Identities live in the Cognito user pool, not in DynamoDB; the item schema of `<deployment>-{env}` will live in `packages/shared` and `apps/api` once written.
 
 ## Tables owned
 
@@ -13,13 +13,13 @@ Identities live in the Cognito user pool, not in DynamoDB; the item schema of `t
 |---|---|
 | Cognito user pool per env | Users, passwords, devices and refresh tokens; managed by AWS. |
 
-Auth owns no item kind in `take-my-word-{env}`.
+Auth owns no item kind in `<deployment>-{env}`.
 
 ## Tables referenced
 
 | Table | Owner module | Relationship |
 |---|---|---|
-| `take-my-word-{env}`, `SETTINGS`, `QUOTA#date`, `DICT#term`, `STYLE#id`, `APPRULE#appId`, `DICTATION#ts` | dictation, dictionary, styles | Every item sits under `USER#{sub}`, the Cognito user id the authorizer emits; there is no `USER` item. |
+| `<deployment>-{env}`, `SETTINGS`, `QUOTA#date`, `DICT#term`, `STYLE#id`, `APPRULE#appId`, `DICTATION#ts` | dictation, dictionary, styles | Every item sits under `USER#{sub}`, the Cognito user id the authorizer emits; there is no `USER` item. |
 
 ## Invariants kept in code
 

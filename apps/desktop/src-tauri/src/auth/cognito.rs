@@ -9,7 +9,7 @@ use time::OffsetDateTime;
 
 use super::Secret;
 use super::srp::{self, Ephemeral, PasswordChallenge, SrpError};
-use crate::env::Environment;
+use crate::server::Server;
 
 const TIMEOUT: Duration = Duration::from_secs(15);
 const TARGET_PREFIX: &str = "AWSCognitoIdentityProviderService.";
@@ -108,14 +108,11 @@ pub struct Cognito {
 }
 
 impl Cognito {
-    pub fn for_environment(environment: &Environment) -> Result<Self, CognitoError> {
+    pub fn for_server(server: &Server) -> Result<Self, CognitoError> {
         Self::new(
-            format!(
-                "https://cognito-idp.{}.amazonaws.com/",
-                environment.region()
-            ),
-            environment.user_pool_id,
-            environment.client_id,
+            format!("https://cognito-idp.{}.amazonaws.com/", server.region),
+            &server.user_pool_id,
+            &server.client_id,
         )
     }
 

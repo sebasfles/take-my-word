@@ -1,19 +1,29 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 import { buttonClass, Mark, Waveform } from "@take-my-word/brand";
 import { Demo, StaticExample } from "@/components/landing/demo.tsx";
 import { Download } from "@/components/landing/download.tsx";
+import { Faq } from "@/components/landing/faq.tsx";
+import { SelfHost } from "@/components/landing/self-host.tsx";
+import { StructuredData } from "@/components/landing/structured-data.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { SiteHeader } from "@/components/site-header.tsx";
-import { demoScripts } from "@/lib/i18n.ts";
-import { currentDictionary, currentLocale, currentTheme } from "@/lib/server/request.ts";
-import "../styles/landing.css";
+import { demoScripts, dictionary, type Locale } from "@/lib/i18n.ts";
+import { landingMetadata } from "@/lib/server/metadata.ts";
+import { currentTheme } from "@/lib/server/request.ts";
+import { publicPath, signInPath } from "@/lib/seo.ts";
+import "@/styles/landing.css";
 
-export default async function LandingPage() {
-  const locale = await currentLocale();
+export function landingPageMetadata(locale: Locale): Metadata {
+  return landingMetadata(dictionary(locale), locale);
+}
+
+export async function Landing({ locale }: { locale: Locale }) {
   const theme = await currentTheme();
-  const t = await currentDictionary();
+  const t = dictionary(locale);
   const l = t.landing;
   const scripts = demoScripts(locale);
+  const other = locale === "es" ? "en" : "es";
 
   return (
     <>
@@ -21,18 +31,20 @@ export default async function LandingPage() {
         locale={locale}
         theme={theme}
         t={t}
-        brandHref="/"
+        brandHref={publicPath(locale)}
+        switchHref={publicPath(other)}
         nav={
           <nav className="site-nav" aria-label={t.nav.label}>
             <a href="#how">{t.nav.howItWorks}</a>
             <a href="#privacy">{t.nav.privacy}</a>
+            <a href="#self-host">{t.nav.selfHost}</a>
             <a href="#download">{t.nav.download}</a>
           </nav>
         }
       >
-        <Link href="/sign-in" className={buttonClass({ variant: "ghost", size: "sm" })}>
+        <a href={signInPath(locale)} className={buttonClass({ variant: "ghost", size: "sm" })}>
           {t.nav.signIn}
-        </Link>
+        </a>
       </SiteHeader>
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
@@ -186,6 +198,10 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        <SelfHost locale={locale} t={l.selfHost} />
+
+        <Faq t={l.faq} />
+
         <section id="download" className="section" aria-labelledby="download-title">
           <div className="container get">
             <Mark size={56} className="get-mark" />
@@ -193,12 +209,15 @@ export default async function LandingPage() {
             <p>{l.get.body}</p>
             <Download t={l} align="center" />
             <p className="get-account">
-              {l.haveAccount} <Link href="/sign-in">{t.nav.signIn}</Link>
+              {l.haveAccount} <a href={signInPath(locale)}>{t.nav.signIn}</a>
             </p>
           </div>
         </section>
       </main>
-      <SiteFooter t={t} theme={theme} />
+      <SiteFooter t={t} theme={theme} locale={locale} />
+      <Suspense fallback={null}>
+        <StructuredData locale={locale} t={t} />
+      </Suspense>
     </>
   );
 }
