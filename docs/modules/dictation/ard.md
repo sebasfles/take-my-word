@@ -179,13 +179,13 @@ source: 0015_user_context
 - Revisit when: every client sends `dictationLanguages`.
 - Source: 0008_desktop_features
 
-## 2026-10-23: The user's context reaches only the refiner, as a tagged background block
+## 2026-10-23: The user's context is stored and shown, not used by dictation until a follow-up proves a gain
 
-- Decision: settings hold up to three pick ids and a detail; `dictate` gives them to the refiner as `<background>` (`<contexto>` in Spanish) in the language used, after the editing contract and before style and dictionary, with a rule that it never adds, inserts or changes meaning; Whisper's prompt stays the ranked dictionary terms.
-- Alternatives rejected: a short hint after the terms in the Whisper prompt, built and measured in 0015 round 1; placing the block after the style.
-- Reason: on the frozen fixtures the hint left raw errors unchanged wherever it fit, and under both languages a Spanish hint on English audio lost a whole sentence; placed before the style, the block falls under "every other rule above still applies".
-- Debt created: the context ships without a measured gain (domain-term errors 35 and 34 without and with it under one language, 34 and 34 under both) and with occasional Spanish meaning changes in the refiner ("Corre" to "Corrige"); the failing terms are speech-recognition errors that labels cannot recover.
-- Revisit when: Sebastian picks the direction from 0015's PR, for example domain vocabularies in the Whisper prompt, a stronger refiner, or removing the context.
+- Decision: settings hold up to three pick ids and a detail, captured by the desktop and shown on the web; neither the Whisper prompt nor the refiner instructions read them, so `dictate` behaves the same with any context.
+- Alternatives rejected: a short hint after the terms in the Whisper prompt (0015 round 1); the context as a tagged background block for the refiner (0015 round 2).
+- Reason: on frozen fixtures, the hint left raw errors unchanged where it fit and, with both languages, lost a whole English sentence under a Spanish hint; the refiner block moved domain-term errors from 35 to 34 under one language and 34 to 34 under both, and changed 3 Spanish verbs' meaning in 12 runs; the failing terms are recognition errors that field labels cannot recover.
+- Debt created: the context is collected but unused.
+- Revisit when: the per-field vocabulary task lands, measured on held-out fixtures.
 - Source: 0015_user_context
 
 ## 2026-10-23: Clients show usage rounded up, clamped, and only when the server reports it

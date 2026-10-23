@@ -34,9 +34,9 @@ Errors and empty states: at least one language stays chosen.
 ### Say what you do
 
 1. During the desktop's onboarding, or later in its General settings, the user picks up to three fields from a fixed list (software development, biology and life sciences, law...) and may add a short detail in their own words.
-2. Every later dictation gives that context to the cleanup as background about the speaker; the web account shows it.
+2. The context is kept with the user's settings and shown on the web account; dictations do not use it yet.
 
-Errors and empty states: the step can be skipped; with nothing chosen, dictation works exactly as without it.
+Errors and empty states: the step can be skipped and the context changed or cleared at any time.
 
 ### See today's allowance
 
@@ -70,7 +70,7 @@ Errors and empty states: with no dictations, the list is empty.
 - The language comes from the user's settings, never from the device; older clients that still send one are ignored.
 - The transcription and cleanup providers follow the user's settings; a dictation may override them.
 - The result is the cleaned text and nothing else.
-- The user's context only helps the cleanup recognize and spell terms; it never adds content, and speech recognition never sees it.
+- The user's context never changes a dictation until a follow-up proves it helps.
 - Used minutes are shown rounded up and never above the allowance.
 
 ## Out of scope

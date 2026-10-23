@@ -64,3 +64,33 @@
 - unit: n/a
 - e2e: n/a
 
+## 2026-10-23T14:57:22Z by om-developer target shared on b22ca66
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (28 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-23T14:57:22Z by om-developer target api on b22ca66
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (200 tests, pnpm test)
+- e2e: pass exit 0 (37 tests, pnpm e2e on 71e3f24 deployed to dev; b22ca66 only adds task notes, code tree identical)
+
+## 2026-10-23T14:57:22Z by om-developer target web on b22ca66
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (168 tests, pnpm test)
+- e2e: pass exit 0 (pnpm integration and pnpm e2e on 98e1920, round 2; apps/web unchanged since: git diff 98e1920 b22ca66 -- apps/web is empty)
+
+## 2026-10-23T14:57:22Z by om-developer target desktop on b22ca66
+- lint: pass exit 0 (pnpm lint) and pass exit 0 (pnpm rust:lint on 9c68e49; src-tauri unchanged since)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (171 tests, pnpm test) and pass exit 0 (207 tests, pnpm rust:test on 9c68e49; src-tauri unchanged since)
+- e2e: n/a
+
+## 2026-10-23T14:57:22Z by om-developer target infra on b22ca66
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+

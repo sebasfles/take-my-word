@@ -11,14 +11,7 @@ import { Actions, Frame } from "./Frame.tsx";
 import { useMicrophoneCheck } from "./MicrophoneCheck.tsx";
 import type { Draft, Flow } from "./Onboarding.tsx";
 import { ChoosePasswordForm, SignInForm } from "./SignIn.tsx";
-import {
-  BrandVisual,
-  ContextVisual,
-  KeysVisual,
-  LiveMeter,
-  TrayVisual,
-  WelcomeVisual,
-} from "./visuals.tsx";
+import { BrandVisual, KeysVisual, LiveMeter, TrayVisual, WelcomeVisual } from "./visuals.tsx";
 
 function Point({ icon, text }: { icon: IconName; text: MessageId }) {
   return (
@@ -212,7 +205,7 @@ export function ContextStep({ flow }: { flow: Flow }) {
       flow={flow}
       title={t("context.title")}
       intro={t("context.intro")}
-      visual={<ContextVisual />}
+      visual={<BrandVisual />}
       actions={
         <Actions
           flow={flow}

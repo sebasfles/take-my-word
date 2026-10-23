@@ -99,6 +99,18 @@ Consolidated 2026-10-23 by the om-reviewer; answers from the om-manager.
   - the prd plan output is in the PR before the apply.
 - Round 1 (om-reviewer, 2026-10-23), Scope adjusted: the STT hint is dropped entirely, so Whisper's prompt stays the ranked terms only, whatever the context. Why: on the frozen fixtures, raw term errors were equal with and without the hint wherever it fit. Under both languages, a Spanish hint on English audio lost bio-en-1 whole ("y", 3 of 3 runs) and lost CRISPR-Cas9 and GAPDH. The alternative (hint only on fixed-language passes) keeps a hint with no measured gain that perturbed English spellings. The context reaches the refiner only.
 - Round 2 (om-reviewer, 2026-10-23): Acceptance 2 is not met and goes to the PR as measured, not tuned further. Totals without/with: one language 35/34, both 34/34. Raw was identical in every run, so every difference is the refiner. With context there were 3 Spanish meaning changes in 12 runs, against 1 without. The terms that fail are STT errors ("QB de GetPods", "Coupé CR", "Gapy") that domain labels cannot recover. The fix the data points to (domain vocabularies in the Whisper prompt) reverses this section's consolidation choice, so Sebastian picks the direction from the PR.
+- Reiteration 1 (2026-10-23, retake 1 on PR #22, Sebastian chose option B). Acceptance 2 is replaced by: the measured result is reported in the PR, and the context does not change dictation. Acceptance 3 holds for any context. Option A (per-field vocabulary measured on held-out fixtures) is the next task, not this one. Findings:
+  1. `apps/api/src/dictation/dictate.ts:26` and `instructions.ts:6-37`: the context leaves dictation. Remove `describeUserContext` (`user-context.ts`), the background headings and the `background` parameter, and the `contextPicks` log field, so `dictate.ts` and `instructions.ts` match develop. Expected: a test that the transcriber prompt and the refiner instructions are identical with and without a context.
+  2. `apps/desktop/src/i18n/{en,es}.json:209,238,258`: `context.intro`, `settings.context.note` and the hands-free note promise results. Expected: copy that says what is kept and that it does not change dictations today, with no accuracy claim; the note may still name the new field.
+  3. `apps/desktop/src/views/onboarding/steps.tsx:215` and `i18n:216-220`: the before/after example shows a benefit dictation no longer has. Expected: drop `ContextVisual` and the `context.example.*` keys; the step uses an existing neutral visual of the 0014 frame.
+  4. Evaluation harness and fixtures stay as the next task's tool. Expected: the dictation trd Testing says that with the context out of dictation both conditions run the same pipeline, and keeps round 2's numbers as the reason.
+  5. Docs:
+     - rewrite `docs/modules/dictation/ard.md:182` as "the context is stored and shown, not used by dictation until a follow-up proves a gain", with round 2 as the reason;
+     - fix the dictation prd's "Say what you do" step 2 and its rules;
+     - remove the desktop ard entry at `:404` and its Debt index row;
+     - the dictation debt row becomes "context collected but unused", revisited when the per-field vocabulary task lands.
+  6. Screenshots: refresh the context onboarding step, Settings > General and the hands-free note, in es and en, light and dark, at the 0014 sizes.
+  7. Verify: api e2e against the branch on dev (ask for "dev available"); no Terraform change; no new evaluation run.
 - clearance: full: dev `infra/scripts/tf dev apply`; prd plan and the additive apply above; `update-function-code` on the four dev Lambdas and the web deploy steps; `pnpm e2e` and `pnpm integration` with throwaway users and Polly; the Windows host. No `pnpm release:desktop`.
 
 ## om-developer notes
@@ -190,3 +202,16 @@ Pending:
 - Updated: dictation (README, prd, trd with the evaluation harness and result under Testing, database, ard with two entries and `Resolved by` on 0009's quota debt), desktop (prd, trd, ard), `docs/ARD.md` Debt index.
 - Not changed: dictionary (its ranking and projections are unchanged; the round 1 hint was removed again), auth (no change), infra (route and env lists live in Terraform, and the change was planned in Context & decisions).
 - External actions after the clean signal: `infra/scripts/tf prd init -reconfigure`, `tf prd plan` (full output in `{{workspace}}/tf-prd-plan.txt`: 2 added, the `GET /me/usage` route and integration; 1 changed, `api` env `DAILY_QUOTA_MINUTES = 60`; nothing destroyed or replaced), then `apply` of that saved plan: 2 added, 1 changed, 0 destroyed.
+
+### Round 3 (reiteration 1)
+
+Findings applied, all seven:
+1. `dictate.ts` and `instructions.ts` are back to develop byte for byte; `user-context.ts` and `contextPicks` are gone. Tests: the develop literals hold with a context set, and Whisper and the refiner get the same input with and without a context, under one language and both.
+2. Desktop copy promises nothing: the step intro and the Settings note say the context is kept with the settings and does not change dictations today; the hands-free note still names the field.
+3. `ContextVisual`, its CSS and the `context.example.*` keys are removed; the step uses `BrandVisual`; `visuals.tsx` and `onboarding.css` match develop.
+4. Dictation trd Testing: both evaluation conditions now run the same pipeline, with round 2's numbers as the reason dictation ignores the context.
+5. Docs: the dictation ard entry now reads "stored and shown, not used by dictation until a follow-up proves a gain"; the prd's "Say what you do" and its rule follow; the desktop ard entry and its Debt index row are removed; the dictation debt row reads "collected but unused", revisited when the per-field vocabulary task lands.
+6. Screenshots refreshed for the context step, Settings > General and the hands-free note, es and en, light and dark, at the 0014 sizes.
+7. api e2e on dev at `71e3f24`'s code: green; no Terraform change, no evaluation run; develop redeployed afterwards.
+
+`retakes.md` travels in this commit.

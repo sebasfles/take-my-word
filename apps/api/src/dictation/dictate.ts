@@ -2,7 +2,6 @@ import {
   defaultDictationLanguages,
   defaultRefiner,
   defaultTranscriber,
-  emptyUserContext,
   minAudioSeconds,
   type DictationResponse,
 } from "@take-my-word/shared";
@@ -23,7 +22,6 @@ import { quotaExceededMessage, quotaWindow, type QuotaStore } from "./quota.ts";
 import type { SilenceLevels } from "./silence.ts";
 import { resolveStyle } from "./style-resolution.ts";
 import type { DictationUpload } from "./upload.ts";
-import { describeUserContext } from "./user-context.ts";
 
 export interface DictateDeps {
   providers: ProviderRegistry;
@@ -153,7 +151,6 @@ export async function dictate(
     defaultStyleId: settings?.defaultStyleId,
     custom: profile.styles,
   });
-  const context = settings?.context ?? emptyUserContext;
   const prompt = transcriberPrompt(profile.terms, {
     now: createdAt,
     halfLifeDays: deps.dictionary.halfLifeDays,
@@ -217,12 +214,7 @@ export async function dictate(
       refiner.refine({
         raw,
         language,
-        instructions: refinerInstructions(
-          language,
-          style.prompt,
-          profile.terms,
-          describeUserContext(context, language),
-        ),
+        instructions: refinerInstructions(language, style.prompt, profile.terms),
       }),
     (result) => result.usage,
   );
@@ -254,7 +246,6 @@ export async function dictate(
     language,
     transcriptions: transcriptions.join(","),
     promptTerms: prompt.terms,
-    contextPicks: context.picks.length,
     dictionaryTerms: profile.terms.length,
     inputTokens: refined.usage.inputTokens,
     outputTokens: refined.usage.outputTokens,

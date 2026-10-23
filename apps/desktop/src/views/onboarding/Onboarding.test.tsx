@@ -60,9 +60,6 @@ describe("Onboarding", () => {
     fireEvent.click(await screen.findByRole("checkbox", { name: "English" }));
     next();
     await screen.findByRole("heading", { name: "What do you do?" });
-    expect(document.querySelector(".visual-context")?.textContent).toContain(
-      "I opened a PR to fix the CI/CD pipeline.",
-    );
     fireEvent.click(screen.getByRole("checkbox", { name: "Software development" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Data and AI" }));
     fireEvent.change(screen.getByLabelText("Anything more specific? (optional)"), {

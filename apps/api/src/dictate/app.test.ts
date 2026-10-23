@@ -13,7 +13,6 @@ import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { RefineInput } from "../dictation/ports/refiner.ts";
 import type { TranscribeInput, Transcript } from "../dictation/ports/transcriber.ts";
 import type { QuotaCharge } from "../dictation/quota.ts";
-import { plainV1 } from "../dictation/prompts/plain.v1.ts";
 import { createSilenceGuard, defaultSilenceLevels } from "../dictation/silence.ts";
 import { createLogger } from "../lib/log.ts";
 import { createMetrics } from "../lib/metrics.ts";
@@ -480,8 +479,8 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
       term("Zentrafolk", [], 1, "2026-10-20T00:00:00.000Z"),
     ];
 
-    it("leaves the prompt and the instructions byte-identical to develop when empty", async () => {
-      world.profile = { settings: settings("plain", ["es"]), styles: [], terms };
+    it("leaves the prompt and the instructions byte-identical to develop, with a context or not", async () => {
+      world.profile = { settings: settings("plain", ["es"], developer), styles: [], terms };
       await post({});
       expect(world.transcribed[0]?.prompt).toBe("Kubernetes, Zentrafolk");
       expect(world.refined[0]?.instructions).toBe(
@@ -498,7 +497,7 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
           "- Zentrafolk",
         ].join("\n"),
       );
-      world.profile = { settings: settings("plain", ["en"]), styles: [], terms: [] };
+      world.profile = { settings: settings("plain", ["en"], developer), styles: [], terms: [] };
       await post({});
       expect(world.transcribed[1]?.prompt).toBeUndefined();
       expect(world.refined[1]?.instructions).toBe(
@@ -513,7 +512,7 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
       );
     });
 
-    it("sends Whisper the same prompt with and without context", async () => {
+    it("sends Whisper and the refiner the same input with and without context", async () => {
       for (const context of [undefined, developer]) {
         for (const languages of [["es"], ["es", "en"]] as ("es" | "en")[][]) {
           world.profile = { settings: settings("plain", languages, context), styles: [], terms };
@@ -521,41 +520,18 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
           await post({});
         }
       }
-      world.profile = { settings: settings("plain", ["en"], developer), styles: [], terms: [] };
-      await post({});
-      expect(world.transcribed.map((input) => input.prompt)).toEqual([
+      const [withoutOne, withoutBoth, withOne, withBoth] = world.transcribed.map(
+        (input) => input.prompt,
+      );
+      expect([withoutOne, withoutBoth]).toEqual([
         "Kubernetes, Zentrafolk",
         "Kubernetes, Zentrafolk",
-        "Kubernetes, Zentrafolk",
-        "Kubernetes, Zentrafolk",
-        undefined,
       ]);
-    });
-
-    it("gives the refiner the context as a delimited background in the language used", async () => {
-      world.profile = { settings: settings("plain", ["es", "en"], developer), styles: [], terms };
-      world.transcript = { text: rawTranscript, language: "en" };
-      await post({});
-      const instructions = world.refined[0]?.instructions ?? "";
-      expect(instructions.startsWith(plainV1.en)).toBe(true);
-      expect(instructions).toContain(
-        "<background>\nSoftware development, data and AI. backend con AWS y TypeScript\n</background>",
-      );
-      expect(instructions).toContain("never add or insert anything because of it");
-      expect(instructions.indexOf("</background>")).toBeLessThan(
-        instructions.indexOf("- Kubernetes (cubernetes)"),
-      );
-    });
-
-    it("never logs the context", async () => {
-      world.profile = { settings: settings("plain", ["es"], developer), styles: [], terms: [] };
-      await post({});
-      const everything = world.lines.join("\n");
-      expect(everything).not.toContain("AWS");
-      expect(everything).not.toContain("software");
-      expect(world.logs()).toContainEqual(
-        expect.objectContaining({ message: "dictation done", contextPicks: 2 }),
-      );
+      expect([withOne, withBoth]).toEqual([withoutOne, withoutBoth]);
+      const instructions = world.refined.map((input) => input.instructions);
+      expect(instructions[2]).toBe(instructions[0]);
+      expect(instructions[3]).toBe(instructions[1]);
+      expect(instructions.join("\n")).not.toContain("backend");
     });
   });
 });

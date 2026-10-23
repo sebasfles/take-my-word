@@ -10,7 +10,7 @@ source: 0015_user_context
 | Path | What |
 |---|---|
 | `apps/api/src/dictate` | The `dictate` Lambda: plain handler, configuration, wiring |
-| `apps/api/src/dictation` | The pipeline (`dictate.ts`), the language choice (`language-selection.ts`), upload reader, audio probes, quota, silence guard, prompts, the profile read, refiner instructions, the user context's phrases per pick (`user-context.ts`), stores |
+| `apps/api/src/dictation` | The pipeline (`dictate.ts`), the language choice (`language-selection.ts`), upload reader, audio probes, quota, silence guard, prompts, the profile read, refiner instructions, stores |
 | `apps/api/src/history`, `apps/api/src/settings`, `apps/api/src/usage` | History, settings and usage routes in the `api` Lambda, with their stores |
 | `apps/api/src/dictation/ports`, `providers` | Transcriber and Refiner ports; adapters `groq-whisper` and `openai` |
 | `packages/shared/src/dictations.ts`, `history.ts`, `settings.ts`, `usage.ts` | Request meta, response, history page, settings with the user context's pick ids, usage and limits shared by every client |
@@ -37,10 +37,10 @@ The HTTP API cuts every request at 30 s, so provider calls time out at 10 s (Gro
 3. Quota and profile, concurrently: the duration is charged to the user's UTC day before any provider call (at or over the cap the request answers 429), while one round trip reads settings, the app rule, custom styles and the dictionary.
 4. Transcribe with the request's Transcriber, else the settings', else `groq-whisper`, prompted with the top dictionary terms: in the one dictation language, or with detection among several, and again in the first language when the detected one is neither.
 5. Silence guard: empty transcripts and known hallucinations answer empty text; ambiguous phrases ("Gracias.") only when the WAV is under `SPEECH_LEVEL_DBFS`.
-6. Refine with the request's Refiner, else the settings', else `openai`: the `plain` editing rules of the language used, the user's context as a tagged background block in that language when set, the resolved style and the full dictionary (see styles and dictionary).
+6. Refine with the request's Refiner, else the settings', else `openai`: the `plain` editing rules of the language used, the resolved style and the full dictionary (see styles and dictionary).
 7. Save `DICTATION#ts` with the `styleId` and language used and respond with raw, text, `styleId`, providers and per-stage latency (`profile` included).
 
-Each provider call emits one CloudWatch EMF record in `TakeMyWord/Dictation` per `Provider` (latency, errors, tokens); logs are JSON lines that never carry audio, raw or clean text, nor the user's context (only how many picks it has).
+Each provider call emits one CloudWatch EMF record in `TakeMyWord/Dictation` per `Provider` (latency, errors, tokens); logs are JSON lines that never carry audio, raw or clean text.
 
 ## Depends on
 
@@ -62,6 +62,7 @@ Optional, with code defaults: `GROQ_WHISPER_MODEL` (`whisper-large-v3-turbo`), `
 - Unit tests next to the code with fake ports; `pnpm e2e` in `apps/api` runs the deployed path against `API_URL` (see TRD), including English and Spanish recordings under each set of dictation languages.
 - The desktop's serde mirror of the dictation, error, settings, style and app rule contracts is checked against JSON Schema generated from `packages/shared`, so changing a contract fails `ci` until `pnpm contract` in `apps/desktop` and the mirror follow.
 - `apps/web` `pnpm e2e` seeds a throwaway user through the API, pages history with `?limit=1`, and deletes a dictation through CloudFront.
-- A unit test pins the Whisper prompt and the refiner instructions with an empty context to literals of 0014's output.
+- A unit test pins the Whisper prompt and the refiner instructions to literals of 0014's output, with a context set or not.
 - `pnpm eval:context <report.md>` in `apps/api` dictates the frozen samples of `evaluation/user-context.samples.json` (developer and biology in English and Spanish, plus controls) as Polly speech against `API_URL`, with and without context, under one language and under both, 3 runs each, with a throwaway user deleted afterwards; the report shows raw and clean text per run, missed terms per stage, language flips and every word outside the expected sentence, plus a JSON of all runs.
-- Its 0015 run on dev found no gain: domain-term errors without and with context were 35 and 34 under one language, 34 and 34 under both, raw transcripts identical in every run, and 3 Spanish verbs changed meaning in 12 runs with context against 1 without.
+- With the context out of dictation, both of its conditions now run the same pipeline; it stays as the tool for the follow-up that puts the context to use.
+- Its 0015 round 2 run, with the context as refiner background, found no gain: domain-term errors without and with context were 35 and 34 under one language, 34 and 34 under both, raw transcripts identical in every run, and 3 Spanish verbs changed meaning in 12 runs with context against 1 without; that is why dictation ignores the context.

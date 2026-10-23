@@ -241,7 +241,9 @@ describe("Settings", () => {
   it("announces hands-free to an upgraded user and hands the dismissal up", async () => {
     render(<Settings handsFreeNote onDismissNote={dismiss} onRerun={rerun} />);
     await screen.findByText("Hands-free dictation and what you do");
-    expect(screen.getByText(/tell Take My Word what you do below/)).toBeTruthy();
+    expect(
+      screen.getByText(/tell Take My Word what you do below; it is kept with your settings/),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Got it" }));
     expect(dismiss).toHaveBeenCalledOnce();
   });
