@@ -34,7 +34,7 @@ export function openaiRefiner({
   temperature,
   ...http
 }: OpenaiOptions): Refiner {
-  const label = `${openaiId}:${model}`;
+  const label = `${openaiId}:${model}${reasoningEffort === undefined ? "" : `@${reasoningEffort}`}`;
   return {
     label,
     async refine({ raw, instructions }: RefineInput) {

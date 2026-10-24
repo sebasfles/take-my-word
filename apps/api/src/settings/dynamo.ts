@@ -28,8 +28,19 @@ export function dynamoSettingsStore(table: Table): SettingsStore {
       return created ? settings : ((await get(userId)) ?? settings);
     },
     async put(userId, settings) {
+      const fields = Object.entries(settings);
       await table.client.send(
-        new PutCommand({ TableName: table.name, Item: { ...key(userId), ...settings } }),
+        new UpdateCommand({
+          TableName: table.name,
+          Key: key(userId),
+          UpdateExpression: `SET ${fields.map((_, index) => `#f${String(index)} = :f${String(index)}`).join(", ")}`,
+          ExpressionAttributeNames: Object.fromEntries(
+            fields.map(([name], index) => [`#f${String(index)}`, name]),
+          ),
+          ExpressionAttributeValues: Object.fromEntries(
+            fields.map(([, value], index) => [`:f${String(index)}`, value]),
+          ),
+        }),
       );
     },
     resetDefaultStyle: (userId, styleId, to) =>

@@ -68,6 +68,59 @@
       "description": "Give dev the eval Lambda that the evaluation harness (apps/api/evaluation) swaps and invokes; needs dev, never reaches prd.",
       "type": "boolean"
     },
+    "providers": {
+      "description": "Transcriber and refiner each environment's dictate runs, set as its TRANSCRIBER and REFINER by Terraform; an environment left out runs whisper-large-v3-turbo and gpt-5.4-nano. Transcribers: whisper-large-v3-turbo, gpt-transcribe, together-parakeet. Refiners: gpt-5.4-nano, gpt-5.4-nano@none, gpt-5.6-luna@none, cerebras-qwen-3.8-27b@none, cerebras-gpt-oss-120b@low, gpt-oss-20b@low.",
+      "type": "object",
+      "properties": {
+        "dev": {
+          "type": "object",
+          "properties": {
+            "transcriber": {
+              "default": "whisper-large-v3-turbo",
+              "type": "string",
+              "enum": ["whisper-large-v3-turbo", "gpt-transcribe", "together-parakeet"]
+            },
+            "refiner": {
+              "default": "gpt-5.4-nano",
+              "type": "string",
+              "enum": [
+                "gpt-5.4-nano",
+                "gpt-5.4-nano@none",
+                "gpt-5.6-luna@none",
+                "cerebras-qwen-3.8-27b@none",
+                "cerebras-gpt-oss-120b@low",
+                "gpt-oss-20b@low"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "prd": {
+          "type": "object",
+          "properties": {
+            "transcriber": {
+              "default": "whisper-large-v3-turbo",
+              "type": "string",
+              "enum": ["whisper-large-v3-turbo", "gpt-transcribe", "together-parakeet"]
+            },
+            "refiner": {
+              "default": "gpt-5.4-nano",
+              "type": "string",
+              "enum": [
+                "gpt-5.4-nano",
+                "gpt-5.4-nano@none",
+                "gpt-5.6-luna@none",
+                "cerebras-qwen-3.8-27b@none",
+                "cerebras-gpt-oss-120b@low",
+                "gpt-oss-20b@low"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "releases": {
       "type": "string",
       "pattern": "^[A-Za-z0-9-]+\\/[A-Za-z0-9._-]+$",

@@ -6,6 +6,8 @@ import type { StyleStore } from "../styles/store.ts";
 import { defaultSettings } from "./defaults.ts";
 import type { SettingsStore } from "./store.ts";
 
+export const releasedDesktopProviders = { transcriber: "groq-whisper", refiner: "openai" } as const;
+
 export interface SettingsRoutesDeps {
   settings: SettingsStore;
   styles: StyleStore;
@@ -17,7 +19,7 @@ export function settingsRoutes({ settings, styles }: SettingsRoutesDeps) {
       const userId = c.var.userId;
       const body: Settings =
         (await settings.get(userId)) ?? (await settings.create(userId, defaultSettings));
-      return c.json(body);
+      return c.json({ ...body, providers: releasedDesktopProviders });
     })
     .put("/", async (c) => {
       const userId = c.var.userId;
@@ -29,10 +31,9 @@ export function settingsRoutes({ settings, styles }: SettingsRoutesDeps) {
         defaultStyleId: input.defaultStyleId,
         locale: localeFor(dictationLanguages, current.locale),
         dictationLanguages,
-        providers: input.providers,
         context: input.context ?? current.context,
       };
       await settings.put(userId, next);
-      return c.json(next);
+      return c.json({ ...next, providers: releasedDesktopProviders });
     });
 }

@@ -62,7 +62,6 @@ export const storedSettings = {
   defaultStyleId: "plain",
   locale: "es",
   dictationLanguages: ["es"],
-  providers: { transcriber: "groq-whisper", refiner: "openai" },
   context: { picks: [], detail: "" },
 };
 

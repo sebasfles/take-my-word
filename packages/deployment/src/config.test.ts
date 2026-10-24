@@ -55,6 +55,10 @@ describe("deployment config", () => {
     { name: "Take My Word" },
     { releases: "take-my-word" },
     { unknownKey: true },
+    { providers: { prd: { transcriber: "groq-whisper" } } },
+    { providers: { prd: { refiner: "openai" } } },
+    { providers: { prd: { refiner: "gpt-5.4-nano", model: "gpt-6" } } },
+    { providers: { staging: {} } },
     { github: { owner: "o", repository: "r", appId: "x", appInstallationId: "1" } },
     {
       desktop: {

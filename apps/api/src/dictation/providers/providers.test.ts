@@ -117,6 +117,9 @@ const completed = {
 describe("openai refiner", () => {
   it("labels itself with its model", () => {
     expect(openaiRefiner({ apiKey, model: "gpt-6-luna" }).label).toBe("openai:gpt-6-luna");
+    expect(openaiRefiner({ apiKey, model: "gpt-6-luna", reasoningEffort: "none" }).label).toBe(
+      "openai:gpt-6-luna@none",
+    );
   });
 
   it("sends the transcript as input under the instructions and maps text and usage", async () => {
@@ -455,7 +458,7 @@ describe("cerebras-chat refiner", () => {
       reasoningEffort: "none",
       temperature: 0,
     });
-    expect(refiner.label).toBe("cerebras-chat:qwen-3.8-27b");
+    expect(refiner.label).toBe("cerebras-chat:qwen-3.8-27b@none");
     const result = await refiner.refine({ raw: "eh hola", language: "es", instructions: "clean" });
     expect(result).toEqual({ text: "Hola, mundo.", usage: { inputTokens: 90, outputTokens: 12 } });
     expect(captured[0]?.url).toBe("https://api.cerebras.ai/v1/chat/completions");

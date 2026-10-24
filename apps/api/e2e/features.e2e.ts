@@ -16,6 +16,7 @@ import {
 } from "@take-my-word/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { requiredEnv, signInCrewE2e, signInCrewE2eB } from "../scripts/sign-in.ts";
+import { configuredPair } from "./configured-pair.ts";
 import { synthesize } from "./speech.ts";
 
 const rareTerm = "Quelvarix";
@@ -70,9 +71,10 @@ async function terms(token = tokenA): Promise<DictionaryTerm[]> {
 const defaults = (defaultStyleId: string) => ({
   defaultStyleId,
   dictationLanguages: ["es"],
-  providers: { transcriber: "groq-whisper", refiner: "openai" },
   context: { picks: [], detail: "" },
 });
+
+const releasedProviders = { transcriber: "groq-whisper", refiner: "openai" };
 
 async function cleanUp(token: string) {
   for (const term of await terms(token)) {
@@ -239,7 +241,7 @@ describe("dictionary in a deployed environment", () => {
         (await call("POST", "/dictionary", { body: { term: rareTerm } })).json,
       );
       const withTerm = await dictate(rareSpeech);
-      expect(withTerm.raw).toContain(rareTerm);
+      if (configuredPair(url).prompted) expect(withTerm.raw).toContain(rareTerm);
       expect(withTerm.text).toContain(rareTerm);
       expect(withTerm.styleId).toBe("plain");
 
@@ -359,14 +361,16 @@ describe("user context and usage in a deployed environment", () => {
     "keeps the context across a client that leaves it out and counts today's audio",
     async () => {
       const context = { picks: ["software-development"], detail: "backend con AWS" };
-      const older = { defaultStyleId: "plain", providers: defaults("plain").providers };
+      const older = { defaultStyleId: "plain", providers: releasedProviders };
       expect(
         (await call("PUT", "/me/settings", { body: { ...defaults("plain"), context } })).status,
       ).toBe(200);
-      expect((await call("PUT", "/me/settings", { body: older })).status).toBe(200);
-      expect(settingsSchema.parse((await call("GET", "/me/settings")).json).context).toEqual(
-        context,
-      );
+      const olderPut = await call("PUT", "/me/settings", { body: older });
+      expect(olderPut.status).toBe(200);
+      expect(olderPut.json).toMatchObject({ providers: releasedProviders });
+      const read = await call("GET", "/me/settings");
+      expect(read.json).toMatchObject({ providers: releasedProviders });
+      expect(settingsSchema.parse(read.json).context).toEqual(context);
 
       const before = usageSchema.parse((await call("GET", "/me/usage")).json);
       expect(before.capSeconds).toBeGreaterThan(0);

@@ -32,6 +32,16 @@ variable "github" {
   default = null
 }
 
+variable "transcriber" {
+  description = "Transcriber id dictate runs, one of transcriberIds in packages/shared"
+  type        = string
+}
+
+variable "refiner" {
+  description = "Refiner id dictate runs, one of refinerIds in packages/shared"
+  type        = string
+}
+
 variable "daily_quota_minutes" {
   description = "Audio minutes each user may dictate per UTC day"
   type        = number

@@ -1,10 +1,4 @@
-import {
-  defaultRefiner,
-  defaultTranscriber,
-  dictionaryHalfLifeDays,
-  emptyUserContext,
-  type Language,
-} from "@take-my-word/shared";
+import { dictionaryHalfLifeDays, emptyUserContext, type Language } from "@take-my-word/shared";
 import type { Dispatcher } from "undici";
 import { dictate } from "../dictation/dictate.ts";
 import { transcribeIn } from "../dictation/language-selection.ts";
@@ -12,11 +6,12 @@ import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { Refiner } from "../dictation/ports/refiner.ts";
 import type { Transcriber, TranscriptionUsage } from "../dictation/ports/transcriber.ts";
 import type { Fetch } from "../dictation/providers/http.ts";
+import { refinerOf, transcriberOf } from "../dictation/providers/registry.ts";
 import { createSilenceGuard, defaultSilenceLevels } from "../dictation/silence.ts";
 import { defaultSttPromptTokenBudget } from "../dictate/config.ts";
 import { HttpError } from "../lib/http-error.ts";
 import { createLogger } from "../lib/log.ts";
-import { buildRefiner, buildTranscriber } from "./candidates.ts";
+import type { ProviderKeys } from "../lib/secrets.ts";
 import type {
   Connection,
   EvalRequest,
@@ -25,10 +20,9 @@ import type {
   ProviderRequest,
 } from "./contract.ts";
 import type { HttpRecord } from "./http-probe.ts";
-import type { EvalKeys } from "./keys.ts";
 
 export interface ExecuteDeps {
-  keys: () => Promise<EvalKeys>;
+  keys: () => Promise<ProviderKeys>;
   dispatcherFor: (connection: Connection) => {
     dispatcher: Dispatcher;
     release: () => Promise<void>;
@@ -110,7 +104,7 @@ export async function execute(request: ProviderRequest, deps: ExecuteDeps): Prom
   try {
     if (request.kind === "transcribe") {
       const transcriber = measuredTranscriber(
-        buildTranscriber(request.transcriber, deps.keys, fetch),
+        transcriberOf(request.transcriber, deps.keys, { fetch }),
       );
       label = transcriber.label;
       const audio = Buffer.from(request.audioBase64, "base64");
@@ -125,7 +119,7 @@ export async function execute(request: ProviderRequest, deps: ExecuteDeps): Prom
       return { ok: true, label, text: chosen.text, language: chosen.language, calls };
     }
     if (request.kind === "refine") {
-      const refiner = measuredRefiner(buildRefiner(request.refiner, deps.keys, fetch));
+      const refiner = measuredRefiner(refinerOf(request.refiner, deps.keys, { fetch }));
       label = refiner.label;
       const refined = await refiner.refine({
         raw: request.raw,
@@ -135,9 +129,9 @@ export async function execute(request: ProviderRequest, deps: ExecuteDeps): Prom
       return { ok: true, label, text: refined.text, usage: refined.usage, calls };
     }
     const transcriber = measuredTranscriber(
-      buildTranscriber(request.transcriber, deps.keys, fetch),
+      transcriberOf(request.transcriber, deps.keys, { fetch }),
     );
-    const refiner = measuredRefiner(buildRefiner(request.refiner, deps.keys, fetch));
+    const refiner = measuredRefiner(refinerOf(request.refiner, deps.keys, { fetch }));
     label = `${transcriber.label} + ${refiner.label}`;
     const dictation = await dictateInLambda(request, transcriber, refiner, deps);
     return { ok: true, label, text: dictation.text, dictation, calls };
@@ -196,10 +190,7 @@ function dictateInLambda(
       },
     },
     {
-      providers: {
-        transcribers: { [defaultTranscriber]: transcriber },
-        refiners: { [defaultRefiner]: refiner },
-      },
+      providers: { transcriber, refiner },
       quota: { charge: () => Promise.resolve(true) },
       dailyQuotaMinutes: 60,
       dictations: { save: () => Promise.resolve() },
@@ -210,7 +201,6 @@ function dictateInLambda(
               defaultStyleId: "plain",
               locale: first,
               dictationLanguages: request.languages,
-              providers: { transcriber: defaultTranscriber, refiner: defaultRefiner },
               context: emptyUserContext,
             },
             styles: [],

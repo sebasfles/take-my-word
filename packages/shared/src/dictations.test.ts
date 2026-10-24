@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dictationMetaSchema } from "./dictations.ts";
 
 describe("dictationMetaSchema", () => {
-  it("accepts a locale alone and leaves providers to the server defaults", () => {
+  it("accepts a locale alone", () => {
     expect(dictationMetaSchema.parse({ locale: "es-CO" })).toEqual({ locale: "es-CO" });
   });
 
@@ -17,11 +17,13 @@ describe("dictationMetaSchema", () => {
   });
 
   it.each([
-    { locale: "fr" },
-    { locale: "es_CO" },
-    { locale: "es", sttProvider: "aws-transcribe" },
-    { locale: "es", refineProvider: "bedrock-claude" },
-  ])("rejects %j", (meta) => {
+    { locale: "es", sttProvider: "groq-whisper", refineProvider: "openai" },
+    { locale: "es", sttProvider: "aws-transcribe", refineProvider: "bedrock-claude" },
+  ])("drops the provider fields released clients send, whatever they hold: %j", (meta) => {
+    expect(dictationMetaSchema.parse(meta)).toEqual({ locale: "es" });
+  });
+
+  it.each([{ locale: "fr" }, { locale: "es_CO" }])("rejects %j", (meta) => {
     expect(dictationMetaSchema.safeParse(meta).success).toBe(false);
   });
 });

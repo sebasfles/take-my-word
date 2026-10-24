@@ -40,7 +40,7 @@ The domain itself is not included.
 - An AWS account where you can create IAM roles, and an AWS CLI profile for it (`aws configure` or `aws configure sso`).
 - A domain with a public Route 53 hosted zone in that account; the web can live on the zone itself or on a subdomain such as `dictation.example.com`.
   If the domain is registered elsewhere, delegate it to the zone's name servers first, or the certificates never validate.
-- A [Groq API key](https://console.groq.com/keys) and an [OpenAI API key](https://platform.openai.com/api-keys) with billing set up.
+- A [Groq API key](https://console.groq.com/keys) and an [OpenAI API key](https://platform.openai.com/api-keys) with billing set up, or the keys of the providers you pick (see "Providers").
 - Node 24, pnpm 10 (`corepack enable`), Terraform 1.10 or newer, AWS CLI v2, git and zip.
 - [Claude Code](https://claude.com/claude-code) for the recommended path.
 - Windows for the desktop app; macOS and Linux come later.
@@ -62,7 +62,7 @@ The domain itself is not included.
    cp -r self-host/skill .claude/skills/self-host
    ```
 
-3. Put your keys in `.env` at the repository root with your own editor, never in the chat:
+3. Put your keys in `.env` at the repository root with your own editor, never in the chat (other providers' keys go the same way, see "Providers"):
 
    ```sh
    GROQ_API_KEY=gsk_...
@@ -83,7 +83,7 @@ The domain itself is not included.
    - the deployment name, the prefix of every AWS resource (`take-my-word` unless you run several);
    - whether to add a dev environment at `dev.<domain>`;
    - the GitHub repository whose releases the web offers for download (your clone's origin by default);
-   - the Groq and OpenAI keys, hidden as you type.
+   - the keys of the providers each environment runs, Groq and OpenAI by default, hidden as you type.
 4. Read the Terraform plan and accept it.
    The command then stores the keys in Secrets Manager, builds and uploads the code, creates the first user and waits until the site answers.
 
@@ -112,6 +112,13 @@ pnpm selfhost
 
 It applies infrastructure changes after showing the plan, and redeploys the code only when the commit, `releases` or `indexed` changed.
 To change a provider key, run `pnpm selfhost` and type the new one; empty answers keep the stored keys.
+
+## Providers
+
+Each environment transcribes with `whisper-large-v3-turbo` and cleans up with `gpt-5.4-nano` unless `deployment.json` picks others, as `"providers": { "prd": { "transcriber": "gpt-transcribe", "refiner": "gpt-5.4-nano" } }`.
+Transcribers: `whisper-large-v3-turbo` (`GROQ_API_KEY`), `gpt-transcribe` (`OPENAI_API_KEY`), `together-parakeet` (`TOGETHER_API_KEY`).
+Refiners: `gpt-5.4-nano`, `gpt-5.4-nano@none`, `gpt-5.6-luna@none` (`OPENAI_API_KEY`), `cerebras-qwen-3.8-27b@none`, `cerebras-gpt-oss-120b@low` (`CEREBRAS_API_KEY`), `gpt-oss-20b@low` (`GROQ_API_KEY`).
+Run `pnpm selfhost` after a change: it asks only for the keys the chosen providers need and keeps every other stored key.
 
 ## Remove everything
 

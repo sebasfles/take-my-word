@@ -18,32 +18,12 @@ pub use stub::{Stub, StubMode, Stubbed};
 pub const AUDIO_FIELD: &str = "audio";
 pub const META_FIELD: &str = "meta";
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(test, derive(schemars::JsonSchema))]
-#[allow(dead_code, reason = "mirrors transcriberIds in packages/shared")]
-pub enum TranscriberId {
-    #[serde(rename = "groq-whisper")]
-    GroqWhisper,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(test, derive(schemars::JsonSchema))]
-#[allow(dead_code, reason = "mirrors refinerIds in packages/shared")]
-pub enum RefinerId {
-    #[serde(rename = "openai")]
-    Openai,
-}
-
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct DictationMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stt_provider: Option<TranscriberId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refine_provider: Option<RefinerId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub style_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -143,14 +123,6 @@ pub struct ApiErrorBody {
     pub error: ApiErrorDetail,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(test, derive(schemars::JsonSchema))]
-#[allow(dead_code, reason = "mirrors settingsSchema in packages/shared")]
-pub struct SettingsProviders {
-    pub transcriber: TranscriberId,
-    pub refiner: RefinerId,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(schemars::JsonSchema))]
 #[serde(rename_all = "kebab-case")]
@@ -188,7 +160,6 @@ pub struct UserSettings {
     pub default_style_id: String,
     pub locale: String,
     pub dictation_languages: Vec<Language>,
-    pub providers: SettingsProviders,
     pub context: UserContext,
 }
 
@@ -274,6 +245,20 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&meta).unwrap(),
             r#"{"appId":"notepad.exe"}"#
+        );
+    }
+
+    #[test]
+    fn settings_parse_with_the_providers_the_server_keeps_for_released_desktops() {
+        let settings: UserSettings = serde_json::from_str(
+            r#"{"defaultStyleId":"plain","locale":"es","dictationLanguages":["es"],"context":{"picks":[],"detail":""},"providers":{"transcriber":"groq-whisper","refiner":"openai"}}"#,
+        )
+        .unwrap();
+        assert_eq!(settings.default_style_id, "plain");
+        assert!(
+            !serde_json::to_string(&settings)
+                .unwrap()
+                .contains("providers")
         );
     }
 

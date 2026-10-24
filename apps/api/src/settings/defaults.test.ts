@@ -9,7 +9,6 @@ describe("settingsFrom", () => {
       defaultStyleId: "formal",
       locale: "es-CL",
       dictationLanguages: ["es"],
-      providers,
       context: { picks: [], detail: "" },
     });
     expect(settingsFrom({ defaultStyleId: "plain", locale: "en", providers })).toMatchObject({

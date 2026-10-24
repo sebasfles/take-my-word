@@ -6,9 +6,7 @@ import {
   contextLabels,
   languageList,
   languageName,
-  refinerNames,
   styleLabel,
-  transcriberNames,
   usageMinutes,
 } from "@/lib/account.ts";
 import { format } from "@/lib/i18n.ts";
@@ -96,16 +94,6 @@ export default async function AccountPage() {
                   testId: "account-usage",
                 },
               ]),
-          {
-            label: t.account.transcriber,
-            value: transcriberNames[settings.providers.transcriber],
-            testId: "account-transcriber",
-          },
-          {
-            label: t.account.refiner,
-            value: refinerNames[settings.providers.refiner],
-            testId: "account-refiner",
-          },
         ];
         return (
           <dl className="card details">

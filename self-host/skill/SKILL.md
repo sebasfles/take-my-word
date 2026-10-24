@@ -11,7 +11,7 @@ You run the same steps as the manual path, through `pnpm selfhost --yes`, and yo
 
 ## Never
 
-- Never ask for, read, print or repeat the Groq or OpenAI keys, and never put a secret in a command line.
+- Never ask for, read, print or repeat a provider key, and never put a secret in a command line.
   The person writes them into `.env` with their own editor; you only check that the two names are there.
 - Never print `.env`, commit `deployment.json` or `.env`, or change code in this repository.
 - Never run `pnpm selfhost remove` unless the person asked for removal in this conversation and typed their domain to confirm it.
@@ -32,8 +32,8 @@ You run the same steps as the manual path, through `pnpm selfhost --yes`, and yo
    If the SSO session expired, ask them to run `! aws sso login --profile <profile>` and wait.
 4. Check the domain: `aws route53 list-hosted-zones-by-name --profile <profile>` must show a public zone that is the domain or a parent of it.
    If none, explain that they need one (see "What you need" in the README) and stop.
-5. Ask them to add `GROQ_API_KEY=...` and `OPENAI_API_KEY=...` to `.env` at the repository root with their editor.
-   Check without reading the values: `grep -oE '^(GROQ_API_KEY|OPENAI_API_KEY)=.' .env | cut -d= -f1`.
+5. Ask them to add `GROQ_API_KEY=...` and `OPENAI_API_KEY=...` to `.env` at the repository root with their editor, or the keys of the providers they pick (the README's "Providers" lists the ids, set under `providers` in `deployment.json`, and their keys).
+   Check without reading the values: `grep -oE '^(GROQ|OPENAI|TOGETHER|CEREBRAS)_API_KEY=.' .env | cut -d= -f1`.
    On a re-run, keys already stored in AWS are kept, so this step can be skipped.
 6. Write `deployment.json` (keep an existing one's values unless they changed an answer):
 
@@ -59,7 +59,7 @@ You run the same steps as the manual path, through `pnpm selfhost --yes`, and yo
 9. When it prints "Ready", give them the web URL, the username and the temporary password, and tell them:
    - the first sign-in on the web asks for a new password;
    - in the desktop app they choose "Use your own server" on the sign-in step and type the domain;
-   - they can delete the two keys from `.env`: they are stored in AWS, and a re-run keeps them.
+   - they can delete the keys from `.env`: they are stored in AWS, and a re-run keeps them.
 
 ## Update
 

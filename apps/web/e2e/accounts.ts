@@ -148,7 +148,6 @@ export function apiClient(token: string) {
       call("PUT", "/me/settings", {
         defaultStyleId,
         dictationLanguages: ["es"],
-        providers: { transcriber: "groq-whisper", refiner: "openai" },
         context: { picks: ["law", "student"], detail: "contratos" },
       }),
     addRule: async (appId: string, styleId: string) =>

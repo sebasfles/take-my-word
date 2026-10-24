@@ -15,6 +15,7 @@ import {
   planOutcome,
   readOutputs,
   repositoryOf,
+  requiredProviderKeys,
   SelfHostError,
   selfHostProblem,
   webBuildOf,
@@ -69,22 +70,58 @@ describe("pnpm selfhost", () => {
   });
 
   it("keeps stored provider keys unless new ones are given, and names the missing ones", () => {
+    const today = ["GROQ_API_KEY", "OPENAI_API_KEY"] as const;
     const stored = { GROQ_API_KEY: "gsk_old", OPENAI_API_KEY: "sk-old" };
-    expect(nextProviderKeys(stored, { GROQ_API_KEY: "", OPENAI_API_KEY: "  " })).toEqual({
+    expect(nextProviderKeys(stored, { GROQ_API_KEY: "", OPENAI_API_KEY: "  " }, today)).toEqual({
       values: stored,
       changed: false,
       missing: [],
     });
-    expect(nextProviderKeys(stored, { GROQ_API_KEY: " gsk_new " })).toEqual({
+    expect(nextProviderKeys(stored, { GROQ_API_KEY: " gsk_new " }, today)).toEqual({
       values: { GROQ_API_KEY: "gsk_new", OPENAI_API_KEY: "sk-old" },
       changed: true,
       missing: [],
     });
-    expect(nextProviderKeys(stored, stored).changed).toBe(false);
+    expect(nextProviderKeys(stored, stored, today).changed).toBe(false);
     const placeholder = { GROQ_API_KEY: "", OPENAI_API_KEY: "" };
-    expect(nextProviderKeys(placeholder, { OPENAI_API_KEY: "sk-new" }).missing).toEqual([
+    expect(nextProviderKeys(placeholder, { OPENAI_API_KEY: "sk-new" }, today).missing).toEqual([
       "GROQ_API_KEY",
     ]);
+  });
+
+  it("requires only the keys of the selected providers and keeps every other stored key", () => {
+    const config = parseConfig({
+      ...base,
+      environments: ["dev", "prd"],
+      providers: {
+        dev: { transcriber: "together-parakeet", refiner: "cerebras-qwen-3.8-27b@none" },
+        prd: { refiner: "gpt-5.4-nano@none" },
+      },
+    });
+    expect(requiredProviderKeys(config, ["prd"])).toEqual(["GROQ_API_KEY", "OPENAI_API_KEY"]);
+    expect(requiredProviderKeys(config, ["dev"])).toEqual(["TOGETHER_API_KEY", "CEREBRAS_API_KEY"]);
+    expect(requiredProviderKeys(config, ["dev", "prd"])).toHaveLength(4);
+    expect(requiredProviderKeys(parseConfig(base), ["prd"])).toEqual([
+      "GROQ_API_KEY",
+      "OPENAI_API_KEY",
+    ]);
+
+    const stored = { GROQ_API_KEY: "gsk_old", OPENAI_API_KEY: "", COOKIE: "kept" };
+    const next = nextProviderKeys(
+      stored,
+      { TOGETHER_API_KEY: "tg", CEREBRAS_API_KEY: "" },
+      requiredProviderKeys(config, ["dev"]),
+    );
+    expect(next).toEqual({
+      values: {
+        GROQ_API_KEY: "gsk_old",
+        OPENAI_API_KEY: "",
+        COOKIE: "kept",
+        TOGETHER_API_KEY: "tg",
+      },
+      changed: true,
+      missing: ["CEREBRAS_API_KEY"],
+    });
   });
 
   it("deploys code only when it changed, the tree is dirty or the infrastructure moved", () => {

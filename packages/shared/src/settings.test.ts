@@ -5,7 +5,6 @@ const settings = {
   defaultStyleId: "plain",
   locale: "es-CL",
   dictationLanguages: ["es"],
-  providers: { transcriber: "groq-whisper", refiner: "openai" },
   context: { picks: [], detail: "" },
 };
 
@@ -24,10 +23,20 @@ describe("settings", () => {
   });
 
   it("lets an update leave out the languages and the locale, as older clients do", () => {
-    const older = { defaultStyleId: settings.defaultStyleId, providers: settings.providers };
+    const older = { defaultStyleId: settings.defaultStyleId };
     expect(settingsUpdateSchema.parse(older)).not.toHaveProperty("context");
     expect(settingsUpdateSchema.parse(older)).toEqual(older);
     expect(settingsSchema.safeParse(older).success).toBe(false);
+  });
+
+  it.each([
+    { transcriber: "groq-whisper", refiner: "openai" },
+    { transcriber: "retired", refiner: 3 },
+  ])("drops the providers released desktops send with their settings: %j", (providers) => {
+    expect(settingsUpdateSchema.parse({ ...settings, providers })).toEqual(
+      settingsUpdateSchema.parse(settings),
+    );
+    expect(settingsSchema.parse({ ...settings, providers })).not.toHaveProperty("providers");
   });
 
   it("takes up to three distinct picks and a trimmed detail of at most 200 characters", () => {

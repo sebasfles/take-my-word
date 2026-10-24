@@ -98,14 +98,6 @@ describe("readDictationUpload", () => {
       ]),
     ],
     [
-      "an unknown provider",
-      multipartContentType,
-      dictationBody({
-        audio: Buffer.alloc(4),
-        meta: { locale: "es", sttProvider: "whisper-local" },
-      }),
-    ],
-    [
       "two audio parts",
       multipartContentType,
       multipart([

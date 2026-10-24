@@ -17,6 +17,8 @@ module "dictate" {
       DAILY_QUOTA_MINUTES       = tostring(var.daily_quota_minutes)
       DICTIONARY_HALF_LIFE_DAYS = tostring(var.dictionary_half_life_days)
       STT_PROMPT_TOKEN_BUDGET   = tostring(var.stt_prompt_token_budget)
+      TRANSCRIBER               = var.transcriber
+      REFINER                   = var.refiner
       NODE_OPTIONS              = "--enable-source-maps"
     },
     local.debug_audio_bucket == null ? {} : { DEBUG_BUCKET = local.debug_audio_bucket.id },

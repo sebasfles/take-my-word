@@ -4,6 +4,7 @@ export * from "./dictionary.ts";
 export * from "./discovery.ts";
 export * from "./errors.ts";
 export * from "./history.ts";
+export * from "./providers.ts";
 export * from "./releases.ts";
 export * from "./settings.ts";
 export * from "./styles.ts";

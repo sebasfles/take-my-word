@@ -112,5 +112,48 @@ Beyond the Pipeline I check:
 - Old-shape tests cover settings `PUT` and dictation meta.
 
 clearance: full: `pnpm tf dev plan` and `apply` (each Acceptance 2 pair, then back to today's), the branch `dictate` swapped on dev for `pnpm e2e` and develop's build restored afterwards (check dev runs develop's build before the first apply), `pnpm tf prd plan` only. No prd apply, no evaluation runs.
+- Before round 1 (om-reviewer, on the om-developer's question): the settings contract change reaches the `api` Lambda, so for the dev e2e runs all four api-bundle Lambdas (`dictate`, `api`, `authorizer`, `dictionary-usage`) are swapped to one branch build. Develop's build of all four is restored afterwards, and the restore is recorded in `verify.log`. Web code is not swapped.
+- Before round 1 (om-reviewer): dev's state holds 0019's paused infra, so every dev apply here is `-target=module.app.module.dictate.aws_lambda_function.this`. That keeps 0019's key, route, integration and policy, and only drops `SEGMENT_RECEIPT_KEY` from dev's `dictate` env, which neither develop's code nor this branch reads. 0019 re-applies it on resume. prd's plan stays the untargeted Acceptance 6 check.
 
 ## om-developer notes
+
+### Round 1
+
+Done:
+- `packages/shared/src/providers.ts` holds the registry ids, today's defaults, the provider key each id needs (`transcriberKeys`, `refinerKeys`, `keysOfPair`) and `providerPairSchema`.
+  `transcriberIds`, `refinerIds` and the defaults left `dictations.ts`; `sttProvider` and `refineProvider` left the meta and `providers` left `settingsSchema`; zod strips the old fields, so old shapes parse and are ignored.
+- `apps/api/src/dictation/providers/registry.ts` is the one adapter table for production and evaluation: entry data (adapter, model, effort, temperature, `prompted`) plus `transcriberOf` and `refinerOf`.
+  Labels append `@<effort>` in the `openai` and chat adapters, so today's pair keeps `groq-whisper:whisper-large-v3-turbo` and `openai:gpt-5.4-nano`.
+- `dictate` reads `TRANSCRIBER` and `REFINER` (defaults today's pair; `GROQ_WHISPER_MODEL` and `OPENAI_MODEL` removed) and selects at init with a top-level await in `handler.ts`: an unknown id or a missing key of the selected pair logs one `providers not selected` JSON line with both values and the reason, and throws before any request is served.
+  `dictate.ts` changes only at the selection point (`deps.providers` is the selected pair).
+- The providers secret is read with every key optional; only the selected pair's keys are required (`requiredKeys`).
+- Settings: `GET` and `PUT /me/settings` answer the fixed `providers` released desktops require (`releasedDesktopProviders` in `settings/routes.ts`); the store writes with `UpdateCommand SET` of the four settings fields, so a stored `providers` stays untouched.
+- Web Account page drops the Transcription and Refiner rows and their copy; desktop mirror drops `TranscriberId`, `RefinerId`, `SettingsProviders` and the meta fields, contract regenerated; no desktop UI changed.
+- Eval: the contract names candidates by registry id; `src/eval/candidates.ts` and `src/eval/keys.ts` removed, the eval Lambda uses the production loader and registry; `together-whisper-large-v3` moved to `notRerun`, cited to 0018's report; `eval:e2e` paces with dev's configured transcriber.
+- Deployment: `providers.{dev,prd}.{transcriber,refiner}` in `deployment.json` (schema and example), `pnpm tf` always passes `TF_VAR_transcriber` and `TF_VAR_refiner`, Terraform sets `TRANSCRIBER` and `REFINER` on `dictate`; self-host asks for and requires only the selected providers' keys and keeps every other stored key; self-host README and skill list ids and keys.
+- Tests: one per registry entry pinning label, URL, key and body; today's pair pinned to develop's literals; selection (pairs, unknown ids, missing keys, one log line); old shapes of meta (shared, upload, handler) and settings (shared, routes, store); deployment config and Terraform variables per environment; self-host required keys.
+
+Dev runs (all four api Lambdas swapped to the build of `b80c3c2`, whose `apps/api` and `packages` sources equal this commit's; every apply targeted at `module.app.module.dictate.aws_lambda_function.this`, each plan checked to change only dictate's environment):
+- Before the first apply all four dev Lambdas ran develop's sources (sourcemaps identical to `origin/develop`); their zips are kept in the workspace's `.restore/` for the restore.
+- Today's pair: `pnpm e2e` 38 of 38 (first verify run).
+- `gpt-transcribe` + `gpt-5.4-nano`: 37 of 38; the labels matched, and the one failure is model quality on a prompted transcriber, twice in a row: with `Quelvarix` in the dictionary and in the prompt, raw was "Hablé con Kelvaric sobre el contrato de mantenimiento." (`.verify/api-e2e-gpt-transcribe.out`); counted as passed per Context & decisions, for the PR.
+- Parakeet + `cerebras-qwen-3.8-27b@none`: 38 of 38; the raw dictionary check skipped (unprompted), the clean text still spelled the term.
+- Dev logs show 18 `dictation done` lines under `openai-transcribe:gpt-transcribe` + `openai:gpt-5.4-nano` and 16 under `together-transcribe:nvidia/parakeet-tdt-0.6b-v3` + `cerebras-chat:qwen-3.8-27b@none`.
+- Dev ends on today's pair; dev's `dictate` no longer has `SEGMENT_RECEIPT_KEY`, so 0019 must re-apply on resume.
+- `pnpm tf prd plan`, untargeted: 1 to change, `dictate` gains only `REFINER = gpt-5.4-nano` and `TRANSCRIBER = whisper-large-v3-turbo`.
+
+Decisions the plan did not record:
+- The provider key each id needs lives in `packages/shared` with the ids, so the api, the deployment config and self-host read one table.
+- Selection runs at init with a top-level await (the secret is read during init, not on the first dictation), and the adapters get the keys already loaded.
+- The fixed `providers` answer is an api constant, not part of the shared contract; new clients never see it in their types, and the desktop test pins that serde ignores it.
+- Settings `PUT` became an `UpdateCommand` setting the four fields instead of a `PutCommand` replacing the item, to keep stored `providers` untouched.
+- Terraform's `transcriber` and `refiner` have no default; `pnpm tf` always passes them from the shared defaults, so the default lives in one place.
+- The e2e reads the configured pair from `deployment.json`, choosing the environment whose API host is `API_URL`'s; the filler check on raw stays unconditional (it is not a prompt behavior).
+- Eval candidates keep a `spec` field that is now the registry entry; their `setting` derives from whether the entry sets an effort.
+
+Pending: none; develop's build of the four dev Lambdas is restored after the final verify run and recorded in `verify.log`.
+
+Deferred:
+- A desktop built from this task no longer sends `providers`, so a server older than this task (an un-updated self-host) answers its settings `PUT` with 400.
+- `defaultGroqWhisperModel` and `defaultOpenaiModel` stay as adapter defaults used only by adapter tests.
+- `infra/environments/dev/.terraform.lock.hcl` gained the `random` provider from 0019's state during these plans; it is left out of the commit.

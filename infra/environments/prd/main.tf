@@ -13,6 +13,8 @@ module "app" {
   web_hostname = local.web_hostname
   hosted_zone  = var.hosted_zone
   github       = var.github
+  transcriber  = var.transcriber
+  refiner      = var.refiner
 
   debug_bucket = local.debug_bucket
 

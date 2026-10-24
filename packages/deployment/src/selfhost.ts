@@ -8,6 +8,9 @@ import {
   discoveryPath,
   discoverySchema,
   hostnamePattern,
+  keysOfPair,
+  providerKeyNames,
+  type ProviderKeyName,
 } from "@take-my-word/shared";
 import {
   callerAccount,
@@ -33,6 +36,7 @@ import {
   indexedOrigin,
   loadConfig,
   parseConfig,
+  providerPair,
   stateBucket,
   type DeploymentConfig,
   type Environment,
@@ -59,7 +63,12 @@ options:
   --user <name>              username of the first user (default: admin)
   --yes                      answer yes to every confirmation`;
 
-export const providerKeys = ["GROQ_API_KEY", "OPENAI_API_KEY"] as const;
+const providerKeyLabels: Readonly<Record<ProviderKeyName, string>> = {
+  GROQ_API_KEY: "Groq API key",
+  OPENAI_API_KEY: "OpenAI API key",
+  TOGETHER_API_KEY: "Together API key",
+  CEREBRAS_API_KEY: "Cerebras API key",
+};
 const removalTargets = [
   "module.app.module.table",
   "module.app.module.user_pool",
@@ -80,19 +89,28 @@ export function repositoryOf(originUrl: string): string | null {
   return match === null ? null : `${match[1]}/${match[2]}`;
 }
 
+export function requiredProviderKeys(
+  config: DeploymentConfig,
+  environments: readonly Environment[],
+): ProviderKeyName[] {
+  const required = new Set(environments.flatMap((env) => keysOfPair(providerPair(config, env))));
+  return providerKeyNames.filter((key) => required.has(key));
+}
+
 export function nextProviderKeys(
   stored: SecretValues,
   given: Partial<SecretValues>,
+  required: readonly ProviderKeyName[],
 ): { values: SecretValues; changed: boolean; missing: string[] } {
   const values = { ...stored };
-  for (const key of providerKeys) {
+  for (const key of providerKeyNames) {
     const value = given[key]?.trim();
     if (value) values[key] = value;
   }
   return {
     values,
-    changed: providerKeys.some((key) => values[key] !== stored[key]),
-    missing: providerKeys.filter((key) => !values[key]),
+    changed: providerKeyNames.some((key) => values[key] !== stored[key]),
+    missing: required.filter((key) => !values[key]),
   };
 }
 
@@ -309,16 +327,20 @@ async function withHostedZone(config: Record<string, unknown>): Promise<Record<s
   return { ...config, hostedZone: zone.name };
 }
 
-async function givenProviderKeys(prompt: Prompt | null): Promise<Partial<SecretValues>> {
+async function givenProviderKeys(
+  prompt: Prompt | null,
+  required: readonly ProviderKeyName[],
+): Promise<Partial<SecretValues>> {
   if (prompt === null) {
     const env = readDotEnv(repositoryRoot);
-    return Object.fromEntries(providerKeys.map((key) => [key, env[key] ?? ""]));
+    return Object.fromEntries(providerKeyNames.map((key) => [key, env[key] ?? ""]));
   }
   console.log("\nThe keys are hidden as you type and go only to AWS Secrets Manager.");
-  return {
-    GROQ_API_KEY: await prompt.secret("Groq API key (empty keeps the stored one)"),
-    OPENAI_API_KEY: await prompt.secret("OpenAI API key (empty keeps the stored one)"),
-  };
+  const given: Partial<SecretValues> = {};
+  for (const key of required) {
+    given[key] = await prompt.secret(`${providerKeyLabels[key]} (empty keeps the stored one)`);
+  }
+  return given;
 }
 
 function terraformOrFail(
@@ -366,7 +388,11 @@ async function writeSecrets(
   given: Partial<SecretValues>,
 ): Promise<void> {
   const { region } = config.aws;
-  const providers = nextProviderKeys(await readSecret(region, outputs.providersSecretId), given);
+  const providers = nextProviderKeys(
+    await readSecret(region, outputs.providersSecretId),
+    given,
+    requiredProviderKeys(config, [env]),
+  );
   if (providers.missing.length > 0) {
     throw new SelfHostError(
       `${providers.missing.join(" and ")} missing: run pnpm selfhost in a terminal to type them, or add them to .env`,
@@ -457,7 +483,9 @@ async function setup(options: { yes: boolean; user: string; plan: boolean }): Pr
     console.log(
       `Account ${config.aws.accountId}, ${config.aws.region}, ${config.domain} in the zone ${draft.hostedZone as string}.`,
     );
-    const given = options.plan ? {} : await givenProviderKeys(prompt);
+    const given = options.plan
+      ? {}
+      : await givenProviderKeys(prompt, requiredProviderKeys(config, config.environments));
 
     step("Terraform state");
     const bucket = await ensureStateBucket(config);
