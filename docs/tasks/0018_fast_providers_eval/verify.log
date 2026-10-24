@@ -45,3 +45,19 @@
 - typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-24T17:17:15Z by om-developer target api on 1c1453f (amended into 8d9b882)
+- lint: fail exit 1 (pnpm lint)
+[warn] evaluation/chained.fixtures.json: prettier style; eval:chain wrote unformatted JSON, fixed in 8d9b882
+
+## 2026-10-24T17:17:15Z by om-developer target api on 8d9b882
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (331 tests, pnpm test, --no-file-parallelism)
+- e2e: n/a (pnpm e2e dictates through the dev API, which this task's clearance excludes)
+
+## 2026-10-24T17:17:15Z by om-developer target infra on 8d9b882
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
