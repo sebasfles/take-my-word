@@ -1,0 +1,2618 @@
+{
+  "cases": [
+    {
+      "id": "chained-dev-en-1-35633b0d",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-1/Joanna, one language",
+      "raw": "I opened a PR to fix the CI slash CD pipeline, can you review it before the deploy?",
+      "expected": ["I opened a PR to fix the CI/CD pipeline, can you review it before the deploy?"],
+      "required": ["opened", "fix", "review", "before"],
+      "forbidden": ["after"],
+      "terms": ["PR", "CI/CD", "pipeline", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-en-1-76b3cb67",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-1/Joanna, one language",
+      "raw": "I opened a PR to fix the C slash CD pipeline, can you review it before the deploy?",
+      "expected": ["I opened a PR to fix the CI/CD pipeline, can you review it before the deploy?"],
+      "required": ["opened", "fix", "review", "before"],
+      "forbidden": ["after"],
+      "terms": ["PR", "CI/CD", "pipeline", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-en-1-719f31e5",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-1/Joanna, one language",
+      "raw": "I open a PR to fix the C slash C D pipeline. Can you review it before the deploy?",
+      "expected": ["I opened a PR to fix the CI/CD pipeline, can you review it before the deploy?"],
+      "required": ["opened", "fix", "review", "before"],
+      "forbidden": ["after"],
+      "terms": ["PR", "CI/CD", "pipeline", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-en-2-a71eeb59",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-2/Joanna, one language",
+      "raw": "run kubectl get pods in the staging namespace and send me the logs",
+      "expected": ["Run kubectl get pods in the staging namespace and send me the logs."],
+      "required": ["run", "get", "send me"],
+      "forbidden": ["delete"],
+      "terms": ["kubectl", "pods", "staging", "namespace", "logs"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-2",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-en-2-fe77d9bf",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-2/Joanna, one language",
+      "raw": "Run kubectl get pods in the staging namespace and send me the logs.",
+      "expected": ["Run kubectl get pods in the staging namespace and send me the logs."],
+      "required": ["run", "get", "send me"],
+      "forbidden": ["delete"],
+      "terms": ["kubectl", "pods", "staging", "namespace", "logs"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-2",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-en-2-773753dc",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-2/Joanna, one language",
+      "raw": "Run KubectelGit pods in the staging namespace and send me the logs.",
+      "expected": ["Run kubectl get pods in the staging namespace and send me the logs."],
+      "required": ["run", "get", "send me"],
+      "forbidden": ["delete"],
+      "terms": ["kubectl", "pods", "staging", "namespace", "logs"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-2",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-en-3-f5babca0",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-3/Joanna, one language",
+      "raw": "The Terraform plan shows the Lamba will be replaced, so let's not merge yet",
+      "expected": ["The Terraform plan shows the Lambda will be replaced, so let's not merge yet."],
+      "required": ["replaced", "not", "yet"],
+      "forbidden": [],
+      "terms": ["Terraform", "Lambda", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-3",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-en-3-e655b11d",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-3/Joanna, one language",
+      "raw": "The Terraform plan shows the Lambda will be replaced, so let's not merge yet.",
+      "expected": ["The Terraform plan shows the Lambda will be replaced, so let's not merge yet."],
+      "required": ["replaced", "not", "yet"],
+      "forbidden": [],
+      "terms": ["Terraform", "Lambda", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-3",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-en-3-8fb437cb",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-3/Joanna, one language",
+      "raw": "The terraform plan shows the Lamba will be replaced, so let's not merge yet.",
+      "expected": ["The Terraform plan shows the Lambda will be replaced, so let's not merge yet."],
+      "required": ["replaced", "not", "yet"],
+      "forbidden": [],
+      "terms": ["Terraform", "Lambda", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-3",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-en-4-7500105f",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-4/Joanna, one language",
+      "raw": "Rebase on main, push the hotfix and tell me when the build is green",
+      "expected": ["Rebase on main, push the hotfix and tell me when the build is green."],
+      "required": ["push", "tell me", "green"],
+      "forbidden": ["red"],
+      "terms": ["Rebase", "main", "hotfix", "build"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-4",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-en-4-14bc37ce",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-4/Joanna, one language",
+      "raw": "Rebase on main, push the hotfix, and tell me when the build is green.",
+      "expected": ["Rebase on main, push the hotfix and tell me when the build is green."],
+      "required": ["push", "tell me", "green"],
+      "forbidden": ["red"],
+      "terms": ["Rebase", "main", "hotfix", "build"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-4",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-en-4-b66fe39b",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-en-4/Joanna, one language",
+      "raw": "Rebase on main, push the hotfix and tell me when the build is green.",
+      "expected": ["Rebase on main, push the hotfix and tell me when the build is green."],
+      "required": ["push", "tell me", "green"],
+      "forbidden": ["red"],
+      "terms": ["Rebase", "main", "hotfix", "build"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-en-4",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-es-1-9458c1c6",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-1/Lupe, one language",
+      "raw": "Abrí un PR para arreglar el pipeline de CI-CD, ¿lo puedes revisar antes del deploy?",
+      "expected": [
+        "Abrí un PR para arreglar el pipeline de CI/CD, ¿lo puedes revisar antes del deploy?"
+      ],
+      "required": ["abrí", "arreglar", "revisar", "antes"],
+      "forbidden": ["después"],
+      "terms": ["PR", "pipeline", "CI/CD", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-es-1-2bc5add9",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-1/Lupe, one language",
+      "raw": "Abrí un PR para arreglar el pipeline de CI/CD, ¿lo puedes revisar antes del deploy?",
+      "expected": [
+        "Abrí un PR para arreglar el pipeline de CI/CD, ¿lo puedes revisar antes del deploy?"
+      ],
+      "required": ["abrí", "arreglar", "revisar", "antes"],
+      "forbidden": ["después"],
+      "terms": ["PR", "pipeline", "CI/CD", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-es-1-7e44c410",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-1/Lupe, one language",
+      "raw": "Abrí un PR para arreglar el pipeline de C barra CD.¿Lo puedes revisar antes del deploy?",
+      "expected": [
+        "Abrí un PR para arreglar el pipeline de CI/CD, ¿lo puedes revisar antes del deploy?"
+      ],
+      "required": ["abrí", "arreglar", "revisar", "antes"],
+      "forbidden": ["después"],
+      "terms": ["PR", "pipeline", "CI/CD", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-es-2-46ac65fe",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-2/Lupe, one language",
+      "raw": "corre kubectl, get pods en el namespace de staging y mándame los logs",
+      "expected": ["Corre kubectl get pods en el namespace de staging y mándame los logs."],
+      "required": ["corre", "mándame"],
+      "forbidden": ["corrige", "corrija", "borra"],
+      "terms": ["kubectl", "pods", "namespace", "staging", "logs"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-2",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-es-2-ec2ae800",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-2/Lupe, one language",
+      "raw": "Corre kubectl get pods en el namespace de staging y mándame los logs.",
+      "expected": ["Corre kubectl get pods en el namespace de staging y mándame los logs."],
+      "required": ["corre", "mándame"],
+      "forbidden": ["corrige", "corrija", "borra"],
+      "terms": ["kubectl", "pods", "namespace", "staging", "logs"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-2",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-es-2-b85dd269",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-2/Lupe, one language",
+      "raw": "Corre Qbec de GetPods en el namespace de staging y mándame los logs.",
+      "expected": ["Corre kubectl get pods en el namespace de staging y mándame los logs."],
+      "required": ["corre", "mándame"],
+      "forbidden": ["corrige", "corrija", "borra"],
+      "terms": ["kubectl", "pods", "namespace", "staging", "logs"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-2",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-es-3-c06cfd6f",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-3/Lupe, one language",
+      "raw": "El plan de Teraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía.",
+      "expected": [
+        "El plan de Terraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía."
+      ],
+      "required": ["reemplazar", "no hagamos", "todavía"],
+      "forbidden": [],
+      "terms": ["Terraform", "Lambda", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-3",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-es-3-2cc71612",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-3/Lupe, one language",
+      "raw": "El plan de Terraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía.",
+      "expected": [
+        "El plan de Terraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía."
+      ],
+      "required": ["reemplazar", "no hagamos", "todavía"],
+      "forbidden": [],
+      "terms": ["Terraform", "Lambda", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-3",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-es-3-07f2d178",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-3/Lupe, one language",
+      "raw": "El plan de Terraform dice que la lambda se va a reemplazar, así que no hagamos merge todavía.",
+      "expected": [
+        "El plan de Terraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía."
+      ],
+      "required": ["reemplazar", "no hagamos", "todavía"],
+      "forbidden": [],
+      "terms": ["Terraform", "Lambda", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-3",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-dev-es-4-5b00dd51",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-4/Lupe, one language",
+      "raw": "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde",
+      "expected": [
+        "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde."
+      ],
+      "required": ["haz", "sube", "avísame", "verde"],
+      "forbidden": ["rojo"],
+      "terms": ["rebase", "main", "hotfix", "build"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-4",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-dev-es-4-0f9ca8d5",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-4/Lupe, one language",
+      "raw": "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde.",
+      "expected": [
+        "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde."
+      ],
+      "required": ["haz", "sube", "avísame", "verde"],
+      "forbidden": ["rojo"],
+      "terms": ["rebase", "main", "hotfix", "build"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-4",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-dev-es-4-ef35ec04",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, dev-es-4/Lupe, one language",
+      "raw": "A re base sobre main, sube el Otfix y avísame cuando el build esté en verde.",
+      "expected": [
+        "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde."
+      ],
+      "required": ["haz", "sube", "avísame", "verde"],
+      "forbidden": ["rojo"],
+      "terms": ["rebase", "main", "hotfix", "build"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "dev-es-4",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-en-1-93355da7",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-1/Joanna, one language",
+      "raw": "We transfected the HEK293 cells and ran a Western blot after 48 hours",
+      "expected": [
+        "We transfected the HEK293 cells and ran a Western blot after forty-eight hours.",
+        "We transfected the HEK293 cells and ran a Western blot after 48 hours."
+      ],
+      "required": ["ran", "after", "hours"],
+      "forbidden": ["before"],
+      "terms": ["transfected", "HEK293", "Western blot"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-bio-en-1-c23718f7",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-1/Joanna, one language",
+      "raw": "We transfected the HEK293 cells and ran a Western blot after 48 hours.",
+      "expected": [
+        "We transfected the HEK293 cells and ran a Western blot after forty-eight hours.",
+        "We transfected the HEK293 cells and ran a Western blot after 48 hours."
+      ],
+      "required": ["ran", "after", "hours"],
+      "forbidden": ["before"],
+      "terms": ["transfected", "HEK293", "Western blot"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-en-1-1351f17b",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-1/Joanna, one language",
+      "raw": "We transfected the HEC 293 cells and ran a western blot after 48 hours.",
+      "expected": [
+        "We transfected the HEK293 cells and ran a Western blot after forty-eight hours.",
+        "We transfected the HEK293 cells and ran a Western blot after 48 hours."
+      ],
+      "required": ["ran", "after", "hours"],
+      "forbidden": ["before"],
+      "terms": ["transfected", "HEK293", "Western blot"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-en-2-a3e953d4",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-2/Joanna, one language",
+      "raw": "The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish",
+      "expected": ["The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish."],
+      "required": ["reduced", "expression"],
+      "forbidden": ["increased"],
+      "terms": ["CRISPR-Cas9", "knockout", "p53", "zebrafish"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-2",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-bio-en-2-49cfe7cd",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-2/Joanna, one language",
+      "raw": "The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish.",
+      "expected": ["The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish."],
+      "required": ["reduced", "expression"],
+      "forbidden": ["increased"],
+      "terms": ["CRISPR-Cas9", "knockout", "p53", "zebrafish"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-2",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-en-2-c218bba6",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-2/Joanna, one language",
+      "raw": "The CRISPR-Cas9 knockout reduced the expression of the P53 gene in zebrafish.",
+      "expected": ["The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish."],
+      "required": ["reduced", "expression"],
+      "forbidden": ["increased"],
+      "terms": ["CRISPR-Cas9", "knockout", "p53", "zebrafish"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-2",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-en-3-86c906f3",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-3/Joanna, one language",
+      "raw": "Run the qPCR with the new primers and normalize against gapi",
+      "expected": ["Run the qPCR with the new primers and normalize against GAPDH."],
+      "required": ["run", "normalize"],
+      "forbidden": [],
+      "terms": ["qPCR", "primers", "GAPDH"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-3",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-bio-en-3-cd737c7e",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-3/Joanna, one language",
+      "raw": "Run the qPCR with the new primers and normalize against GAPDH.",
+      "expected": ["Run the qPCR with the new primers and normalize against GAPDH."],
+      "required": ["run", "normalize"],
+      "forbidden": [],
+      "terms": ["qPCR", "primers", "GAPDH"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-3",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-en-3-3b1bed25",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-3/Joanna, one language",
+      "raw": "Run the QPCR with the new primers and normalize against GAP.",
+      "expected": ["Run the qPCR with the new primers and normalize against GAPDH."],
+      "required": ["run", "normalize"],
+      "forbidden": [],
+      "terms": ["qPCR", "primers", "GAPDH"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-3",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-en-4-637a5f3c",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-4/Joanna, one language",
+      "raw": "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress,",
+      "expected": [
+        "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress."
+      ],
+      "required": ["showed", "less", "drought"],
+      "forbidden": ["more"],
+      "terms": ["Arabidopsis thaliana", "chlorophyll"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-4",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-bio-en-4-96207218",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-4/Joanna, one language",
+      "raw": "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress.",
+      "expected": [
+        "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress."
+      ],
+      "required": ["showed", "less", "drought"],
+      "forbidden": ["more"],
+      "terms": ["Arabidopsis thaliana", "chlorophyll"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-4",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-en-4-7c7efb9f",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-en-4/Joanna, one language",
+      "raw": "The Aerodopsis thaliana mutants showed less chlorophyll under drought stress.",
+      "expected": [
+        "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress."
+      ],
+      "required": ["showed", "less", "drought"],
+      "forbidden": ["more"],
+      "terms": ["Arabidopsis thaliana", "chlorophyll"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-en-4",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-es-1-28ca26aa",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-1/Lupe, one language",
+      "raw": "Transfectamos la célula a secto 193 e hicimos un Western blot a las 48 horas.",
+      "expected": [
+        "Transfectamos las células HEK293 e hicimos un Western blot a las cuarenta y ocho horas.",
+        "Transfectamos las células HEK293 e hicimos un Western blot a las 48 horas."
+      ],
+      "required": ["hicimos", "horas"],
+      "forbidden": [],
+      "terms": ["Transfectamos", "HEK293", "Western blot"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-bio-es-1-edb79087",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-1/Lupe, one language",
+      "raw": "Transfectamos las células HEK293 e hicimos un Western blot a las 48 horas.",
+      "expected": [
+        "Transfectamos las células HEK293 e hicimos un Western blot a las cuarenta y ocho horas.",
+        "Transfectamos las células HEK293 e hicimos un Western blot a las 48 horas."
+      ],
+      "required": ["hicimos", "horas"],
+      "forbidden": [],
+      "terms": ["Transfectamos", "HEK293", "Western blot"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-es-1-38fe4b60",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-1/Lupe, one language",
+      "raw": "Transfectamos la célula sec 293 e hicimos un Western Blood a las 48 horas.",
+      "expected": [
+        "Transfectamos las células HEK293 e hicimos un Western blot a las cuarenta y ocho horas.",
+        "Transfectamos las células HEK293 e hicimos un Western blot a las 48 horas."
+      ],
+      "required": ["hicimos", "horas"],
+      "forbidden": [],
+      "terms": ["Transfectamos", "HEK293", "Western blot"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-es-2-2d7ba80d",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-2/Lupe, one language",
+      "raw": "El knockout con CRISPR-Cas9 redujo la expresión del gen p53 en el pez cebra.",
+      "expected": ["El knockout con CRISPR-Cas9 redujo la expresión del gen p53 en el pez cebra."],
+      "required": ["redujo", "expresión"],
+      "forbidden": ["aumentó"],
+      "terms": ["knockout", "CRISPR-Cas9", "p53", "pez cebra"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-2",
+        "transcribers": ["whisper-large-v3-turbo", "gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-es-2-4f940cb8",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-2/Lupe, one language",
+      "raw": "El knockout con CRISPR-Cast 9 redujo la expresión del Gen P53 en el P Zebra.",
+      "expected": ["El knockout con CRISPR-Cas9 redujo la expresión del gen p53 en el pez cebra."],
+      "required": ["redujo", "expresión"],
+      "forbidden": ["aumentó"],
+      "terms": ["knockout", "CRISPR-Cas9", "p53", "pez cebra"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-2",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-es-3-fb698e48",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-3/Lupe, one language",
+      "raw": "Corre la Coupé CR con los nuevos primers y normaliza contra GAPI",
+      "expected": ["Corre la qPCR con los nuevos primers y normaliza contra GAPDH."],
+      "required": ["corre", "normaliza"],
+      "forbidden": ["corrige"],
+      "terms": ["qPCR", "primers", "GAPDH"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-3",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-bio-es-3-b7e245cc",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-3/Lupe, one language",
+      "raw": "Corre la qPCR con los nuevos primers y normaliza contra GAPDH.",
+      "expected": ["Corre la qPCR con los nuevos primers y normaliza contra GAPDH."],
+      "required": ["corre", "normaliza"],
+      "forbidden": ["corrige"],
+      "terms": ["qPCR", "primers", "GAPDH"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-3",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-es-3-93309b15",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-3/Lupe, one language",
+      "raw": "Corre la Q P Cr con los nuevos Primers y normaliza contra Gapey.",
+      "expected": ["Corre la qPCR con los nuevos primers y normaliza contra GAPDH."],
+      "required": ["corre", "normaliza"],
+      "forbidden": ["corrige"],
+      "terms": ["qPCR", "primers", "GAPDH"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-3",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-bio-es-4-0effee8c",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-4/Lupe, one language",
+      "raw": "Las mutantes de Arabidopsis thaliana mostraron menos clorofila bajo estrés hídrico.",
+      "expected": [
+        "Las mutantes de Arabidopsis thaliana mostraron menos clorofila bajo estrés hídrico."
+      ],
+      "required": ["mostraron", "menos", "estrés"],
+      "forbidden": ["más"],
+      "terms": ["Arabidopsis thaliana", "clorofila"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-4",
+        "transcribers": ["whisper-large-v3-turbo", "gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-bio-es-4-459d82bf",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, bio-es-4/Lupe, one language",
+      "raw": "Las mutantes de Arabidopsis thalliana mostraron menos clorofila bajo estrés hídrico.",
+      "expected": [
+        "Las mutantes de Arabidopsis thaliana mostraron menos clorofila bajo estrés hídrico."
+      ],
+      "required": ["mostraron", "menos", "estrés"],
+      "forbidden": ["más"],
+      "terms": ["Arabidopsis thaliana", "clorofila"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "bio-es-4",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-control-en-1-2b7a9b21",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, control-en-1/Joanna, one language",
+      "raw": "Let's meet tomorrow at 3 in the office and bring the report",
+      "expected": [
+        "Let's meet tomorrow at three in the office, and bring the report.",
+        "Let's meet tomorrow at 3 in the office, and bring the report."
+      ],
+      "required": ["meet", "tomorrow", "office", "bring", "report"],
+      "forbidden": ["today"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-en-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-control-en-1-fdd5d04b",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, control-en-1/Joanna, one language",
+      "raw": "Let's meet tomorrow at three in the office and bring the report.",
+      "expected": [
+        "Let's meet tomorrow at three in the office, and bring the report.",
+        "Let's meet tomorrow at 3 in the office, and bring the report."
+      ],
+      "required": ["meet", "tomorrow", "office", "bring", "report"],
+      "forbidden": ["today"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-en-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-control-en-1-5f579e58",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, control-en-1/Joanna, one language",
+      "raw": "Let's meet tomorrow at 3 in the office and bring the report.",
+      "expected": [
+        "Let's meet tomorrow at three in the office, and bring the report.",
+        "Let's meet tomorrow at 3 in the office, and bring the report."
+      ],
+      "required": ["meet", "tomorrow", "office", "bring", "report"],
+      "forbidden": ["today"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-en-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-control-en-2-9ea35d10",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, control-en-2/Joanna, one language",
+      "raw": "I'll call my mother after lunch to plan the weekend trip",
+      "expected": ["I'll call my mother after lunch to plan the weekend trip."],
+      "required": ["call", "mother", "after lunch", "plan", "weekend"],
+      "forbidden": ["before lunch"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-en-2",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-control-en-2-cce4fa1a",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, control-en-2/Joanna, one language",
+      "raw": "I'll call my mother after lunch to plan the weekend trip.",
+      "expected": ["I'll call my mother after lunch to plan the weekend trip."],
+      "required": ["call", "mother", "after lunch", "plan", "weekend"],
+      "forbidden": ["before lunch"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-en-2",
+        "transcribers": ["gpt-transcribe", "together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-control-es-1-a294f41d",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, control-es-1/Lupe, one language",
+      "raw": "Nos vemos mañana a las 3 en la oficina, y trae el informe.",
+      "expected": [
+        "Nos vemos mañana a las tres en la oficina, y trae el informe.",
+        "Nos vemos mañana a las 3 en la oficina, y trae el informe."
+      ],
+      "required": ["nos vemos", "mañana", "oficina", "trae", "informe"],
+      "forbidden": ["hoy"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-es-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-control-es-1-d43f75a9",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, control-es-1/Lupe, one language",
+      "raw": "Nos vemos mañana a las tres en la oficina, y trae el informe.",
+      "expected": [
+        "Nos vemos mañana a las tres en la oficina, y trae el informe.",
+        "Nos vemos mañana a las 3 en la oficina, y trae el informe."
+      ],
+      "required": ["nos vemos", "mañana", "oficina", "trae", "informe"],
+      "forbidden": ["hoy"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-es-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-control-es-1-a8f0ae0b",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, control-es-1/Lupe, one language",
+      "raw": "Nos vemos mañana a las 3 en la oficina y trae el informe.",
+      "expected": [
+        "Nos vemos mañana a las tres en la oficina, y trae el informe.",
+        "Nos vemos mañana a las 3 en la oficina, y trae el informe."
+      ],
+      "required": ["nos vemos", "mañana", "oficina", "trae", "informe"],
+      "forbidden": ["hoy"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-es-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-control-es-2-5e55cd4e",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, control-es-2/Lupe, one language",
+      "raw": "Voy a llamar a mi mamá después de almuerzo para planear el viaje del fin de semana.",
+      "expected": [
+        "Voy a llamar a mi mamá después de almuerzo para planear el viaje del fin de semana."
+      ],
+      "required": ["llamar", "mamá", "después", "planear", "fin de semana"],
+      "forbidden": ["antes"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "control-es-2",
+        "transcribers": ["whisper-large-v3-turbo", "gpt-transcribe", "together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-mixed-1-af610fd2",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-1/Pedro, one language",
+      "raw": "Mañana tengo un meeting con el team de marketing para revisar el roadmap.",
+      "expected": ["Mañana tengo un meeting con el team de marketing para revisar el roadmap."],
+      "required": ["mañana", "revisar"],
+      "forbidden": ["hoy"],
+      "terms": ["meeting", "team", "marketing", "roadmap"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-1",
+        "transcribers": ["whisper-large-v3-turbo", "gpt-transcribe", "together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-mixed-2-40456e59",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-2/Pedro, one language",
+      "raw": "Mándame el link del dashboard y el feedback del cliente antes del deadline",
+      "expected": ["Mándame el link del dashboard y el feedback del cliente antes del deadline."],
+      "required": ["mándame", "antes"],
+      "forbidden": ["después"],
+      "terms": ["link", "dashboard", "feedback", "deadline"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-2",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-mixed-2-1b1ec0cc",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-2/Pedro, one language",
+      "raw": "Mándame el link del dashboard y el feedback del cliente antes del deadline.",
+      "expected": ["Mándame el link del dashboard y el feedback del cliente antes del deadline."],
+      "required": ["mándame", "antes"],
+      "forbidden": ["después"],
+      "terms": ["link", "dashboard", "feedback", "deadline"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-2",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-mixed-2-405dc4d0",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-2/Pedro, one language",
+      "raw": "Mandame el link del dashboard y el feedback del cliente antes del deadline.",
+      "expected": ["Mándame el link del dashboard y el feedback del cliente antes del deadline."],
+      "required": ["mándame", "antes"],
+      "forbidden": ["después"],
+      "terms": ["link", "dashboard", "feedback", "deadline"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-2",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-mixed-3-2b804e3c",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-3/Pedro, one language",
+      "raw": "El sprint termina el viernes, así que hagamos el standup a las 9",
+      "expected": [
+        "El sprint termina el viernes, así que hagamos el standup a las nueve.",
+        "El sprint termina el viernes, así que hagamos el standup a las 9."
+      ],
+      "required": ["termina", "viernes", "hagamos"],
+      "forbidden": ["jueves"],
+      "terms": ["sprint", "standup"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-3",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-mixed-3-a92a6245",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-3/Pedro, one language",
+      "raw": "El sprint termina el viernes, así que hagamos el standup a las nueve.",
+      "expected": [
+        "El sprint termina el viernes, así que hagamos el standup a las nueve.",
+        "El sprint termina el viernes, así que hagamos el standup a las 9."
+      ],
+      "required": ["termina", "viernes", "hagamos"],
+      "forbidden": ["jueves"],
+      "terms": ["sprint", "standup"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-3",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-mixed-3-010a2229",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-3/Pedro, one language",
+      "raw": "El sprint termina el viernes, así que hagamos el stand-up a las 9.",
+      "expected": [
+        "El sprint termina el viernes, así que hagamos el standup a las nueve.",
+        "El sprint termina el viernes, así que hagamos el standup a las 9."
+      ],
+      "required": ["termina", "viernes", "hagamos"],
+      "forbidden": ["jueves"],
+      "terms": ["sprint", "standup"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-3",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-mixed-4-76396a7a",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-4/Pedro, one language",
+      "raw": "Hoy estoy trabajando from home, pero igual puedo hacer la call de las 4.",
+      "expected": [
+        "Hoy estoy trabajando from home, pero igual puedo hacer la call de las cuatro.",
+        "Hoy estoy trabajando from home, pero igual puedo hacer la call de las 4."
+      ],
+      "required": ["trabajando", "puedo"],
+      "forbidden": ["no puedo"],
+      "terms": ["from home", "call"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-4",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-mixed-4-f4cabe7d",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-4/Pedro, one language",
+      "raw": "Hoy estoy trabajando from home, pero igual puedo hacer la call de las cuatro.",
+      "expected": [
+        "Hoy estoy trabajando from home, pero igual puedo hacer la call de las cuatro.",
+        "Hoy estoy trabajando from home, pero igual puedo hacer la call de las 4."
+      ],
+      "required": ["trabajando", "puedo"],
+      "forbidden": ["no puedo"],
+      "terms": ["from home", "call"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-4",
+        "transcribers": ["gpt-transcribe", "together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-mixed-5-13bd377f",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-5/Pedro, one language",
+      "raw": "Subí los slides al drive compartido, échales un look cuando puedas",
+      "expected": ["Subí los slides al drive compartido, échales un look cuando puedas."],
+      "required": ["subí", "compartido"],
+      "forbidden": [],
+      "terms": ["slides", "drive", "look"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-5",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-mixed-5-8300a49e",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-5/Pedro, one language",
+      "raw": "Subí los slides al drive compartido, échales un look cuando puedas.",
+      "expected": ["Subí los slides al drive compartido, échales un look cuando puedas."],
+      "required": ["subí", "compartido"],
+      "forbidden": [],
+      "terms": ["slides", "drive", "look"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-5",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-mixed-5-3cbf68be",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, mixed-5/Pedro, one language",
+      "raw": "Subí los slides al drive compartido, échales un log cuando puedas.",
+      "expected": ["Subí los slides al drive compartido, échales un look cuando puedas."],
+      "required": ["subí", "compartido"],
+      "forbidden": [],
+      "terms": ["slides", "drive", "look"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "mixed-5",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-long-es-1-3b44728c",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-es-1/Lupe, one language",
+      "raw": "Bueno, te cuento que ayer revisé el pipeline de deploy, y encontré que el build falla cuando corren los tests de integración, así que voy a abrir un PR con el hotfix, y te aviso cuando esté en verde para que hagamos el merge",
+      "expected": [
+        "Bueno, te cuento que ayer revisé el pipeline de deploy y encontré que el build falla cuando corre los tests de integración, así que voy a abrir un PR con el hotfix y te aviso cuando esté en verde para que hagamos el merge."
+      ],
+      "required": ["revisé", "encontré", "falla", "abrir", "aviso", "verde"],
+      "forbidden": [],
+      "terms": ["pipeline", "deploy", "build", "PR", "hotfix", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-es-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-long-es-1-f0cac6b1",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-es-1/Lupe, one language",
+      "raw": "Bueno, te cuento que ayer revisé el pipeline de deploy y encontré que el build falla cuando corren los tests de integración, así que voy a abrir un PR con el hotfix y te aviso cuando esté en verde para que hagamos el merge.",
+      "expected": [
+        "Bueno, te cuento que ayer revisé el pipeline de deploy y encontré que el build falla cuando corre los tests de integración, así que voy a abrir un PR con el hotfix y te aviso cuando esté en verde para que hagamos el merge."
+      ],
+      "required": ["revisé", "encontré", "falla", "abrir", "aviso", "verde"],
+      "forbidden": [],
+      "terms": ["pipeline", "deploy", "build", "PR", "hotfix", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-es-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-long-es-1-8e0c87fd",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-es-1/Lupe, one language",
+      "raw": "Bueno, te cuento que ayer revisé el pipeline de deploy y encontré que el build falla cuando corren los tests de integración, así que voy a abrir un PR con el OTFIX y te aviso cuando esté en verde para que hagamos el merge.",
+      "expected": [
+        "Bueno, te cuento que ayer revisé el pipeline de deploy y encontré que el build falla cuando corre los tests de integración, así que voy a abrir un PR con el hotfix y te aviso cuando esté en verde para que hagamos el merge."
+      ],
+      "required": ["revisé", "encontré", "falla", "abrir", "aviso", "verde"],
+      "forbidden": [],
+      "terms": ["pipeline", "deploy", "build", "PR", "hotfix", "merge"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-es-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-long-en-1-f9e948bc",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-en-1/Joanna, one language",
+      "raw": "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production",
+      "expected": [
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least 2 days of testing before we can deploy to production."
+      ],
+      "required": ["talked", "agreed", "move", "Thursday", "still down", "testing"],
+      "forbidden": ["Tuesday"],
+      "terms": ["staging", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-en-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-long-en-1-e82c62ce",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-en-1/Joanna, one language",
+      "raw": "So I talked to the team this morning, and we agreed to move the release to Thursday because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+      "expected": [
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least 2 days of testing before we can deploy to production."
+      ],
+      "required": ["talked", "agreed", "move", "Thursday", "still down", "testing"],
+      "forbidden": ["Tuesday"],
+      "terms": ["staging", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-en-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-long-en-1-5b29dfe0",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-en-1/Joanna, one language",
+      "raw": "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+      "expected": [
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least 2 days of testing before we can deploy to production."
+      ],
+      "required": ["talked", "agreed", "move", "Thursday", "still down", "testing"],
+      "forbidden": ["Tuesday"],
+      "terms": ["staging", "deploy"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-en-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-long-mixed-1-ca70fe81",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-mixed-1/Pedro, one language",
+      "raw": "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el deck con el roadmap del próximo quarter y me lo mandes antes del viernes para darle feedback",
+      "expected": [
+        "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el deck con el roadmap del próximo quarter y me lo mandes antes del viernes para darle feedback."
+      ],
+      "required": ["lunes", "prepares", "mandes", "viernes"],
+      "forbidden": [],
+      "terms": ["kickoff", "deck", "roadmap", "quarter", "feedback"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-mixed-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-long-mixed-1-7aa7c315",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-mixed-1/Pedro, one language",
+      "raw": "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el deck con el roadmap del próximo quarter y me lo mandes antes del viernes para darle feedback.",
+      "expected": [
+        "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el deck con el roadmap del próximo quarter y me lo mandes antes del viernes para darle feedback."
+      ],
+      "required": ["lunes", "prepares", "mandes", "viernes"],
+      "forbidden": [],
+      "terms": ["kickoff", "deck", "roadmap", "quarter", "feedback"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-mixed-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-long-mixed-1-692de130",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, long-mixed-1/Pedro, one language",
+      "raw": "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el DAC con el roadmap del próximo quarto y me lo mandes antes del viernes para darle feedback.",
+      "expected": [
+        "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el deck con el roadmap del próximo quarter y me lo mandes antes del viernes para darle feedback."
+      ],
+      "required": ["lunes", "prepares", "mandes", "viernes"],
+      "forbidden": [],
+      "terms": ["kickoff", "deck", "roadmap", "quarter", "feedback"],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "long-mixed-1",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-extended-en-45-b1c1d908",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-en-45/Joanna, one language",
+      "raw": "Quick update on the migration. This morning I merged the PR that moves the queue workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I'll check the logs after lunch. If the pods in the old namespace keep restarting, we should roll back with kubectl and open a hotfix instead of patching it by hand. Can you also add the Terraform changes to the roadmap for the next sprint, and mention it in tomorrow's standup so the rest of the team knows what changed? Thanks, and let me know if anything looks good. One more thing about the release. The client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan.",
+      "expected": [
+        "Quick update on the migration. This morning I merged the PR that moves the queue workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I'll check the logs after lunch. If the pods in the old namespace keep restarting, we should roll back with kubectl and open a hotfix instead of patching it by hand. Can you also add the Terraform changes to the roadmap for the next sprint, and mention it in tomorrow's standup so the rest of the team knows what changed? Thanks, and let me know if anything looks off. One more thing about the release. The client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan."
+      ],
+      "required": [
+        "merged",
+        "moves",
+        "green",
+        "still running",
+        "check",
+        "roll back",
+        "instead",
+        "add",
+        "mention",
+        "freeze",
+        "Thursday",
+        "Friday",
+        "send"
+      ],
+      "forbidden": ["Tuesday"],
+      "terms": [
+        "PR",
+        "Lambda",
+        "build",
+        "staging",
+        "deploy",
+        "logs",
+        "pods",
+        "namespace",
+        "kubectl",
+        "hotfix",
+        "Terraform",
+        "roadmap",
+        "sprint",
+        "standup"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-en-45",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-extended-en-45-e2a2d5b4",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-en-45/Joanna, one language",
+      "raw": "Quick update on the migration. This morning I merged the PR that moves the queue workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I’ll check the logs after lunch. If the pods in the old namespace keep restarting, we should roll back with kubectl and open a hotfix instead of patching it by hand. Can you also add the Terraform changes to the roadmap for the next sprint and mention it in tomorrow’s standup so the rest of the team knows what changed? Thanks, and let me know if anything looks off. One more thing about the release: the client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan.",
+      "expected": [
+        "Quick update on the migration. This morning I merged the PR that moves the queue workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I'll check the logs after lunch. If the pods in the old namespace keep restarting, we should roll back with kubectl and open a hotfix instead of patching it by hand. Can you also add the Terraform changes to the roadmap for the next sprint, and mention it in tomorrow's standup so the rest of the team knows what changed? Thanks, and let me know if anything looks off. One more thing about the release. The client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan."
+      ],
+      "required": [
+        "merged",
+        "moves",
+        "green",
+        "still running",
+        "check",
+        "roll back",
+        "instead",
+        "add",
+        "mention",
+        "freeze",
+        "Thursday",
+        "Friday",
+        "send"
+      ],
+      "forbidden": ["Tuesday"],
+      "terms": [
+        "PR",
+        "Lambda",
+        "build",
+        "staging",
+        "deploy",
+        "logs",
+        "pods",
+        "namespace",
+        "kubectl",
+        "hotfix",
+        "Terraform",
+        "roadmap",
+        "sprint",
+        "standup"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-en-45",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-extended-en-45-c57d98dd",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-en-45/Joanna, one language",
+      "raw": "Quick update on the migration. This morning I merged the PR that moves the Q workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I'll check the logs after lunch. If the pods in the old namespace keep restarting, We should roll back with Ku Bekle and open a hotfix instead of patching it by hand. Can you also add the terraform changes to the roadmap for the next sprint, and mention it in tomorrow's stand-up so the rest of the team knows what changed? Thanks, and let me know if anything looks off. One more thing about the release. The client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan.",
+      "expected": [
+        "Quick update on the migration. This morning I merged the PR that moves the queue workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I'll check the logs after lunch. If the pods in the old namespace keep restarting, we should roll back with kubectl and open a hotfix instead of patching it by hand. Can you also add the Terraform changes to the roadmap for the next sprint, and mention it in tomorrow's standup so the rest of the team knows what changed? Thanks, and let me know if anything looks off. One more thing about the release. The client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan."
+      ],
+      "required": [
+        "merged",
+        "moves",
+        "green",
+        "still running",
+        "check",
+        "roll back",
+        "instead",
+        "add",
+        "mention",
+        "freeze",
+        "Thursday",
+        "Friday",
+        "send"
+      ],
+      "forbidden": ["Tuesday"],
+      "terms": [
+        "PR",
+        "Lambda",
+        "build",
+        "staging",
+        "deploy",
+        "logs",
+        "pods",
+        "namespace",
+        "kubectl",
+        "hotfix",
+        "Terraform",
+        "roadmap",
+        "sprint",
+        "standup"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-en-45",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-extended-en-100-906ccc94",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-en-100/Joanna, one language",
+      "raw": "So, here is the summary of yesterday's incident, so you can share it with the client before the review. Around the middle of the afternoon, the checkout service started returning errors for a small share of users. The alert fired, but the person on call was in a meeting, so nobody looked at the logs until much later. When we finally checked, we saw that the latest deploy had changed the timeout of the payment Lambda, and the requests were failing whenever the bank answered slowly. We rolled back the deploy, and the errors stopped within a few minutes. Nothing was lost, because the queue kept every order and retried them once the service was healthy again. Now, for the follow-up. First, I want a hotfix that restores the old timeout and adds a test for it, so the pipeline catches this kind of change before it reaches staging. Second, the Teraform module for the payment service should own that setting, instead of having it hidden in the application code. to the website at least 5-2. We need a better on call rotation because one person cannot answer pages while they are presenting to a customer. I already opened a PR with the first change, and I would like a review before the end of the day. Please do not merge anything else in domain until that is done. We can talk about the rotation in the standup on Monday, and I will add the rest to the roadmap for the next sprint. There is also a smaller issue that showed up during the same investigation. The dashboards for the payment service only keep a few days of logs, so we could not see when the slow answers from the bank actually started. I would like to keep at least a month of history, and to add an alert on the share of slow requests instead of waiting for errors. Finally, please write down what you did during the incident while it is still fresh, even if it feels obvious. Short notes are enough, and they will help the next person who has to deal with something similar at a bad moment.",
+      "expected": [
+        "So, here is the summary of yesterday's incident, so you can share it with the client before the review. Around the middle of the afternoon, the checkout service started returning errors for a small share of users. The alert fired, but the person on call was in a meeting, so nobody looked at the logs until much later. When we finally checked, we saw that the latest deploy had changed the timeout of the payment Lambda, and the requests were failing whenever the bank answered slowly. We rolled back the deploy, and the errors stopped within a few minutes. Nothing was lost, because the queue kept every order and retried them once the service was healthy again. Now, for the follow up. First, I want a hotfix that restores the old timeout and adds a test for it, so the pipeline catches this kind of change before it reaches staging. Second, the Terraform module for the payment service should own that setting, instead of having it hidden in the application code. Third, we need a better on call rotation, because one person cannot answer pages while they are presenting to a customer. I already opened a PR with the first change, and I would like a review before the end of the day. Please do not merge anything else into main until that is done. We can talk about the rotation in the standup on Monday, and I will add the rest to the roadmap for the next sprint. There is also a smaller issue that showed up during the same investigation. The dashboards for the payment service only keep a few days of logs, so we could not see when the slow answers from the bank actually started. I would like to keep at least a month of history, and to add an alert on the share of slow requests instead of waiting for errors. Finally, please write down what you did during the incident while it is still fresh, even if it feels obvious. Short notes are enough, and they will help the next person who has to deal with something similar at a bad moment."
+      ],
+      "required": [
+        "started returning errors",
+        "alert fired",
+        "rolled back",
+        "stopped",
+        "nothing was lost",
+        "restores",
+        "module",
+        "rotation",
+        "opened",
+        "do not",
+        "Monday",
+        "keep",
+        "alert",
+        "write down"
+      ],
+      "forbidden": [],
+      "terms": [
+        "logs",
+        "deploy",
+        "Lambda",
+        "hotfix",
+        "pipeline",
+        "staging",
+        "Terraform",
+        "PR",
+        "merge",
+        "standup",
+        "roadmap",
+        "sprint"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-en-100",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-extended-en-100-c6305dfb",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-en-100/Joanna, one language",
+      "raw": "So, here is the summary of yesterday’s incident so you can share it with the client before the review. Around the middle of the afternoon, the checkout service started returning errors for a small share of users. The alert fired, but the person on call was in a meeting, so nobody looked at the logs until much later. When we finally checked, we saw that the latest deploy had changed the timeout of the payment Lambda, and the requests were failing whenever the bank answered slowly. We rolled back the deploy, and the errors stopped within a few minutes. Nothing was lost because the queue kept every order and retried them once the service was healthy again. Now, for the follow-up. First, I want a hotfix that restores the old timeout and adds a test for it so the pipeline catches this kind of change before it reaches staging. Second, the Terraform module for the payment service should own that setting instead of having it hidden in the application code. Third, we need a better on-call rotation because one person cannot answer pages while they are presenting to a customer. I already opened a PR with the first change, and I would like a review before the end of the day. Please do not merge anything else into main until that is done. We can talk about the rotation in the standup on Monday, and I will add the rest to the roadmap for the next sprint. There is also a smaller issue that showed up during the same investigation. The dashboards for the payment service only keep a few days of logs, so we could not see when the slow answers from the bank actually started. I would like to keep at least a month of history and to add an alert on the share of slow requests instead of waiting for errors. Finally, please write down what you did during the incident while it is still fresh, even if it feels obvious. Short notes are enough, and they will help the next person who has to deal with something similar at a bad moment.",
+      "expected": [
+        "So, here is the summary of yesterday's incident, so you can share it with the client before the review. Around the middle of the afternoon, the checkout service started returning errors for a small share of users. The alert fired, but the person on call was in a meeting, so nobody looked at the logs until much later. When we finally checked, we saw that the latest deploy had changed the timeout of the payment Lambda, and the requests were failing whenever the bank answered slowly. We rolled back the deploy, and the errors stopped within a few minutes. Nothing was lost, because the queue kept every order and retried them once the service was healthy again. Now, for the follow up. First, I want a hotfix that restores the old timeout and adds a test for it, so the pipeline catches this kind of change before it reaches staging. Second, the Terraform module for the payment service should own that setting, instead of having it hidden in the application code. Third, we need a better on call rotation, because one person cannot answer pages while they are presenting to a customer. I already opened a PR with the first change, and I would like a review before the end of the day. Please do not merge anything else into main until that is done. We can talk about the rotation in the standup on Monday, and I will add the rest to the roadmap for the next sprint. There is also a smaller issue that showed up during the same investigation. The dashboards for the payment service only keep a few days of logs, so we could not see when the slow answers from the bank actually started. I would like to keep at least a month of history, and to add an alert on the share of slow requests instead of waiting for errors. Finally, please write down what you did during the incident while it is still fresh, even if it feels obvious. Short notes are enough, and they will help the next person who has to deal with something similar at a bad moment."
+      ],
+      "required": [
+        "started returning errors",
+        "alert fired",
+        "rolled back",
+        "stopped",
+        "nothing was lost",
+        "restores",
+        "module",
+        "rotation",
+        "opened",
+        "do not",
+        "Monday",
+        "keep",
+        "alert",
+        "write down"
+      ],
+      "forbidden": [],
+      "terms": [
+        "logs",
+        "deploy",
+        "Lambda",
+        "hotfix",
+        "pipeline",
+        "staging",
+        "Terraform",
+        "PR",
+        "merge",
+        "standup",
+        "roadmap",
+        "sprint"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-en-100",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-extended-en-100-1acbf773",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-en-100/Joanna, one language",
+      "raw": "So, here is the summary of yesterday's incident, so you can share it with the client before the review. Around the middle of the afternoon, the checkout service started returning errors for a small share of users. The alert fired, but the person on call was in a meeting. So nobody looked at the logs until much later. When we finally checked, we saw that the latest deploy had changed the timeout of the payment lambda, and the requests were failing whenever the bank answered slowly. We rolled back the deploy, and the errors stopped within a few minutes. Nothing was lost, because the queue kept every order and retried them once the service was healthy again. Now, for the follow-up. First, I want a hotfix that restores the old timeout and adds a test for it, so the pipeline catches this kind of change. before it reaches staging. Second, the Terraform module for the payment service should own that setting, instead of having it hidden in the application code. Third, we need a better on-call rotation, because one person cannot answer pages while they are presenting to a customer. I already opened a PR with the first change, and I would like a review before the end of the day. Please do not merge anything else into main until that is done. We can talk about the rotation in the stand-up on Monday, and I will add the rest to the roadmap for the next sprint. There is also a smaller issue that showed up during the same investigation. The dashboards for the payment service only keep a few days of vlogs, so we could not see when the slow answers from the bank actually started. I would like to keep at least a month of history. And to add an alert on the share of slow requests instead of waiting for errors. Finally, please write down what you did during the incident while it is still fresh, even if it feels obvious. Short notes are enough, and they will help the next person who has to deal with something similar at a bad moment.",
+      "expected": [
+        "So, here is the summary of yesterday's incident, so you can share it with the client before the review. Around the middle of the afternoon, the checkout service started returning errors for a small share of users. The alert fired, but the person on call was in a meeting, so nobody looked at the logs until much later. When we finally checked, we saw that the latest deploy had changed the timeout of the payment Lambda, and the requests were failing whenever the bank answered slowly. We rolled back the deploy, and the errors stopped within a few minutes. Nothing was lost, because the queue kept every order and retried them once the service was healthy again. Now, for the follow up. First, I want a hotfix that restores the old timeout and adds a test for it, so the pipeline catches this kind of change before it reaches staging. Second, the Terraform module for the payment service should own that setting, instead of having it hidden in the application code. Third, we need a better on call rotation, because one person cannot answer pages while they are presenting to a customer. I already opened a PR with the first change, and I would like a review before the end of the day. Please do not merge anything else into main until that is done. We can talk about the rotation in the standup on Monday, and I will add the rest to the roadmap for the next sprint. There is also a smaller issue that showed up during the same investigation. The dashboards for the payment service only keep a few days of logs, so we could not see when the slow answers from the bank actually started. I would like to keep at least a month of history, and to add an alert on the share of slow requests instead of waiting for errors. Finally, please write down what you did during the incident while it is still fresh, even if it feels obvious. Short notes are enough, and they will help the next person who has to deal with something similar at a bad moment."
+      ],
+      "required": [
+        "started returning errors",
+        "alert fired",
+        "rolled back",
+        "stopped",
+        "nothing was lost",
+        "restores",
+        "module",
+        "rotation",
+        "opened",
+        "do not",
+        "Monday",
+        "keep",
+        "alert",
+        "write down"
+      ],
+      "forbidden": [],
+      "terms": [
+        "logs",
+        "deploy",
+        "Lambda",
+        "hotfix",
+        "pipeline",
+        "staging",
+        "Terraform",
+        "PR",
+        "merge",
+        "standup",
+        "roadmap",
+        "sprint"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-en-100",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-extended-es-45-3a2fe316",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-es-45/Lupe, one language",
+      "raw": "Te dejo un resumen de lo que hice hoy. En la mañana revisé el pipeline y arreglé el build que fallaba por una dependencia vieja, así que ya está en verde otra vez. Después hice el deploy staging y revisé los logs, y por ahora no veo errores. Mañana quiero abrir un PR con el cambio de Teraform para la Lambda nueva, pero necesito que alguien lo revise antes del merge. Si tienes tiempo, échale un ojo y avísame en el standup si ves algo raro. También anoté las tareas pendientes en el roadmap del sprint. Una última cosa sobre la entrega de la próxima semana. El cliente quiere ver una demostración el viernes, así que prefiero congelar la rama principal el jueves en la tarde y aceptar solo arreglos después de eso. Si te parece bien, le mando un mensaje corto al equipo y actualizo la invitación del calendario con el nuevo plan.",
+      "expected": [
+        "Te dejo un resumen de lo que hice hoy. En la mañana revisé el pipeline y arreglé el build que fallaba por una dependencia vieja, así que ya está en verde otra vez. Después hice el deploy a staging y revisé los logs, y por ahora no veo errores. Mañana quiero abrir un PR con el cambio de Terraform para la Lambda nueva, pero necesito que alguien lo revise antes del merge. Si tienes tiempo, échale un ojo y avísame en el standup si ves algo raro. También anoté las tareas pendientes en el roadmap del sprint. Una última cosa sobre la entrega de la próxima semana. El cliente quiere ver una demostración el viernes, así que prefiero congelar la rama principal el jueves en la tarde y aceptar solo arreglos después de eso. Si te parece bien, le mando un mensaje corto al equipo y actualizo la invitación del calendario con el nuevo plan."
+      ],
+      "required": [
+        "revisé",
+        "arreglé",
+        "verde",
+        "no veo errores",
+        "abrir",
+        "revise",
+        "avísame",
+        "anoté",
+        "viernes",
+        "congelar",
+        "jueves",
+        "actualizo"
+      ],
+      "forbidden": [],
+      "terms": [
+        "pipeline",
+        "build",
+        "deploy",
+        "staging",
+        "logs",
+        "PR",
+        "Terraform",
+        "Lambda",
+        "merge",
+        "standup",
+        "roadmap",
+        "sprint"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-es-45",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-extended-es-45-9de87598",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-es-45/Lupe, one language",
+      "raw": "Te dejo un resumen de lo que hice hoy. En la mañana revisé el pipeline y arreglé el build que fallaba por una dependencia vieja, así que ya está en verde otra vez. Después hice el deploy a staging y revisé los logs, y por ahora no veo errores. Mañana quiero abrir un PR con el cambio de Terraform para la Lambda nueva, pero necesito que alguien lo revise antes del merge. Si tienes tiempo, échale un ojo y avísame en el standup si ves algo raro. También anoté las tareas pendientes en el roadmap del sprint. Una última cosa sobre la entrega de la próxima semana: el cliente quiere ver una demostración el viernes, así que prefiero congelar la rama principal el jueves en la tarde y aceptar solo arreglos después de eso. Si te parece bien, le mando un mensaje corto al equipo y actualizo la invitación del calendario con el nuevo plan.",
+      "expected": [
+        "Te dejo un resumen de lo que hice hoy. En la mañana revisé el pipeline y arreglé el build que fallaba por una dependencia vieja, así que ya está en verde otra vez. Después hice el deploy a staging y revisé los logs, y por ahora no veo errores. Mañana quiero abrir un PR con el cambio de Terraform para la Lambda nueva, pero necesito que alguien lo revise antes del merge. Si tienes tiempo, échale un ojo y avísame en el standup si ves algo raro. También anoté las tareas pendientes en el roadmap del sprint. Una última cosa sobre la entrega de la próxima semana. El cliente quiere ver una demostración el viernes, así que prefiero congelar la rama principal el jueves en la tarde y aceptar solo arreglos después de eso. Si te parece bien, le mando un mensaje corto al equipo y actualizo la invitación del calendario con el nuevo plan."
+      ],
+      "required": [
+        "revisé",
+        "arreglé",
+        "verde",
+        "no veo errores",
+        "abrir",
+        "revise",
+        "avísame",
+        "anoté",
+        "viernes",
+        "congelar",
+        "jueves",
+        "actualizo"
+      ],
+      "forbidden": [],
+      "terms": [
+        "pipeline",
+        "build",
+        "deploy",
+        "staging",
+        "logs",
+        "PR",
+        "Terraform",
+        "Lambda",
+        "merge",
+        "standup",
+        "roadmap",
+        "sprint"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-es-45",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-extended-es-45-7d7a0c97",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-es-45/Lupe, one language",
+      "raw": "Te dejo un resumen de lo que hice hoy. En la mañana revisé el pipeline y arreglé el build que fallaba por una dependencia vieja, así que ya está en verde otra vez. Después hice el deploy staging y revisé los logs, y por ahora no veo errores. Mañana quiero abrir un PR con el cambio de terraform para la lambda nueva, pero necesito que alguien lo revise antes del merge. Si tienes tiempo, échale un ojo y avísame en el stand-up si ves algo raro. También anoté las tareas pendientes en el roadmap del sprint. Una última cosa sobre la entrega de la próxima semana. El cliente quiere ver una demostración el viernes, así que prefiero congelar la rama principal el jueves en la tarde y aceptar solo arreglos después de eso. Si te parece bien, le mando un mensaje corto al equipo y a Actualizo la invitación del calendario con el nuevo plan.",
+      "expected": [
+        "Te dejo un resumen de lo que hice hoy. En la mañana revisé el pipeline y arreglé el build que fallaba por una dependencia vieja, así que ya está en verde otra vez. Después hice el deploy a staging y revisé los logs, y por ahora no veo errores. Mañana quiero abrir un PR con el cambio de Terraform para la Lambda nueva, pero necesito que alguien lo revise antes del merge. Si tienes tiempo, échale un ojo y avísame en el standup si ves algo raro. También anoté las tareas pendientes en el roadmap del sprint. Una última cosa sobre la entrega de la próxima semana. El cliente quiere ver una demostración el viernes, así que prefiero congelar la rama principal el jueves en la tarde y aceptar solo arreglos después de eso. Si te parece bien, le mando un mensaje corto al equipo y actualizo la invitación del calendario con el nuevo plan."
+      ],
+      "required": [
+        "revisé",
+        "arreglé",
+        "verde",
+        "no veo errores",
+        "abrir",
+        "revise",
+        "avísame",
+        "anoté",
+        "viernes",
+        "congelar",
+        "jueves",
+        "actualizo"
+      ],
+      "forbidden": [],
+      "terms": [
+        "pipeline",
+        "build",
+        "deploy",
+        "staging",
+        "logs",
+        "PR",
+        "Terraform",
+        "Lambda",
+        "merge",
+        "standup",
+        "roadmap",
+        "sprint"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-es-45",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-extended-es-100-7bcc22ff",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, extended-es-100/Lupe, one language",
+      "raw": "Hola, te mando las notas del laboratorio de esta semana para que las tengas antes de la reunión. El lunes transfectamos las células EK293 con el plásmido nuevo, y el martes hicimos un Western blot para confirmar la expresión de la proteína. La banda salió más débil de lo que esperábamos, así que repetimos la extracción y esta vez normalizamos contra GAPI. Con eso el resultado se ve mucho más limpio. El miércoles corrimos la QPCR con los primers que diseñó el equipo, pero algunas de las muestras no amplificaron, y creo que el problema fue la calidad de la RN Vamos a repetir esas muestras la próxima semana En paralelo, seguimos con el knockout de p53 en el pez cebra usando CRISPR-Cas9 Los embriones se ven sanos y ya empezamos a medir el desarrollo de las aletas Por último, las plantas de Arabidopsis thaliana que pusimos en estrés hídrico muestran menos clorofila que las del grupo control, lo que coincide con lo que vimos el año pasado Me gustaría que revises los gráficos antes del viernes, y me digas si te parece que el análisis estadístico está bien hecho, porque quiero mandar el resumen al director a fin de mes Si necesitas los datos crudos, están en la carpeta compartida del laboratorio Otra cosa que quería comentarte es que el equipo nuevo del laboratorio todavía no conoce bien los protocolos de seguridad para el manejo de las muestras Creo que sería bueno organizar una sesión corta el lunes para revisar juntos los pasos más importantes y dejar claro quién es responsable de cada equipo También necesitamos pedir más reactivos antes de fin de mes, porque con el ritmo actual se nos van a acabar antes de lo previsto Si puedes, revisa el inventario y prepara una lista con lo que falta, y yo me encargo de enviar el pedido al proveedor",
+      "expected": [
+        "Hola, te mando las notas del laboratorio de esta semana para que las tengas antes de la reunión. El lunes transfectamos las células HEK293 con el plásmido nuevo y el martes hicimos un Western blot para confirmar la expresión de la proteína. La banda salió más débil de lo que esperábamos, así que repetimos la extracción y esta vez normalizamos contra GAPDH. Con eso el resultado se ve mucho más limpio. El miércoles corrimos la qPCR con los primers que diseñó el equipo, pero algunas de las muestras no amplificaron, y creo que el problema fue la calidad del ARN. Vamos a repetir esas muestras la próxima semana. En paralelo, seguimos con el knockout de p53 en el pez cebra usando CRISPR-Cas9. Los embriones se ven sanos y ya empezamos a medir el desarrollo de las aletas. Por último, las plantas de Arabidopsis thaliana que pusimos en estrés hídrico muestran menos clorofila que las del grupo control, lo que coincide con lo que vimos el año pasado. Me gustaría que revises los gráficos antes del viernes y me digas si te parece que el análisis estadístico está bien hecho, porque quiero mandar el resumen al director a fin de mes. Si necesitas los datos crudos, están en la carpeta compartida del laboratorio. Otra cosa que quería comentarte es que el equipo nuevo del laboratorio todavía no conoce bien los protocolos de seguridad para el manejo de las muestras. Creo que sería bueno organizar una sesión corta el lunes para revisar juntos los pasos más importantes y dejar claro quién es responsable de cada equipo. También necesitamos pedir más reactivos antes de fin de mes, porque con el ritmo actual se nos van a acabar antes de lo previsto. Si puedes, revisa el inventario y prepara una lista con lo que falta, y yo me encargo de enviar el pedido al proveedor."
+      ],
+      "required": [
+        "hicimos",
+        "más débil",
+        "repetimos",
+        "normalizamos",
+        "corrimos",
+        "no amplificaron",
+        "repetir",
+        "sanos",
+        "menos",
+        "revises",
+        "viernes",
+        "mandar",
+        "sesión",
+        "lunes",
+        "pedir",
+        "reactivos",
+        "revisa",
+        "inventario"
+      ],
+      "forbidden": [],
+      "terms": [
+        "transfectamos",
+        "HEK293",
+        "Western blot",
+        "GAPDH",
+        "qPCR",
+        "primers",
+        "knockout",
+        "p53",
+        "pez cebra",
+        "CRISPR-Cas9",
+        "Arabidopsis thaliana",
+        "clorofila"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-es-100",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-extended-es-100-12a1e91e",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, extended-es-100/Lupe, one language",
+      "raw": "Hola, te mando las notas del laboratorio de esta semana para que las tengas antes de la reunión. El lunes transfectamos las células HEK293 con el plásmido nuevo, y el martes hicimos un Western blot para confirmar la expresión de la proteína. La banda salió más débil de lo que esperábamos, así que repetimos la extracción y esta vez normalizamos con GAPDH. Con eso el resultado se ve mucho más limpio. El miércoles corrimos la qPCR con los primers que diseñó el equipo, pero algunas de las muestras no amplificaron y creo que el problema fue la calidad del ARN. Vamos a repetir esas muestras la próxima semana. En paralelo, seguimos con el knockout de p53 en el pez cebra usando CRISPR-Cas9. Los embriones se ven sanos y ya empezamos a medir el desarrollo de las aletas. Por último, las plantas de Arabidopsis thaliana que pusimos en estrés hídrico muestran menos clorofila que las del grupo control, lo que coincide con lo que vimos el año pasado. Me gustaría que revises los gráficos antes del viernes y me digas si te parece que el análisis estadístico está bien hecho, porque quiero mandar el resumen al director a fin de mes. Si necesitas los datos crudos, están en la carpeta compartida del laboratorio. Otra cosa que quería comentarte es que el equipo nuevo del laboratorio todavía no conoce bien los protocolos de seguridad para el manejo de las muestras. Creo que sería bueno organizar una sesión corta el lunes para revisar juntos los pasos más importantes y dejar claro quién es responsable de cada equipo. También necesitamos pedir más reactivos antes de fin de mes, porque con el ritmo actual se nos van a acabar antes de lo previsto. Si puedes, revisa el inventario y prepara una lista con lo que falta, y yo me encargo de enviar el pedido al proveedor.",
+      "expected": [
+        "Hola, te mando las notas del laboratorio de esta semana para que las tengas antes de la reunión. El lunes transfectamos las células HEK293 con el plásmido nuevo y el martes hicimos un Western blot para confirmar la expresión de la proteína. La banda salió más débil de lo que esperábamos, así que repetimos la extracción y esta vez normalizamos contra GAPDH. Con eso el resultado se ve mucho más limpio. El miércoles corrimos la qPCR con los primers que diseñó el equipo, pero algunas de las muestras no amplificaron, y creo que el problema fue la calidad del ARN. Vamos a repetir esas muestras la próxima semana. En paralelo, seguimos con el knockout de p53 en el pez cebra usando CRISPR-Cas9. Los embriones se ven sanos y ya empezamos a medir el desarrollo de las aletas. Por último, las plantas de Arabidopsis thaliana que pusimos en estrés hídrico muestran menos clorofila que las del grupo control, lo que coincide con lo que vimos el año pasado. Me gustaría que revises los gráficos antes del viernes y me digas si te parece que el análisis estadístico está bien hecho, porque quiero mandar el resumen al director a fin de mes. Si necesitas los datos crudos, están en la carpeta compartida del laboratorio. Otra cosa que quería comentarte es que el equipo nuevo del laboratorio todavía no conoce bien los protocolos de seguridad para el manejo de las muestras. Creo que sería bueno organizar una sesión corta el lunes para revisar juntos los pasos más importantes y dejar claro quién es responsable de cada equipo. También necesitamos pedir más reactivos antes de fin de mes, porque con el ritmo actual se nos van a acabar antes de lo previsto. Si puedes, revisa el inventario y prepara una lista con lo que falta, y yo me encargo de enviar el pedido al proveedor."
+      ],
+      "required": [
+        "hicimos",
+        "más débil",
+        "repetimos",
+        "normalizamos",
+        "corrimos",
+        "no amplificaron",
+        "repetir",
+        "sanos",
+        "menos",
+        "revises",
+        "viernes",
+        "mandar",
+        "sesión",
+        "lunes",
+        "pedir",
+        "reactivos",
+        "revisa",
+        "inventario"
+      ],
+      "forbidden": [],
+      "terms": [
+        "transfectamos",
+        "HEK293",
+        "Western blot",
+        "GAPDH",
+        "qPCR",
+        "primers",
+        "knockout",
+        "p53",
+        "pez cebra",
+        "CRISPR-Cas9",
+        "Arabidopsis thaliana",
+        "clorofila"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-es-100",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-extended-es-100-d9eb08b9",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "biology",
+      "source": "suite 1 run 1, extended-es-100/Lupe, one language",
+      "raw": "Hola, te mando las notas del laboratorio de esta semana para que las tengas antes de la reunión. El lunes transfectamos la célula C293 con el plásmido nuevo, y el martes hicimos un Western Blood para confirmar la expresión de la proteína. La banda salió más débil de lo que esperábamos, así que repetimos la extracción y esta vez normalizamos contra Gapey. Con eso el resultado se ve mucho más limpio. El miércoles corrimos la Q PSR con los primers que diseñó el equipo. Pero algunas de las muestras no amplificaron, y creo que el problema fue la calidad de la RN. Vamos a repetir esas muestras la próxima semana. En paralelo, seguimos con el knockout de P53 en el PZRA usando CRISPRCAS 9. Los embriones se ven sanos y ya empezamos a medir el desarrollo de las aletas. Por último, las plantas de Arabidopsis thauliana que pusimos en estrés hídrico muestran menos clorofila que las del grupo control, lo que coincide con lo que vimos el año pasado. Me gustaría que revises los gráficos antes del viernes y me digas si te parece que el análisis estadístico está bien hecho, porque quiero mandar el resumen al director a fin de mes. Si necesitas los datos crudos, están en la carpeta compartida del laboratorio. Otra cosa que quería comentarte es que el equipo nuevo del laboratorio todavía no conoce bien los protocolos de seguridad para el manejo de las muestras. Creo que sería bueno organizar una sesión corta el lunes para revisar juntos los pasos más importantes y dejarlo en la vida. Claro quién es responsable de cada equipo. También necesitamos pedir más reactivos antes de fin de mes, porque con el ritmo actual se nos van a acabar antes de lo previsto. Si puedes, revisa el inventario y prepara una lista con lo que falta, y yo me encanta. cargo de enviar el pedido al proveedor.",
+      "expected": [
+        "Hola, te mando las notas del laboratorio de esta semana para que las tengas antes de la reunión. El lunes transfectamos las células HEK293 con el plásmido nuevo y el martes hicimos un Western blot para confirmar la expresión de la proteína. La banda salió más débil de lo que esperábamos, así que repetimos la extracción y esta vez normalizamos contra GAPDH. Con eso el resultado se ve mucho más limpio. El miércoles corrimos la qPCR con los primers que diseñó el equipo, pero algunas de las muestras no amplificaron, y creo que el problema fue la calidad del ARN. Vamos a repetir esas muestras la próxima semana. En paralelo, seguimos con el knockout de p53 en el pez cebra usando CRISPR-Cas9. Los embriones se ven sanos y ya empezamos a medir el desarrollo de las aletas. Por último, las plantas de Arabidopsis thaliana que pusimos en estrés hídrico muestran menos clorofila que las del grupo control, lo que coincide con lo que vimos el año pasado. Me gustaría que revises los gráficos antes del viernes y me digas si te parece que el análisis estadístico está bien hecho, porque quiero mandar el resumen al director a fin de mes. Si necesitas los datos crudos, están en la carpeta compartida del laboratorio. Otra cosa que quería comentarte es que el equipo nuevo del laboratorio todavía no conoce bien los protocolos de seguridad para el manejo de las muestras. Creo que sería bueno organizar una sesión corta el lunes para revisar juntos los pasos más importantes y dejar claro quién es responsable de cada equipo. También necesitamos pedir más reactivos antes de fin de mes, porque con el ritmo actual se nos van a acabar antes de lo previsto. Si puedes, revisa el inventario y prepara una lista con lo que falta, y yo me encargo de enviar el pedido al proveedor."
+      ],
+      "required": [
+        "hicimos",
+        "más débil",
+        "repetimos",
+        "normalizamos",
+        "corrimos",
+        "no amplificaron",
+        "repetir",
+        "sanos",
+        "menos",
+        "revises",
+        "viernes",
+        "mandar",
+        "sesión",
+        "lunes",
+        "pedir",
+        "reactivos",
+        "revisa",
+        "inventario"
+      ],
+      "forbidden": [],
+      "terms": [
+        "transfectamos",
+        "HEK293",
+        "Western blot",
+        "GAPDH",
+        "qPCR",
+        "primers",
+        "knockout",
+        "p53",
+        "pez cebra",
+        "CRISPR-Cas9",
+        "Arabidopsis thaliana",
+        "clorofila"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-es-100",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-extended-mixed-45-05105256",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-mixed-45/Pedro, one language",
+      "raw": "Oye, te cuento rápido cómo va el proyecto. Ayer tuvimos el meeting con el cliente y le gustó mucho el demo, pero pidió unos cambios en el dashboard antes del launch. El team de diseño ya está trabajando en el feedback y la idea es tener una nueva versión para el review del jueves. Mientras tanto, yo voy a actualizar el roadmap y mandar un email con los next steps. Si puedes, revisa el deck y dime si falta algo antes de que se lo mande. Gracias si cualquier cosa me escribes por Slack. Otra cosa, el Spring Review lo movimos al viernes en la mañana porque el Product Owner no puede el jueves. Si tienes algún blocker con las tareas del Backlog, avísame antes para que lo podamos discutir en el Daily y no se nos atrase el Release.",
+      "expected": [
+        "Oye, te cuento rápido cómo va el proyecto. Ayer tuvimos el meeting con el cliente y le gustó mucho el demo, pero pidió unos cambios en el dashboard antes del launch. El team de diseño ya está trabajando en el feedback, y la idea es tener una nueva versión para el review del jueves. Mientras tanto, yo voy a actualizar el roadmap y mandar un email con los next steps. Si puedes, revisa el deck y dime si falta algo antes de que se lo mande. Gracias, y cualquier cosa me escribes por Slack. Otra cosa, el sprint review lo movimos al viernes en la mañana porque el product owner no puede el jueves. Si tienes algún blocker con las tareas del backlog, avísame antes para que lo podamos discutir en el daily y no se nos atrase el release."
+      ],
+      "required": ["gustó", "cambios", "jueves", "actualizar", "revisa", "viernes", "avísame"],
+      "forbidden": [],
+      "terms": [
+        "meeting",
+        "demo",
+        "dashboard",
+        "launch",
+        "team",
+        "feedback",
+        "review",
+        "roadmap",
+        "email",
+        "next steps",
+        "deck",
+        "Slack",
+        "sprint review",
+        "product owner",
+        "blocker",
+        "backlog",
+        "release"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-mixed-45",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-extended-mixed-45-c6777b90",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-mixed-45/Pedro, one language",
+      "raw": "Oye, te cuento rápido cómo va el proyecto. Ayer tuvimos el meeting con el cliente y le gustó mucho el demo, pero pidió unos cambios en el dashboard antes del launch. El team de diseño ya está trabajando en el feedback y la idea es tener una nueva versión para el review del jueves. Mientras tanto, yo voy a actualizar el roadmap y mandar un email con los next steps. Si puedes, revisa el deck y dime si falta algo antes de que se lo mande. Gracias, y cualquier cosa me escribes por Slack. Otra cosa, el sprint review lo movimos al viernes en la mañana porque el product owner no puede el jueves. Si tienes algún blocker con las tareas del backlog, avísame antes para que lo podamos discutir en el daily y no se nos atrase el release.",
+      "expected": [
+        "Oye, te cuento rápido cómo va el proyecto. Ayer tuvimos el meeting con el cliente y le gustó mucho el demo, pero pidió unos cambios en el dashboard antes del launch. El team de diseño ya está trabajando en el feedback, y la idea es tener una nueva versión para el review del jueves. Mientras tanto, yo voy a actualizar el roadmap y mandar un email con los next steps. Si puedes, revisa el deck y dime si falta algo antes de que se lo mande. Gracias, y cualquier cosa me escribes por Slack. Otra cosa, el sprint review lo movimos al viernes en la mañana porque el product owner no puede el jueves. Si tienes algún blocker con las tareas del backlog, avísame antes para que lo podamos discutir en el daily y no se nos atrase el release."
+      ],
+      "required": ["gustó", "cambios", "jueves", "actualizar", "revisa", "viernes", "avísame"],
+      "forbidden": [],
+      "terms": [
+        "meeting",
+        "demo",
+        "dashboard",
+        "launch",
+        "team",
+        "feedback",
+        "review",
+        "roadmap",
+        "email",
+        "next steps",
+        "deck",
+        "Slack",
+        "sprint review",
+        "product owner",
+        "blocker",
+        "backlog",
+        "release"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-mixed-45",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-extended-mixed-45-5f044baf",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-mixed-45/Pedro, one language",
+      "raw": "Oye, te cuento rápido cómo va el proyecto. Ayer tuvimos el meeting con el cliente y le gustó mucho el demo, pero pidió unos cambios en el dashboard antes del launch. El team de diseño ya está trabajando en el feedback, y la idea es tener una nueva versión para el review del jueves. Mientras tanto, yo voy a actualizar el roadmap y mandar un email con los next steps. Si puedes, revisa el deck y dime si falta algo antes de que se lo mande. Gracias y cualquier cosa me escribes por Slack. Otra cosa, el Sprint. Review lo movimos al viernes en la mañana porque el product owner no puede el jueves. Si tienes algún blocker con las tareas del backlog, avísame antes para que lo podamos discutir en el daily y no se nos atrase el release.",
+      "expected": [
+        "Oye, te cuento rápido cómo va el proyecto. Ayer tuvimos el meeting con el cliente y le gustó mucho el demo, pero pidió unos cambios en el dashboard antes del launch. El team de diseño ya está trabajando en el feedback, y la idea es tener una nueva versión para el review del jueves. Mientras tanto, yo voy a actualizar el roadmap y mandar un email con los next steps. Si puedes, revisa el deck y dime si falta algo antes de que se lo mande. Gracias, y cualquier cosa me escribes por Slack. Otra cosa, el sprint review lo movimos al viernes en la mañana porque el product owner no puede el jueves. Si tienes algún blocker con las tareas del backlog, avísame antes para que lo podamos discutir en el daily y no se nos atrase el release."
+      ],
+      "required": ["gustó", "cambios", "jueves", "actualizar", "revisa", "viernes", "avísame"],
+      "forbidden": [],
+      "terms": [
+        "meeting",
+        "demo",
+        "dashboard",
+        "launch",
+        "team",
+        "feedback",
+        "review",
+        "roadmap",
+        "email",
+        "next steps",
+        "deck",
+        "Slack",
+        "sprint review",
+        "product owner",
+        "blocker",
+        "backlog",
+        "release"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-mixed-45",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-extended-mixed-100-44df3d35",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-mixed-100/Pedro, one language",
+      "raw": "Bueno, te mando este audio porque no alcancé a contarte todo en la call de hoy. El kickoff del nuevo cliente salió bien, aunque el timeline que nos pidieron es bastante agresivo. Quieren el MVP listo antes del deadline de fin de mes, y eso significa que tenemos que cerrar el scope esta semana. Mi propuesta es hacer un sprint corto enfocado solo en el onboarding y en el checkout, y dejar los reportes para después del launch. También hablé con el Product Manager y está de acuerdo, pero quiere ver un mockup antes de aprobar el plan. Por otro lado, el equipo de backend me dijo que la API todavía tiene problemas de performance cuando hay mucho tráfico, así que vamos a necesitar un load test antes de cualquier deploy a producción. Te pido que organizes un meeting con ellos para el martes y que prepares un one pager con los riesgos principales. Yo me encargo de actualizar el roadmap y de mandar el follow up al cliente. Ah, y antes de que se me olvide, el feedback del último demo está en el drive compartido. Échale un look cuando puedas porque hay varios comentarios sobre el diseño que vale la pena discutir. Lo otro que quería contarte es que el budget para el próximo quarter todavía no está aprobado, así que por ahora no podemos contratar a nadie nuevo para el team. Mientras tanto, la idea es que cada uno tome un poco más de ownership en su parte y que usemos mejor el tiempo de las reuniones. Propongo que el daily sea corto y que los temas largos los dejemos para una call aparte. Si tienes otras ideas para mejorar el workflow, anótalas en el doc compartido y las revisamos juntos en el retro del viernes.",
+      "expected": [
+        "Bueno, te mando este audio porque no alcancé a contarte todo en la call de hoy. El kickoff del nuevo cliente salió bien, aunque el timeline que nos pidieron es bastante agresivo. Quieren el MVP listo antes del deadline de fin de mes, y eso significa que tenemos que cerrar el scope esta semana. Mi propuesta es hacer un sprint corto enfocado solo en el onboarding y en el checkout, y dejar los reportes para después del launch. También hablé con el product manager y está de acuerdo, pero quiere ver un mockup antes de aprobar el plan. Por otro lado, el equipo de backend me dijo que la API todavía tiene problemas de performance cuando hay mucho tráfico, así que vamos a necesitar un load test antes de cualquier deploy a producción. Te pido que organices un meeting con ellos para el martes, y que prepares un one pager con los riesgos principales. Yo me encargo de actualizar el roadmap y de mandar el follow up al cliente. Ah, y antes de que se me olvide, el feedback del último demo está en el drive compartido, échale un look cuando puedas porque hay varios comentarios sobre el diseño que vale la pena discutir con el team. Lo otro que quería contarte es que el budget para el próximo quarter todavía no está aprobado, así que por ahora no podemos contratar a nadie nuevo para el team. Mientras tanto, la idea es que cada uno tome un poco más de ownership en su parte y que usemos mejor el tiempo de las reuniones. Propongo que el daily sea corto y que los temas largos los dejemos para una call aparte. Si tienes otras ideas para mejorar el workflow, anótalas en el doc compartido y las revisamos juntos en el retro del viernes."
+      ],
+      "required": [
+        "agresivo",
+        "cerrar",
+        "después",
+        "martes",
+        "no está aprobado",
+        "no podemos contratar"
+      ],
+      "forbidden": [],
+      "terms": [
+        "call",
+        "kickoff",
+        "timeline",
+        "MVP",
+        "deadline",
+        "scope",
+        "sprint",
+        "onboarding",
+        "checkout",
+        "launch",
+        "product manager",
+        "mockup",
+        "backend",
+        "API",
+        "performance",
+        "load test",
+        "deploy",
+        "meeting",
+        "one pager",
+        "roadmap",
+        "follow up",
+        "feedback",
+        "demo",
+        "drive",
+        "team",
+        "budget",
+        "quarter",
+        "ownership",
+        "daily",
+        "workflow",
+        "retro"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-mixed-100",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-extended-mixed-100-28aa4455",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-mixed-100/Pedro, one language",
+      "raw": "Bueno, te mando este audio porque no alcancé a contarte todo en la call de hoy. El kickoff del nuevo cliente salió bien, aunque el timeline que nos pidieron es bastante agresivo. Quieren el MVP listo antes del deadline de fin de mes y eso significa que tenemos que cerrar el scope esta semana. Mi propuesta es hacer un sprint corto enfocado solo en el onboarding y en el checkout, y dejar los reportes para después del launch. También hablé con el product manager y está de acuerdo, pero quiere ver un mockup antes de aprobar el plan. Por otro lado, el equipo de backend me dijo que la API todavía tiene problemas de performance cuando hay mucho tráfico, así que vamos a necesitar un load test antes de cualquier deploy a producción. Te pido que organices un meeting con ellos para el martes y que prepares un one-pager con los riesgos principales. Yo me encargo de actualizar el roadmap y de mandar el follow-up al cliente. Ah, y antes de que se me olvide, el feedback del último demo está en el Drive compartido, échale un look cuando puedas porque hay varios comentarios sobre el diseño que vale la pena discutir con el team. Lo otro que quería contarte es que el budget para el próximo quarter todavía no está aprobado, así que por ahora no podemos contratar a nadie nuevo para el team. Mientras tanto, la idea es que cada uno tome un poco más de ownership en su parte y que usemos mejor el tiempo de las reuniones. Propongo que el daily sea corto y que los temas largos los dejemos para una call aparte. Si tienes otras ideas para mejorar el workflow, anótalas en el doc compartido y las revisamos juntos en el retro del viernes.",
+      "expected": [
+        "Bueno, te mando este audio porque no alcancé a contarte todo en la call de hoy. El kickoff del nuevo cliente salió bien, aunque el timeline que nos pidieron es bastante agresivo. Quieren el MVP listo antes del deadline de fin de mes, y eso significa que tenemos que cerrar el scope esta semana. Mi propuesta es hacer un sprint corto enfocado solo en el onboarding y en el checkout, y dejar los reportes para después del launch. También hablé con el product manager y está de acuerdo, pero quiere ver un mockup antes de aprobar el plan. Por otro lado, el equipo de backend me dijo que la API todavía tiene problemas de performance cuando hay mucho tráfico, así que vamos a necesitar un load test antes de cualquier deploy a producción. Te pido que organices un meeting con ellos para el martes, y que prepares un one pager con los riesgos principales. Yo me encargo de actualizar el roadmap y de mandar el follow up al cliente. Ah, y antes de que se me olvide, el feedback del último demo está en el drive compartido, échale un look cuando puedas porque hay varios comentarios sobre el diseño que vale la pena discutir con el team. Lo otro que quería contarte es que el budget para el próximo quarter todavía no está aprobado, así que por ahora no podemos contratar a nadie nuevo para el team. Mientras tanto, la idea es que cada uno tome un poco más de ownership en su parte y que usemos mejor el tiempo de las reuniones. Propongo que el daily sea corto y que los temas largos los dejemos para una call aparte. Si tienes otras ideas para mejorar el workflow, anótalas en el doc compartido y las revisamos juntos en el retro del viernes."
+      ],
+      "required": [
+        "agresivo",
+        "cerrar",
+        "después",
+        "martes",
+        "no está aprobado",
+        "no podemos contratar"
+      ],
+      "forbidden": [],
+      "terms": [
+        "call",
+        "kickoff",
+        "timeline",
+        "MVP",
+        "deadline",
+        "scope",
+        "sprint",
+        "onboarding",
+        "checkout",
+        "launch",
+        "product manager",
+        "mockup",
+        "backend",
+        "API",
+        "performance",
+        "load test",
+        "deploy",
+        "meeting",
+        "one pager",
+        "roadmap",
+        "follow up",
+        "feedback",
+        "demo",
+        "drive",
+        "team",
+        "budget",
+        "quarter",
+        "ownership",
+        "daily",
+        "workflow",
+        "retro"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-mixed-100",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-extended-mixed-100-fa0937b9",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, extended-mixed-100/Pedro, one language",
+      "raw": "Bueno, te mando este audio porque no alcancé a contarte todo en la call de hoy. El kickoff del nuevo cliente salió bien, aunque el timeline que nos pidieron es bastante agresivo. Quieren el MVP listo antes del deadline de fin de mes, y eso significa que tenemos que cerrar el scope esta semana. Mi propuesta es hacer un sprint corto enfocado solo en el onboarding y en el checkout, y dejar los reportes para después del launch. También hablé con el product manager y está de acuerdo, pero quiere ver un mocoup antes de aprobar el plan. Por otro lado, El equipo de backend me dijo que la API todavía tiene problemas de performance cuando hay mucho tráfico, así que vamos a necesitar un load test antes de cualquier deploy a producción. Te pido que organices un meeting con ellos para el martes y que prepares un one pager con los riesgos principales. Yo me encargo de actualizar el roadmap y de mandar el follow up al cliente. Ah, y antes de que se me olvide, el feedback del último demo está en el drive compartido. Échale un log cuando puedas porque hay varios comentarios sobre el diseño que vale la pena discutir con el team. Lo otro que quería contarte es que el budget para el próximo quarto todavía no está aprobado, así que por ahora no podemos contratar a nadie nuevo para el team. Mientras tanto, la idea es que cada uno tome un poco más de ownership en su parte y que usemos mejor el tiempo de las reuniones. Propongo que el daily sea corto y que los temas largos los dejemos para una call aparte. Si tienes otras ideas para mejorar el workflow, anótalas en el DAC compartido y las revisamos juntos en el retro del viernes.",
+      "expected": [
+        "Bueno, te mando este audio porque no alcancé a contarte todo en la call de hoy. El kickoff del nuevo cliente salió bien, aunque el timeline que nos pidieron es bastante agresivo. Quieren el MVP listo antes del deadline de fin de mes, y eso significa que tenemos que cerrar el scope esta semana. Mi propuesta es hacer un sprint corto enfocado solo en el onboarding y en el checkout, y dejar los reportes para después del launch. También hablé con el product manager y está de acuerdo, pero quiere ver un mockup antes de aprobar el plan. Por otro lado, el equipo de backend me dijo que la API todavía tiene problemas de performance cuando hay mucho tráfico, así que vamos a necesitar un load test antes de cualquier deploy a producción. Te pido que organices un meeting con ellos para el martes, y que prepares un one pager con los riesgos principales. Yo me encargo de actualizar el roadmap y de mandar el follow up al cliente. Ah, y antes de que se me olvide, el feedback del último demo está en el drive compartido, échale un look cuando puedas porque hay varios comentarios sobre el diseño que vale la pena discutir con el team. Lo otro que quería contarte es que el budget para el próximo quarter todavía no está aprobado, así que por ahora no podemos contratar a nadie nuevo para el team. Mientras tanto, la idea es que cada uno tome un poco más de ownership en su parte y que usemos mejor el tiempo de las reuniones. Propongo que el daily sea corto y que los temas largos los dejemos para una call aparte. Si tienes otras ideas para mejorar el workflow, anótalas en el doc compartido y las revisamos juntos en el retro del viernes."
+      ],
+      "required": [
+        "agresivo",
+        "cerrar",
+        "después",
+        "martes",
+        "no está aprobado",
+        "no podemos contratar"
+      ],
+      "forbidden": [],
+      "terms": [
+        "call",
+        "kickoff",
+        "timeline",
+        "MVP",
+        "deadline",
+        "scope",
+        "sprint",
+        "onboarding",
+        "checkout",
+        "launch",
+        "product manager",
+        "mockup",
+        "backend",
+        "API",
+        "performance",
+        "load test",
+        "deploy",
+        "meeting",
+        "one pager",
+        "roadmap",
+        "follow up",
+        "feedback",
+        "demo",
+        "drive",
+        "team",
+        "budget",
+        "quarter",
+        "ownership",
+        "daily",
+        "workflow",
+        "retro"
+      ],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "extended-mixed-100",
+        "transcribers": ["together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-quiet-es-1-d5db8106",
+      "language": "es",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, quiet-es-1/Lupe, one language",
+      "raw": "Gracias, ya revisé el informe y está todo bien.",
+      "expected": ["Gracias, ya revisé el informe y está todo bien."],
+      "required": ["gracias", "revisé", "informe", "bien"],
+      "forbidden": ["mal"],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "quiet-es-1",
+        "transcribers": ["whisper-large-v3-turbo", "gpt-transcribe", "together-parakeet"]
+      }
+    },
+    {
+      "id": "chained-quiet-en-1-49c2875f",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, quiet-en-1/Joanna, one language",
+      "raw": "Thank you, I already checked the report and it looks fine",
+      "expected": ["Thank you, I already checked the report and it looks fine."],
+      "required": ["thank you", "checked", "report", "fine"],
+      "forbidden": [],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "quiet-en-1",
+        "transcribers": ["whisper-large-v3-turbo"]
+      }
+    },
+    {
+      "id": "chained-quiet-en-1-fc02fe15",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, quiet-en-1/Joanna, one language",
+      "raw": "Thank you, I already checked the report and it looks fine.",
+      "expected": ["Thank you, I already checked the report and it looks fine."],
+      "required": ["thank you", "checked", "report", "fine"],
+      "forbidden": [],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "quiet-en-1",
+        "transcribers": ["gpt-transcribe"]
+      }
+    },
+    {
+      "id": "chained-quiet-en-1-5de24108",
+      "language": "en",
+      "style": "plain",
+      "dictionary": "developer",
+      "source": "suite 1 run 1, quiet-en-1/Joanna, one language",
+      "raw": "Thank you. I already checked the report and it looks fine.",
+      "expected": ["Thank you, I already checked the report and it looks fine."],
+      "required": ["thank you", "checked", "report", "fine"],
+      "forbidden": [],
+      "terms": [],
+      "fillers": [],
+      "styleRequired": [],
+      "styleForbidden": [],
+      "allowed": [],
+      "chain": {
+        "caseId": "quiet-en-1",
+        "transcribers": ["together-parakeet"]
+      }
+    }
+  ]
+}

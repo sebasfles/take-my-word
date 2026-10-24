@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PollyClient } from "@aws-sdk/client-polly";
-import { dictionaryHalfLifeDays, languages, type Language } from "@take-my-word/shared";
+import {
+  dictionaryHalfLifeDays,
+  languages,
+  maxAudioBytes,
+  type Language,
+} from "@take-my-word/shared";
 import { z } from "zod";
 import {
   transcriberPrompt,
@@ -105,6 +110,10 @@ export function voicesFor(
   return item.mixed ? fixtures.voices.mixed : fixtures.voices[item.language];
 }
 
+export const extendedPrefix = "extended-";
+export const isExtended = (caseId: string): boolean => caseId.startsWith(extendedPrefix);
+export const extendedBucket = "30 to 120 s";
+
 export interface Clip {
   id: string;
   item: TranscriptionCase;
@@ -127,6 +136,11 @@ export async function buildClip(
     if (voice === "none") throw new Error(`${item.id} needs a voice`);
     const spoken = await speak(polly, item.text, voice);
     audio = item.levelDbfs === undefined ? spoken : withLevel(spoken, item.levelDbfs);
+  }
+  if (audio.length > maxAudioBytes) {
+    throw new Error(
+      `${item.id}/${voice} is ${String(audio.length)} bytes, over production's ${String(maxAudioBytes)} byte cap`,
+    );
   }
   return {
     id: `${item.id}/${voice}`,

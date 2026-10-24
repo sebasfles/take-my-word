@@ -6,18 +6,27 @@ export interface Failure {
   message: string;
 }
 
+export interface StageUse {
+  pacingKey: string;
+  usage: Usage;
+  costUsd: number;
+  headers: Record<string, string>;
+}
+
 export interface Attempt<R> {
   result?: R;
   usage: Usage;
   costUsd: number;
   headers: Record<string, string>;
   failure?: Failure;
+  alsoUsed?: StageUse[];
 }
 
 export interface PlannedItem<R> {
   id: string;
   pacingKey: string;
   estimate: Usage & { costUsd: number };
+  alsoPaced?: { pacingKey: string; estimate: Usage & { costUsd: number } }[];
   run: () => Promise<Attempt<R>>;
   exhausted: (failure: Failure) => R;
 }
@@ -51,25 +60,53 @@ export async function runSchedule<R>(
     let earliest = Infinity;
     const reasons = new Set<string>();
     for (const item of pending) {
-      const readiness = pacer.readiness(item.pacingKey, item.estimate, at);
-      if (readiness.kind === "now") {
+      const stages = [
+        { pacingKey: item.pacingKey, estimate: item.estimate },
+        ...(item.alsoPaced ?? []),
+      ];
+      let readyAt = at;
+      let paused = false;
+      for (const stage of stages) {
+        const readiness = pacer.readiness(stage.pacingKey, stage.estimate, at);
+        if (readiness.kind === "tomorrow") {
+          reasons.add(`${stage.pacingKey}: ${readiness.reason}`);
+          paused = true;
+        } else if (readiness.kind === "at") readyAt = Math.max(readyAt, readiness.at);
+      }
+      if (paused) continue;
+      if (readyAt <= at) {
         next = item;
         break;
       }
-      if (readiness.kind === "at") earliest = Math.min(earliest, readiness.at);
-      else reasons.add(`${item.pacingKey}: ${readiness.reason}`);
+      earliest = Math.min(earliest, readyAt);
     }
     if (next === undefined) {
       if (earliest === Infinity) return { kind: "paused", reasons: [...reasons] };
       await wait(earliest - at);
       continue;
     }
-    guard.check(next.estimate.costUsd);
+    guard.check(
+      (next.alsoPaced ?? []).reduce(
+        (sum, stage) => sum + stage.estimate.costUsd,
+        next.estimate.costUsd,
+      ),
+    );
     const attempt = await next.run();
     const finishedAt = now();
-    hooks.usage(pacer.record(next.pacingKey, attempt.usage, finishedAt));
-    pacer.observe(next.pacingKey, attempt.headers, finishedAt);
-    guard.add(attempt.costUsd);
+    const used: StageUse[] = [
+      {
+        pacingKey: next.pacingKey,
+        usage: attempt.usage,
+        costUsd: attempt.costUsd,
+        headers: attempt.headers,
+      },
+      ...(attempt.alsoUsed ?? []),
+    ];
+    for (const stage of used) {
+      hooks.usage(pacer.record(stage.pacingKey, stage.usage, finishedAt, stage.costUsd));
+      pacer.observe(stage.pacingKey, stage.headers, finishedAt);
+      guard.add(stage.costUsd);
+    }
 
     const counts = attempts.get(next.id) ?? { failures: 0, limited: 0 };
     attempts.set(next.id, counts);

@@ -1,21 +1,23 @@
-import type { TranscriberCandidate } from "./candidates.ts";
-import type { TranscriptionFixtures } from "./fixtures.ts";
+import { notRerun, type TranscriberCandidate } from "./candidates.ts";
+import { extendedBucket, isExtended, type TranscriptionFixtures } from "./fixtures.ts";
 import { mean } from "./metrics.ts";
-import { modelFacts, notServed, pricesCheckedOn, transcriptionCallUsd } from "./prices.ts";
+import { modelFacts, notServed, pricesCheckedFor, transcriptionCallUsd } from "./prices.ts";
 import type { FailureRecord } from "./suite.ts";
 import {
   actualConnection,
-  hardGatePassed,
+  isProviderFailure,
   itemKey,
   pct,
-  relativeGate,
+  transcriptionGate,
   type CandidateSummary,
   type Checked,
   type LatencyStats,
+  type TranscriptionBuckets,
 } from "./transcription-analysis.ts";
 
 export interface RunContext {
   command: string;
+  planNotes: string[];
   generatedAt: string;
   codeCommit: string;
   fixturesSha256: string;
@@ -63,17 +65,73 @@ export function dictationCostUsd(
   return perSecond === undefined ? undefined : perSecond * normalDictationSeconds * calls;
 }
 
+function accuracyRows(
+  candidates: readonly TranscriberCandidate[],
+  summaries: ReadonlyMap<string, CandidateSummary>,
+): string[] {
+  const rows = [
+    "| Candidate | Languages | WER | WER per run | Domain-term errors, raw (gated after cleanup) | Language flips | Dropped by guard | Failed calls | Rate limited |",
+    "|---|---|---|---|---|---|---|---|---|",
+  ];
+  for (const candidate of candidates) {
+    const summary = summaries.get(candidate.id);
+    if (summary === undefined) continue;
+    for (const mode of ["one", "both"] as const) {
+      const m = summary.modes[mode];
+      if (m.results === 0) continue;
+      rows.push(
+        `| ${candidate.id} | ${mode} | ${pct(m.wer)} | ${m.werPerRun.map(pct).join(", ")} | ${String(m.missedTerms)}/${String(m.terms)} (${pct(m.termErrorRate)}) | ${String(m.flips)}/${String(m.speechResults)} | ${String(m.dropped)} | ${String(m.failedAttempts)}/${String(m.attempts)} (${pct(m.failureRate)}) | ${String(m.rateLimited)} |`,
+      );
+    }
+  }
+  return rows;
+}
+
+function latencyRows(
+  candidates: readonly TranscriberCandidate[],
+  summaries: ReadonlyMap<string, CandidateSummary>,
+  withLong: boolean,
+): string[] {
+  const rows = withLong
+    ? [
+        "| Candidate | Languages | Fresh connection | Reused connection | ~15 s clips, reused | Calls per dictation | Groq region |",
+        "|---|---|---|---|---|---|---|",
+      ]
+    : [
+        "| Candidate | Languages | Fresh connection | Reused connection | Calls per dictation |",
+        "|---|---|---|---|---|",
+      ];
+  for (const candidate of candidates) {
+    const summary = summaries.get(candidate.id);
+    if (summary === undefined) continue;
+    for (const mode of ["one", "both"] as const) {
+      const m = summary.modes[mode];
+      if (m.results === 0) continue;
+      rows.push(
+        withLong
+          ? `| ${candidate.id} | ${mode} | ${stat(m.latencyByConnection.fresh)} | ${stat(m.latencyByConnection.reused)} | ${stat(m.latencyLongReused)} | ${m.callsPerDictation.toFixed(2)} | ${summary.regions.join(", ")} |`
+          : `| ${candidate.id} | ${mode} | ${stat(m.latencyByConnection.fresh)} | ${stat(m.latencyByConnection.reused)} | ${m.callsPerDictation.toFixed(2)} |`,
+      );
+    }
+  }
+  return rows;
+}
+
 export function transcriptionReport(
   context: RunContext,
   fixtures: TranscriptionFixtures,
   candidates: readonly TranscriberCandidate[],
-  summaries: ReadonlyMap<string, CandidateSummary>,
+  buckets: TranscriptionBuckets,
   checked: readonly Checked[],
 ): string {
   const lines: string[] = [];
   const push = (...more: string[]) => lines.push(...more);
+  const summaries = buckets.all;
   const baseline = candidates.find((candidate) => candidate.baseline);
-  const baselineSummary = baseline && summaries.get(baseline.id);
+  const gateOf = (id: string) =>
+    baseline === undefined
+      ? undefined
+      : transcriptionGate(id, baseline.id, buckets, extendedBucket);
 
   push("# Transcription evaluation", "");
   push(
@@ -81,7 +139,8 @@ export function transcriptionReport(
     `Every provider call ran inside the dev eval Lambda \`${context.functionName}\` (${context.region}, ${context.memoryMb} MB, arm64), through the production adapters and production's \`transcribeIn\`, ${String(context.runs)} runs per clip and language setting; run 1 opens a fresh connection, later runs reuse the Lambda's kept-alive one.`,
     `Clips are Polly neural speech generated at run time (voices ${[...new Set([...fixtures.voices.es, ...fixtures.voices.en, ...fixtures.voices.mixed])].join(", ")}) and seeded noise; every candidate got the same bytes and the transcriber prompt of the case's fixture dictionary.`,
     `"one" sends the case's language; "both" lets the transcriber detect among es and en and transcribes again in es when it reports neither, as production does.`,
-    `Prices and plans as checked on ${pricesCheckedOn}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan).`,
+    `Prices and plans as checked on ${pricesCheckedFor(candidates.map((candidate) => candidate.spec.model))}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan unless noted below, prepaid balances at list price).`,
+    ...context.planNotes.map((note) => `${note}.`),
     ...context.overrides.map((note) => `Override for part of this run: ${note}.`),
     `Reproduce from the repository root: \`${context.command}\`.`,
     "",
@@ -101,13 +160,15 @@ export function transcriptionReport(
         : facts.price.kind === "audio-tokens"
           ? `${String(facts.price.usdPerMillionInput)} / ${String(facts.price.usdPerMillionOutput)} USD per 1M audio tokens in / out`
           : "";
-    const hard = summary === undefined ? "not measured" : hardGatePassed(summary) ? "pass" : "FAIL";
+    const gate = gateOf(candidate.id);
+    const hard =
+      summary === undefined || gate === undefined ? "not measured" : gate.hard ? "pass" : "FAIL";
     const relative =
-      summary === undefined || baselineSummary === undefined
+      gate === undefined
         ? "n/a"
         : candidate.baseline
           ? "baseline"
-          : relativeGate(summary, baselineSummary).passed
+          : gate.relative.passed
             ? "pass"
             : "FAIL";
     push(
@@ -117,12 +178,14 @@ export function transcriptionReport(
   push("", "Not measured:", "");
   for (const model of notServed)
     push(`- ${model.provider} \`${model.model}\`: ${model.reason} ([source](${model.source})).`);
+  for (const model of notRerun) push(`- \`${model.id}\`: ${model.reason}.`);
   push("");
 
   push("## Quality gate", "");
   push(
-    "Hard gate, any occurrence fails: invented content (3 or more inserted words in a row), a known hallucination phrase or any text on noise that survives production's level and phrase guards, and text that reads as the other language.",
-    "Relative gate: WER and domain-term errors no worse than today's model plus its run-to-run spread, per language setting.",
+    "Hard gate, any occurrence fails: invented content (3 or more inserted words in a row), a known hallucination phrase or any text on noise that survives production's level and phrase guards, and wrong language: text that reads as the other language, text with letters outside the Latin script, or Latin text whose function words read as neither es nor en.",
+    `Relative gate: WER and failed calls no worse than today's model plus its run-to-run spread, per language setting, over every case and again over the ${extendedBucket} samples alone.`,
+    "Raw domain-term errors are reported here but gated only after cleanup, on each transcriber's own raws (suite 2 and the summary), since a transcriber that takes no prompt leaves the dictionary to cleanup.",
     "",
   );
   push(
@@ -132,10 +195,11 @@ export function transcriptionReport(
   for (const candidate of candidates) {
     const summary = summaries.get(candidate.id);
     if (summary === undefined) continue;
+    const gate = gateOf(candidate.id);
     const relative =
-      baselineSummary === undefined || candidate.baseline
+      gate === undefined || candidate.baseline
         ? "baseline"
-        : relativeGate(summary, baselineSummary).reasons.join("; ") || "pass";
+        : gate.relative.reasons.join("; ") || "pass";
     push(
       `| ${candidate.id} | ${String(summary.flags["invented content"])} | ${String(summary.flags.hallucination)} | ${String(summary.flags["wrong language"])} | ${relative} |`,
     );
@@ -143,43 +207,34 @@ export function transcriptionReport(
   push("");
 
   push("## Accuracy", "");
-  push(
-    "| Candidate | Languages | WER | WER per run | Domain-term errors | Language flips | Dropped by guard | Failed calls | Rate limited |",
-    "|---|---|---|---|---|---|---|---|---|",
-  );
-  for (const candidate of candidates) {
-    const summary = summaries.get(candidate.id);
-    if (summary === undefined) continue;
-    for (const mode of ["one", "both"] as const) {
-      const m = summary.modes[mode];
-      push(
-        `| ${candidate.id} | ${mode} | ${pct(m.wer)} | ${m.werPerRun.map(pct).join(", ")} | ${String(m.missedTerms)}/${String(m.terms)} (${pct(m.termErrorRate)}) | ${String(m.flips)}/${String(m.speechResults)} | ${String(m.dropped)} | ${String(m.failedAttempts)}/${String(m.attempts)} (${pct(m.failureRate)}) | ${String(m.rateLimited)} |`,
-      );
-    }
-  }
-  push("");
+  push(...accuracyRows(candidates, summaries), "");
 
-  push("## Latency inside us-east-1", "");
+  push(`## Latency inside us-east-1, clips under 30 s`, "");
   push(
     "Per dictation: the sum of the transcriber calls `transcribeIn` made, measured in the eval Lambda around the adapter, as P50 / P95 (samples).",
     "Fresh means the call opened a new TLS connection; reused means it rode a kept-alive one.",
+    `The ${extendedBucket} samples have their own section, so these numbers stay comparable with round 1.`,
     "",
   );
+  push(...latencyRows(candidates, buckets.short, true), "");
+
+  push(`## Samples of ${extendedBucket}`, "");
+  const extendedCases = fixtures.cases.filter((item) => isExtended(item.id));
   push(
-    "| Candidate | Languages | Fresh connection | Reused connection | ~15 s clips, reused | Calls per dictation | Groq region |",
-    "|---|---|---|---|---|---|---|",
+    `${String(extendedCases.length)} cases (${extendedCases.map((item) => item.id).join(", ")}), each with its bucket's two voices; they count in the totals above, and a candidate must also pass both gates on them alone.`,
+    "",
   );
+  push("| Candidate | Invented content | Hallucination | Wrong language |", "|---|---|---|---|");
   for (const candidate of candidates) {
-    const summary = summaries.get(candidate.id);
-    if (summary === undefined) continue;
-    for (const mode of ["one", "both"] as const) {
-      const m = summary.modes[mode];
-      push(
-        `| ${candidate.id} | ${mode} | ${stat(m.latencyByConnection.fresh)} | ${stat(m.latencyByConnection.reused)} | ${stat(m.latencyLongReused)} | ${m.callsPerDictation.toFixed(2)} | ${summary.regions.join(", ")} |`,
-      );
-    }
+    const summary = buckets.extended.get(candidate.id);
+    if (summary === undefined || summary.modes.one.results + summary.modes.both.results === 0)
+      continue;
+    push(
+      `| ${candidate.id} | ${String(summary.flags["invented content"])} | ${String(summary.flags.hallucination)} | ${String(summary.flags["wrong language"])} |`,
+    );
   }
-  push("");
+  push("", ...accuracyRows(candidates, buckets.extended), "");
+  push(...latencyRows(candidates, buckets.extended, false), "");
 
   push("## Cost", "");
   push(
@@ -207,7 +262,7 @@ export function transcriptionReport(
   else {
     const counts = new Map<string, number>();
     for (const failure of context.failedAttempts) {
-      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}`;
+      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}${isProviderFailure(failure) ? "" : " (the harness's own call to the eval Lambda, not a provider answer; not counted as a failed call)"}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     for (const [key, count] of counts) push(`- ${key}, ${String(count)} attempts`);

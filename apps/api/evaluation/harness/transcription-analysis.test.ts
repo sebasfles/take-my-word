@@ -78,6 +78,20 @@ describe("check", () => {
     expect(checked.flags).toContain("wrong language");
   });
 
+  it("flags a transcript in another script or a third language, with what it read", () => {
+    const cyrillic = check(result({ text: "Хаз ребейс собре мейн." }), speech);
+    expect(cyrillic.flags).toEqual(["wrong language"]);
+    expect(cyrillic.detail).toEqual(["non-Latin script (Хазре)"]);
+    const portuguese = check(
+      result({
+        text: "Faz rebase em main, sobe o hotfix e me avisa quando o build estiver em verde, não é?",
+      }),
+      speech,
+    );
+    expect(portuguese.flags).toContain("wrong language");
+    expect(portuguese.detail).toContain("reads as neither es nor en");
+  });
+
   it("counts missed domain terms and a language flip", () => {
     const checked = check(
       result({
@@ -147,6 +161,37 @@ describe("relativeGate", () => {
     const worse = relativeGate(summarize("worse", checked, [], longIds), baseline);
     expect(worse.passed).toBe(false);
     expect(worse.reasons[0]).toMatch(/^one: WER/);
+  });
+
+  it("leaves raw domain-term errors to the gate after cleanup", () => {
+    const termError = exact.replace("build", "bild");
+    const checked = [
+      ...runsOf("baseline", [oneError, oneError, oneError]),
+      ...runsOf("unprompted", [termError, termError, termError]),
+    ];
+    const baseline = summarize("baseline", checked, [], longIds);
+    const unprompted = summarize("unprompted", checked, [], longIds);
+    expect(unprompted.modes.one.wer).toBe(baseline.modes.one.wer);
+    expect(unprompted.modes.one.termErrorRate).toBeGreaterThan(baseline.modes.one.termErrorRate);
+    expect(relativeGate(unprompted, baseline)).toEqual({ passed: true, reasons: [] });
+  });
+
+  it("counts provider failures, not the harness's own failed calls to the eval Lambda", () => {
+    const checked = runsOf("candidate", [exact, exact, exact]);
+    const failures = [
+      {
+        id: "candidate|dev-es-4/Lupe|one|1",
+        message: "groq-whisper:whisper-large-v3-turbo request failed: TimeoutError",
+      },
+      {
+        id: "candidate|dev-es-4/Lupe|one|2",
+        message: "Signature expired: 20261024T123841Z is now earlier than 20261024T124959Z",
+      },
+    ];
+    expect(summarize("candidate", checked, failures, longIds).modes.one).toMatchObject({
+      failedAttempts: 1,
+      attempts: 4,
+    });
   });
 
   it("fails a candidate whose calls fail more often than the baseline's plus its spread", () => {
