@@ -7,6 +7,8 @@ import { builtinStyles } from "../../src/styles/builtin/index.ts";
 import { projectedTerms, type TranscriptionFixtures } from "./fixtures.ts";
 
 export const cleanupFixturesPath = join(import.meta.dirname, "..", "cleanup.fixtures.json");
+export const chainedFixturesPath = join(import.meta.dirname, "..", "chained.fixtures.json");
+export const chainedChecksPath = join(import.meta.dirname, "..", "chained-checks.json");
 
 const caseSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -23,6 +25,9 @@ const caseSchema = z.object({
   styleRequired: z.array(z.string()).default([]),
   styleForbidden: z.array(z.string()).default([]),
   allowed: z.array(z.string()).default([]),
+  chain: z
+    .object({ caseId: z.string().min(1), transcribers: z.array(z.string().min(1)).min(1) })
+    .optional(),
 });
 export type CleanupCase = z.infer<typeof caseSchema>;
 
@@ -40,9 +45,13 @@ export type CleanupFixtures = z.infer<typeof cleanupFixturesSchema>;
 
 export function loadCleanupFixtures(
   transcription: TranscriptionFixtures,
-  path = cleanupFixturesPath,
+  paths: readonly string[] = [cleanupFixturesPath, chainedFixturesPath],
 ): CleanupFixtures {
-  const fixtures = cleanupFixturesSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+  const fixtures = cleanupFixturesSchema.parse({
+    cases: paths.flatMap(
+      (path) => (JSON.parse(readFileSync(path, "utf8")) as { cases: unknown[] }).cases,
+    ),
+  });
   for (const item of fixtures.cases) {
     if (!(item.dictionary in transcription.dictionaries)) {
       throw new Error(`${item.id}: no dictionary ${item.dictionary} in the transcription fixtures`);
@@ -58,3 +67,13 @@ export function instructionsFor(transcription: TranscriptionFixtures, item: Clea
     projectedTerms(transcription, item.dictionary),
   );
 }
+
+export const chainedChecksSchema = z.record(
+  z.string(),
+  z.object({
+    required: z.array(z.string()).default([]),
+    forbidden: z.array(z.string()).default([]),
+    allowed: z.array(z.string()).default([]),
+  }),
+);
+export type ChainedChecks = z.infer<typeof chainedChecksSchema>;

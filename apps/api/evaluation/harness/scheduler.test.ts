@@ -20,6 +20,10 @@ const keys = new Map<string, PacingKey>([
   ],
   ["fast", { provider: "openai" }],
   [
+    "cerebras:qwen",
+    { provider: "cerebras", prepaid: { startUsd: 15, since: "2026-10-23", floorUsd: 5 } },
+  ],
+  [
     "tiny",
     { provider: "groq", plan: { requestsPerMinute: 100, requestsPerDay: 2, source: "test" } },
   ],
@@ -186,6 +190,87 @@ describe("runSchedule", () => {
     );
     expect(recorder.failed).toHaveLength(maxAttempts);
     expect(recorder.done).toEqual(["y exhausted: invoke failed"]);
+  });
+});
+
+describe("runSchedule across two stages", () => {
+  it("waits for the slower of a dictation's two providers and records the use of both", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const dictation = (id: string): PlannedItem<string> => ({
+      ...item(id, "slow", () =>
+        Promise.resolve({
+          ...ok(id),
+          alsoUsed: [
+            {
+              pacingKey: "cerebras:qwen",
+              usage: { requests: 1, audioSeconds: 0, tokens: 500 },
+              costUsd: 0.002,
+              headers: {},
+            },
+          ],
+        }),
+      ),
+      alsoPaced: [
+        {
+          pacingKey: "cerebras:qwen",
+          estimate: { requests: 1, audioSeconds: 0, tokens: 500, costUsd: 0.002 },
+        },
+      ],
+    });
+    const guard = new CostGuard(3);
+    const outcome = await runSchedule(
+      [dictation("d1"), dictation("d2")],
+      new Pacer(keys, []),
+      guard,
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(outcome).toEqual({ kind: "complete" });
+    expect(recorder.ledger.map((entry) => [entry.key, entry.usd])).toEqual([
+      ["slow", 0.01],
+      ["cerebras:qwen", 0.002],
+      ["slow", 0.01],
+      ["cerebras:qwen", 0.002],
+    ]);
+    expect(guard.spentUsd).toBeCloseTo(0.024, 10);
+  });
+
+  it("pauses an item whose second stage would take a prepaid balance under its floor", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const spent: LedgerEntry = {
+      key: "cerebras:qwen",
+      at: time.now() - 1_000,
+      requests: 1,
+      audioSeconds: 0,
+      tokens: 0,
+      usd: 9.999,
+    };
+    const outcome = await runSchedule(
+      [
+        {
+          ...item("d1", "fast"),
+          alsoPaced: [
+            {
+              pacingKey: "cerebras:qwen",
+              estimate: { requests: 1, audioSeconds: 0, tokens: 500, costUsd: 0.002 },
+            },
+          ],
+        },
+      ],
+      new Pacer(keys, [spent]),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(outcome.kind).toBe("paused");
+    expect(outcome.kind === "paused" && outcome.reasons[0]).toMatch(
+      /^cerebras:qwen: cerebras balance: 5\.0010 of 15\.00 USD left/,
+    );
+    expect(recorder.done).toEqual([]);
   });
 });
 

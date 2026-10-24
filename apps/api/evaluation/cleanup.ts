@@ -3,11 +3,11 @@ import type { Connection, ProviderRequest } from "../src/eval/contract.ts";
 import { refinerCandidates, type RefinerCandidate } from "./harness/candidates.ts";
 import {
   checkCleanup,
-  summarizeCleanup,
+  summarizeCleanupBuckets,
   type CleanupResult,
-  type CleanupSummary,
 } from "./harness/cleanup-analysis.ts";
 import {
+  chainedFixturesPath,
   cleanupFixturesPath,
   instructionsFor,
   loadCleanupFixtures,
@@ -16,7 +16,11 @@ import {
 } from "./harness/cleanup-fixtures.ts";
 import { cleanupReport } from "./harness/cleanup-report.ts";
 import { buildEvalBundle, type EvalFunction } from "./harness/eval-lambda.ts";
-import { loadTranscriptionFixtures, transcriptionFixturesPath } from "./harness/fixtures.ts";
+import {
+  isExtended,
+  loadTranscriptionFixtures,
+  transcriptionFixturesPath,
+} from "./harness/fixtures.ts";
 import { chargedUsd, modelFacts, tokenCostUsd } from "./harness/prices.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
 import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
@@ -37,6 +41,7 @@ import {
   openWorkspace,
   requireCommittedFixtures,
   sha256,
+  sha256s,
 } from "./harness/workspace.ts";
 
 const usage = "usage: pnpm eval:cleanup --results <dir> --report <report.md> [--runs 3] | --smoke";
@@ -194,11 +199,11 @@ function render(
     return checkCleanup(result, item);
   });
   const failures = readJsonl<FailureRecord>(dir.failures);
-  const summaries = new Map<string, CleanupSummary>(
-    refinerCandidates.map((candidate) => [
-      candidate.id,
-      summarizeCleanup(candidate.id, checked, failures),
-    ]),
+  const buckets = summarizeCleanupBuckets(
+    refinerCandidates.map((candidate) => candidate.id),
+    checked,
+    failures,
+    isExtended,
   );
   writeFileSync(
     reportPath,
@@ -222,7 +227,7 @@ function render(
       },
       fixtures,
       refinerCandidates,
-      summaries,
+      buckets,
       checked,
     ),
   );
@@ -230,13 +235,20 @@ function render(
 }
 
 async function measure(results: string, reportPath: string): Promise<void> {
+  requireCommittedFixtures(chainedFixturesPath, []);
   const state = requireCommittedFixtures(cleanupFixturesPath, [
+    chainedFixturesPath,
     transcriptionFixturesPath,
     ...evaluationCodePaths,
   ]);
   const fixtures = loadCleanupFixtures(transcription);
+  if (!fixtures.cases.some((item) => item.chain !== undefined)) {
+    throw new Error(
+      "no chained cases; run pnpm eval:chain on suite 1's results and commit them first",
+    );
+  }
   const codeCommit = lastCommitTouching(evaluationCodePaths);
-  const fixturesSha256 = sha256(cleanupFixturesPath);
+  const fixturesSha256 = sha256s([cleanupFixturesPath, chainedFixturesPath]);
   const finished = openFinishedRun(results, { suite: "cleanup", fixturesSha256, runs: args.runs });
   if (finished !== undefined) {
     const done = new Set(readJsonl<CleanupResult>(finished.results).map((r) => r.id));

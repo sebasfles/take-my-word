@@ -78,6 +78,20 @@ describe("check", () => {
     expect(checked.flags).toContain("wrong language");
   });
 
+  it("flags a transcript in another script or a third language, with what it read", () => {
+    const cyrillic = check(result({ text: "Хаз ребейс собре мейн." }), speech);
+    expect(cyrillic.flags).toEqual(["wrong language"]);
+    expect(cyrillic.detail).toEqual(["non-Latin script (Хазре)"]);
+    const portuguese = check(
+      result({
+        text: "Faz rebase em main, sobe o hotfix e me avisa quando o build estiver em verde, não é?",
+      }),
+      speech,
+    );
+    expect(portuguese.flags).toContain("wrong language");
+    expect(portuguese.detail).toContain("reads as neither es nor en");
+  });
+
   it("counts missed domain terms and a language flip", () => {
     const checked = check(
       result({

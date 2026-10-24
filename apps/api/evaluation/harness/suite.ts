@@ -10,11 +10,13 @@ import {
 import {
   CostGuard,
   Pacer,
+  prepaidOutlook,
+  requireAboveFloor,
   type LedgerEntry,
   type PacingKey,
   type PacingOverrides,
 } from "./pacing.ts";
-import { complimentaryDailyTokens, modelFacts, runBudgetUsd } from "./prices.ts";
+import { complimentaryDailyTokens, modelFacts, prepaidBalances, runBudgetUsd } from "./prices.ts";
 import { runSchedule, type PlannedItem } from "./scheduler.ts";
 import { appendJsonl, readJsonl, type ResultsDir } from "./store.ts";
 import { fromInvocation, type Workspace } from "./workspace.ts";
@@ -75,11 +77,13 @@ export function pacingKeys(models: readonly string[]): Map<string, PacingKey> {
     models.map((model) => {
       const facts = modelFacts(model);
       const group = facts.complimentaryGroup;
+      const prepaid = prepaidBalances[facts.provider];
       return [
         pacingKeyOf(model),
         {
           provider: facts.provider,
           ...(facts.freePlan && { plan: facts.freePlan }),
+          ...(prepaid && { prepaid }),
           ...(group && {
             complimentary: { group, tokensPerDay: complimentaryDailyTokens[group].tokens },
           }),
@@ -155,17 +159,29 @@ export async function executePlan<R extends Charged>(
 ): Promise<boolean> {
   const ledger = readJsonl<LedgerEntry>(dir.ledger);
   const overrides = options.overrides ?? {};
-  const pacer = new Pacer(pacingKeys(models), ledger, undefined, overrides);
+  const keys = pacingKeys(models);
+  const pacer = new Pacer(keys, ledger, undefined, overrides);
   for (const line of describeOverrides(overrides)) {
     appendJsonl(dir.overrides, { at: new Date().toISOString(), note: line });
     console.log(`override: ${line}`);
   }
   const guard = new CostGuard(runBudgetUsd, recordedSpendUsd(dir));
-  const estimate = items.reduce((sum, item) => sum + item.estimate.costUsd, 0);
+  const stages = items.flatMap((item) => [
+    { pacingKey: item.pacingKey, estimate: item.estimate },
+    ...(item.alsoPaced ?? []),
+  ]);
+  const estimate = stages.reduce((sum, stage) => sum + stage.estimate.costUsd, 0);
   console.log(
     `${String(items.length)} calls pending, estimated ${estimate.toFixed(3)} USD charged after ${guard.spentUsd.toFixed(3)} USD already spent (budget ${runBudgetUsd.toFixed(2)} USD per run)`,
   );
   guard.check(estimate);
+  const outlooks = prepaidOutlook(keys, pacer, stages);
+  for (const { provider, leftUsd, estimateUsd, floorUsd } of outlooks) {
+    console.log(
+      `${provider}: estimated ${estimateUsd.toFixed(3)} USD of ${leftUsd.toFixed(3)} USD left by the ledger (floor ${floorUsd.toFixed(2)} USD)`,
+    );
+  }
+  requireAboveFloor(outlooks);
   const outcome = await runSchedule(
     items,
     pacer,

@@ -4,6 +4,7 @@ import { transcriberCandidates, type TranscriberCandidate } from "./harness/cand
 import { buildEvalBundle, type EvalFunction } from "./harness/eval-lambda.ts";
 import {
   buildClip,
+  isExtended,
   languageModes,
   languagesFor,
   loadTranscriptionFixtures,
@@ -33,8 +34,7 @@ import {
 } from "./harness/suite.ts";
 import {
   check,
-  summarize,
-  type CandidateSummary,
+  summarizeBuckets,
   type TranscriptionResult,
 } from "./harness/transcription-analysis.ts";
 import { transcriptionReport } from "./harness/transcription-report.ts";
@@ -72,41 +72,56 @@ function request(
 
 async function smoke(): Promise<void> {
   const evalFunction = await deployAndWarm(workspace);
-  const clip = await buildClip(
-    workspace.polly,
+  const spoken = [
     {
-      id: "smoke",
-      kind: "speech",
       language: "en",
-      dictionary: "developer",
       text: "This is a short smoke test of the evaluation harness.",
-      variants: [],
-      terms: [],
-      mixed: false,
-      endToEnd: false,
+      voice: "Joanna",
     },
-    "Joanna",
-  );
+    { language: "es", text: "Esta es una prueba corta del arnés de evaluación.", voice: "Lupe" },
+  ] as const;
+  const clips: Clip[] = [];
+  for (const { language, text, voice } of spoken) {
+    clips.push(
+      await buildClip(
+        workspace.polly,
+        {
+          id: `smoke-${language}`,
+          kind: "speech",
+          language,
+          dictionary: "developer",
+          text,
+          variants: [],
+          terms: [],
+          mixed: false,
+          endToEnd: false,
+        },
+        voice,
+      ),
+    );
+  }
   for (const candidate of transcriberCandidates) {
-    for (const mode of languageModes) {
-      const response = await evalFunction.invoke(request(candidate, clip, mode, "fresh"));
-      console.log(
-        JSON.stringify({
-          candidate: candidate.id,
-          mode,
-          ok: response.ok,
-          text: response.text,
-          language: response.language,
-          error: response.error,
-          calls: response.calls.map((call) => ({
-            requested: call.requested,
-            ms: Math.round(call.ms),
-            newConnections: call.newConnections,
-            headers: call.headers,
-          })),
-        }),
-      );
-    }
+    for (const clip of clips)
+      for (const mode of languageModes) {
+        const response = await evalFunction.invoke(request(candidate, clip, mode, "fresh"));
+        console.log(
+          JSON.stringify({
+            candidate: candidate.id,
+            clip: clip.id,
+            mode,
+            ok: response.ok,
+            text: response.text,
+            language: response.language,
+            error: response.error,
+            calls: response.calls.map((call) => ({
+              requested: call.requested,
+              ms: Math.round(call.ms),
+              newConnections: call.newConnections,
+              headers: call.headers,
+            })),
+          }),
+        );
+      }
   }
 }
 
@@ -240,11 +255,12 @@ function render(dir: ResultsDir, results: string, reportPath: string): void {
     fixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
   );
   const failures = readJsonl<FailureRecord>(dir.failures);
-  const summaries = new Map<string, CandidateSummary>(
-    transcriberCandidates.map((candidate) => [
-      candidate.id,
-      summarize(candidate.id, checked, failures, longIds),
-    ]),
+  const buckets = summarizeBuckets(
+    transcriberCandidates.map((candidate) => candidate.id),
+    checked,
+    failures,
+    longIds,
+    isExtended,
   );
   writeFileSync(
     reportPath,
@@ -271,7 +287,7 @@ function render(dir: ResultsDir, results: string, reportPath: string): void {
       },
       fixtures,
       transcriberCandidates,
-      summaries,
+      buckets,
       checked,
     ),
   );

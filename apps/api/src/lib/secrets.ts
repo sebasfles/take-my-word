@@ -14,21 +14,23 @@ export class MissingProviderKeysError extends Error {
   }
 }
 
-export function cachedProviderKeys(
+export function cachedSecretJson<T>(
   client: SecretsManagerClient,
   secretId: string,
-): () => Promise<ProviderKeys> {
-  let cached: Promise<ProviderKeys> | undefined;
+  schema: z.ZodType<T>,
+  missing: () => Error,
+): () => Promise<T> {
+  let cached: Promise<T> | undefined;
   const load = async () => {
     const { SecretString } = await client.send(new GetSecretValueCommand({ SecretId: secretId }));
     let json: unknown;
     try {
       json = JSON.parse(SecretString ?? "");
     } catch {
-      throw new MissingProviderKeysError();
+      throw missing();
     }
-    const parsed = providerKeysSchema.safeParse(json);
-    if (!parsed.success) throw new MissingProviderKeysError();
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) throw missing();
     return parsed.data;
   };
   return () => {
@@ -38,4 +40,16 @@ export function cachedProviderKeys(
     });
     return cached;
   };
+}
+
+export function cachedProviderKeys(
+  client: SecretsManagerClient,
+  secretId: string,
+): () => Promise<ProviderKeys> {
+  return cachedSecretJson(
+    client,
+    secretId,
+    providerKeysSchema,
+    () => new MissingProviderKeysError(),
+  );
 }
