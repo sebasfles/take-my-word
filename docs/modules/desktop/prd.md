@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0016_self_hosting
+updated: 2026-10-24
+source: 0020_fix_overlay_after_reboot
 ---
 
 # Desktop: product
@@ -28,6 +28,7 @@ Errors and empty states: Windows SmartScreen warns on the first install because 
 1. The user places the cursor where the text should go, in any app, the app's own windows included.
 2. To hold to talk, the user holds the shortcut, speaks and releases; to dictate hands-free, the user taps the shortcut twice, speaks, and taps it once to finish, or presses Esc to cancel.
 3. While listening the overlay shows only the moving waveform, with a small stop button when hands-free; while cleaning up it shows only a spinner.
+   It shows on every dictation however the app was started, centred above the taskbar of the screen with the pointer and drawn at that screen's scale.
 4. The clean text is pasted at the cursor and the overlay disappears.
 5. Whatever the user had in the clipboard before is back in the clipboard.
 

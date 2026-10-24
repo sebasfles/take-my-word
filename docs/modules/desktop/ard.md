@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0016_self_hosting
+updated: 2026-10-24
+source: 0020_fix_overlay_after_reboot
 ---
 
 # Desktop: architecture and debt
@@ -120,6 +120,7 @@ source: 0016_self_hosting
 - Debt created: none.
 - Revisit when: idle memory passes 100 MB.
 - Amended by 0014_desktop_ux: the gate also covers the hands-free state; the overlay is shown with `ShowWindow(SW_SHOWNOACTIVATE)` and hidden with `SW_HIDE` on its handle, because tao shows a window without activation only the first time, so every later `show()` took focus from the app being dictated into (a focus flicker since 0.2.0, and lost key-ups in the app's own window).
+- Amended by 0020_fix_overlay_after_reboot: the page confirms every shown state from its second animation frame and reports when it listens, and a state shown 1 s without a frame, a show of 400 ms or more that ended without one, a page not ready 20 s after creation or a failed WebView2 browser, renderer or GPU process recreates the overlay (queued on the main thread, at most 3 times without a frame), because the overlay started at sign-in on 0.3.0 showed and received every state but drew nothing for its whole life while a new window in the same WebView2 painted; the overlay sets its own rasterization scale before a show on a monitor of another scale, because WebView2's detection left the content at the old scale after a move while hidden; and the frame is refreshed once after creation, because the raw `ShowWindow` never ran tao's refresh and a start by hand showed a title bar around the pill.
 - Source: 0002_desktop_shell
 
 ## 2026-10-21: Recordings capped at two minutes
@@ -447,3 +448,20 @@ source: 0016_self_hosting
 - Revisit when: the updater key rotates.
 - Source: 0016_self_hosting
 
+## 2026-10-24: Overlay placement still waits on the main thread inside the hold's gate
+
+- Decision: keep `place_above_taskbar` and the show on the session thread inside the gate lock of `begin_recording`, as before this task.
+- Alternatives rejected: moving placement and show to the main thread in this task, which changes the warm overlay's first-frame path the task had to keep.
+- Reason: the fix stayed inside the overlay's lifecycle; the window getters (`cursor_position`, the monitor lookup) already waited on the main thread.
+- Debt created: a hold waits on the main thread while the gate lock is held, and a recreation queued there can now lengthen that wait, against "The tray paints its state on the main thread from live state".
+- Revisit when: a hold's first frame shows a delay after a recreation, or the gate lock appears in a hang.
+- Source: 0020_fix_overlay_after_reboot
+
+## 2026-10-24: The single-instance plugin can start a second full instance
+
+- Decision: keep `tauri-plugin-single-instance` 2.5.4 as is; the overlay smoke stops each instance's whole tree, waits before the next start and fails when a handoff leaves two instances.
+- Alternatives rejected: patching or replacing the plugin in this task.
+- Reason: the plugin carries on as a full instance, with no window to receive later launches, when its mutex exists but its window does not (a start while the previous instance is still dying, or after that window is closed); normal starts and exits never meet it.
+- Debt created: in that state every later launch becomes another instance with its own tray, hook and overlay.
+- Revisit when: a user sees two tray icons, or a second launch fails to bring the main window to the front.
+- Source: 0020_fix_overlay_after_reboot

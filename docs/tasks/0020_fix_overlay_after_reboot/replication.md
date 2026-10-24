@@ -49,3 +49,10 @@ Equivalent starts on `develop`:
   pid 21460 is frameless (client 600x120), as is a dev overlay after a forced frame recalculation, which still paints.
 
 ## om-reviewer verification
+
+2026-10-24, om-reviewer, round 4 (code at dd512b2, debug build at b6f444b with the same app code).
+The steps as written need a Windows restart, which the crew cannot do; per Context & decisions the fallback applies.
+- Cause: pid 21460 showed its overlay and its page received every state, yet painted no frame (see om-developer confirmation); no equivalent start reproduced it on `develop`.
+- Fix: `overlay-smoke.sh --starts hand,autostart --takes 5 --no-frames --displays` passes 17 of 17 on the fixed build. The overlay paints in every hold and hands-free take after a start by hand and with `--autostart`, frameless, centred and at the monitor's scale after display and scale changes. A forced no-frames overlay is recreated and paints again within the hold.
+- The same smoke fails on the `develop` build (title bar, off-centre), and its scale check fails on the round 3 build.
+- Pending: the real sign-in path, closed by Sebastian's next restart with 0.3.1 installed; a log line "recreating the overlay" there would confirm the repair caught it.

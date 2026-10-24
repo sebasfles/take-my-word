@@ -99,6 +99,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-23 | Desktop animations run even for users who need reduced motion | A user asks for reduced motion in the desktop app |
 | desktop | 2026-10-23 | A main-window insert answered after 1 s leaves the text in the field and in the clipboard | A dictation shows up twice in the app's own window |
 | desktop | 2026-10-23 | An app newer than a self-hosted server can call a route that server lacks; discovery carries no API version | A release adds or changes a route the app depends on |
+| desktop | 2026-10-24 | A hold waits on the main thread inside the gate lock to place the overlay, now possibly behind a queued recreation | A hold's first frame shows a delay after a recreation, or the gate lock appears in a hang |
+| desktop | 2026-10-24 | The single-instance plugin can carry on as a second full instance when its mutex exists without its window | A user sees two tray icons, or a second launch does not bring the main window forward |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |
