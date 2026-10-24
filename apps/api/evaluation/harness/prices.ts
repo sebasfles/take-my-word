@@ -355,11 +355,19 @@ export interface PaidPlan {
   since: string;
   plan: string;
   monthlySpendLimitUsd: number;
+  creditUsd: number;
 }
 
 export type PaidPlans = Readonly<Partial<Record<Provider, PaidPlan>>>;
 
-export const paidPlans: PaidPlans = {};
+export const paidPlans: PaidPlans = {
+  groq: {
+    since: "2026-10-24T18:25:00.000Z",
+    plan: "paid Developer tier",
+    monthlySpendLimitUsd: 5,
+    creditUsd: 10,
+  },
+};
 
 export function freePlanAt(
   facts: ModelFacts,
@@ -388,6 +396,6 @@ export function planNotes(
     const spent = ledger
       .filter((entry) => entry.key.startsWith(`${provider}:`) && entry.at >= since)
       .reduce((total, entry) => total + (entry.usd ?? 0), 0);
-    return `${providerNames[provider as Provider]} moved from its free plan to its ${paid.plan} on ${paid.since}; its calls from then on are charged at list price and count in the run cap; this task's ${providerNames[provider as Provider]} spend since then is ${spent.toFixed(3)} USD of the ${paid.monthlySpendLimitUsd.toFixed(2)} USD monthly spend limit, which the account shares with production`;
+    return `${providerNames[provider as Provider]} moved from its free plan to its ${paid.plan} at ${paid.since}, with ${paid.creditUsd.toFixed(2)} USD of credit and a ${paid.monthlySpendLimitUsd.toFixed(2)} USD monthly spend limit that the account shares with production; its calls from then on are charged at list price and count in the run cap, and pace only on its rate-limit headers; this task's ${providerNames[provider as Provider]} spend since then is ${spent.toFixed(3)} USD`;
   });
 }

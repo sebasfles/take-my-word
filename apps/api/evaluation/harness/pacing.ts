@@ -20,6 +20,7 @@ export interface PacingKey {
   plan?: FreePlanLimits;
   complimentary?: { group: string; tokensPerDay: number };
   prepaid?: PrepaidBalance;
+  paid?: true;
 }
 
 interface Window {
@@ -233,7 +234,7 @@ export class Pacer {
   }
 
   observe(key: string, headers: Readonly<Record<string, string>>, now: number): void {
-    const { provider, plan } = this.config(key);
+    const { provider, plan, paid } = this.config(key);
     const dailyRequestsKept =
       plan?.audioSecondsPerDay !== undefined && this.overrides.whisperDailyKept !== undefined
         ? this.overrides.whisperDailyKept
@@ -259,7 +260,7 @@ export class Pacer {
         }
         continue;
       }
-      if (remaining >= limit * this.share) continue;
+      if (paid === true ? remaining > 0 : remaining >= limit * this.share) continue;
       block(now + (parseResetMs(headers[`x-ratelimit-reset-${budget}`]) ?? minuteMs));
     }
   }

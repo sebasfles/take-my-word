@@ -6,7 +6,7 @@ import {
   type CleanupSummary,
 } from "./cleanup-analysis.ts";
 import type { CleanupFixtures } from "./cleanup-fixtures.ts";
-import { extendedBucket } from "./fixtures.ts";
+import { extendedBucket, isExtended } from "./fixtures.ts";
 import { modelFacts, notServed, pricesCheckedFor } from "./prices.ts";
 import type { FailureRecord } from "./suite.ts";
 import { isProviderFailure, itemKey, pct, type LatencyStats } from "./transcription-analysis.ts";
@@ -149,6 +149,32 @@ export function cleanupReport(
 
   push(`## Quality on the ${extendedBucket} samples`, "");
   push(...qualityRows(candidates, buckets.extended), "");
+  push(
+    `New words on the ${extendedBucket} samples, the words outside the raw, the expected texts and the allowed words, with how many outputs had each:`,
+    "",
+  );
+  for (const candidate of candidates) {
+    const long = checked.filter(
+      (entry) =>
+        entry.result.candidate === candidate.id &&
+        entry.result.ok &&
+        entry.item.chain !== undefined &&
+        isExtended(entry.item.chain.caseId),
+    );
+    const counts = new Map<string, number>();
+    for (const entry of long) {
+      for (const word of entry.newWords) counts.set(word, (counts.get(word) ?? 0) + 1);
+    }
+    const withNew = long.filter((entry) => entry.newWords.length > 0).length;
+    const words = [...counts]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([word, count]) => `${word} (${String(count)})`)
+      .join(", ");
+    push(
+      `- ${candidate.id}: ${String(withNew)} of ${String(long.length)} outputs${words === "" ? "" : `; ${words}`}`,
+    );
+  }
+  push("");
 
   push("## Latency inside us-east-1 and cost", "");
   push(

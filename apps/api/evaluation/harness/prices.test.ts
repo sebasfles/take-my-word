@@ -35,7 +35,7 @@ describe("transcription prices", () => {
   it("charges nothing on a free plan while keeping the list price", () => {
     const list = tokenCostUsd(modelFacts("openai/gpt-oss-20b"), 1_000_000, 0);
     expect(list).toBeCloseTo(0.075, 10);
-    expect(chargedUsd(modelFacts("openai/gpt-oss-20b"), list)).toBe(0);
+    expect(chargedUsd(modelFacts("openai/gpt-oss-20b"), list, Date.now(), {})).toBe(0);
     expect(chargedUsd(modelFacts("gpt-6-luna"), 0.5)).toBe(0.5);
   });
 
@@ -62,7 +62,12 @@ describe("pricesCheckedFor", () => {
 
 describe("a provider's move to a paid plan", () => {
   const paid = {
-    groq: { since: "2026-10-25T00:00:00.000Z", plan: "Developer tier", monthlySpendLimitUsd: 5 },
+    groq: {
+      since: "2026-10-25T00:00:00.000Z",
+      plan: "Developer tier",
+      monthlySpendLimitUsd: 5,
+      creditUsd: 10,
+    },
   };
   const before = Date.parse("2026-10-24T23:59:59.000Z");
   const after = Date.parse("2026-10-25T00:00:01.000Z");
@@ -73,7 +78,7 @@ describe("a provider's move to a paid plan", () => {
     expect(chargedUsd(turbo, 0.01, after, paid)).toBe(0.01);
     expect(freePlanAt(turbo, after, paid)).toBeUndefined();
     expect(freePlanAt(turbo, before, paid)).toBe(turbo.freePlan);
-    expect(chargedUsd(turbo, 0.01, after)).toBe(0);
+    expect(chargedUsd(turbo, 0.01, before, {})).toBe(0);
   });
 
   it("states the task's spend since the move against the shared monthly limit", () => {
@@ -84,7 +89,7 @@ describe("a provider's move to a paid plan", () => {
       { key: "openai:gpt-transcribe", at: after, usd: 1 },
     ];
     expect(planNotes(ledger, paid)).toEqual([
-      "Groq moved from its free plan to its Developer tier on 2026-10-25T00:00:00.000Z; its calls from then on are charged at list price and count in the run cap; this task's Groq spend since then is 0.750 USD of the 5.00 USD monthly spend limit, which the account shares with production",
+      "Groq moved from its free plan to its Developer tier at 2026-10-25T00:00:00.000Z, with 10.00 USD of credit and a 5.00 USD monthly spend limit that the account shares with production; its calls from then on are charged at list price and count in the run cap, and pace only on its rate-limit headers; this task's Groq spend since then is 0.750 USD",
     ]);
   });
 });

@@ -55,6 +55,13 @@ describe("wordErrors", () => {
         .longestInsertionRun,
     ).toBe(5);
     expect(wordErrors("Merge it today.", "Merge it now today.").longestInsertionRun).toBe(1);
+    expect(
+      wordErrors("Merge it today.", "Merge it today. Thanks for watching the video.")
+        .longestInsertion,
+    ).toEqual(["thanks", "for", "watching", "the", "video"]);
+    expect(
+      wordErrors("y dejar claro quién", "y dejarlo en la vida claro quién").longestInsertion,
+    ).toEqual(["dejarlo", "en", "la"]);
   });
 
   it("takes the best of the expected text and its allowed variants", () => {
