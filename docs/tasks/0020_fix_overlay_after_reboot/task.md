@@ -174,3 +174,12 @@ Decisions the plan did not record:
 - The overlay's size is set on every show from the target scale, not left to `WM_DPICHANGED`.
 
 Deferred: none new; round 1's item on window getters inside the gate lock goes to the ARD as debt in `document-task`.
+
+### Round 3
+
+Did:
+- The `--displays` primary take moves the cursor to the primary display's centre and restores `cursor_home` only after it, as the cleanup already did.
+- Any start that opens the sign-in window now signs in through it; before, only a start by hand did, so an `--autostart`-only run after a sign-out took no dictation (`smoke-0462390`, invalid: 4 FAIL with the sign-in window in front).
+
+Evidence (workspace `evidence/probe`):
+- `smoke-73011ba`: the debug build of the app at b8f6b5c (no app code changed since), `--starts autostart --takes 1 --displays`: 5 of 5 pass, exit 0; the primary take lands at 660,870, 600x120 at 125 %, after the takes on the secondary display at 100 % and 125 %.

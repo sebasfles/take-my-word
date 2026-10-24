@@ -15,9 +15,9 @@ sit centred above the taskbar of the monitor it shows on and leave the focus on 
 --no-frames (debug builds only) makes the overlay paint nothing before one extra hold, which must paint again within
 that hold once the overlay is recreated.
 --displays adds, after the last start's takes, a hold on the secondary display (the cursor moved there), one after
-raising that display's scale a step, and one back on the primary display; the scale and cursor are always restored.
+raising that display's scale a step, and one on the primary display (the cursor moved there); the scale and cursor are always restored.
 Exits nonzero when any check fails.
---sign-in names a file with CREW_E2E_B_USERNAME and CREW_E2E_B_PASSWORD; the run signs in through the main window
+--sign-in names a file with CREW_E2E_B_USERNAME and CREW_E2E_B_PASSWORD; any start that asks for it signs in through the main window
 and signs out at the end. Needs nobody at the keyboard and no other dev instance running.
 EOF
   exit 2
@@ -254,13 +254,17 @@ for start in "${paths[@]}"; do
   if [[ "$start" == hand ]]; then
     window="$(main_window)"
     [[ "$window" != 0 ]] || fail "a start by hand opened no main window"
-    if [[ -z "${signed_in:-}" ]] && psw tree "$window" | grep -qE "Edit '(Usuario|Username)'|Button '(Empezar|Get started)'"; then
+  else
+    window="$(psw find-process "$app_pid")"
+  fi
+  if [[ "$window" != 0 ]]; then
+    if psw tree "$window" | grep -qE "Edit '(Usuario|Username)'|Button '(Empezar|Get started)'"; then
       sign_in "$window"
     fi
-    signed_in=1
     act close-window "$window" >/dev/null
     sleep 2
   fi
+  signed_in=1
   frame="$(psw overlay-frame "$app_pid")"
   log "$start: overlay after start $frame"
   printf '%s\t%s\t%s\t%s\t%s\n' "$start" start frame "$([[ "$frame" == frameless* && "$frame" == *noactivate=True* ]] && echo PASS || echo FAIL)" "$frame" >> "$out/results.tsv"
@@ -293,9 +297,12 @@ for start in "${paths[@]}"; do
     log "displays: $display scale restored to $(act set-scale "$display" "$scale")%"
     scaled_display=""
     sleep 3
+    read -r _ _ primary_bounds _ <<<"$(psw displays | grep ' primary ' | head -1)"
+    IFS=, read -r px py pw ph <<<"$primary_bounds"
+    act move-cursor "$((px + pw / 2))" "$((py + ph / 2))" >/dev/null
+    take "$start" primary hold
     act move-cursor "${cursor_home%,*}" "${cursor_home#*,}" >/dev/null
     cursor_home=""
-    take "$start" primary hold
   fi
   stop_app
 done
