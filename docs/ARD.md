@@ -72,6 +72,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | dictation | 2026-10-21 | With several dictation languages, a dictation detected as neither costs a second transcription | Re-transcriptions show up in cost or latency |
 | dictation | 2026-10-23 | The user's context is collected but unused | The per-field vocabulary task lands |
 | dictation | 2026-10-24 | Groq's 20 transcriptions a minute are shared by every user and dev; concurrent use can fail prd dictations with 429 | The transcriber switch task, or a transcriber 429 in prd logs |
+| dictation | 2026-10-24 | Round 1's evaluation reports re-render only from their recorded commit | A round needs an earlier round's candidates again |
+| dictation | 2026-10-24 | prd's turbo dictations are billed on Groq's paid tier and run against a daily allowance the evaluation cannot explain | The transcriber switch task, or Groq's console shows the paid-tier limits |
 | dictionary | 2026-10-21 | Folding merges ñ and umlauts with their base letter; such terms cannot coexist | A user needs two terms that differ only by ñ or an umlaut |
 | dictionary | 2026-10-21 | The byte budget leaves part of Whisper's 224 prompt tokens unused | Users keep more top terms than fit and transcription misses them |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |

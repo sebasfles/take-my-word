@@ -40,4 +40,18 @@ describe("cachedProviderKeys", () => {
     await expect(load()).rejects.toThrow("throttled");
     expect((await load()).GROQ_API_KEY).toBe("g");
   });
+
+  it("keeps only production's keys when the secret holds evaluation keys too", async () => {
+    const all = JSON.stringify({
+      GROQ_API_KEY: "g",
+      OPENAI_API_KEY: "o",
+      TOGETHER_API_KEY: "t",
+      CEREBRAS_API_KEY: "c",
+    });
+    const fake = client([() => Promise.resolve({ SecretString: all })]);
+    expect(await cachedProviderKeys(fake.client, "s")()).toEqual({
+      GROQ_API_KEY: "g",
+      OPENAI_API_KEY: "o",
+    });
+  });
 });

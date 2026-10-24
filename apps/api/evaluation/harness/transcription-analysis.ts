@@ -5,9 +5,9 @@ import type { TranscriptionCase } from "./fixtures.ts";
 import type { LanguageMode } from "./fixtures.ts";
 import {
   bestWordErrors,
-  dominantLanguage,
   hallucinatedPhrases,
   inventedRunThreshold,
+  languageIssue,
   mean,
   missedTerms,
   percentile,
@@ -40,7 +40,14 @@ export interface TranscriptionResult {
 export interface AttemptFailure {
   id: string;
   status?: number;
+  message?: string;
 }
+
+export const isProviderFailure = (failure: AttemptFailure): boolean =>
+  failure.message === undefined || /^[a-z-]+:\S+ /.test(failure.message);
+
+export const caseIdOf = (itemId: string): string =>
+  (itemId.split("|")[1] ?? "").split("/")[0] ?? "";
 
 export function itemKey(id: string): { candidate: string; mode: LanguageMode; run: number } {
   const [candidate = "", , mode = "one", run = "0"] = id.split("|");
@@ -92,17 +99,19 @@ export function check(result: TranscriptionResult, item: TranscriptionCase): Che
   if (pasted) {
     if (counted.longestInsertionRun >= inventedRunThreshold) {
       flags.push("invented content");
-      detail.push(`${String(counted.longestInsertionRun)} inserted words in a row`);
+      detail.push(
+        `${String(counted.longestInsertionRun)} inserted words in a row: "${counted.longestInsertion.join(" ")}"`,
+      );
     }
     const phrases = hallucinatedPhrases(text, references);
     if (phrases.length > 0) {
       flags.push("hallucination");
       detail.push(`known hallucination: ${phrases.join(", ")}`);
     }
-    const dominant = dominantLanguage(text);
-    if (dominant !== undefined && dominant !== item.language) {
+    const issue = languageIssue(text, item.language);
+    if (issue !== undefined) {
       flags.push("wrong language");
-      detail.push(`reads as ${dominant}`);
+      detail.push(issue);
     }
   }
   if (result.ok && !pasted) detail.push("dropped by the silence guard");
@@ -179,6 +188,7 @@ export function summarize(
 ): CandidateSummary {
   const mine = checked.filter((entry) => entry.result.candidate === candidate);
   const myFailures = failures
+    .filter(isProviderFailure)
     .map((failure) => ({ ...failure, ...itemKey(failure.id) }))
     .filter((failure) => failure.candidate === candidate);
   const flags: Record<GateFlag, number> = {
@@ -302,12 +312,6 @@ export function relativeGate(
         `${mode}: failed calls ${pct(mine.failureRate)} above the baseline's ${pct(base.failureRate)} plus its spread ${pct(spread(base.failureRatePerRun))}`,
       );
     }
-    const termAllowance = base.termErrorRate + spread(base.termErrorsPerRun);
-    if (mine.termErrorRate > termAllowance) {
-      reasons.push(
-        `${mode}: domain-term errors ${pct(mine.termErrorRate)} above the baseline's ${pct(base.termErrorRate)} plus its spread ${pct(spread(base.termErrorsPerRun))}`,
-      );
-    }
   }
   return { passed: reasons.length === 0, reasons };
 }
@@ -316,3 +320,71 @@ export const hardGatePassed = (summary: CandidateSummary): boolean =>
   Object.values(summary.flags).every((count) => count === 0);
 
 export const pct = (value: number): string => `${(value * 100).toFixed(1)}%`;
+
+export interface TranscriptionBuckets {
+  all: ReadonlyMap<string, CandidateSummary>;
+  short: ReadonlyMap<string, CandidateSummary>;
+  extended: ReadonlyMap<string, CandidateSummary>;
+}
+
+export function summarizeBuckets(
+  candidates: readonly string[],
+  checked: readonly Checked[],
+  failures: readonly (AttemptFailure & { id: string })[],
+  longCaseIds: ReadonlySet<string>,
+  isExtended: (caseId: string) => boolean,
+): TranscriptionBuckets {
+  const bucket = (keep: (caseId: string) => boolean) =>
+    new Map(
+      candidates.map((candidate) => [
+        candidate,
+        summarize(
+          candidate,
+          checked.filter((entry) => keep(entry.item.id)),
+          failures.filter((failure) => keep(caseIdOf(failure.id))),
+          longCaseIds,
+        ),
+      ]),
+    );
+  return {
+    all: bucket(() => true),
+    short: bucket((caseId) => !isExtended(caseId)),
+    extended: bucket(isExtended),
+  };
+}
+
+export interface TranscriptionGate {
+  hard: boolean;
+  relative: RelativeGate;
+}
+
+export function transcriptionGate(
+  candidate: string,
+  baseline: string,
+  buckets: TranscriptionBuckets,
+  extendedName: string,
+): TranscriptionGate | undefined {
+  const all = buckets.all.get(candidate);
+  const base = buckets.all.get(baseline);
+  if (
+    all === undefined ||
+    base === undefined ||
+    all.modes.one.results + all.modes.both.results === 0
+  )
+    return undefined;
+  const hard = hardGatePassed(all);
+  if (candidate === baseline) return { hard, relative: { passed: true, reasons: [] } };
+  const reasons = [...relativeGate(all, base).reasons];
+  const extended = buckets.extended.get(candidate);
+  const extendedBase = buckets.extended.get(baseline);
+  if (
+    extended !== undefined &&
+    extendedBase !== undefined &&
+    extended.modes.one.results + extended.modes.both.results > 0
+  ) {
+    reasons.push(
+      ...relativeGate(extended, extendedBase).reasons.map((reason) => `${extendedName}, ${reason}`),
+    );
+  }
+  return { hard, relative: { passed: reasons.length === 0, reasons } };
+}

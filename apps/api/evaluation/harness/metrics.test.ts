@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bestWordErrors,
   dominantLanguage,
+  languageIssue,
   hallucinatedPhrases,
   missedTerms,
   percentile,
@@ -54,6 +55,13 @@ describe("wordErrors", () => {
         .longestInsertionRun,
     ).toBe(5);
     expect(wordErrors("Merge it today.", "Merge it now today.").longestInsertionRun).toBe(1);
+    expect(
+      wordErrors("Merge it today.", "Merge it today. Thanks for watching the video.")
+        .longestInsertion,
+    ).toEqual(["thanks", "for", "watching", "the", "video"]);
+    expect(
+      wordErrors("y dejar claro quién", "y dejarlo en la vida claro quién").longestInsertion,
+    ).toEqual(["dejarlo", "en", "la"]);
   });
 
   it("takes the best of the expected text and its allowed variants", () => {
@@ -89,6 +97,40 @@ describe("dominantLanguage", () => {
 
   it("gives no verdict on too few function words", () => {
     expect(dominantLanguage("Kubectl pods.")).toBeUndefined();
+  });
+});
+
+describe("languageIssue", () => {
+  const cyrillic = "Завтра у меня встреча с командой маркетинга.";
+  const portuguese = "Eu não sei se você vai conseguir fazer isso hoje com a equipe.";
+
+  it("fails text in a non-Latin script and Latin text in a third language, which dominantLanguage misses", () => {
+    expect(dominantLanguage(cyrillic)).toBeUndefined();
+    expect(dominantLanguage(portuguese)).toBeUndefined();
+    expect(languageIssue(cyrillic, "es")).toBe("non-Latin script (Завтр)");
+    expect(languageIssue("Deploy 明天 the Lambda.", "en")).toMatch(/^non-Latin script/);
+    expect(languageIssue(portuguese, "es")).toBe("reads as neither es nor en");
+    expect(languageIssue("Domani ho una riunione con il team, ma non è ancora pronto.", "es")).toBe(
+      "reads as neither es nor en",
+    );
+    expect(languageIssue("Je ne sais pas si nous avons le temps pour ça.", "en")).toBe(
+      "reads as neither es nor en",
+    );
+  });
+
+  it("still reports the other of es and en, and passes es, en, mixed and term-only text", () => {
+    expect(languageIssue("Tomorrow I have a meeting with the marketing team.", "es")).toBe(
+      "reads as en",
+    );
+    for (const [text, language] of [
+      ["Mañana tengo un meeting con el team de marketing.", "es"],
+      ["No sé si le dije a Ana que el deploy ya está.", "es"],
+      ["Tomorrow I have a meeting with the marketing team.", "en"],
+      ["Kubectl pods.", "en"],
+      ["Árbol, café y pingüino.", "es"],
+    ] as const) {
+      expect(languageIssue(text, language)).toBeUndefined();
+    }
   });
 });
 

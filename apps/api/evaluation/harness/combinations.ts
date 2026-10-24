@@ -1,8 +1,12 @@
 import {
   complimentaryDailyTokens,
+  freePlanAt,
   modelFacts,
+  paidPlans,
+  prepaidBalances,
   transcriptionCallUsd,
   type ModelFacts,
+  type PaidPlans,
 } from "./prices.ts";
 
 export const dictationSeconds = 15;
@@ -47,9 +51,10 @@ function freeCoverage(
   facts: ModelFacts,
   stage: StageUse,
   perDay: number,
+  plans: PaidPlans,
 ): { covered: boolean; why: string } {
   const requests = perDay * stage.callsPerDictation;
-  const plan = facts.freePlan;
+  const plan = freePlanAt(facts, Date.now(), plans);
   if (plan !== undefined) {
     const checks: [string, number, number | undefined][] = [
       ["requests per day", requests, plan.requestsPerDay],
@@ -91,12 +96,36 @@ function freeCoverage(
           why: `complimentary tokens exceeded: ${String(Math.round(tokens))} of ${String(group.tokens)} per day`,
         };
   }
+  const paid = plans[facts.provider];
+  if (paid !== undefined) {
+    return { covered: false, why: `${paid.plan} since ${paid.since}, billed at list price` };
+  }
+  if (prepaidBalances[facts.provider] !== undefined) {
+    return { covered: false, why: "prepaid balance, billed at list price" };
+  }
   return { covered: false, why: "no free allowance" };
 }
 
-export function stageMonth(stage: StageUse, scenario: Scenario): StageMonth {
+export function stageMonth(
+  stage: StageUse,
+  scenario: Scenario,
+  plans: PaidPlans = paidPlans,
+): StageMonth {
   const facts = modelFacts(stage.model);
   const dictations = dictationsPerMonth(scenario);
-  const coverage = freeCoverage(facts, stage, dictations / daysPerMonth);
+  const coverage = freeCoverage(facts, stage, dictations / daysPerMonth, plans);
   return { listUsd: stage.usdPerDictation * dictations, ...coverage };
+}
+
+export interface RankedRow {
+  transcriber: string;
+  refiner: string;
+  passed: boolean;
+  releaseP50: number | undefined;
+}
+
+export function rankPassing<T extends RankedRow>(rows: readonly T[]): T[] {
+  return rows
+    .filter((row) => row.passed && row.releaseP50 !== undefined)
+    .sort((a, b) => (a.releaseP50 ?? 0) - (b.releaseP50 ?? 0));
 }

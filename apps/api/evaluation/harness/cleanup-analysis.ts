@@ -1,15 +1,17 @@
 import type { Connection, EvalResponse, ProviderCall } from "../../src/eval/contract.ts";
 import type { CleanupCase } from "./cleanup-fixtures.ts";
 import {
-  dominantLanguage,
   hasTerm,
   inventedRunThreshold,
+  languageIssue,
   mean,
   percentile,
   recognitionTokens,
   spread,
 } from "./metrics.ts";
 import {
+  caseIdOf,
+  isProviderFailure,
   itemKey,
   latency,
   pct,
@@ -106,8 +108,8 @@ export function checkCleanup(result: CleanupResult, item: CleanupCase): CleanupC
   const newWords = [...new Set(tokens.filter((_, index) => isNew[index]))];
   const flags: CleanupFlag[] = [];
   if (longestNewRun >= inventedRunThreshold) flags.push("invented content");
-  const dominant = dominantLanguage(text);
-  if (dominant !== undefined && dominant !== item.language) flags.push("wrong language");
+  const issue = languageIssue(text, item.language);
+  if (issue !== undefined) flags.push("wrong language");
   const missingRequired = item.required.filter((word) => !hasTerm(text, word));
   const presentForbidden = item.forbidden.filter((word) => hasTerm(text, word));
   return {
@@ -143,11 +145,11 @@ export interface CleanupSummary {
   newWordsPerRun: number[];
   meaningChangeRate: number;
   meaningChangesPerRun: number[];
-  fillerRemovalRate: number;
+  fillerRemovalRate: number | undefined;
   punctuationRate: number;
   termErrorRate: number;
   termErrorsPerRun: number[];
-  styleRate: number;
+  styleRate: number | undefined;
   attempts: number;
   failedAttempts: number;
   rateLimited: number;
@@ -177,6 +179,7 @@ export function summarizeCleanup(
   const mine = checked.filter((entry) => entry.result.candidate === candidate);
   const ok = mine.filter((entry) => entry.result.ok);
   const myFailures = failures
+    .filter(isProviderFailure)
     .map((failure) => ({ ...failure, ...itemKey(failure.id) }))
     .filter((failure) => failure.candidate === candidate);
   const failed = myFailures.filter((failure) => failure.status !== 429);
@@ -219,17 +222,20 @@ export function summarizeCleanup(
     newWordsPerRun: runs.map((run) => newWordRateOf(inRun(run))),
     meaningChangeRate: changeRateOf(ok),
     meaningChangesPerRun: runs.map((run) => changeRateOf(inRun(run))),
-    fillerRemovalRate: rate(
-      fillers - ok.reduce((sum, entry) => sum + entry.fillersLeft.length, 0),
-      fillers,
-    ),
+    fillerRemovalRate:
+      fillers === 0
+        ? undefined
+        : rate(fillers - ok.reduce((sum, entry) => sum + entry.fillersLeft.length, 0), fillers),
     punctuationRate: rate(
       ok.filter((entry) => entry.punctuationIssues.length === 0).length,
       ok.length,
     ),
     termErrorRate: termRateOf(ok),
     termErrorsPerRun: runs.map((run) => termRateOf(inRun(run))),
-    styleRate: rate(styled.filter((entry) => entry.styleIssues.length === 0).length, styled.length),
+    styleRate:
+      styled.length === 0
+        ? undefined
+        : rate(styled.filter((entry) => entry.styleIssues.length === 0).length, styled.length),
     attempts: ok.length + failed.length,
     failedAttempts: failed.length,
     rateLimited: myFailures.length - failed.length,
@@ -292,3 +298,109 @@ export function cleanupRelativeGate(
 
 export const cleanupHardGatePassed = (summary: CleanupSummary): boolean =>
   Object.values(summary.flags).every((count) => count === 0);
+
+export interface CleanupBuckets {
+  all: ReadonlyMap<string, CleanupSummary>;
+  round1: ReadonlyMap<string, CleanupSummary>;
+  extended: ReadonlyMap<string, CleanupSummary>;
+  chainedBy: (transcriber: string) => ReadonlyMap<string, CleanupSummary>;
+}
+
+export function summarizeCleanupBuckets(
+  candidates: readonly string[],
+  checked: readonly CleanupChecked[],
+  failures: readonly (AttemptFailure & { id: string })[],
+  isExtended: (caseId: string) => boolean,
+): CleanupBuckets {
+  const caseById = new Map(checked.map((entry) => [entry.item.id, entry.item]));
+  const bucket = (keep: (item: CleanupCase) => boolean) =>
+    new Map(
+      candidates.map((candidate) => [
+        candidate,
+        summarizeCleanup(
+          candidate,
+          checked.filter((entry) => keep(entry.item)),
+          failures.filter((failure) => {
+            const item = caseById.get(caseIdOf(failure.id));
+            return item !== undefined && keep(item);
+          }),
+        ),
+      ]),
+    );
+  const chained = new Map<string, ReadonlyMap<string, CleanupSummary>>();
+  return {
+    all: bucket(() => true),
+    round1: bucket((item) => item.chain === undefined),
+    extended: bucket((item) => item.chain !== undefined && isExtended(item.chain.caseId)),
+    chainedBy: (transcriber) => {
+      const found =
+        chained.get(transcriber) ??
+        bucket((item) => item.chain?.transcribers.includes(transcriber) ?? false);
+      chained.set(transcriber, found);
+      return found;
+    },
+  };
+}
+
+export interface CleanupGate {
+  hard: boolean;
+  relative: { passed: boolean; reasons: string[] };
+}
+
+const hasResults = (summary: CleanupSummary | undefined): summary is CleanupSummary =>
+  summary !== undefined && summary.results > 0;
+
+export function cleanupGate(
+  candidate: string,
+  baseline: string,
+  buckets: CleanupBuckets,
+  extendedName: string,
+): CleanupGate | undefined {
+  const all = buckets.all.get(candidate);
+  if (!hasResults(all)) return undefined;
+  const hard = cleanupHardGatePassed(all);
+  if (candidate === baseline) return { hard, relative: { passed: true, reasons: [] } };
+  const reasons: string[] = [];
+  const round1 = buckets.round1.get(candidate);
+  const round1Base = buckets.round1.get(baseline);
+  if (hasResults(round1) && hasResults(round1Base)) {
+    reasons.push(...cleanupRelativeGate(round1, round1Base).reasons);
+  }
+  const extended = buckets.extended.get(candidate);
+  const extendedBase = buckets.extended.get(baseline);
+  if (hasResults(extended) && hasResults(extendedBase)) {
+    reasons.push(
+      ...cleanupRelativeGate(extended, extendedBase).reasons.map(
+        (reason) => `${extendedName}, ${reason}`,
+      ),
+    );
+  }
+  return { hard, relative: { passed: reasons.length === 0, reasons } };
+}
+
+export function combinationCleanupGate(
+  refiner: CleanupSummary,
+  baseline: CleanupSummary,
+): { passed: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  const compare = (name: string, mine: number, base: number, perRun: readonly number[]) => {
+    if (mine > base + spread(perRun)) {
+      reasons.push(
+        `${name} ${pct(mine)} on its transcriber's raws, above today's ${pct(base)} plus its spread ${pct(spread(perRun))}`,
+      );
+    }
+  };
+  compare(
+    "meaning changes",
+    refiner.meaningChangeRate,
+    baseline.meaningChangeRate,
+    baseline.meaningChangesPerRun,
+  );
+  compare(
+    "dictionary term errors",
+    refiner.termErrorRate,
+    baseline.termErrorRate,
+    baseline.termErrorsPerRun,
+  );
+  return { passed: reasons.length === 0, reasons };
+}

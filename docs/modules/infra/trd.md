@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-24
-source: 0017_eval_harness
+source: 0018_fast_providers_eval
 ---
 
 # Infra: technical
@@ -29,7 +29,7 @@ The official deployment runs `core`, `dev` and `prd` from Sebastian's machine an
 | Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream through an event source mapping filtered to inserts of `DICTATION#`, batch 10, retry 2, bisect, batch item failures (dictionary module). |
 | DynamoDB `<deployment>-{env}` | The single table, with TTL and a stream enabled. |
 | Cognito user pool | Configured by the auth module, created here. |
-| Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`; `<deployment>-{env}/web` holds the web's `COOKIE_KEY`; prd's recovery window is 7 days, 0 under `removal`. |
+| Secrets Manager blob | Provider keys in one secret: Groq and OpenAI, read by `dictate`, plus Together and Cerebras, read only by the dev eval Lambda; values are written outside Terraform, whose placeholder names the keys only for new environments; `<deployment>-{env}/web` holds the web's `COOKIE_KEY`; prd's recovery window is 7 days, 0 under `removal`. |
 | S3 debug bucket | Dev only, optional raw audio for debugging, one-day lifecycle. |
 | Lambda `eval` | Dev only, when `evalFunction` is on: the evaluation harness swaps its code from the checkout that runs it and invokes it with the deployment profile; no route, 1024 MB like `dictate`, 120 s, allowed only to read the providers secret; CI and the deploy role never touch it. |
 | Web hosting | Lambda `web` (OpenNext server, 512 MB, 30 s) behind an `AWS_IAM` Function URL, the private bucket `<deployment>-{env}-web-assets-{account}` for `/_next/static/*` and `/static/*`, and one CloudFront distribution with OAC to both, caching disabled for the server and a headers policy (HSTS, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`); its certificate comes from an `aws.us_east_1` provider alias, so any region works. |

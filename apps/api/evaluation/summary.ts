@@ -1,36 +1,54 @@
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
-import { refinerCandidates, transcriberCandidates } from "./harness/candidates.ts";
+import {
+  notRerun,
+  refinerCandidates,
+  transcriberCandidates,
+  type RefinerCandidate,
+  type TranscriberCandidate,
+} from "./harness/candidates.ts";
+import { clientOverhead } from "./harness/client-overhead.ts";
 import {
   checkCleanup,
-  cleanupHardGatePassed,
-  cleanupRelativeGate,
-  summarizeCleanup,
+  cleanupGate,
+  combinationCleanupGate,
+  summarizeCleanupBuckets,
   type CleanupResult,
-  type CleanupSummary,
 } from "./harness/cleanup-analysis.ts";
 import { loadCleanupFixtures } from "./harness/cleanup-fixtures.ts";
 import {
   dictationSeconds,
   dictationsPerMonth,
+  rankPassing,
   scenarios,
   stageMonth,
   transcriptionStage,
   type StageUse,
 } from "./harness/combinations.ts";
-import { loadTranscriptionFixtures, languageModes } from "./harness/fixtures.ts";
+import {
+  checkDictation,
+  combinationOf,
+  dictateLatency,
+  type DictateResult,
+} from "./harness/dictate-analysis.ts";
+import {
+  extendedBucket,
+  isExtended,
+  languageModes,
+  loadTranscriptionFixtures,
+  type LanguageMode,
+} from "./harness/fixtures.ts";
 import { percentile, sumDistribution } from "./harness/metrics.ts";
-import { modelFacts, pricesCheckedOn } from "./harness/prices.ts";
+import type { LedgerEntry } from "./harness/pacing.ts";
+import { modelFacts, planNotes, pricesCheckedFor } from "./harness/prices.ts";
 import { readJsonl } from "./harness/store.ts";
 import type { FailureRecord } from "./harness/suite.ts";
 import {
   check,
-  hardGatePassed,
   pct,
-  relativeGate,
-  summarize,
-  type CandidateSummary,
+  summarizeBuckets,
+  transcriptionGate,
   type TranscriptionResult,
 } from "./harness/transcription-analysis.ts";
 import { usdPerAudioSecond } from "./harness/transcription-report.ts";
@@ -40,6 +58,7 @@ const { values } = parseArgs({
   options: {
     transcription: { type: "string" },
     cleanup: { type: "string" },
+    dictate: { type: "string" },
     report: { type: "string" },
   },
 });
@@ -49,13 +68,14 @@ if (
   values.report === undefined
 ) {
   console.error(
-    "usage: pnpm eval:summary --transcription <dir> --cleanup <dir> --report <report.md>",
+    "usage: pnpm eval:summary --transcription <dir> --cleanup <dir> [--dictate <dir>] --report <report.md>",
   );
   process.exit(2);
 }
 
 const transcriptionDir = fromInvocation(values.transcription);
 const cleanupDir = fromInvocation(values.cleanup);
+const dictateDir = values.dictate === undefined ? undefined : fromInvocation(values.dictate);
 const reportPath = fromInvocation(values.report);
 const transcriptionFixtures = loadTranscriptionFixtures();
 const cleanupFixtures = loadCleanupFixtures(transcriptionFixtures);
@@ -68,17 +88,15 @@ const transcriptionChecked = readJsonl<TranscriptionResult>(
   if (item === undefined) throw new Error(`no case ${result.caseId}`);
   return check(result, item);
 });
-const transcriptionFailures = readJsonl<FailureRecord>(
-  join(transcriptionDir, "transcription.failures.jsonl"),
-);
 const longIds = new Set(
   transcriptionFixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
 );
-const transcriptionSummaries = new Map<string, CandidateSummary>(
-  transcriberCandidates.map((candidate) => [
-    candidate.id,
-    summarize(candidate.id, transcriptionChecked, transcriptionFailures, longIds),
-  ]),
+const transcription = summarizeBuckets(
+  transcriberCandidates.map((candidate) => candidate.id),
+  transcriptionChecked,
+  readJsonl<FailureRecord>(join(transcriptionDir, "transcription.failures.jsonl")),
+  longIds,
+  isExtended,
 );
 
 const cleanupCases = new Map(cleanupFixtures.cases.map((item) => [item.id, item]));
@@ -87,98 +105,208 @@ const cleanupChecked = readJsonl<CleanupResult>(join(cleanupDir, "cleanup.jsonl"
   if (item === undefined) throw new Error(`no case ${result.caseId}`);
   return checkCleanup(result, item);
 });
-const cleanupFailures = readJsonl<FailureRecord>(join(cleanupDir, "cleanup.failures.jsonl"));
-const cleanupSummaries = new Map<string, CleanupSummary>(
-  refinerCandidates.map((candidate) => [
-    candidate.id,
-    summarizeCleanup(candidate.id, cleanupChecked, cleanupFailures),
-  ]),
+const cleanup = summarizeCleanupBuckets(
+  refinerCandidates.map((candidate) => candidate.id),
+  cleanupChecked,
+  readJsonl<FailureRecord>(join(cleanupDir, "cleanup.failures.jsonl")),
+  isExtended,
 );
 
-const transcriptionBaseline = transcriptionSummaries.get(
-  transcriberCandidates.find((candidate) => candidate.baseline)?.id ?? "",
+const speechCases = new Map(
+  transcriptionFixtures.cases.flatMap((item) =>
+    item.kind === "speech" ? [[item.id, item] as const] : [],
+  ),
 );
-const cleanupBaseline = cleanupSummaries.get(
-  refinerCandidates.find((candidate) => candidate.baseline)?.id ?? "",
-);
-if (transcriptionBaseline === undefined || cleanupBaseline === undefined) {
-  throw new Error("both baselines need results");
+const dictations =
+  dictateDir === undefined
+    ? []
+    : readJsonl<DictateResult>(join(dictateDir, "dictate.jsonl")).map((result) => {
+        const item = speechCases.get(result.caseId);
+        if (item === undefined) throw new Error(`no case ${result.caseId}`);
+        return checkDictation(result, item);
+      });
+
+const transcriberBaseline = transcriberCandidates.find((candidate) => candidate.baseline);
+const refinerBaseline = refinerCandidates.find((candidate) => candidate.baseline);
+if (transcriberBaseline === undefined || refinerBaseline === undefined) {
+  throw new Error("both suites need a baseline");
+}
+const todayOnTurbo = cleanup.chainedBy(transcriberBaseline.id).get(refinerBaseline.id);
+if (todayOnTurbo === undefined || todayOnTurbo.results === 0) {
+  throw new Error("today's cleanup needs results on today's transcriber's chained raws");
 }
 
 const ms = (value: number | undefined) => (value === undefined ? "n/a" : String(Math.round(value)));
 const usd = (value: number) => (value < 0.01 ? value.toFixed(4) : value.toFixed(2));
-const combined = (first: number[], second: number[]) => {
-  const all = sumDistribution(first, second);
-  return `${ms(percentile(all, 50))} / ${ms(percentile(all, 95))}`;
-};
+const p50p95 = (samples: readonly number[]) =>
+  `${ms(percentile(samples, 50))} / ${ms(percentile(samples, 95))}`;
 
+interface Row {
+  transcriber: string;
+  refiner: string;
+  passed: boolean;
+  failures: string[];
+  wer: number;
+  termErrors: number | undefined;
+  meaningChanges: number | undefined;
+  releaseP50: number | undefined;
+  release: string;
+  inLambda: string;
+  source: string;
+  perDictation: number;
+  months: string[];
+}
+
+const notes = new Map<string, string>();
+
+function row(
+  transcriber: TranscriberCandidate,
+  refiner: RefinerCandidate,
+  mode: LanguageMode,
+): Row | undefined {
+  const t = transcription.all.get(transcriber.id);
+  const c = cleanup.all.get(refiner.id);
+  if (t === undefined || t.modes[mode].results === 0 || c === undefined || c.results === 0) {
+    return undefined;
+  }
+  const failures: string[] = [];
+  const tGate = transcriptionGate(
+    transcriber.id,
+    transcriberBaseline?.id ?? "",
+    transcription,
+    extendedBucket,
+  );
+  if (!tGate?.hard) failures.push("transcription hard gate");
+  if (!tGate?.relative.passed) failures.push("transcription relative gate");
+  const cGate = cleanupGate(refiner.id, refinerBaseline?.id ?? "", cleanup, extendedBucket);
+  if (!cGate?.hard) failures.push("cleanup hard gate");
+  if (!cGate?.relative.passed) failures.push("cleanup relative gate");
+  const chained = cleanup.chainedBy(transcriber.id).get(refiner.id);
+  const onOwnRaws = chained !== undefined && chained.results > 0 ? chained : undefined;
+  if (onOwnRaws === undefined) failures.push("no cleanup of this transcriber's raws");
+  else if (todayOnTurbo !== undefined && !combinationCleanupGate(onOwnRaws, todayOnTurbo).passed) {
+    failures.push("cleanup of its own raws");
+  }
+
+  const name = combinationOf(transcriber.id, refiner.id);
+  const measured = dictations.filter((entry) => entry.result.combination === name);
+  let releaseSamples: number[];
+  let inLambda = "n/a";
+  let source: string;
+  if (mode === "one" && measured.length > 0) {
+    const latency = dictateLatency(
+      measured.filter((entry) => !isExtended(entry.item.id)),
+      clientOverhead.samplesMs,
+    );
+    releaseSamples = sumDistribution(latency.inLambdaSamples, clientOverhead.samplesMs);
+    inLambda = p50p95(latency.inLambdaSamples);
+    source = "end to end in the Lambda";
+  } else {
+    const shortT = transcription.short.get(transcriber.id);
+    const stages = sumDistribution(
+      shortT?.modes[mode].samplesByConnection.fresh ?? [],
+      c.samplesByConnection.fresh,
+    );
+    releaseSamples = sumDistribution(stages, clientOverhead.samplesMs);
+    source = "suites' provider calls";
+  }
+
+  const tStage: StageUse = transcriptionStage(
+    transcriber.spec.model,
+    t.modes[mode].callsPerDictation,
+    usdPerAudioSecond(transcriber, transcriptionChecked),
+  );
+  const cStage: StageUse = {
+    model: refiner.spec.model,
+    callsPerDictation: 1,
+    usdPerDictation: c.listUsdPerCall,
+    tokensPerCall: (c.inputTokensP50 ?? 0) + (c.outputTokensP50 ?? 0),
+  };
+  const months = scenarios.map((scenario) => {
+    const stages = [stageMonth(tStage, scenario), stageMonth(cStage, scenario)];
+    stages.forEach((month, index) => {
+      notes.set(`${index === 0 ? transcriber.id : refiner.id}, ${scenario.name}`, month.why);
+    });
+    const list = stages.reduce((sum, stage) => sum + stage.listUsd, 0);
+    const charged = stages.reduce((sum, stage) => sum + (stage.covered ? 0 : stage.listUsd), 0);
+    return `${usd(list)} / ${usd(charged)} USD`;
+  });
+  return {
+    transcriber: transcriber.id,
+    refiner: refiner.id,
+    passed: failures.length === 0,
+    failures,
+    wer: t.modes[mode].wer,
+    termErrors: onOwnRaws?.termErrorRate,
+    meaningChanges: onOwnRaws?.meaningChangeRate,
+    releaseP50: percentile(releaseSamples, 50),
+    release: p50p95(releaseSamples),
+    inLambda,
+    source,
+    perDictation: tStage.usdPerDictation + cStage.usdPerDictation,
+    months,
+  };
+}
+
+const rate = (value: number | undefined) => (value === undefined ? "n/a" : pct(value));
 const lines: string[] = [];
 const push = (...more: string[]) => lines.push(...more);
 push("# Transcription and cleanup combinations", "");
 push(
-  `Generated ${new Date().toISOString()} from the transcription results in \`${fromRoot(transcriptionDir)}\` and the cleanup results in \`${fromRoot(cleanupDir)}\`; prices and plans as checked on ${pricesCheckedOn}.`,
-  `Gates: both stages pass their hard gate and their relative gate against today's models (see each suite's report).`,
-  "Latency is release to text inside us-east-1 for the provider calls only, in ms: the P50 / P95 of the sum over every pair of measured transcription and cleanup samples, so it assumes the two stages are independent and is never a sum of percentiles.",
-  `Cost per ${String(dictationSeconds)} s dictation at list price; a light month is ${String(dictationsPerMonth(scenarios[0]))} dictations (2 hours of audio), a heavy month ${String(dictationsPerMonth(scenarios[1]))} (1 hour a day); "charged" counts only stages whose free allowance would not cover that volume.`,
+  `Generated ${new Date().toISOString()} from the transcription results in \`${fromRoot(transcriptionDir)}\`, the cleanup results in \`${fromRoot(cleanupDir)}\`${dictateDir === undefined ? "" : ` and the end-to-end results in \`${fromRoot(dictateDir)}\``}; prices and plans as checked on ${pricesCheckedFor([...transcriberCandidates.map((c) => c.spec.model), ...refinerCandidates.map((c) => c.spec.model)])}.`,
+  `A combination passes when its transcriber passes suite 1's hard and relative gates (over every case and over the ${extendedBucket} samples alone), its cleanup passes suite 2's, and its cleanup of its own transcriber's raws has no more meaning changes or dictionary term errors than today's pair (\`${transcriberBaseline.id}\` raws cleaned by \`${refinerBaseline.id}\` as production calls it) plus that pair's run-to-run spread.`,
+  ...planNotes(readJsonl<LedgerEntry>(join(dirname(transcriptionDir), "ledger.jsonl"))).map(
+    (note) => `${note}.`,
+  ),
+  "WER is the transcriber's raw WER; term errors and meaning changes are measured after cleanup, on the transcriber's own raws.",
+  `Release to text, in ms, on the fresh connection a normal dictation gets: \`dictate()\`'s total inside the eval Lambda where the end-to-end run measured the combination (cases under 30 s), otherwise the provider calls of both suites, each plus the client-to-API overhead of round 1's dev run (${clientOverhead.run}, ${clientOverhead.measuredAt}: ${clientOverhead.meaning}); P50 / P95 come from the distribution of every sum, never from adding percentiles.`,
+  `Cost per ${String(dictationSeconds)} s dictation at list price; a light month is ${String(dictationsPerMonth(scenarios[0]))} dictations (2 hours of audio), a heavy month ${String(dictationsPerMonth(scenarios[1]))} (1 hour a day); "charged" counts only stages whose free allowance would not cover that volume. Together bills per started second of audio at its per-minute list price, an assumption of this harness.`,
   "",
 );
 
 for (const mode of languageModes) {
-  push(`## Dictation languages: ${mode === "one" ? "one" : "both (es, en)"}`, "");
-  push(
-    "| Transcriber | Cleanup | Gates | WER | Term errors | Meaning changes | Fresh P50 / P95 | Reused P50 / P95 | Per dictation | Light month list / charged | Heavy month list / charged |",
-    "|---|---|---|---|---|---|---|---|---|---|---|",
+  const rows = transcriberCandidates.flatMap((transcriber) =>
+    refinerCandidates.flatMap((refiner) => {
+      const built = row(transcriber, refiner, mode);
+      return built === undefined ? [] : [built];
+    }),
   );
-  const notes = new Map<string, string>();
-  for (const transcriber of transcriberCandidates) {
-    const t = transcriptionSummaries.get(transcriber.id);
-    if (t === undefined || t.modes[mode].results === 0) continue;
-    const tGate =
-      hardGatePassed(t) &&
-      (transcriber.baseline === true || relativeGate(t, transcriptionBaseline).passed);
-    const tStage: StageUse = transcriptionStage(
-      transcriber.spec.model,
-      t.modes[mode].callsPerDictation,
-      usdPerAudioSecond(transcriber, transcriptionChecked),
+  const languageLabel = mode === "one" ? "one dictation language" : "both (es, en)";
+  push(`## Passing combinations, fastest first, ${languageLabel}`, "");
+  const ranked = rankPassing(rows);
+  if (ranked.length === 0) push("None.", "");
+  else {
+    push(
+      "| Rank | Transcriber | Cleanup | Release to text P50 / P95 | Measured from | In the Lambda P50 / P95 | WER | Term errors after cleanup | Meaning changes | Per dictation | Light month list / charged | Heavy month list / charged |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|",
     );
-    for (const refiner of refinerCandidates) {
-      const c = cleanupSummaries.get(refiner.id);
-      if (c === undefined || c.results === 0) continue;
-      const cGate =
-        cleanupHardGatePassed(c) &&
-        (refiner.baseline === true || cleanupRelativeGate(c, cleanupBaseline).passed);
-      const cStage: StageUse = {
-        model: refiner.spec.model,
-        callsPerDictation: 1,
-        usdPerDictation: c.listUsdPerCall,
-        tokensPerCall: (c.inputTokensP50 ?? 0) + (c.outputTokensP50 ?? 0),
-      };
-      const months = scenarios.map((scenario) => {
-        const stages = [stageMonth(tStage, scenario), stageMonth(cStage, scenario)];
-        for (const [stage, month] of [
-          [transcriber.id, stages[0]],
-          [refiner.id, stages[1]],
-        ] as const) {
-          if (month !== undefined) notes.set(`${stage}, ${scenario.name}`, month.why);
-        }
-        const list = stages.reduce((sum, stage) => sum + stage.listUsd, 0);
-        const charged = stages.reduce((sum, stage) => sum + (stage.covered ? 0 : stage.listUsd), 0);
-        return `${usd(list)} / ${usd(charged)} USD`;
-      });
-      const gates =
-        tGate && cGate
-          ? "pass"
-          : `fail (${[!tGate && "transcription", !cGate && "cleanup"].filter(Boolean).join(", ")})`;
+    ranked.forEach((r, index) => {
       push(
-        `| ${transcriber.id} | ${refiner.id} | ${gates} | ${pct(t.modes[mode].wer)} | ${pct(t.modes[mode].termErrorRate)} | ${pct(c.meaningChangeRate)} | ${combined(t.modes[mode].samplesByConnection.fresh, c.samplesByConnection.fresh)} | ${combined(t.modes[mode].samplesByConnection.reused, c.samplesByConnection.reused)} | ${usd(tStage.usdPerDictation + cStage.usdPerDictation)} USD | ${months.join(" | ")} |`,
+        `| ${String(index + 1)} | ${r.transcriber} | ${r.refiner} | ${r.release} | ${r.source} | ${r.inLambda} | ${pct(r.wer)} | ${rate(r.termErrors)} | ${rate(r.meaningChanges)} | ${usd(r.perDictation)} USD | ${r.months.join(" | ")} |`,
       );
-    }
+    });
+    push("");
   }
-  push("", "Free allowances at these volumes:", "");
-  for (const [key, why] of [...notes].sort(([a], [b]) => a.localeCompare(b)))
-    push(`- ${key}: ${why}`);
+  push(`## Every combination, ${languageLabel}`, "");
+  push(
+    "| Transcriber | Cleanup | Gates | WER | Term errors after cleanup | Meaning changes | Release to text P50 / P95 | Per dictation | Light month list / charged | Heavy month list / charged |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+  );
+  for (const r of rows) {
+    push(
+      `| ${r.transcriber} | ${r.refiner} | ${r.passed ? "pass" : `fail (${r.failures.join(", ")})`} | ${pct(r.wer)} | ${rate(r.termErrors)} | ${rate(r.meaningChanges)} | ${r.release} | ${usd(r.perDictation)} USD | ${r.months.join(" | ")} |`,
+    );
+  }
   push("");
 }
+
+push("Free allowances at these volumes:", "");
+for (const [key, why] of [...notes].sort(([a], [b]) => a.localeCompare(b)))
+  push(`- ${key}: ${why}`);
+push("");
+push("Not re-run in this round:", "");
+for (const model of notRerun) push(`- \`${model.id}\`: ${model.reason}.`);
+push("");
 
 push("## Models", "");
 for (const model of new Set([

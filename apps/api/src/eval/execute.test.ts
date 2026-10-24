@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { pcmToWav } from "../../e2e/speech.ts";
 import type { ProviderRequest } from "./contract.ts";
 import { execute, type ExecuteDeps } from "./execute.ts";
 import { dispatcherFor, probedFetch, urlOf } from "./http-probe.ts";
@@ -39,6 +40,12 @@ function answer(seenRequest: Seen): {
   };
   if (seenRequest.path.endsWith("/audio/transcriptions")) {
     const language = seenRequest.fields?.language;
+    if (language === "auto")
+      return {
+        status: 200,
+        body: { text: " hola ", language: "spanish", duration: 1 },
+        headers: {},
+      };
     if (language === undefined)
       return { status: 200, body: { text: "bonjour", language: "french" }, headers: limits };
     return {
@@ -93,7 +100,13 @@ afterAll(async () => {
 });
 
 const deps: ExecuteDeps = {
-  keys: () => Promise.resolve({ GROQ_API_KEY: "groq-key", OPENAI_API_KEY: "openai-key" }),
+  keys: () =>
+    Promise.resolve({
+      GROQ_API_KEY: "groq-key",
+      OPENAI_API_KEY: "openai-key",
+      TOGETHER_API_KEY: "together-key",
+      CEREBRAS_API_KEY: "cerebras-key",
+    }),
   dispatcherFor,
   probedFetch: (dispatcher, records) => {
     const fetch = probedFetch(dispatcher, () => performance.now(), records);
@@ -193,5 +206,63 @@ describe("execute", () => {
       error: "groq-chat:limited answered 429",
       headers: { "retry-after": "7" },
     });
+  });
+});
+
+function tone(seconds: number): Buffer {
+  const samples = new Int16Array(16_000 * seconds).map((_, index) =>
+    Math.round(Math.sin((index / 16_000) * 2 * Math.PI * 220) * 6_000),
+  );
+  return pcmToWav(Buffer.from(samples.buffer));
+}
+
+const dictateRequest = (refinerModel: string): ProviderRequest => ({
+  kind: "dictate",
+  connection: "fresh",
+  transcriber: { provider: "together-transcribe", model: "nvidia/parakeet-tdt-0.6b-v3" },
+  refiner: { provider: "cerebras-chat", model: refinerModel, reasoningEffort: "none" },
+  audioBase64: tone(1).toString("base64"),
+  container: "wav",
+  languages: ["es", "en"],
+  terms: [{ term: "Terraform", aliases: ["terra form"] }],
+  termsUsedAt: "2026-10-24T00:00:00.000Z",
+});
+
+describe("execute dictate", () => {
+  it("runs production's pipeline with the candidate adapters and measures each stage", async () => {
+    seen.length = 0;
+    const result = await execute(dictateRequest("qwen-3.8-27b"), deps);
+    expect(result).toMatchObject({
+      ok: true,
+      label: "together-transcribe:nvidia/parakeet-tdt-0.6b-v3 + cerebras-chat:qwen-3.8-27b",
+      text: "Clean text.",
+      dictation: {
+        raw: "hola",
+        text: "Clean text.",
+        providers: {
+          transcriber: "together-transcribe:nvidia/parakeet-tdt-0.6b-v3",
+          refiner: "cerebras-chat:qwen-3.8-27b",
+        },
+      },
+    });
+    expect(result.calls.map((call) => call.stage)).toEqual(["transcribe", "refine"]);
+    expect(result.calls[0]?.usage).toEqual({ seconds: 1 });
+    expect(result.calls[1]?.usage).toEqual({ inputTokens: 40, outputTokens: 3 });
+    expect(seen[0]?.fields).toMatchObject({ language: "auto", response_format: "verbose_json" });
+    expect(seen[0]?.fields).not.toHaveProperty("prompt");
+    const messages = seen[1]?.json?.messages as { role: string; content: string }[];
+    expect(messages[0]?.content).toContain("Terraform");
+    expect(messages[1]).toEqual({ role: "user", content: "hola" });
+    const latency = result.dictation?.latencyMs;
+    expect(latency?.total).toBeGreaterThanOrEqual(
+      (latency?.transcribe ?? 0) + (latency?.refine ?? 0),
+    );
+  });
+
+  it("reports the failing provider's status instead of the API error", async () => {
+    const result = await execute(dictateRequest("limited"), deps);
+    expect(result.ok).toBe(false);
+    expect(result.error).toEqual({ status: 429, message: "cerebras-chat:limited answered 429" });
+    expect(result.calls.map((call) => call.stage)).toEqual(["transcribe", "refine"]);
   });
 });

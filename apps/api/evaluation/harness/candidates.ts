@@ -19,16 +19,22 @@ export const transcriberCandidates: readonly TranscriberCandidate[] = [
     spec: { provider: "groq-whisper", model: "whisper-large-v3-turbo" },
     baseline: true,
   },
-  { id: "whisper-large-v3", spec: { provider: "groq-whisper", model: "whisper-large-v3" } },
   {
     id: "gpt-transcribe",
     spec: { provider: "openai-transcribe", model: "gpt-transcribe", languageField: "languages[]" },
   },
   {
-    id: "gpt-4o-mini-transcribe",
-    spec: { provider: "openai-transcribe", model: "gpt-4o-mini-transcribe" },
+    id: "together-parakeet",
+    spec: {
+      provider: "together-transcribe",
+      model: "nvidia/parakeet-tdt-0.6b-v3",
+      prompted: false,
+    },
   },
-  { id: "gpt-4o-transcribe", spec: { provider: "openai-transcribe", model: "gpt-4o-transcribe" } },
+  {
+    id: "together-whisper-large-v3",
+    spec: { provider: "together-transcribe", model: "openai/whisper-large-v3", prompted: true },
+  },
 ];
 
 export const refinerCandidates: readonly RefinerCandidate[] = [
@@ -44,44 +50,29 @@ export const refinerCandidates: readonly RefinerCandidate[] = [
     setting: "lowest effort",
   },
   {
-    id: "gpt-5.6-luna",
-    spec: { provider: "openai", model: "gpt-5.6-luna" },
-    setting: "production call",
-  },
-  {
     id: "gpt-5.6-luna@none",
     spec: { provider: "openai", model: "gpt-5.6-luna", reasoningEffort: "none", temperature: 0 },
     setting: "lowest effort",
   },
   {
-    id: "gpt-6-luna",
-    spec: { provider: "openai", model: "gpt-6-luna" },
-    setting: "production call",
-  },
-  {
-    id: "gpt-6-luna@none",
-    spec: { provider: "openai", model: "gpt-6-luna", reasoningEffort: "none", temperature: 0 },
-    setting: "lowest effort",
-  },
-  {
-    id: "gpt-oss-120b",
-    spec: { provider: "groq-chat", model: "openai/gpt-oss-120b" },
-    setting: "production call",
-  },
-  {
-    id: "gpt-oss-120b@low",
+    id: "cerebras-qwen-3.8-27b@none",
     spec: {
-      provider: "groq-chat",
-      model: "openai/gpt-oss-120b",
-      reasoningEffort: "low",
+      provider: "cerebras-chat",
+      model: "qwen-3.8-27b",
+      reasoningEffort: "none",
       temperature: 0,
     },
     setting: "lowest effort",
   },
   {
-    id: "gpt-oss-20b",
-    spec: { provider: "groq-chat", model: "openai/gpt-oss-20b" },
-    setting: "production call",
+    id: "cerebras-gpt-oss-120b@low",
+    spec: {
+      provider: "cerebras-chat",
+      model: "gpt-oss-120b",
+      reasoningEffort: "low",
+      temperature: 0,
+    },
+    setting: "lowest effort",
   },
   {
     id: "gpt-oss-20b@low",
@@ -93,4 +84,27 @@ export const refinerCandidates: readonly RefinerCandidate[] = [
     },
     setting: "lowest effort",
   },
+];
+
+const round1 = "docs/tasks/0017_eval_harness/report.md";
+
+export const notRerun: readonly { id: string; reason: string }[] = [
+  {
+    id: "whisper-large-v3 (Groq)",
+    reason: `not re-run; it failed round 1's hard gate on noise (${round1})`,
+  },
+  {
+    id: "gpt-4o-mini-transcribe",
+    reason: `not re-run; it failed round 1's hard gate on noise and retires on 2027-02-26 (${round1})`,
+  },
+  {
+    id: "gpt-4o-transcribe",
+    reason: `not re-run; it failed round 1's hard gate on noise and language and retires on 2027-02-26 (${round1})`,
+  },
+];
+
+export const chainedTranscribers: readonly string[] = [
+  "whisper-large-v3-turbo",
+  "gpt-transcribe",
+  "together-parakeet",
 ];

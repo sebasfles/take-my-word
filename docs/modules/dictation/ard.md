@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-24
-source: 0017_eval_harness
+source: 0018_fast_providers_eval
 ---
 
 # Dictation: architecture and debt
@@ -250,4 +250,58 @@ source: 0017_eval_harness
 - Debt created: a few users dictating at once, or one `pnpm e2e` run on dev, can make prd dictations fail with 429.
 - Revisit when: the transcriber switch task, or a 429 from the transcriber in prd logs.
 - Source: 0017_eval_harness
+
+## 2026-10-24: The eval Lambda reads its provider keys through a loader of its own
+
+- Decision: `src/eval/keys.ts` requires the four keys of the providers secret (Groq, OpenAI, Together, Cerebras) through a generic `cachedSecretJson` in `lib/secrets.ts`, which `cachedProviderKeys` now also uses with production's two-key schema unchanged.
+- Alternatives rejected: adding the new keys to `providerKeysSchema`, which would make `dictate` fail on a secret without them.
+- Reason: evaluation-only providers must not change what production requires or reads.
+- Debt created: none.
+- Revisit when: production registers a Together or Cerebras adapter.
+- Source: 0018_fast_providers_eval
+
+## 2026-10-24: Evaluation failure rates count only provider failures
+
+- Decision: a failed attempt counts in a candidate's failure rate only when its message comes from an adapter (`<adapter>:<model> ...`); the harness's own failed calls to the eval Lambda, such as request-signing errors from a drifting clock, are listed apart in the reports.
+- Alternatives rejected: counting every failed attempt, as 0017 did.
+- Reason: two signing failures in suite 1 would have raised today's baseline failure rate and loosened that gate for every candidate.
+- Debt created: none.
+- Revisit when: an adapter's error message stops carrying its label.
+- Source: 0018_fast_providers_eval
+
+## 2026-10-24: On a paid plan the evaluation keeps fixed floors of each reported allowance
+
+- Decision: a provider dated as paid in `prices.ts` (`paidPlans`; Groq since 2026-10-24T18:25Z) has no free-plan windows; its calls are charged at list price into the run cap, and the runner waits when a reported remaining count falls under a fixed floor (1000 requests, 7200 audio seconds, 20,000 tokens) or on `retry-after`; providers without a paid plan keep the half rule.
+- Alternatives rejected: keeping half of every reported limit, which blocked turbo for 23 h 43 m on the first paid call; waiting only at zero, which could drain a budget prd shares.
+- Reason: Groq's paid-tier headers reported 2320 of 200,000 requests left, so a share of the limit is meaningless, while the floors cover more than twice a heavy production day and two hours of audio per window.
+- Debt created: none.
+- Revisit when: Groq's paid-tier limits are confirmed in its console, or production's volume approaches the floors.
+- Source: 0018_fast_providers_eval
+
+## 2026-10-24: Speech synthesis counts in each evaluation run's cap
+
+- Decision: before synthesizing clips, a run checks the Polly cost of its characters at list price against the 3 USD cap with what it already spent, and records each synthesis in its results.
+- Alternatives rejected: leaving Polly outside the cost guard, as since 0017 (its price constant was unused).
+- Reason: suite 1 synthesizes at its start and at every resume, about 0.40 USD each time, which can carry a run over its cap unseen.
+- Debt created: none.
+- Revisit when: clips are cached between resumes.
+- Source: 0018_fast_providers_eval
+
+## 2026-10-24: Candidate lists hold the current round; measured commits stay reachable by tags
+
+- Decision: `evaluation/harness/candidates.ts` lists only round 2's candidates, with the dropped ones cited to 0017's report; every commit a report or run meta records keeps an `eval/0018/<sha>` tag, since rebases rewrite them.
+- Alternatives rejected: keeping every round's candidates, which reruns retired models; rewriting the recorded hashes after a rebase.
+- Reason: a report must reproduce from the commit it names, and a round's runs cost money only for the models it chose.
+- Debt created: round 1's reports re-render only from their recorded commit.
+- Revisit when: a round needs an earlier round's candidates again.
+- Source: 0018_fast_providers_eval
+
+## 2026-10-24: Production's transcriber now bills on Groq's paid tier and its daily allowance is unexplained
+
+- Decision: no change in this task; the evaluation recommends moving to `gpt-transcribe` with `gpt-5.4-nano` as called today, and records that Groq moved to its paid Developer tier (5 USD monthly spend limit shared with production), whose first headers reported 2320 of 200,000 daily requests left while this task had made 761 in the 24 hours before.
+- Alternatives rejected: none in this task.
+- Reason: the switch is its own task, and the limits belong to the provider plan.
+- Debt created: prd's turbo dictations are now billed (about 1.20 USD in a heavy month) and run against a daily allowance this task cannot explain.
+- Revisit when: the transcriber switch task, or Groq's console shows the paid-tier limits.
+- Source: 0018_fast_providers_eval
 

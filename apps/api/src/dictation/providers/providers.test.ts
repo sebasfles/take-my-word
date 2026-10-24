@@ -1,20 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { ProviderError } from "../ports/provider-error.ts";
+import { cerebrasChatRefiner } from "./cerebras-chat.ts";
 import { groqChatRefiner } from "./groq-chat.ts";
 import { groqWhisper } from "./groq-whisper.ts";
 import type { Fetch } from "./http.ts";
 import { openaiTranscriber } from "./openai-transcribe.ts";
 import { openaiRefiner } from "./openai.ts";
+import { togetherTranscriber } from "./together-transcribe.ts";
 
 interface Captured {
+  url: string;
+  method: string | undefined;
   headers: Record<string, string>;
   body: unknown;
 }
 
 function fakeFetch(status: number, json: unknown): { fetch: Fetch; captured: Captured[] } {
   const captured: Captured[] = [];
-  const fetch: Fetch = (_input, init) => {
+  const fetch: Fetch = (input, init) => {
     captured.push({
+      url: typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      method: init?.method,
       headers: (init?.headers ?? {}) as Record<string, string>,
       body: init?.body,
     });
@@ -352,5 +358,202 @@ describe("groq-chat refiner", () => {
     });
     await expect(failure).rejects.toThrow(ProviderError);
     await expect(failure).rejects.toThrow(/answered 429$/);
+  });
+});
+
+async function formEntries(form: FormData): Promise<unknown[]> {
+  const entries: unknown[] = [];
+  for (const [name, value] of form.entries()) {
+    entries.push(
+      typeof value === "string"
+        ? [name, value]
+        : [name, value.name, value.type, Buffer.from(await value.arrayBuffer()).toString("hex")],
+    );
+  }
+  return entries;
+}
+
+describe("production requests stay byte-identical", () => {
+  it("groq-whisper sends the same URL, headers and form fields in the same order", async () => {
+    const one = fakeFetch(200, { text: "Hola." });
+    await groqWhisper({ apiKey, fetch: one.fetch }).transcribe({
+      audio: Buffer.from("RIFF"),
+      container: "wav",
+      language: "es",
+      prompt: "Terraform, Lambda.",
+    });
+    expect(one.captured[0]?.url).toBe("https://api.groq.com/openai/v1/audio/transcriptions");
+    expect(one.captured[0]?.method).toBe("POST");
+    expect(one.captured[0]?.headers).toEqual({ authorization: "Bearer secret-key" });
+    expect(await formEntries(one.captured[0]?.body as FormData)).toEqual([
+      ["file", "audio.wav", "audio/wav", "52494646"],
+      ["model", "whisper-large-v3-turbo"],
+      ["language", "es"],
+      ["response_format", "json"],
+      ["temperature", "0"],
+      ["prompt", "Terraform, Lambda."],
+    ]);
+
+    const detect = fakeFetch(200, { text: "Hello.", language: "english" });
+    await groqWhisper({ apiKey, fetch: detect.fetch }).transcribe({
+      audio: Buffer.from("RIFF"),
+      container: "m4a",
+    });
+    expect(await formEntries(detect.captured[0]?.body as FormData)).toEqual([
+      ["file", "audio.m4a", "audio/mp4", "52494646"],
+      ["model", "whisper-large-v3-turbo"],
+      ["response_format", "verbose_json"],
+      ["temperature", "0"],
+    ]);
+  });
+
+  it("openai sends the same URL, headers and body string", async () => {
+    const { fetch, captured } = fakeFetch(200, completed);
+    await openaiRefiner({ apiKey, fetch }).refine({
+      raw: "eh hola mundo",
+      language: "es",
+      instructions: "clean",
+    });
+    expect(captured[0]?.url).toBe("https://api.openai.com/v1/responses");
+    expect(captured[0]?.method).toBe("POST");
+    expect(captured[0]?.headers).toEqual({
+      authorization: "Bearer secret-key",
+      "content-type": "application/json",
+    });
+    expect(captured[0]?.body).toBe(
+      '{"model":"gpt-5.4-nano","instructions":"clean","input":"eh hola mundo","store":false}',
+    );
+  });
+
+  it("groq-chat sends the same URL, headers and body string through the shared chat helper", async () => {
+    const { fetch, captured } = fakeFetch(200, chatCompleted);
+    await groqChatRefiner({
+      apiKey,
+      fetch,
+      model: "openai/gpt-oss-20b",
+      reasoningEffort: "low",
+      temperature: 0,
+    }).refine({ raw: "x", language: "en", instructions: "i" });
+    expect(captured[0]?.url).toBe("https://api.groq.com/openai/v1/chat/completions");
+    expect(captured[0]?.headers).toEqual({
+      authorization: "Bearer secret-key",
+      "content-type": "application/json",
+    });
+    expect(captured[0]?.body).toBe(
+      '{"model":"openai/gpt-oss-20b","messages":[{"role":"system","content":"i"},{"role":"user","content":"x"}],"reasoning_effort":"low","temperature":0}',
+    );
+  });
+});
+
+describe("cerebras-chat refiner", () => {
+  it("labels itself with its model and posts chat completions to Cerebras", async () => {
+    const { fetch, captured } = fakeFetch(200, chatCompleted);
+    const refiner = cerebrasChatRefiner({
+      apiKey,
+      fetch,
+      model: "qwen-3.8-27b",
+      reasoningEffort: "none",
+      temperature: 0,
+    });
+    expect(refiner.label).toBe("cerebras-chat:qwen-3.8-27b");
+    const result = await refiner.refine({ raw: "eh hola", language: "es", instructions: "clean" });
+    expect(result).toEqual({ text: "Hola, mundo.", usage: { inputTokens: 90, outputTokens: 12 } });
+    expect(captured[0]?.url).toBe("https://api.cerebras.ai/v1/chat/completions");
+    expect(JSON.parse(String(captured[0]?.body))).toEqual({
+      model: "qwen-3.8-27b",
+      messages: [
+        { role: "system", content: "clean" },
+        { role: "user", content: "eh hola" },
+      ],
+      reasoning_effort: "none",
+      temperature: 0,
+    });
+  });
+
+  it("fails when the answer was cut instead of returning partial text", async () => {
+    const { fetch } = fakeFetch(200, {
+      ...chatCompleted,
+      choices: [{ finish_reason: "length", message: { content: "Hola" } }],
+    });
+    const failure = cerebrasChatRefiner({ apiKey, fetch, model: "gpt-oss-120b" }).refine({
+      raw: "x",
+      language: "es",
+      instructions: "i",
+    });
+    await expect(failure).rejects.toThrow(/^cerebras-chat:gpt-oss-120b finished with length$/);
+  });
+});
+
+describe("together-transcribe transcriber", () => {
+  it("sends the requested language as json and leaves the prompt out of an unprompted model", async () => {
+    const { fetch, captured } = fakeFetch(200, { text: " Hola. " });
+    const transcriber = togetherTranscriber({
+      apiKey,
+      fetch,
+      model: "nvidia/parakeet-tdt-0.6b-v3",
+      prompted: false,
+    });
+    expect(transcriber.label).toBe("together-transcribe:nvidia/parakeet-tdt-0.6b-v3");
+    const result = await transcriber.transcribe({
+      audio: Buffer.from("RIFF"),
+      container: "wav",
+      language: "es",
+      prompt: "Terraform",
+    });
+    expect(result).toEqual({ text: "Hola." });
+    expect(captured[0]?.url).toBe("https://api.together.ai/v1/audio/transcriptions");
+    expect(captured[0]?.headers).toEqual({ authorization: "Bearer secret-key" });
+    expect(await formEntries(captured[0]?.body as FormData)).toEqual([
+      ["file", "audio.wav", "audio/wav", "52494646"],
+      ["model", "nvidia/parakeet-tdt-0.6b-v3"],
+      ["language", "es"],
+      ["response_format", "json"],
+      ["temperature", "0"],
+    ]);
+  });
+
+  it("asks for detection with auto and verbose_json, and sends the prompt to a prompted model", async () => {
+    const { fetch, captured } = fakeFetch(200, {
+      text: "Hola.",
+      language: "spanish",
+      duration: 2.5,
+    });
+    const result = await togetherTranscriber({
+      apiKey,
+      fetch,
+      model: "openai/whisper-large-v3",
+      prompted: true,
+    }).transcribe({ audio: Buffer.from("RIFF"), container: "wav", prompt: "Terraform" });
+    expect(result).toEqual({ text: "Hola.", language: "es", usage: { seconds: 2.5 } });
+    const form = captured[0]?.body as FormData;
+    expect(form.get("language")).toBe("auto");
+    expect(form.get("response_format")).toBe("verbose_json");
+    expect(form.get("prompt")).toBe("Terraform");
+  });
+
+  it("reports no language when the answer echoes auto or names another language", async () => {
+    for (const language of ["auto", "french", undefined]) {
+      const { fetch } = fakeFetch(200, { text: "x", ...(language && { language }) });
+      const result = await togetherTranscriber({
+        apiKey,
+        fetch,
+        model: "nvidia/parakeet-tdt-0.6b-v3",
+        prompted: false,
+      }).transcribe({ audio: Buffer.from("RIFF"), container: "wav" });
+      expect(result).toEqual({ text: "x" });
+    }
+  });
+
+  it("fails with the status and without the provider's body", async () => {
+    const { fetch } = fakeFetch(402, { error: { message: "balance for secret-key" } });
+    const failure = togetherTranscriber({
+      apiKey,
+      fetch,
+      model: "nvidia/parakeet-tdt-0.6b-v3",
+      prompted: false,
+    }).transcribe({ audio: Buffer.alloc(1), container: "wav", language: "en" });
+    await expect(failure).rejects.toThrow(
+      /^together-transcribe:nvidia\/parakeet-tdt-0\.6b-v3 answered 402$/,
+    );
   });
 });

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  BalanceFloorError,
   BudgetExceededError,
   CostGuard,
   Pacer,
   parseResetMs,
+  prepaidOutlook,
+  requireAboveFloor,
   type LedgerEntry,
   type PacingKey,
 } from "./pacing.ts";
@@ -18,6 +21,14 @@ const keys = new Map<string, PacingKey>([
   [
     "openai:nano",
     { provider: "openai", complimentary: { group: "openai-small", tokensPerDay: 1_000 } },
+  ],
+  [
+    "together:parakeet",
+    { provider: "together", prepaid: { startUsd: 15, since: "2026-10-24", floorUsd: 5 } },
+  ],
+  [
+    "together:whisper",
+    { provider: "together", prepaid: { startUsd: 15, since: "2026-10-24", floorUsd: 5 } },
   ],
   [
     "openai:other",
@@ -47,9 +58,85 @@ describe("parseResetMs", () => {
 describe("Pacer", () => {
   it("keeps half of the per-minute requests free and waits until the window frees one", () => {
     expect(nano).toBeDefined();
-    const ledger = entries("groq:whisper", 10, (index) => noon - 50_000 + index * 1_000);
+    const ledger = entries("groq:chat", 15, (index) => noon - 50_000 + index * 1_000, {
+      requests: 1,
+      audioSeconds: 0,
+      tokens: 0,
+    });
+    const need = { requests: 1, audioSeconds: 0, tokens: 0 };
     const pacer = new Pacer(keys, ledger);
-    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "at", at: noon + 10_000 });
+    expect(pacer.readiness("groq:chat", need, noon)).toEqual({ kind: "at", at: noon + 10_000 });
+    expect(new Pacer(keys, ledger.slice(1)).readiness("groq:chat", need, noon)).toEqual({
+      kind: "now",
+    });
+  });
+
+  it("paces a Groq model on a paid plan only by Groq's headers, with no free-plan windows", () => {
+    const paid = new Map<string, PacingKey>([["groq:whisper", { provider: "groq" }]]);
+    const pacer = new Pacer(
+      paid,
+      entries("groq:whisper", 40, (index) => noon - 50_000 + index * 1_000, {
+        requests: 1,
+        audioSeconds: 7_200,
+        tokens: 0,
+      }),
+    );
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "now" });
+    pacer.observe("groq:whisper", { "retry-after": "2" }, noon);
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "at", at: noon + 2_000 });
+  });
+
+  it("keeps a fixed production floor of a paid plan's reported allowance instead of half", () => {
+    const floors = { requests: 1_000, "audio-seconds": 7_200, tokens: 20_000 };
+    const paid = new Map<string, PacingKey>([
+      ["groq:whisper", { provider: "groq", paidFloors: floors }],
+    ]);
+    const headers = {
+      "x-ratelimit-limit-requests": "200000",
+      "x-ratelimit-remaining-requests": "2320",
+      "x-ratelimit-reset-requests": "23h43m17.76s",
+      "x-ratelimit-limit-audio-seconds": "400000",
+      "x-ratelimit-remaining-audio-seconds": "48481",
+      "x-ratelimit-reset-audio-seconds": "52m43.671s",
+    };
+    const pacer = new Pacer(paid, []);
+    pacer.observe("groq:whisper", headers, noon);
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "now" });
+    pacer.observe(
+      "groq:whisper",
+      { ...headers, "x-ratelimit-remaining-audio-seconds": "7199" },
+      noon,
+    );
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 3_163_671,
+    });
+    const requests = new Pacer(paid, []);
+    requests.observe("groq:whisper", { ...headers, "x-ratelimit-remaining-requests": "999" }, noon);
+    expect(requests.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 85_397_760,
+    });
+    requests.observe("groq:whisper", { "retry-after": "90000" }, noon);
+    expect(requests.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 90_000_000,
+    });
+    const free = new Pacer(keys, []);
+    free.observe(
+      "openai:nano",
+      { "x-ratelimit-limit-tokens": "200000", "x-ratelimit-remaining-tokens": "90000" },
+      noon,
+    );
+    expect(free.readiness("openai:nano", call, noon).kind).toBe("at");
+  });
+
+  it("paces Groq Whisper at a quarter of its per-minute limit, 5 of 20", () => {
+    const ledger = entries("groq:whisper", 5, (index) => noon - 50_000 + index * 1_000);
+    expect(new Pacer(keys, ledger).readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 10_000,
+    });
     expect(new Pacer(keys, ledger.slice(1)).readiness("groq:whisper", call, noon)).toEqual({
       kind: "now",
     });
@@ -252,8 +339,8 @@ describe("whisper daily override", () => {
     expect(standard.readiness("groq:whisper", call, noon)).toMatchObject({ kind: "at" });
   });
 
-  it("leaves the per-minute half, the chat reserve and OpenAI's half untouched", () => {
-    const recent = entries("groq:whisper", 10, (index) => noon - 50_000 + index * 1_000);
+  it("leaves the per-minute pace, the chat reserve and OpenAI's half untouched", () => {
+    const recent = entries("groq:whisper", 5, (index) => noon - 50_000 + index * 1_000);
     expect(
       new Pacer(keys, recent, undefined, { whisperDailyKept: 0.1 }).readiness(
         "groq:whisper",
@@ -300,5 +387,55 @@ describe("CostGuard", () => {
     expect(() => {
       guard.check(0.6);
     }).toThrow(BudgetExceededError);
+  });
+});
+
+describe("prepaid balance floor", () => {
+  const day = Date.parse("2026-10-24T12:00:00.000Z");
+  const spent = (key: string, usd: number, at = day - 1_000): LedgerEntry => ({
+    key,
+    at,
+    requests: 1,
+    audioSeconds: 0,
+    tokens: 0,
+    usd,
+  });
+
+  it("refuses a call that would leave the provider's balance under the floor", () => {
+    const pacer = new Pacer(keys, [spent("together:parakeet", 9.5)]);
+    const need = { requests: 1, audioSeconds: 10, tokens: 0 };
+    expect(pacer.readiness("together:whisper", { ...need, costUsd: 0.4 }, day)).toEqual({
+      kind: "now",
+    });
+    const refused = pacer.readiness("together:whisper", { ...need, costUsd: 0.6 }, day);
+    expect(refused.kind === "tomorrow" && refused.reason).toMatch(
+      /^together balance: 5\.5000 of 15\.00 USD left .* under the 5\.00 USD floor$/,
+    );
+  });
+
+  it("counts only the provider's own spend since the balance date", () => {
+    const pacer = new Pacer(keys, [
+      spent("together:parakeet", 4, Date.parse("2026-10-23T23:00:00.000Z")),
+      spent("openai:nano", 20),
+      spent("together:whisper", 1),
+    ]);
+    expect(pacer.prepaidSpentUsd("together", "2026-10-24")).toBe(1);
+  });
+
+  it("states each prepaid provider's estimate and refuses a run that would cross the floor", () => {
+    const pacer = new Pacer(keys, [spent("together:parakeet", 9)]);
+    const planned = [
+      { pacingKey: "together:parakeet", estimate: { costUsd: 0.5 } },
+      { pacingKey: "together:whisper", estimate: { costUsd: 0.6 } },
+      { pacingKey: "groq:whisper", estimate: { costUsd: 0 } },
+    ];
+    const outlooks = prepaidOutlook(keys, pacer, planned);
+    expect(outlooks).toEqual([{ provider: "together", leftUsd: 6, estimateUsd: 1.1, floorUsd: 5 }]);
+    expect(() => {
+      requireAboveFloor(outlooks);
+    }).toThrow(BalanceFloorError);
+    expect(() => {
+      requireAboveFloor(prepaidOutlook(keys, pacer, planned.slice(0, 1)));
+    }).not.toThrow();
   });
 });
