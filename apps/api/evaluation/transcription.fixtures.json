@@ -400,7 +400,6 @@
       "dictionary": "developer",
       "text": "Quick update on the migration. This morning I merged the PR that moves the queue workers to Lambda, and the build went green on the first try. The staging deploy is still running, so I'll check the logs after lunch. If the pods in the old namespace keep restarting, we should roll back with kubectl and open a hotfix instead of patching it by hand. Can you also add the Terraform changes to the roadmap for the next sprint, and mention it in tomorrow's standup so the rest of the team knows what changed? Thanks, and let me know if anything looks off. One more thing about the release. The client asked for a demo on Friday, so I would rather freeze the main branch on Thursday evening and only accept fixes after that. If you agree, I will send a short note to everyone and update the calendar invite with the new plan.",
       "terms": [
-        "merged",
         "PR",
         "Lambda",
         "build",

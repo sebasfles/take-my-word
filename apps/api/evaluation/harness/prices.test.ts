@@ -43,6 +43,8 @@ describe("transcription prices", () => {
     const list = transcriptionCallUsd(parakeet, 4.2);
     expect(list).toBeCloseTo((5 / 60) * 0.0015, 12);
     expect(chargedUsd(parakeet, list)).toBe(list);
+    expect(billedAudioSeconds(parakeet, 4.2, { seconds: 4.04 })).toBe(5);
+    expect(transcriptionCallUsd(parakeet, 4.2, { seconds: 4.04 })).toBeCloseTo(list, 12);
     const qwen = modelFacts("qwen-3.8-27b");
     expect(chargedUsd(qwen, tokenCostUsd(qwen, 1_000_000, 1_000_000))).toBeCloseTo(2.48, 10);
   });

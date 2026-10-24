@@ -85,7 +85,12 @@ export async function runSchedule<R>(
       await wait(earliest - at);
       continue;
     }
-    guard.check(next.estimate.costUsd);
+    guard.check(
+      (next.alsoPaced ?? []).reduce(
+        (sum, stage) => sum + stage.estimate.costUsd,
+        next.estimate.costUsd,
+      ),
+    );
     const attempt = await next.run();
     const finishedAt = now();
     const used: StageUse[] = [

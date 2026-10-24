@@ -317,7 +317,7 @@ export function billedAudioSeconds(
   usage?: CallUsage,
 ): number {
   if (facts.price.kind !== "duration") return clipSeconds;
-  return Math.max(facts.price.minimumBilledSeconds, usage?.seconds ?? Math.ceil(clipSeconds));
+  return Math.max(facts.price.minimumBilledSeconds, Math.ceil(usage?.seconds ?? clipSeconds));
 }
 
 export function transcriptionCallUsd(

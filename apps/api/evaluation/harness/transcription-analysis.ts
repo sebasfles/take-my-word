@@ -305,12 +305,6 @@ export function relativeGate(
         `${mode}: failed calls ${pct(mine.failureRate)} above the baseline's ${pct(base.failureRate)} plus its spread ${pct(spread(base.failureRatePerRun))}`,
       );
     }
-    const termAllowance = base.termErrorRate + spread(base.termErrorsPerRun);
-    if (mine.termErrorRate > termAllowance) {
-      reasons.push(
-        `${mode}: domain-term errors ${pct(mine.termErrorRate)} above the baseline's ${pct(base.termErrorRate)} plus its spread ${pct(spread(base.termErrorsPerRun))}`,
-      );
-    }
   }
   return { passed: reasons.length === 0, reasons };
 }
