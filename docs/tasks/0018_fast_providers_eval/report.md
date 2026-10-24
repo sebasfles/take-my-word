@@ -44,7 +44,9 @@ A heavy month is 7200 dictations of 15 s; Groq is now billed at list price, so t
 
 1. Combination: `gpt-transcribe` with `gpt-5.4-nano` called as production calls it today.
    It is the only combination that passes every gate, and its release to text (1972 ms P50) is within 31 ms of today's pair at P50.
+   The trade-offs from the table: its P95 is 3012 ms against today's 2617 ms, and its meaning changes after cleanup are 2.8% against today's 1.9%, inside the baseline's run-to-run spread.
    It confirms round 1's transcriber choice: 0.2% raw WER against today's 2.6%, no invented content, hallucination or wrong language in 780 outputs.
+   The one choice left to weigh: `gpt-5.4-nano@none` (effort none, temperature 0) has 0.0% meaning changes and fails only on rendering the speaker's English words in Spanish on the long samples (point 3), at the same cost and 1956 / 2643 ms.
 2. Transcription: `gpt-transcribe`, as round 1 recommended; the faster candidates fail the hard gate.
    - `together-parakeet` is about three times faster per call (176 ms P50 on a fresh connection against 549 ms) and a third of the price (0.09 against 0.27 USD per hour), but it fails on its own garble alone: in all 10 outputs of extended-es-100 with one voice it turned "y dejar claro quién es responsable" into "y dejarlo en la vida. Claro quién es responsable", and end to end `gpt-oss-120b@low` pasted it unchanged in all 5 runs.
      Its other 20 flags are dev-en-1, where it writes "CI/CD" as "C slash C D", a spelled-out symbol more than invention.
@@ -62,10 +64,13 @@ A heavy month is 7200 dictations of 15 s; Groq is now billed at list price, so t
 - Register `openai-transcribe` with `gpt-transcribe` (the adapter exists since 0017): add it to `transcriberIds` and the registry, make it the default transcriber, keep production's 15 s timeout, and send `languages[]` as the eval did; the refiner stays as production calls it.
 - Cost: about 8.10 USD charged in a heavy month and 0.54 USD in a light one (transcription at 0.27 USD per hour; nano inside OpenAI's complimentary tokens), against 1.20 and 0.08 USD for today's pair now that Groq is billed.
 - Limits: transcription moves from Groq's account-wide limits, shared with dev and the 5 USD spend limit, to OpenAI's per-account limits.
+- Until the switch, prd stays on turbo against Groq's paid-tier limits; those limits must be checked in Groq's console, since the headers this task saw (below) leave little room on the daily request allowance.
 - Long dictations: release to text on 30 to 120 s samples was 5501 ms P50 for the recommended pair (3915 ms in the Lambda), and the switch removes the invented sentences turbo pastes on long English audio.
 
 ## Other findings
 
 - The in-Lambda end-to-end path reproduces the real one: today's pair measured 1941 ms P50 release to text against 1921 ms in round 1's dev end-to-end run.
-- Groq's paid tier reports daily allowances nearly used (2320 of 200,000 requests left on the first paid call); the runner keeps fixed production floors of each reported allowance instead of half, which would have blocked it for a day.
+- The first call on Groq's paid tier, at 2026-10-24T18:27:52Z, returned `x-ratelimit-limit-requests` 200000 with `x-ratelimit-remaining-requests` 2320 (reset in 23h43m17.76s), and `x-ratelimit-limit-audio-seconds` 400000 with 48481 remaining (reset in 52m43.671s).
+  This task's own calls do not account for that gap: the shared ledger holds 761 `whisper-large-v3-turbo` requests from this task in the 24 hours before that call, against about 197,700 used by that header.
+  The runner now keeps fixed production floors of each reported allowance on paid keys, since keeping half of these limits blocked it for 23 h 43 m.
 - Two Lambda invocations failed request signing because the measuring machine's clock drifted; both retried, and failure rates now count only provider failures.

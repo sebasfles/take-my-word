@@ -145,11 +145,11 @@ export interface CleanupSummary {
   newWordsPerRun: number[];
   meaningChangeRate: number;
   meaningChangesPerRun: number[];
-  fillerRemovalRate: number;
+  fillerRemovalRate: number | undefined;
   punctuationRate: number;
   termErrorRate: number;
   termErrorsPerRun: number[];
-  styleRate: number;
+  styleRate: number | undefined;
   attempts: number;
   failedAttempts: number;
   rateLimited: number;
@@ -222,17 +222,20 @@ export function summarizeCleanup(
     newWordsPerRun: runs.map((run) => newWordRateOf(inRun(run))),
     meaningChangeRate: changeRateOf(ok),
     meaningChangesPerRun: runs.map((run) => changeRateOf(inRun(run))),
-    fillerRemovalRate: rate(
-      fillers - ok.reduce((sum, entry) => sum + entry.fillersLeft.length, 0),
-      fillers,
-    ),
+    fillerRemovalRate:
+      fillers === 0
+        ? undefined
+        : rate(fillers - ok.reduce((sum, entry) => sum + entry.fillersLeft.length, 0), fillers),
     punctuationRate: rate(
       ok.filter((entry) => entry.punctuationIssues.length === 0).length,
       ok.length,
     ),
     termErrorRate: termRateOf(ok),
     termErrorsPerRun: runs.map((run) => termRateOf(inRun(run))),
-    styleRate: rate(styled.filter((entry) => entry.styleIssues.length === 0).length, styled.length),
+    styleRate:
+      styled.length === 0
+        ? undefined
+        : rate(styled.filter((entry) => entry.styleIssues.length === 0).length, styled.length),
     attempts: ok.length + failed.length,
     failedAttempts: failed.length,
     rateLimited: myFailures.length - failed.length,

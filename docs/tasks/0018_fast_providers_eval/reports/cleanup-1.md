@@ -1,6 +1,6 @@
 # Cleanup evaluation
 
-Generated 2026-10-24T19:13:58.651Z from code commit `8d9b882089989d45ecd8952020aab97882bf64d3`, resumed with `adf32ee92757f8046ba13946841c36ba422f16fb` and fixtures sha256 `484a0f0207e2e6a8`.
+Generated 2026-10-24T19:27:08.387Z from code commit `8d9b882089989d45ecd8952020aab97882bf64d3`, resumed with `adf32ee92757f8046ba13946841c36ba422f16fb` and fixtures sha256 `484a0f0207e2e6a8`.
 Every call ran inside the dev eval Lambda `take-my-word-dev-eval` (us-east-1, 1024 MB, arm64) through the production adapters, with production's `refinerInstructions` for the case's language, style and fixture dictionary, unchanged for every model; 3 runs per case, run 1 on a fresh connection.
 Latency is the whole non-streamed call, as production makes it.
 Cases: round 1's 33 plus 98 chained raws, which suite 1's run 1 of whisper-large-v3-turbo, gpt-transcribe, together-parakeet produced for each speech case (first voice, the case's own language, identical raws counted once), checked against that case's expected text and terms.
@@ -57,45 +57,45 @@ The chained raws of one transcriber; a combination's meaning changes and term er
 
 | Candidate | Outputs | Exact | New words | Meaning changes | Fillers removed | Punctuation | Dictionary terms wrong | Style followed | Failed calls | Rate limited |
 |---|---|---|---|---|---|---|---|---|---|---|
-| gpt-5.4-nano | 108 | 38.9% | 12.0% | 1.9% (0.0%, 2.8%, 2.8%) | 0.0% | 88.9% | 5.9% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-5.4-nano@none | 108 | 38.0% | 8.3% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 88.0% | 5.7% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-5.6-luna@none | 108 | 49.1% | 3.7% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 98.1% | 3.8% | 0.0% | 0/108 (0.0%) | 0 |
-| cerebras-qwen-3.8-27b@none | 108 | 52.8% | 2.8% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 3.3% | 0.0% | 0/108 (0.0%) | 0 |
-| cerebras-gpt-oss-120b@low | 108 | 44.4% | 8.3% | 2.8% (2.8%, 2.8%, 2.8%) | 0.0% | 97.2% | 6.0% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-oss-20b@low | 108 | 56.5% | 3.7% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 88.0% | 4.0% | 0.0% | 0/108 (0.0%) | 0 |
+| gpt-5.4-nano | 108 | 38.9% | 12.0% | 1.9% (0.0%, 2.8%, 2.8%) | n/a | 88.9% | 5.9% | n/a | 0/108 (0.0%) | 0 |
+| gpt-5.4-nano@none | 108 | 38.0% | 8.3% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 88.0% | 5.7% | n/a | 0/108 (0.0%) | 0 |
+| gpt-5.6-luna@none | 108 | 49.1% | 3.7% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 98.1% | 3.8% | n/a | 0/108 (0.0%) | 0 |
+| cerebras-qwen-3.8-27b@none | 108 | 52.8% | 2.8% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 3.3% | n/a | 0/108 (0.0%) | 0 |
+| cerebras-gpt-oss-120b@low | 108 | 44.4% | 8.3% | 2.8% (2.8%, 2.8%, 2.8%) | n/a | 97.2% | 6.0% | n/a | 0/108 (0.0%) | 0 |
+| gpt-oss-20b@low | 108 | 56.5% | 3.7% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 88.0% | 4.0% | n/a | 0/108 (0.0%) | 0 |
 
 ### gpt-transcribe
 
 | Candidate | Outputs | Exact | New words | Meaning changes | Fillers removed | Punctuation | Dictionary terms wrong | Style followed | Failed calls | Rate limited |
 |---|---|---|---|---|---|---|---|---|---|---|
-| gpt-5.4-nano | 108 | 49.1% | 13.0% | 2.8% (0.0%, 5.6%, 2.8%) | 0.0% | 100.0% | 2.9% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-5.4-nano@none | 108 | 52.8% | 11.1% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 3.5% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-5.6-luna@none | 108 | 55.6% | 4.6% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 2.0% | 0.0% | 0/108 (0.0%) | 0 |
-| cerebras-qwen-3.8-27b@none | 108 | 61.1% | 2.8% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 1.6% | 0.0% | 0/108 (0.0%) | 0 |
-| cerebras-gpt-oss-120b@low | 108 | 63.9% | 2.8% | 2.8% (2.8%, 2.8%, 2.8%) | 0.0% | 97.2% | 1.6% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-oss-20b@low | 108 | 65.7% | 0.0% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 1.8% | 0.0% | 0/108 (0.0%) | 0 |
+| gpt-5.4-nano | 108 | 49.1% | 13.0% | 2.8% (0.0%, 5.6%, 2.8%) | n/a | 100.0% | 2.9% | n/a | 0/108 (0.0%) | 0 |
+| gpt-5.4-nano@none | 108 | 52.8% | 11.1% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 3.5% | n/a | 0/108 (0.0%) | 0 |
+| gpt-5.6-luna@none | 108 | 55.6% | 4.6% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 2.0% | n/a | 0/108 (0.0%) | 0 |
+| cerebras-qwen-3.8-27b@none | 108 | 61.1% | 2.8% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 1.6% | n/a | 0/108 (0.0%) | 0 |
+| cerebras-gpt-oss-120b@low | 108 | 63.9% | 2.8% | 2.8% (2.8%, 2.8%, 2.8%) | n/a | 97.2% | 1.6% | n/a | 0/108 (0.0%) | 0 |
+| gpt-oss-20b@low | 108 | 65.7% | 0.0% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 1.8% | n/a | 0/108 (0.0%) | 0 |
 
 ### together-parakeet
 
 | Candidate | Outputs | Exact | New words | Meaning changes | Fillers removed | Punctuation | Dictionary terms wrong | Style followed | Failed calls | Rate limited |
 |---|---|---|---|---|---|---|---|---|---|---|
-| gpt-5.4-nano | 108 | 38.0% | 15.7% | 10.2% (11.1%, 8.3%, 11.1%) | 0.0% | 100.0% | 7.7% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-5.4-nano@none | 108 | 38.9% | 15.7% | 11.1% (11.1%, 11.1%, 11.1%) | 0.0% | 100.0% | 7.3% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-5.6-luna@none | 108 | 48.1% | 13.0% | 3.7% (2.8%, 2.8%, 5.6%) | 0.0% | 100.0% | 4.2% | 0.0% | 0/108 (0.0%) | 0 |
-| cerebras-qwen-3.8-27b@none | 108 | 38.9% | 13.9% | 8.3% (8.3%, 8.3%, 8.3%) | 0.0% | 100.0% | 5.5% | 0.0% | 0/108 (0.0%) | 0 |
-| cerebras-gpt-oss-120b@low | 108 | 36.1% | 13.9% | 5.6% (5.6%, 5.6%, 5.6%) | 0.0% | 100.0% | 8.8% | 0.0% | 0/108 (0.0%) | 0 |
-| gpt-oss-20b@low | 108 | 34.3% | 6.5% | 6.5% (8.3%, 5.6%, 5.6%) | 0.0% | 100.0% | 8.8% | 0.0% | 0/108 (0.0%) | 0 |
+| gpt-5.4-nano | 108 | 38.0% | 15.7% | 10.2% (11.1%, 8.3%, 11.1%) | n/a | 100.0% | 7.7% | n/a | 0/108 (0.0%) | 0 |
+| gpt-5.4-nano@none | 108 | 38.9% | 15.7% | 11.1% (11.1%, 11.1%, 11.1%) | n/a | 100.0% | 7.3% | n/a | 0/108 (0.0%) | 0 |
+| gpt-5.6-luna@none | 108 | 48.1% | 13.0% | 3.7% (2.8%, 2.8%, 5.6%) | n/a | 100.0% | 4.2% | n/a | 0/108 (0.0%) | 0 |
+| cerebras-qwen-3.8-27b@none | 108 | 38.9% | 13.9% | 8.3% (8.3%, 8.3%, 8.3%) | n/a | 100.0% | 5.5% | n/a | 0/108 (0.0%) | 0 |
+| cerebras-gpt-oss-120b@low | 108 | 36.1% | 13.9% | 5.6% (5.6%, 5.6%, 5.6%) | n/a | 100.0% | 8.8% | n/a | 0/108 (0.0%) | 0 |
+| gpt-oss-20b@low | 108 | 34.3% | 6.5% | 6.5% (8.3%, 5.6%, 5.6%) | n/a | 100.0% | 8.8% | n/a | 0/108 (0.0%) | 0 |
 
 ## Quality on the 30 to 120 s samples
 
 | Candidate | Outputs | Exact | New words | Meaning changes | Fillers removed | Punctuation | Dictionary terms wrong | Style followed | Failed calls | Rate limited |
 |---|---|---|---|---|---|---|---|---|---|---|
-| gpt-5.4-nano | 54 | 0.0% | 20.4% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 4.5% | 0.0% | 0/54 (0.0%) | 0 |
-| gpt-5.4-nano@none | 54 | 0.0% | 27.8% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 5.1% | 0.0% | 0/54 (0.0%) | 0 |
-| gpt-5.6-luna@none | 54 | 0.0% | 27.8% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 4.1% | 0.0% | 0/54 (0.0%) | 0 |
-| cerebras-qwen-3.8-27b@none | 54 | 0.0% | 11.1% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 3.7% | 0.0% | 0/54 (0.0%) | 0 |
-| cerebras-gpt-oss-120b@low | 54 | 0.0% | 27.8% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 94.4% | 5.4% | 0.0% | 0/54 (0.0%) | 0 |
-| gpt-oss-20b@low | 54 | 0.0% | 1.9% | 0.0% (0.0%, 0.0%, 0.0%) | 0.0% | 100.0% | 4.4% | 0.0% | 0/54 (0.0%) | 0 |
+| gpt-5.4-nano | 54 | 0.0% | 20.4% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 4.5% | n/a | 0/54 (0.0%) | 0 |
+| gpt-5.4-nano@none | 54 | 0.0% | 27.8% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 5.1% | n/a | 0/54 (0.0%) | 0 |
+| gpt-5.6-luna@none | 54 | 0.0% | 27.8% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 4.1% | n/a | 0/54 (0.0%) | 0 |
+| cerebras-qwen-3.8-27b@none | 54 | 0.0% | 11.1% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 3.7% | n/a | 0/54 (0.0%) | 0 |
+| cerebras-gpt-oss-120b@low | 54 | 0.0% | 27.8% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 94.4% | 5.4% | n/a | 0/54 (0.0%) | 0 |
+| gpt-oss-20b@low | 54 | 0.0% | 1.9% | 0.0% (0.0%, 0.0%, 0.0%) | n/a | 100.0% | 4.4% | n/a | 0/54 (0.0%) | 0 |
 
 New words on the 30 to 120 s samples, the words outside the raw, the expected texts and the allowed words, with how many outputs had each:
 

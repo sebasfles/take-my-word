@@ -31,6 +31,8 @@ const ms = (value: number | undefined) =>
 const stat = (stats: LatencyStats) =>
   stats.count === 0 ? "n/a" : `${ms(stats.p50)} / ${ms(stats.p95)} (${String(stats.count)})`;
 
+const measured = (value: number | undefined) => (value === undefined ? "n/a" : pct(value));
+
 function qualityRows(
   candidates: readonly RefinerCandidate[],
   summaries: ReadonlyMap<string, CleanupSummary>,
@@ -43,7 +45,7 @@ function qualityRows(
     const s = summaries.get(candidate.id);
     if (s === undefined || s.results === 0) continue;
     rows.push(
-      `| ${candidate.id} | ${String(s.okResults)} | ${pct(s.exactRate)} | ${pct(s.newWordRate)} | ${pct(s.meaningChangeRate)} (${s.meaningChangesPerRun.map(pct).join(", ")}) | ${pct(s.fillerRemovalRate)} | ${pct(s.punctuationRate)} | ${pct(s.termErrorRate)} | ${pct(s.styleRate)} | ${String(s.failedAttempts)}/${String(s.attempts)} (${pct(s.failureRate)}) | ${String(s.rateLimited)} |`,
+      `| ${candidate.id} | ${String(s.okResults)} | ${pct(s.exactRate)} | ${pct(s.newWordRate)} | ${pct(s.meaningChangeRate)} (${s.meaningChangesPerRun.map(pct).join(", ")}) | ${measured(s.fillerRemovalRate)} | ${pct(s.punctuationRate)} | ${pct(s.termErrorRate)} | ${measured(s.styleRate)} | ${String(s.failedAttempts)}/${String(s.attempts)} (${pct(s.failureRate)}) | ${String(s.rateLimited)} |`,
     );
   }
   return rows;

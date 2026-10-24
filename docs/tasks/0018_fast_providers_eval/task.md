@@ -200,3 +200,13 @@ Changes and decisions not in the plan:
 
 Applied the finding of round 6: before rebasing, one lightweight tag per commit that a report or `meta.json` records (`eval/0018/6e03bab`, `8d9b882`, `787a4b1`, `f494986`, `adf32ee`); then rebased on `origin/develop` (dd517e8) with no conflicts, so round 6's code is now e8dae15, which verify ran on.
 The reports keep the hashes as measured, and `report.md` says the tags keep them reachable; no other change.
+
+### Round 8
+
+Applied all 3 findings of round 7:
+
+1. Filler removal and style followed are n/a in a bucket with no fillers or style markers (24 rows of the chained, per-transcriber and long tables), with a test.
+2. `report.md` states the first paid call's Groq headers as returned (limit, remaining, reset, time), that this task's 761 turbo requests in the 24 hours before do not account for the gap, and under the production switch that prd stays on turbo against those limits, which must be checked in Groq's console.
+3. Recommendation 1 states the trade-offs (P95 3012 against 2617 ms, meaning changes 2.8% against 1.9% inside the baseline's spread) and that `gpt-5.4-nano@none` has 0.0% meaning changes and fails only on loanwords.
+
+Reports re-rendered from the stored results only (no swap, synthesis or provider call); only the generation times and those 24 rows changed.

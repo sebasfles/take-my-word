@@ -216,6 +216,17 @@ describe("cleanup buckets", () => {
     expect(cleanupGate("baseline", "baseline", buckets, "30 to 120 s")?.relative.passed).toBe(true);
   });
 
+  it("reports filler removal and style as not measured where a bucket has neither", () => {
+    const plainCase = { ...longCase, fillers: [], styleRequired: [], styleForbidden: [] };
+    const checked = run("candidate", plainCase, [expected, expected, expected]);
+    const buckets = summarizeCleanupBuckets(["candidate"], checked, [], isExtended);
+    expect(buckets.extended.get("candidate")).toMatchObject({
+      fillerRemovalRate: undefined,
+      styleRate: undefined,
+      punctuationRate: 1,
+    });
+  });
+
   it("judges a combination on its own transcriber's raws against today's pair", () => {
     const checked = [
       ...run("baseline", longCase, [expected, expected, expected]),

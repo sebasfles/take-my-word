@@ -1,6 +1,6 @@
 # Transcription evaluation
 
-Generated 2026-10-24T19:17:05.257Z from code commit `6e03babaf69d3540d4886a0e47815a91b89d01fc`, resumed with `787a4b12e9e199ddaebe28260da69044eb828b78`, resumed with `f4949864aab6fe05f43e271ba2f87c8ae50910da` and fixtures sha256 `7a350e4eaedc4fcf`.
+Generated 2026-10-24T19:27:07.079Z from code commit `6e03babaf69d3540d4886a0e47815a91b89d01fc`, resumed with `787a4b12e9e199ddaebe28260da69044eb828b78`, resumed with `f4949864aab6fe05f43e271ba2f87c8ae50910da` and fixtures sha256 `7a350e4eaedc4fcf`.
 Every provider call ran inside the dev eval Lambda `take-my-word-dev-eval` (us-east-1, 1024 MB, arm64), through the production adapters and production's `transcribeIn`, 5 runs per clip and language setting; run 1 opens a fresh connection, later runs reuse the Lambda's kept-alive one.
 Clips are Polly neural speech generated at run time (voices Lupe, Andres, Joanna, Matthew, Pedro, Mia) and seeded noise; every candidate got the same bytes and the transcriber prompt of the case's fixture dictionary.
 "one" sends the case's language; "both" lets the transcriber detect among es and en and transcribes again in es when it reports neither, as production does.
