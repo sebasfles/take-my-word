@@ -171,3 +171,10 @@ The report is rendered when those calls land.
 - Groq paid plan, ready but off: `paidPlans` in `prices.ts` (empty); with a dated entry, Groq calls from that date get no free plan (no daily reserve, no quarter-minute pace; pacing by Groq's headers only), are charged at list price into the run cap, and every report states the task's Groq spend since then against the monthly limit; tests.
 - `eval:dictate --smoke --combinations ...`: one end-to-end case through production's `dictate()` in the eval Lambda, no baseline forced; run with three non-Groq pairs, all ok.
 - The 08:33Z resume is scheduled behind an STS check (`scripts/sts-check.sh` in the workspace) that leaves the run paused on stale credentials.
+
+### Round 5
+
+Applied the finding of round 4: no required or forbidden word contains one of its case's terms or translates one.
+Changed: extended-en-100 "opened a PR" to "opened" and "not merge" to "do not"; extended-es-100 "menos clorofila" to "menos", forbidden "más clorofila" dropped (a bare "más" is in its own text, "más débil", so "menos" carries the check); extended-mixed-100 "después del launch" to "después", "pager" and "follow" dropped; long-mixed-1 forbidden "reunión inicial" and "presentación" dropped; dev-en-3 "not merge" to "not", forbidden "let's merge" dropped; dev-es-3 forbidden "hagamos merge ya" dropped (the last three also contained the term "merge").
+`chained.fixtures.json` regenerated with `eval:chain` (98 cases); a test fails any check that contains one of its case's terms.
+`eval:chain` now runs prettier on the file it writes, so a regenerated `chained.fixtures.json` passes lint as written.

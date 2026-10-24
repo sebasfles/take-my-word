@@ -81,4 +81,18 @@ describe("committed fixtures", () => {
     );
     expect(problems).toEqual([]);
   });
+
+  it("keep every chained check free of its case's own terms", () => {
+    const checks = chainedChecksSchema.parse(JSON.parse(readFileSync(chainedChecksPath, "utf8")));
+    const overlaps = transcription.cases.flatMap((item) => {
+      const written = item.kind === "speech" ? checks[item.id] : undefined;
+      if (item.kind !== "speech" || written === undefined) return [];
+      return [...written.required, ...written.forbidden].flatMap((word) =>
+        item.terms
+          .filter((term) => hasTerm(word, term))
+          .map((term) => `${item.id}: "${word}" has "${term}"`),
+      );
+    });
+    expect(overlaps).toEqual([]);
+  });
 });

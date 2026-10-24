@@ -8,8 +8,8 @@
     "forbidden": ["delete"]
   },
   "dev-en-3": {
-    "required": ["replaced", "not merge", "yet"],
-    "forbidden": ["let's merge"]
+    "required": ["replaced", "not", "yet"],
+    "forbidden": []
   },
   "dev-en-4": {
     "required": ["push", "tell me", "green"],
@@ -25,7 +25,7 @@
   },
   "dev-es-3": {
     "required": ["reemplazar", "no hagamos", "todavía"],
-    "forbidden": ["hagamos merge ya"]
+    "forbidden": []
   },
   "dev-es-4": {
     "required": ["haz", "sube", "avísame", "verde"],
@@ -109,7 +109,7 @@
   },
   "long-mixed-1": {
     "required": ["lunes", "prepares", "mandes", "viernes"],
-    "forbidden": ["reunión inicial", "presentación"]
+    "forbidden": []
   },
   "quiet-es-1": {
     "required": ["gracias", "revisé", "informe", "bien"],
@@ -147,8 +147,8 @@
       "restores",
       "module",
       "rotation",
-      "opened a PR",
-      "not merge",
+      "opened",
+      "do not",
       "Monday",
       "keep",
       "alert",
@@ -183,7 +183,7 @@
       "no amplificaron",
       "repetir",
       "sanos",
-      "menos clorofila",
+      "menos",
       "revises",
       "viernes",
       "mandar",
@@ -194,7 +194,7 @@
       "revisa",
       "inventario"
     ],
-    "forbidden": ["más clorofila"]
+    "forbidden": []
   },
   "extended-mixed-45": {
     "required": ["gustó", "cambios", "jueves", "actualizar", "revisa", "viernes", "avísame"],
@@ -204,10 +204,8 @@
     "required": [
       "agresivo",
       "cerrar",
-      "después del launch",
+      "después",
       "martes",
-      "pager",
-      "follow",
       "no está aprobado",
       "no podemos contratar"
     ],
