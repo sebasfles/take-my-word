@@ -2,8 +2,8 @@ use std::sync::LazyLock;
 
 use serde::Deserialize;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
 use crate::config::Placement;
@@ -307,6 +307,10 @@ fn view_url(label: &str, query: &str) -> String {
     let language = crate::i18n::language().code();
     let theme = crate::theme::query();
     format!("index.html?view={label}&lang={language}{theme}{query}")
+}
+
+pub fn overlay_size(scale: f64) -> PhysicalSize<u32> {
+    LogicalSize::new(SIZES.overlay.width, SIZES.overlay.height).to_physical(scale)
 }
 
 pub fn create_overlay(app: &AppHandle) -> tauri::Result<WebviewWindow> {

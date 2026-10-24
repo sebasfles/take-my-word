@@ -4,15 +4,19 @@ set -euo pipefail
 usage() {
   cat >&2 <<'EOF'
 usage: scripts/overlay-smoke.sh --app 'C:\path\take-my-word.exe' --sign-in .env [--takes 5]
-                                [--starts hand,autostart] [--no-frames] [--keys alt,ctrl,win] [--out dir]
+                                [--starts hand,autostart] [--no-frames] [--displays] [--keys alt,ctrl,win] [--out dir]
 
 Starts the dev app each way it starts and checks the overlay's pixels on every take, from WSL on the Windows host:
   hand       a start by hand, which opens the main window; the run closes it
   autostart  --autostart by hand, which stays in the tray
 After each start the overlay must be frameless; then near-silent takes into a scratch window, alternating hold and
-hands-free, must each paint listening and processing, draw no title bar and leave the focus on the scratch window.
+hands-free, must each paint listening and processing (accent pixels the hidden baseline lacks), draw no title bar,
+sit centred above the taskbar of the monitor it shows on and leave the focus on the scratch window.
 --no-frames (debug builds only) makes the overlay paint nothing before one extra hold, which must paint again within
 that hold once the overlay is recreated.
+--displays adds, after the last start's takes, a hold on the secondary display (the cursor moved there), one after
+raising that display's scale a step, and one back on the primary display; the scale and cursor are always restored.
+Exits nonzero when any check fails.
 --sign-in names a file with CREW_E2E_B_USERNAME and CREW_E2E_B_PASSWORD; the run signs in through the main window
 and signs out at the end. Needs nobody at the keyboard and no other dev instance running.
 EOF
@@ -24,6 +28,7 @@ app=""
 takes=5
 starts="hand,autostart"
 no_frames=0
+displays=0
 keys="alt,ctrl,win"
 run_id="tmw-overlay-$(date +%H%M%S)"
 out=""
@@ -34,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     --takes) takes="$2"; shift 2 ;;
     --starts) starts="$2"; shift 2 ;;
     --no-frames) no_frames=1; shift ;;
+    --displays) displays=1; shift ;;
     --keys) keys="$2"; shift 2 ;;
     --out) out="$2"; shift 2 ;;
     *) usage ;;
@@ -49,6 +55,8 @@ mkdir -p "$scratch" "$out"
 cp "$here/terminal-smoke.ps1" "$scratch/terminal-smoke.ps1"
 ps1="$(wslpath -w "$scratch/terminal-smoke.ps1")"
 app_log="$local_app_data/dev.fless.takemyword.dev/logs/Take My Word Dev.log"
+overlay_size="$(node -p "const o = require('$here/../src/windows.json').overlay; o.width + 'x' + o.height")"
+overlay_margin="$(grep -oP 'const BOTTOM_MARGIN: f64 = \K[0-9.]+' "$here/../src-tauri/src/overlay.rs")"
 
 log() {
   printf '%s %s\n' "$(date -u +%H:%M:%S.%3N)" "$*" | tee -a "$out/run.log" >&2
@@ -93,9 +101,8 @@ start_app() {
 
 stop_app() {
   [[ -n "${app_pid:-}" ]] || return 0
-  powershell.exe -NoProfile -Command "Stop-Process -Id $app_pid" >/dev/null 2>&1 && log "stopped the app ($app_pid)"
+  log "stopped the app ($app_pid) and its WebView2: $(psw stop-tree "$app_pid")"
   app_pid=""
-  sleep 2
 }
 
 main_window() {
@@ -159,6 +166,10 @@ sign_out() {
 cleanup() {
   set +e
   in_cleanup=1
+  if [[ -n "${scaled_display:-}" ]]; then
+    log "scale of $scaled_display restored to $(psw set-scale "$scaled_display" "$scaled_from")%"
+  fi
+  [[ -n "${cursor_home:-}" ]] && psw move-cursor "${cursor_home%,*}" "${cursor_home#*,}" >/dev/null
   [[ -n "${target_pid:-}" ]] && powershell.exe -NoProfile -Command "Stop-Process -Id $target_pid" >/dev/null 2>&1
   [[ -n "${signed_in:-}" ]] && sign_out
   stop_app
@@ -197,7 +208,7 @@ judge() {
   local line="$1" mode="$2"
   [[ "$line" == *"focus=kept"* ]] || return 1
   [[ "$line" == *"listening=painted"* && "$line" == *"processing=painted"* ]] || return 1
-  [[ "$line" != *"framed"* ]] || return 1
+  [[ "$line" != *"framed"* && "$line" != *"off-centre"* ]] || return 1
   local band
   for band in $(grep -o 'band=[0-9]*' <<<"$line" | cut -d= -f2); do
     (( band <= 200 )) || return 1
@@ -209,7 +220,7 @@ take() {
   local start="$1" n="$2" mode="$3" offset line verdict
   guard_ok
   offset="$(app_log_size)"
-  line="$(act overlay-take "$app_pid" "$mode" "$keys" "$target" "$(wslpath -w "$out/$start-$n-$mode")")"
+  line="$(act overlay-take "$app_pid" "$mode" "$keys" "$target" "$(wslpath -w "$out/$start-$n-$mode")" "$overlay_size" "$overlay_margin")"
   sleep 2
   if judge "$line" "$mode"; then verdict=PASS; else verdict=FAIL; fi
   if [[ "$mode" == no-frames ]] && ! app_log_since "$offset" | grep -q 'recreating the overlay'; then verdict=FAIL; fi
@@ -262,7 +273,33 @@ for start in "${paths[@]}"; do
     sleep 1
     take "$start" "$((takes + 1))" no-frames
   fi
+  if (( displays )) && [[ "$start" == "${paths[-1]}" ]]; then
+    secondary="$(psw displays | grep ' secondary ' | head -1)"
+    [[ -n "$secondary" ]] || fail "--displays needs a secondary display"
+    read -r display _ bounds scale <<<"$secondary"
+    IFS=, read -r bx by bw bh <<<"$bounds"
+    cursor_home="$(psw cursor)"
+    log "displays: secondary $display at $scale%, cursor from $cursor_home"
+    act move-cursor "$((bx + bw / 2))" "$((by + bh / 2))" >/dev/null
+    take "$start" secondary hold
+    case "$scale" in 100) raised=125 ;; 125) raised=150 ;; *) raised=100 ;; esac
+    scaled_display="$display"
+    scaled_from="$scale"
+    guard_ok
+    log "displays: $display scale now $(act set-scale "$display" "$raised")%"
+    sleep 3
+    act move-cursor "$((bx + bw / 2))" "$((by + bh / 2))" >/dev/null
+    take "$start" "secondary-$raised" hold
+    log "displays: $display scale restored to $(act set-scale "$display" "$scale")%"
+    scaled_display=""
+    sleep 3
+    act move-cursor "${cursor_home%,*}" "${cursor_home#*,}" >/dev/null
+    cursor_home=""
+    take "$start" primary hold
+  fi
   stop_app
 done
 
-log "done: $(grep -c $'\tPASS\t' "$out/results.tsv") passed, $(grep -c $'\tFAIL\t' "$out/results.tsv") failed, results in $out"
+failed="$(grep -c $'\tFAIL\t' "$out/results.tsv" || true)"
+log "done: $(grep -c $'\tPASS\t' "$out/results.tsv") passed, $failed failed, results in $out"
+(( failed == 0 )) || exit 1

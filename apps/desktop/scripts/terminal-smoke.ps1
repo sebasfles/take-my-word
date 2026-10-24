@@ -609,6 +609,112 @@ public static class TmwSmoke
         return changed;
     }
 
+    static bool IsAccent(System.Drawing.Color p) { return p.R > 170 && p.R - p.G > 60 && p.R - p.B > 90; }
+
+    public static int NewAccent(System.Drawing.Bitmap shot, System.Drawing.Bitmap baseline)
+    {
+        int count = 0;
+        for (int x = 0; x < shot.Width; x++)
+            for (int y = 0; y < shot.Height; y++)
+                if (IsAccent(shot.GetPixel(x, y)) && !IsAccent(baseline.GetPixel(x, y))) count++;
+        return count;
+    }
+
+    [StructLayout(LayoutKind.Sequential)] struct MONITORINFO { public int size; public RECT monitor; public RECT work; public uint flags; }
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+    [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
+
+    public static string Centred(long handle, double width, double height, double margin)
+    {
+        var window = new IntPtr(handle);
+        var info = new MONITORINFO { size = Marshal.SizeOf(typeof(MONITORINFO)) };
+        GetMonitorInfo(MonitorFromWindow(window, 2), ref info);
+        double scale = GetDpiForWindow(window) / 96.0;
+        int w = (int)Math.Round(width * scale), h = (int)Math.Round(height * scale);
+        int x = info.work.left + (info.work.right - info.work.left - w) / 2;
+        int y = info.work.bottom - h - (int)Math.Round(margin * scale);
+        RECT outer;
+        GetWindowRect(window, out outer);
+        bool centred = Math.Abs(outer.left - x) <= 1 && Math.Abs(outer.top - y) <= 1
+            && Math.Abs(outer.right - outer.left - w) <= 1 && Math.Abs(outer.bottom - outer.top - h) <= 1;
+        return string.Format("{0}({1},{2} {3}x{4} at {5}%, expected {6},{7} {8}x{9})", centred ? "centred" : "off-centre",
+            outer.left, outer.top, outer.right - outer.left, outer.bottom - outer.top, Math.Round(scale * 100), x, y, w, h);
+    }
+
+    [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT point);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+    [StructLayout(LayoutKind.Sequential)] struct POINT { public int x, y; }
+
+    public static string Cursor() { POINT p; GetCursorPos(out p); return p.x + "," + p.y; }
+
+    public static void MoveCursor(int x, int y)
+    {
+        int left = GetSystemMetrics(76), top = GetSystemMetrics(77), width = GetSystemMetrics(78), height = GetSystemMetrics(79);
+        var input = new INPUT { type = 0 };
+        input.u.mi = new MOUSEINPUT
+        {
+            dx = (int)Math.Round((x - left) * 65535.0 / (width - 1)),
+            dy = (int)Math.Round((y - top) * 65535.0 / (height - 1)),
+            dwFlags = 0x0001 | 0x8000 | 0x4000
+        };
+        SendInput(1, new[] { input }, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    [StructLayout(LayoutKind.Sequential)] struct DC_SOURCE { public uint adapterLow; public int adapterHigh; public uint id; public uint mode; public uint flags; }
+    [StructLayout(LayoutKind.Sequential)] struct DC_TARGET { public uint adapterLow; public int adapterHigh; public uint id; public uint mode; public int tech; public int rotation; public int scaling; public uint num; public uint den; public int order; public int available; public uint flags; }
+    [StructLayout(LayoutKind.Sequential)] struct DC_PATH { public DC_SOURCE source; public DC_TARGET target; public uint flags; }
+    [StructLayout(LayoutKind.Sequential)] struct DC_HEADER { public int type; public uint size; public uint adapterLow; public int adapterHigh; public uint id; }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct DC_SOURCE_NAME { public DC_HEADER header; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string name; }
+    [StructLayout(LayoutKind.Sequential)] struct DC_DPI_GET { public DC_HEADER header; public int min; public int cur; public int max; }
+    [StructLayout(LayoutKind.Sequential)] struct DC_DPI_SET { public DC_HEADER header; public int scale; }
+    [DllImport("user32.dll")] static extern int GetDisplayConfigBufferSizes(uint flags, out uint paths, out uint modes);
+    [DllImport("user32.dll")] static extern int QueryDisplayConfig(uint flags, ref uint paths, [Out] DC_PATH[] pathArray, ref uint modes, [Out] byte[] modeArray, IntPtr topology);
+    [DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(ref DC_SOURCE_NAME info);
+    [DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(ref DC_DPI_GET info);
+    [DllImport("user32.dll")] static extern int DisplayConfigSetDeviceInfo(ref DC_DPI_SET info);
+    static readonly int[] ScaleSteps = { 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500 };
+
+    static DC_PATH Path(string display)
+    {
+        uint paths, modes;
+        if (GetDisplayConfigBufferSizes(2, out paths, out modes) != 0) throw new Exception("GetDisplayConfigBufferSizes failed");
+        var pathArray = new DC_PATH[paths];
+        var modeArray = new byte[modes * 64];
+        if (QueryDisplayConfig(2, ref paths, pathArray, ref modes, modeArray, IntPtr.Zero) != 0) throw new Exception("QueryDisplayConfig failed");
+        for (int i = 0; i < paths; i++)
+        {
+            var name = new DC_SOURCE_NAME();
+            name.header = new DC_HEADER { type = 1, size = (uint)Marshal.SizeOf(typeof(DC_SOURCE_NAME)), adapterLow = pathArray[i].source.adapterLow, adapterHigh = pathArray[i].source.adapterHigh, id = pathArray[i].source.id };
+            if (DisplayConfigGetDeviceInfo(ref name) == 0 && name.name == display) return pathArray[i];
+        }
+        throw new Exception("no display " + display);
+    }
+
+    static DC_HEADER Header(DC_PATH path, int type, Type kind)
+    {
+        return new DC_HEADER { type = type, size = (uint)Marshal.SizeOf(kind), adapterLow = path.source.adapterLow, adapterHigh = path.source.adapterHigh, id = path.source.id };
+    }
+
+    public static int ScaleOf(string display)
+    {
+        var path = Path(display);
+        var dpi = new DC_DPI_GET { header = Header(path, -3, typeof(DC_DPI_GET)) };
+        if (DisplayConfigGetDeviceInfo(ref dpi) != 0) throw new Exception("reading the scale failed");
+        return ScaleSteps[Math.Max(0, Math.Min(ScaleSteps.Length - 1, Math.Abs(dpi.min) + dpi.cur))];
+    }
+
+    public static void SetScale(string display, int percent)
+    {
+        var path = Path(display);
+        var dpi = new DC_DPI_GET { header = Header(path, -3, typeof(DC_DPI_GET)) };
+        if (DisplayConfigGetDeviceInfo(ref dpi) != 0) throw new Exception("reading the scale failed");
+        int step = Array.IndexOf(ScaleSteps, percent);
+        if (step < 0) throw new Exception("unsupported scale " + percent);
+        var set = new DC_DPI_SET { header = Header(path, -4, typeof(DC_DPI_SET)), scale = step - Math.Abs(dpi.min) };
+        if (DisplayConfigSetDeviceInfo(ref set) != 0) throw new Exception("setting the scale failed");
+    }
+
     public static void Send(ushort vk, bool up)
     {
         SendInput(1, new[] { Key(vk, up) }, Marshal.SizeOf(typeof(INPUT)));
@@ -658,9 +764,33 @@ switch ($Command) {
         if ($overlay -eq 0) { 'no overlay'; exit 4 }
         [TmwSmoke]::Frame($overlay)
     }
+    'displays' {
+        [TmwSmoke]::PhysicalPixels()
+        Add-Type -AssemblyName System.Windows.Forms
+        [Windows.Forms.Screen]::AllScreens | ForEach-Object { '{0} {1} {2},{3},{4},{5} {6}' -f $_.DeviceName, $(if ($_.Primary) { 'primary' } else { 'secondary' }), $_.Bounds.X, $_.Bounds.Y, $_.Bounds.Width, $_.Bounds.Height, [TmwSmoke]::ScaleOf($_.DeviceName) }
+    }
+    'scale' { [TmwSmoke]::ScaleOf($Rest[0]) }
+    'set-scale' { [TmwSmoke]::SetScale($Rest[0], [int]$Rest[1]); Start-Sleep -Milliseconds 500; [TmwSmoke]::ScaleOf($Rest[0]) }
+    'cursor' { [TmwSmoke]::PhysicalPixels(); [TmwSmoke]::Cursor() }
+    'move-cursor' { [TmwSmoke]::PhysicalPixels(); [TmwSmoke]::MoveCursor([int]$Rest[0], [int]$Rest[1]); Start-Sleep -Milliseconds 100; [TmwSmoke]::Cursor() }
+    'stop-tree' {
+        $root = [int]$Rest[0]
+        $all = Get-CimInstance Win32_Process
+        $ids = @($root)
+        do {
+            $added = @($all | Where-Object { $ids -contains $_.ParentProcessId -and $ids -notcontains $_.ProcessId } | ForEach-Object { [int]$_.ProcessId })
+            $ids += $added
+        } while ($added.Count -gt 0)
+        Stop-Process -Id $root -ErrorAction SilentlyContinue
+        for ($i = 0; $i -lt 100 -and (Get-Process -Id $ids -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 100 }
+        $left = @(Get-Process -Id $ids -ErrorAction SilentlyContinue)
+        $left | Stop-Process -Force -ErrorAction SilentlyContinue
+        'stopped {0} processes, {1} forced' -f $ids.Count, $left.Count
+    }
     'overlay-take' {
         [TmwSmoke]::PhysicalPixels()
         $appPid = [int]$Rest[0]; $mode = $Rest[1]; $target = [long]$Rest[3]; $dir = $Rest[4]
+        $size = $Rest[5].Split('x') | ForEach-Object { [double]$_ }; $margin = [double]$Rest[6]
         $chord = [uint16[]]($Rest[2].Split(',') | ForEach-Object { $keys[$_] })
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         if (-not [TmwSmoke]::Focus($target)) { 'not focused'; exit 4 }
@@ -680,7 +810,7 @@ switch ($Command) {
                     $rect = [TmwSmoke]::RectOf($overlay)
                     $shot = [TmwSmoke]::Grab($rect)
                     $accent = [TmwSmoke]::Accent($shot)
-                    if ($null -eq $best -or $accent -gt $best.Accent) { $best = @{ Rect = $rect; Shot = $shot; Frame = $frame; Accent = $accent } }
+                    if ($null -eq $best -or $accent -gt $best.Accent) { $best = @{ Rect = $rect; Shot = $shot; Frame = $frame; Accent = $accent; Place = [TmwSmoke]::Centred($overlay, $size[0], $size[1], $margin) } }
                 }
                 if (-not [TmwSmoke]::IsForeground($target)) { $script:focusKept = $false }
             } while ((Get-Date) -lt $deadline)
@@ -703,10 +833,11 @@ switch ($Command) {
             if ($null -eq $shots[$name]) { '{0}=hidden' -f $name; continue }
             $baseline = [TmwSmoke]::Grab($shots[$name].Rect)
             $baseline.Save((Join-Path $dir "$name-baseline.png"))
-            $accent = $shots[$name].Accent
+            $accent = [TmwSmoke]::NewAccent($shots[$name].Shot, $baseline)
+            $behind = [TmwSmoke]::Accent($baseline)
             $band = [TmwSmoke]::TopBandChanges($shots[$name].Shot, $baseline)
             $painted = if ($accent -gt 0) { 'painted' } else { 'unpainted' }
-            '{0}={1} accent={2} band={3} {4}' -f $name, $painted, $accent, $band, ($shots[$name].Frame -split ' ')[0]
+            '{0}={1} accent={2} baseline={3} band={4} {5} {6}' -f $name, $painted, $accent, $behind, $band, ($shots[$name].Frame -split ' ')[0], $shots[$name].Place
         }
         $focus = if ($script:focusKept) { 'kept' } else { 'taken' }
         'take mode={0} focus={1} {2}' -f $mode, $focus, ($parts -join ' ')

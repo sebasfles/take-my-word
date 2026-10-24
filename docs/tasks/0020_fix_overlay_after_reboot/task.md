@@ -148,3 +148,29 @@ Deferred:
 - `place_above_taskbar` and `set_shown` run window getters from the session thread inside the gate lock during `begin_recording`; they wait on the main thread during a hold (pre-existing).
 - A dev release build's first run writes the `Take My Word Dev` Run entry (`refresh_autostart` with `firstRunDone` false); I removed the one my probe build wrote.
 - The shell's default Node is 22 while `.nvmrc` pins 24; `release.test.ts` fails on 22.
+
+### Round 2
+
+Did, finding by finding:
+1. `place_above_taskbar` now centres with `above_taskbar(work_area, scale)`, which takes the size from `SIZES.overlay` times the target monitor's scale, and then sets that size too, so a size left from an earlier scale never survives (the first fix without `set_size` still showed 480x96 at 125 % and 384x77 back at 100 % in the smoke).
+   Unit test `the_overlay_is_centred_above_the_taskbar_at_the_scale_of_the_monitor_it_goes_to`; the smoke's `--displays` holds on the secondary display, after raising its scale a step and back on the first display, the scale always restored.
+2. "painted" counts only accent pixels the hidden baseline lacks at the same coordinates, and the take reports the baseline's own accent; every take also checks the overlay is centred and sized for the monitor it shows on.
+3. `overlay-smoke.sh` exits 1 when `results.tsv` holds a FAIL; cleanup still runs.
+4. Evidence below is on the commit that closes these findings.
+
+Also changed, found while closing them:
+- A show that lasted 400 ms or more and ended without a confirmed frame now counts as missed and recreates the overlay when it hides; before, hiding cleared it, so a near-silent take under 1 s was never judged.
+- The smoke stops the app's whole process tree and waits for its WebView2 to exit before the next start.
+  The round 2 run that skipped this (`smoke-r2`) failed autostart takes 1 to 3: that instance shared the browser process the previous, faulted instance left behind; the same builds started cleanly painted every take (`exp-*`).
+- Windows moves the cursor to the primary display when a display's scale changes, so the smoke puts it back before the take at the new scale.
+
+Evidence (workspace `evidence/probe`):
+- `smoke-a14046a`: debug build of the app at b8f6b5c (a14046a only adds the cursor line to the smoke), `--starts hand,autostart --takes 5 --no-frames --displays`: 17 of 17 pass, exit 0, recreated at the no-frames take of each start and painted again within its hold.
+- `smoke-base-1a77433`: the same smoke on the `develop` release build fails, exit 1: framed after start, and its first take off-centre on the 100 % display (2580,888 for 2640,912).
+- `measure-1052`, Acceptance 3 and 4 on dev release builds of `develop` (1a77433) and b8f6b5c, same session: first painted pill (accent pixels below the top third the baseline lacks) median 35 ms and 38 ms; private working set 27.1 MB and 24.8 MB; CPU over 5 idle minutes 0.31 s and 0.58 s.
+
+Decisions the plan did not record:
+- Missed show at 400 ms: a healthy overlay confirms its first frame in about 40 to 160 ms.
+- The overlay's size is set on every show from the target scale, not left to `WM_DPICHANGED`.
+
+Deferred: none new; round 1's item on window getters inside the gate lock goes to the ARD as debt in `document-task`.

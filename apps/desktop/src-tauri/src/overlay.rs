@@ -4,7 +4,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalRect, WindowEvent};
 
 use crate::audio::Level;
 use crate::dictation::Notifier;
@@ -256,7 +256,7 @@ impl Overlay for WindowOverlay {
             if shown {
                 lifecycle.health.shown(generation, Instant::now());
             } else {
-                lifecycle.health.hidden();
+                lifecycle.health.hidden(Instant::now());
             }
             lifecycle.health.is_ready()
         };
@@ -276,6 +276,7 @@ impl Overlay for WindowOverlay {
         if !shown {
             set_shown(&window, false);
             set_memory_target(&window, MemoryTarget::Low);
+            self.check();
             return;
         }
         set_memory_target(&window, MemoryTarget::Normal);
@@ -355,14 +356,20 @@ fn place_above_taskbar(app: &AppHandle, window: &tauri::WebviewWindow) {
         .ok()
         .and_then(|cursor| app.monitor_from_point(cursor.x, cursor.y).ok().flatten())
         .or_else(|| window.primary_monitor().ok().flatten());
-    let (Some(monitor), Ok(size)) = (monitor, window.outer_size()) else {
+    let Some(monitor) = monitor else {
         return;
     };
-    let area = monitor.work_area();
-    let margin = (BOTTOM_MARGIN * monitor.scale_factor()) as i32;
+    let scale = monitor.scale_factor();
+    let _ = window.set_position(above_taskbar(monitor.work_area(), scale));
+    let _ = window.set_size(crate::windows::overlay_size(scale));
+}
+
+fn above_taskbar(area: &PhysicalRect<i32, u32>, scale: f64) -> PhysicalPosition<i32> {
+    let size = crate::windows::overlay_size(scale);
+    let margin = (BOTTOM_MARGIN * scale).round() as i32;
     let x = area.position.x + (area.size.width as i32 - size.width as i32) / 2;
     let y = area.position.y + area.size.height as i32 - size.height as i32 - margin;
-    let _ = window.set_position(PhysicalPosition::new(x, y));
+    PhysicalPosition::new(x, y)
 }
 
 fn set_shown(window: &tauri::WebviewWindow, shown: bool) {
@@ -498,6 +505,22 @@ mod tests {
         pump(&level, &running, Duration::ZERO, |_| {
             panic!("sent while idle")
         });
+    }
+
+    #[test]
+    fn the_overlay_is_centred_above_the_taskbar_at_the_scale_of_the_monitor_it_goes_to() {
+        let area = |x: i32, width: u32, height: u32, taskbar: u32| PhysicalRect {
+            position: PhysicalPosition::new(x, 0),
+            size: tauri::PhysicalSize::new(width, height - taskbar),
+        };
+        let laptop = area(0, 1920, 1080, 0);
+        let right = area(1920, 1920, 1080, 48);
+        assert_eq!(
+            above_taskbar(&laptop, 1.25),
+            PhysicalPosition::new(660, 870)
+        );
+        assert_eq!(above_taskbar(&right, 1.0), PhysicalPosition::new(2640, 864));
+        assert_eq!(above_taskbar(&right, 1.5), PhysicalPosition::new(2520, 780));
     }
 
     #[test]

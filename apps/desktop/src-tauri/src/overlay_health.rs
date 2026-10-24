@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 pub const PAINT_DEADLINE: Duration = Duration::from_secs(1);
 pub const READY_DEADLINE: Duration = Duration::from_secs(20);
+pub const MISSED_SHOW: Duration = Duration::from_millis(400);
 const REPAIRS_WITHOUT_A_FRAME: u32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,6 +28,7 @@ pub struct Health {
     created: Instant,
     ready: bool,
     unpainted: Option<(u64, Instant)>,
+    missed: bool,
     failed: bool,
     repairs: u32,
 }
@@ -37,6 +39,7 @@ impl Health {
             created: now,
             ready: false,
             unpainted: None,
+            missed: false,
             failed: false,
             repairs: 0,
         }
@@ -62,14 +65,19 @@ impl Health {
         self.unpainted = Some((seq, since));
     }
 
-    pub fn hidden(&mut self) {
-        self.unpainted = None;
+    pub fn hidden(&mut self, now: Instant) {
+        if let Some((_, since)) = self.unpainted.take()
+            && now.saturating_duration_since(since) >= MISSED_SHOW
+        {
+            self.missed = true;
+        }
     }
 
     pub fn painted(&mut self, seq: u64) {
         if self.unpainted.is_some_and(|(shown, _)| shown <= seq) {
             self.unpainted = None;
         }
+        self.missed = false;
         self.repairs = 0;
     }
 
@@ -93,8 +101,10 @@ pub fn verdict(health: &Health, now: Instant) -> Option<Repair> {
         let waited = now.saturating_duration_since(health.created);
         return (waited >= READY_DEADLINE).then_some(Repair::NeverReady);
     }
-    let (_, since) = health.unpainted?;
-    (now.saturating_duration_since(since) >= PAINT_DEADLINE).then_some(Repair::NoFrames)
+    let overdue = health
+        .unpainted
+        .is_some_and(|(_, since)| now.saturating_duration_since(since) >= PAINT_DEADLINE);
+    (health.missed || overdue).then_some(Repair::NoFrames)
 }
 
 #[cfg(test)]
@@ -148,12 +158,22 @@ mod tests {
     }
 
     #[test]
-    fn a_hidden_overlay_is_never_judged_on_its_frames() {
+    fn a_show_too_brief_to_paint_is_not_judged_but_a_long_one_that_ended_unpainted_is() {
         let start = Instant::now();
         let mut health = ready_at(start);
         health.shown(1, start);
-        health.hidden();
+        health.hidden(start + MISSED_SHOW / 2);
         assert_eq!(verdict(&health, start + PAINT_DEADLINE * 10), None);
+        health.shown(2, start);
+        health.hidden(start + MISSED_SHOW);
+        assert_eq!(
+            verdict(&health, start + MISSED_SHOW),
+            Some(Repair::NoFrames)
+        );
+        health.shown(3, start);
+        health.painted(3);
+        health.hidden(start + PAINT_DEADLINE);
+        assert_eq!(verdict(&health, start + PAINT_DEADLINE), None);
     }
 
     #[test]
