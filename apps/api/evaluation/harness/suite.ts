@@ -7,7 +7,13 @@ import {
   type EvalBundle,
   type EvalFunction,
 } from "./eval-lambda.ts";
-import { CostGuard, Pacer, type LedgerEntry, type PacingKey } from "./pacing.ts";
+import {
+  CostGuard,
+  Pacer,
+  type LedgerEntry,
+  type PacingKey,
+  type PacingOverrides,
+} from "./pacing.ts";
 import { complimentaryDailyTokens, modelFacts, runBudgetUsd } from "./prices.ts";
 import { runSchedule, type PlannedItem } from "./scheduler.ts";
 import { appendJsonl, readJsonl, type ResultsDir } from "./store.ts";
@@ -18,6 +24,7 @@ export interface SuiteArgs {
   report?: string;
   runs: number;
   smoke: boolean;
+  overrides: PacingOverrides;
 }
 
 export function suiteArgs(usage: string, defaultRuns: number): SuiteArgs {
@@ -27,6 +34,7 @@ export function suiteArgs(usage: string, defaultRuns: number): SuiteArgs {
       report: { type: "string" },
       runs: { type: "string", default: String(defaultRuns) },
       smoke: { type: "boolean", default: false },
+      "whisper-daily-kept": { type: "string" },
     },
   });
   const runs = Number(values.runs);
@@ -41,7 +49,23 @@ export function suiteArgs(usage: string, defaultRuns: number): SuiteArgs {
     ...(values.report !== undefined && { report: fromInvocation(values.report) }),
     runs,
     smoke: values.smoke,
+    overrides: overridesFrom(values["whisper-daily-kept"]),
   };
+}
+
+export function overridesFrom(whisperDailyKept: string | undefined): PacingOverrides {
+  if (whisperDailyKept === undefined) return {};
+  const kept = Number(whisperDailyKept);
+  if (!Number.isFinite(kept)) throw new Error("--whisper-daily-kept must be a fraction");
+  return { whisperDailyKept: kept };
+}
+
+export function describeOverrides(overrides: PacingOverrides): string[] {
+  return overrides.whisperDailyKept === undefined
+    ? []
+    : [
+        `Groq Whisper daily limits kept ${String(overrides.whisperDailyKept * 100)}% free for production instead of half (--whisper-daily-kept ${String(overrides.whisperDailyKept)}); per-minute and hourly pacing unchanged`,
+      ];
 }
 
 export const pacingKeyOf = (model: string): string => `${modelFacts(model).provider}:${model}`;
@@ -123,10 +147,19 @@ export async function executePlan<R extends Charged>(
   dir: ResultsDir,
   models: readonly string[],
   items: readonly PlannedItem<R>[],
-  options: { now?: () => number; wait?: (ms: number) => Promise<unknown> } = {},
+  options: {
+    now?: () => number;
+    wait?: (ms: number) => Promise<unknown>;
+    overrides?: PacingOverrides;
+  } = {},
 ): Promise<boolean> {
   const ledger = readJsonl<LedgerEntry>(dir.ledger);
-  const pacer = new Pacer(pacingKeys(models), ledger);
+  const overrides = options.overrides ?? {};
+  const pacer = new Pacer(pacingKeys(models), ledger, undefined, overrides);
+  for (const line of describeOverrides(overrides)) {
+    appendJsonl(dir.overrides, { at: new Date().toISOString(), note: line });
+    console.log(`override: ${line}`);
+  }
   const guard = new CostGuard(runBudgetUsd, recordedSpendUsd(dir));
   const estimate = items.reduce((sum, item) => sum + item.estimate.costUsd, 0);
   console.log(

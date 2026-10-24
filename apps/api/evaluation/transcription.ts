@@ -265,6 +265,9 @@ function render(dir: ResultsDir, results: string, reportPath: string): void {
         listUsd: stored.reduce((sum, result) => sum + result.listUsd, 0),
         chargedUsd: recordedSpendUsd(dir),
         failedAttempts: failures,
+        overrides: [
+          ...new Set(readJsonl<{ note: string }>(dir.overrides).map((entry) => entry.note)),
+        ],
       },
       fixtures,
       transcriberCandidates,
@@ -329,6 +332,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
       dir,
       transcriberCandidates.map((candidate) => candidate.spec.model),
       pending,
+      { overrides: args.overrides },
     ));
   if (complete) render(dir, results, reportPath);
 }

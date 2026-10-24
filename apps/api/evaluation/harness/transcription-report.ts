@@ -26,6 +26,7 @@ export interface RunContext {
   listUsd: number;
   chargedUsd: number;
   failedAttempts: FailureRecord[];
+  overrides: string[];
 }
 
 export const normalDictationSeconds = 15;
@@ -81,6 +82,7 @@ export function transcriptionReport(
     `Clips are Polly neural speech generated at run time (voices ${[...new Set([...fixtures.voices.es, ...fixtures.voices.en, ...fixtures.voices.mixed])].join(", ")}) and seeded noise; every candidate got the same bytes and the transcriber prompt of the case's fixture dictionary.`,
     `"one" sends the case's language; "both" lets the transcriber detect among es and en and transcribes again in es when it reports neither, as production does.`,
     `Prices and plans as checked on ${pricesCheckedOn}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan).`,
+    ...context.overrides.map((note) => `Override for part of this run: ${note}.`),
     `Reproduce from the repository root: \`${context.command}\`.`,
     "",
   );

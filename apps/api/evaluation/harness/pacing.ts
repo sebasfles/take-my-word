@@ -69,20 +69,35 @@ function earliestWithin(
   return now + windowMs;
 }
 
+export interface PacingOverrides {
+  whisperDailyKept?: number;
+}
+
+export const minimumWhisperDailyKept = 0.1;
+
 export class Pacer {
   private readonly blockedUntil = new Map<string, number>();
   private readonly keys: ReadonlyMap<string, PacingKey>;
   private readonly ledger: LedgerEntry[];
   private readonly share: number;
+  private readonly overrides: PacingOverrides;
 
   constructor(
     keys: ReadonlyMap<string, PacingKey>,
     ledger: LedgerEntry[],
     share = productionShare,
+    overrides: PacingOverrides = {},
   ) {
+    const kept = overrides.whisperDailyKept;
+    if (kept !== undefined && (kept < minimumWhisperDailyKept || kept > 1 - share)) {
+      throw new Error(
+        `whisperDailyKept must keep between ${String(minimumWhisperDailyKept)} and ${String(1 - share)} of a daily limit`,
+      );
+    }
     this.keys = keys;
     this.ledger = ledger;
     this.share = share;
+    this.overrides = overrides;
   }
 
   private config(key: string): PacingKey {
@@ -94,17 +109,23 @@ export class Pacer {
   private windows(plan: FreePlanLimits): Window[] {
     const half = (limit: number | undefined) =>
       limit === undefined ? undefined : { limit, allowed: limit * this.share };
+    const whisperKept =
+      plan.audioSecondsPerDay !== undefined ? this.overrides.whisperDailyKept : undefined;
+    const daily = (limit: number | undefined) =>
+      limit === undefined || whisperKept === undefined
+        ? half(limit)
+        : { limit, allowed: limit * (1 - whisperKept) };
     const tokensPerDay =
       plan.tokensPerDay !== undefined && plan.tokensPerDayKept !== undefined
         ? { limit: plan.tokensPerDay, allowed: plan.tokensPerDay - plan.tokensPerDayKept }
         : half(plan.tokensPerDay);
     return [
-      { name: "requests per day", ms: dayMs, field: "requests", cap: half(plan.requestsPerDay) },
+      { name: "requests per day", ms: dayMs, field: "requests", cap: daily(plan.requestsPerDay) },
       {
         name: "audio seconds per day",
         ms: dayMs,
         field: "audioSeconds",
-        cap: half(plan.audioSecondsPerDay),
+        cap: daily(plan.audioSecondsPerDay),
       },
       { name: "tokens per day", ms: dayMs, field: "tokens", cap: tokensPerDay },
       {

@@ -28,7 +28,7 @@ import {
 import { Pacer, type LedgerEntry } from "./harness/pacing.ts";
 import { billedAudioSeconds, modelFacts } from "./harness/prices.ts";
 import { appendJsonl, readJsonl } from "./harness/store.ts";
-import { pacingKeyOf, pacingKeys } from "./harness/suite.ts";
+import { describeOverrides, overridesFrom, pacingKeyOf, pacingKeys } from "./harness/suite.ts";
 import { createThrowawayUser } from "./harness/throwaway-user.ts";
 import { defaultGroqWhisperModel } from "../src/dictation/providers/groq-whisper.ts";
 import {
@@ -48,6 +48,7 @@ const { values } = parseArgs({
     report: { type: "string" },
     runs: { type: "string", default: "5" },
     burst: { type: "string", default: "3" },
+    "whisper-daily-kept": { type: "string" },
   },
 });
 if (values.results === undefined || values.report === undefined) {
@@ -200,7 +201,8 @@ function report(
     `Run ${startedAt} against the dev API with the production pipeline as deployed there, from code commit \`${codeCommit}\` and fixtures sha256 \`${sha256(transcriptionFixturesPath).slice(0, 16)}\`.`,
     `A throwaway user with the fixture's developer dictionary dictated each case under its own language; ${String(burst)} concurrent requests opened the run to catch cold starts, then ${String(runs)} sequential runs per case, paced to half of the production transcriber's free-plan limits.`,
     "Release to text is measured on the client that sent the request, so it includes that client's network to us-east-1.",
-    `Reproduce from the repository root: \`pnpm --filter @take-my-word/api eval:e2e --results ${fromRoot(resultsDir)} --report ${fromRoot(reportPath)} --runs ${String(runs)} --burst ${String(burst)}\`.`,
+    ...describeOverrides(overrides).map((note) => `Override for this run: ${note}.`),
+    `Reproduce from the repository root: \`pnpm --filter @take-my-word/api eval:e2e --results ${fromRoot(resultsDir)} --report ${fromRoot(reportPath)} --runs ${String(runs)} --burst ${String(burst)}${overrides.whisperDailyKept === undefined ? "" : ` --whisper-daily-kept ${String(overrides.whisperDailyKept)}`}\`.`,
     "",
   );
   const ok = sent.filter((entry) => entry.response !== undefined);
@@ -275,7 +277,13 @@ const sent: Sent[] = [];
 const productionTranscriber = modelFacts(defaultGroqWhisperModel);
 const pacingKey = pacingKeyOf(defaultGroqWhisperModel);
 const ledgerPath = join(dirname(resultsDir), "ledger.jsonl");
-const pacer = new Pacer(pacingKeys([defaultGroqWhisperModel]), readJsonl<LedgerEntry>(ledgerPath));
+const overrides = overridesFrom(values["whisper-daily-kept"]);
+const pacer = new Pacer(
+  pacingKeys([defaultGroqWhisperModel]),
+  readJsonl<LedgerEntry>(ledgerPath),
+  undefined,
+  overrides,
+);
 const useOf = (clip: Clip, requests: number) => ({
   requests,
   audioSeconds: billedAudioSeconds(productionTranscriber, clip.seconds) * requests,

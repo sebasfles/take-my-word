@@ -28,6 +28,7 @@ export interface ResultsDir {
   dir: string;
   results: string;
   failures: string;
+  overrides: string;
   ledger: string;
   meta: StoredMeta;
 }
@@ -39,6 +40,7 @@ function paths(dir: string, suite: string): Omit<ResultsDir, "meta"> {
     dir,
     results: join(dir, `${suite}.jsonl`),
     failures: join(dir, `${suite}.failures.jsonl`),
+    overrides: join(dir, "overrides.jsonl"),
     ledger: join(dirname(dir), "ledger.jsonl"),
   };
 }

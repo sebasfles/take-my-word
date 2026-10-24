@@ -203,6 +203,75 @@ describe("Pacer", () => {
   });
 });
 
+describe("whisper daily override", () => {
+  const usedToday = entries("groq:whisper", 1, () => noon - 3_600_000, {
+    requests: 1_500,
+    audioSeconds: 20_000,
+    tokens: 0,
+  });
+
+  it("is off by default: Whisper keeps half of each daily limit", () => {
+    expect(new Pacer(keys, usedToday).readiness("groq:whisper", call, noon)).toMatchObject({
+      kind: "tomorrow",
+    });
+  });
+
+  it("when opted in, lets Whisper use its daily limits down to the kept share, never below 10%", () => {
+    const pacer = new Pacer(keys, usedToday, undefined, { whisperDailyKept: 0.1 });
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "now" });
+    const nearlyAll = entries("groq:whisper", 1, () => noon - 3_600_000, {
+      requests: 1_795,
+      audioSeconds: 0,
+      tokens: 0,
+    });
+    const full = new Pacer(keys, nearlyAll, undefined, { whisperDailyKept: 0.1 }).readiness(
+      "groq:whisper",
+      { requests: 6, audioSeconds: 0, tokens: 0 },
+      noon,
+    );
+    expect(full.kind === "tomorrow" && full.reason).toMatch(/keeps 200 of 2000 free/);
+    expect(() => new Pacer(keys, [], undefined, { whisperDailyKept: 0.05 })).toThrow(/between 0.1/);
+  });
+
+  it("leaves the per-minute half, the chat reserve and OpenAI's half untouched", () => {
+    const recent = entries("groq:whisper", 10, (index) => noon - 50_000 + index * 1_000);
+    expect(
+      new Pacer(keys, recent, undefined, { whisperDailyKept: 0.1 }).readiness(
+        "groq:whisper",
+        call,
+        noon,
+      ),
+    ).toEqual({ kind: "at", at: noon + 10_000 });
+    const chat = new Pacer(
+      keys,
+      entries("groq:chat", 1, () => noon - 3_600_000, {
+        requests: 1,
+        audioSeconds: 0,
+        tokens: 189_500,
+      }),
+      undefined,
+      { whisperDailyKept: 0.1 },
+    ).readiness("groq:chat", { requests: 1, audioSeconds: 0, tokens: 600 }, noon);
+    expect(chat.kind).toBe("tomorrow");
+    const openai = new Pacer(
+      keys,
+      [
+        {
+          key: "openai:nano",
+          group: "openai-small",
+          at: noon - 1_000,
+          requests: 1,
+          audioSeconds: 0,
+          tokens: 450,
+        },
+      ],
+      undefined,
+      { whisperDailyKept: 0.1 },
+    ).readiness("openai:nano", { requests: 1, audioSeconds: 0, tokens: 100 }, noon);
+    expect(openai.kind).toBe("tomorrow");
+  });
+});
+
 describe("CostGuard", () => {
   it("refuses a call that would take the run above its budget", () => {
     const guard = new CostGuard(3);
