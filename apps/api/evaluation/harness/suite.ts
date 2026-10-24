@@ -20,6 +20,7 @@ import {
   complimentaryDailyTokens,
   freePlanAt,
   modelFacts,
+  paidPlans,
   prepaidBalances,
   runBudgetUsd,
 } from "./prices.ts";
@@ -85,12 +86,14 @@ export function pacingKeys(models: readonly string[]): Map<string, PacingKey> {
       const group = facts.complimentaryGroup;
       const prepaid = prepaidBalances[facts.provider];
       const plan = freePlanAt(facts);
+      const paidFloors = plan === undefined ? paidPlans[facts.provider]?.headerFloors : undefined;
       return [
         pacingKeyOf(model),
         {
           provider: facts.provider,
           ...(plan && { plan }),
           ...(prepaid && { prepaid }),
+          ...(paidFloors && { paidFloors }),
           ...(group && {
             complimentary: { group, tokensPerDay: complimentaryDailyTokens[group].tokens },
           }),

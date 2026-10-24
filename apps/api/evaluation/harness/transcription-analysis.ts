@@ -99,7 +99,9 @@ export function check(result: TranscriptionResult, item: TranscriptionCase): Che
   if (pasted) {
     if (counted.longestInsertionRun >= inventedRunThreshold) {
       flags.push("invented content");
-      detail.push(`${String(counted.longestInsertionRun)} inserted words in a row`);
+      detail.push(
+        `${String(counted.longestInsertionRun)} inserted words in a row: "${counted.longestInsertion.join(" ")}"`,
+      );
     }
     const phrases = hallucinatedPhrases(text, references);
     if (phrases.length > 0) {
