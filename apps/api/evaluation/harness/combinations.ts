@@ -1,6 +1,8 @@
 import {
   complimentaryDailyTokens,
+  freePlanAt,
   modelFacts,
+  paidPlans,
   prepaidBalances,
   transcriptionCallUsd,
   type ModelFacts,
@@ -50,7 +52,7 @@ function freeCoverage(
   perDay: number,
 ): { covered: boolean; why: string } {
   const requests = perDay * stage.callsPerDictation;
-  const plan = facts.freePlan;
+  const plan = freePlanAt(facts);
   if (plan !== undefined) {
     const checks: [string, number, number | undefined][] = [
       ["requests per day", requests, plan.requestsPerDay],
@@ -91,6 +93,10 @@ function freeCoverage(
           covered: false,
           why: `complimentary tokens exceeded: ${String(Math.round(tokens))} of ${String(group.tokens)} per day`,
         };
+  }
+  const paid = paidPlans[facts.provider];
+  if (paid !== undefined) {
+    return { covered: false, why: `${paid.plan} since ${paid.since}, billed at list price` };
   }
   if (prepaidBalances[facts.provider] !== undefined) {
     return { covered: false, why: "prepaid balance, billed at list price" };

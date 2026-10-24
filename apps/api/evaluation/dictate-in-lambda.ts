@@ -30,9 +30,11 @@ import {
   billedAudioSeconds,
   chargedUsd,
   modelFacts,
+  planNotes,
   tokenCostUsd,
   transcriptionCallUsd,
 } from "./harness/prices.ts";
+import type { LedgerEntry } from "./harness/pacing.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
 import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
 import {
@@ -60,20 +62,20 @@ const { values } = parseArgs({
     report: { type: "string" },
     runs: { type: "string", default: "5" },
     combinations: { type: "string" },
+    smoke: { type: "boolean", default: false },
   },
 });
 if (
-  values.results === undefined ||
-  values.report === undefined ||
-  values.combinations === undefined
+  values.combinations === undefined ||
+  (!values.smoke && (values.results === undefined || values.report === undefined))
 ) {
   console.error(
-    "usage: pnpm eval:dictate --results <dir> --report <report.md> --combinations <transcriber>+<refiner>,... [--runs 5]",
+    "usage: pnpm eval:dictate --results <dir> --report <report.md> --combinations <transcriber>+<refiner>,... [--runs 5] | --smoke --combinations ...",
   );
   process.exit(2);
 }
-const resultsDir = fromInvocation(values.results);
-const reportPath = fromInvocation(values.report);
+const resultsDir = fromInvocation(values.results ?? ".");
+const reportPath = fromInvocation(values.report ?? ".");
 const runs = Number(values.runs);
 if (!Number.isInteger(runs) || runs < 3) throw new Error("--runs must be an integer of at least 3");
 
@@ -82,7 +84,7 @@ interface Combination {
   refiner: RefinerCandidate;
 }
 
-function combinationsFrom(list: string): Combination[] {
+function combinationsFrom(list: string, withBaseline = true): Combination[] {
   const transcriberBaseline = transcriberCandidates.find((candidate) => candidate.baseline);
   const refinerBaseline = refinerCandidates.find((candidate) => candidate.baseline);
   if (transcriberBaseline === undefined || refinerBaseline === undefined) {
@@ -97,7 +99,9 @@ function combinationsFrom(list: string): Combination[] {
     }
     return { transcriber, refiner };
   });
-  const all = [{ transcriber: transcriberBaseline, refiner: refinerBaseline }, ...asked];
+  const all = withBaseline
+    ? [{ transcriber: transcriberBaseline, refiner: refinerBaseline }, ...asked]
+    : asked;
   return all.filter(
     (combination, index) =>
       all.findIndex(
@@ -108,7 +112,7 @@ function combinationsFrom(list: string): Combination[] {
   );
 }
 
-const combinations = combinationsFrom(values.combinations);
+const combinations = combinationsFrom(values.combinations, !values.smoke);
 const workspace = openWorkspace();
 const fixtures = loadTranscriptionFixtures();
 const cases = fixtures.cases.filter(
@@ -298,6 +302,7 @@ function render(dir: ResultsDir): void {
   writeFileSync(
     reportPath,
     dictateReport({
+      planNotes: planNotes(readJsonl<LedgerEntry>(dir.ledger)),
       command: `pnpm --filter @take-my-word/api eval:dictate --results ${fromRoot(resultsDir)} --report ${fromRoot(reportPath)} --combinations ${values.combinations ?? ""} --runs ${String(runs)}`,
       generatedAt: new Date().toISOString(),
       codeCommit: [dir.meta.codeCommit, ...(dir.meta.resumedWith ?? [])].join("`, resumed with `"),
@@ -315,6 +320,30 @@ function render(dir: ResultsDir): void {
     }),
   );
   console.log(`report written to ${fromRoot(reportPath)}`);
+}
+
+if (values.smoke) {
+  const evalFunction = await deployAndWarm(workspace);
+  const [item] = cases;
+  const [voice] = item === undefined ? [] : voicesFor(fixtures, item);
+  if (item === undefined || voice === undefined) throw new Error("no end-to-end case");
+  const clip = await buildClip(workspace.polly, item, voice);
+  for (const combination of combinations) {
+    const response = await evalFunction.invoke(request(combination, clip));
+    console.log(
+      JSON.stringify({
+        combination: combinationOf(combination.transcriber.id, combination.refiner.id),
+        clip: clip.id,
+        ok: response.ok,
+        raw: response.dictation?.raw,
+        text: response.dictation?.text,
+        latencyMs: response.dictation?.latencyMs,
+        error: response.error,
+        calls: response.calls.map((call) => ({ stage: call.stage, ms: Math.round(call.ms) })),
+      }),
+    );
+  }
+  process.exit(0);
 }
 
 requireCommittedFixtures(transcriptionFixturesPath, evaluationCodePaths);

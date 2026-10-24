@@ -1,0 +1,216 @@
+{
+  "dev-en-1": {
+    "required": ["opened", "fix", "review", "before"],
+    "forbidden": ["after"]
+  },
+  "dev-en-2": {
+    "required": ["run", "get", "send me"],
+    "forbidden": ["delete"]
+  },
+  "dev-en-3": {
+    "required": ["replaced", "not merge", "yet"],
+    "forbidden": ["let's merge"]
+  },
+  "dev-en-4": {
+    "required": ["push", "tell me", "green"],
+    "forbidden": ["red"]
+  },
+  "dev-es-1": {
+    "required": ["abrí", "arreglar", "revisar", "antes"],
+    "forbidden": ["después"]
+  },
+  "dev-es-2": {
+    "required": ["corre", "mándame"],
+    "forbidden": ["corrige", "corrija", "borra"]
+  },
+  "dev-es-3": {
+    "required": ["reemplazar", "no hagamos", "todavía"],
+    "forbidden": ["hagamos merge ya"]
+  },
+  "dev-es-4": {
+    "required": ["haz", "sube", "avísame", "verde"],
+    "forbidden": ["rojo"]
+  },
+  "bio-en-1": {
+    "required": ["ran", "after", "hours"],
+    "forbidden": ["before"]
+  },
+  "bio-en-2": {
+    "required": ["reduced", "expression"],
+    "forbidden": ["increased"]
+  },
+  "bio-en-3": {
+    "required": ["run", "normalize"],
+    "forbidden": []
+  },
+  "bio-en-4": {
+    "required": ["showed", "less", "drought"],
+    "forbidden": ["more"]
+  },
+  "bio-es-1": {
+    "required": ["hicimos", "horas"],
+    "forbidden": []
+  },
+  "bio-es-2": {
+    "required": ["redujo", "expresión"],
+    "forbidden": ["aumentó"]
+  },
+  "bio-es-3": {
+    "required": ["corre", "normaliza"],
+    "forbidden": ["corrige"]
+  },
+  "bio-es-4": {
+    "required": ["mostraron", "menos", "estrés"],
+    "forbidden": ["más"]
+  },
+  "control-en-1": {
+    "required": ["meet", "tomorrow", "office", "bring", "report"],
+    "forbidden": ["today"]
+  },
+  "control-en-2": {
+    "required": ["call", "mother", "after lunch", "plan", "weekend"],
+    "forbidden": ["before lunch"]
+  },
+  "control-es-1": {
+    "required": ["nos vemos", "mañana", "oficina", "trae", "informe"],
+    "forbidden": ["hoy"]
+  },
+  "control-es-2": {
+    "required": ["llamar", "mamá", "después", "planear", "fin de semana"],
+    "forbidden": ["antes"]
+  },
+  "mixed-1": {
+    "required": ["mañana", "revisar"],
+    "forbidden": ["hoy"]
+  },
+  "mixed-2": {
+    "required": ["mándame", "antes"],
+    "forbidden": ["después"]
+  },
+  "mixed-3": {
+    "required": ["termina", "viernes", "hagamos"],
+    "forbidden": ["jueves"]
+  },
+  "mixed-4": {
+    "required": ["trabajando", "puedo"],
+    "forbidden": ["no puedo"]
+  },
+  "mixed-5": {
+    "required": ["subí", "compartido"],
+    "forbidden": []
+  },
+  "long-es-1": {
+    "required": ["revisé", "encontré", "falla", "abrir", "aviso", "verde"],
+    "forbidden": []
+  },
+  "long-en-1": {
+    "required": ["talked", "agreed", "move", "Thursday", "still down", "testing"],
+    "forbidden": ["Tuesday"]
+  },
+  "long-mixed-1": {
+    "required": ["lunes", "prepares", "mandes", "viernes"],
+    "forbidden": ["reunión inicial", "presentación"]
+  },
+  "quiet-es-1": {
+    "required": ["gracias", "revisé", "informe", "bien"],
+    "forbidden": ["mal"]
+  },
+  "quiet-en-1": {
+    "required": ["thank you", "checked", "report", "fine"],
+    "forbidden": []
+  },
+  "extended-en-45": {
+    "required": [
+      "merged",
+      "moves",
+      "green",
+      "still running",
+      "check",
+      "roll back",
+      "instead",
+      "add",
+      "mention",
+      "freeze",
+      "Thursday",
+      "Friday",
+      "send"
+    ],
+    "forbidden": ["Tuesday"]
+  },
+  "extended-en-100": {
+    "required": [
+      "started returning errors",
+      "alert fired",
+      "rolled back",
+      "stopped",
+      "nothing was lost",
+      "restores",
+      "module",
+      "rotation",
+      "opened a PR",
+      "not merge",
+      "Monday",
+      "keep",
+      "alert",
+      "write down"
+    ],
+    "forbidden": []
+  },
+  "extended-es-45": {
+    "required": [
+      "revisé",
+      "arreglé",
+      "verde",
+      "no veo errores",
+      "abrir",
+      "revise",
+      "avísame",
+      "anoté",
+      "viernes",
+      "congelar",
+      "jueves",
+      "actualizo"
+    ],
+    "forbidden": []
+  },
+  "extended-es-100": {
+    "required": [
+      "hicimos",
+      "más débil",
+      "repetimos",
+      "normalizamos",
+      "corrimos",
+      "no amplificaron",
+      "repetir",
+      "sanos",
+      "menos clorofila",
+      "revises",
+      "viernes",
+      "mandar",
+      "sesión",
+      "lunes",
+      "pedir",
+      "reactivos",
+      "revisa",
+      "inventario"
+    ],
+    "forbidden": ["más clorofila"]
+  },
+  "extended-mixed-45": {
+    "required": ["gustó", "cambios", "jueves", "actualizar", "revisa", "viernes", "avísame"],
+    "forbidden": []
+  },
+  "extended-mixed-100": {
+    "required": [
+      "agresivo",
+      "cerrar",
+      "después del launch",
+      "martes",
+      "pager",
+      "follow",
+      "no está aprobado",
+      "no podemos contratar"
+    ],
+    "forbidden": []
+  }
+}
