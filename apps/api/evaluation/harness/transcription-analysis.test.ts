@@ -163,6 +163,19 @@ describe("relativeGate", () => {
     expect(worse.reasons[0]).toMatch(/^one: WER/);
   });
 
+  it("leaves raw domain-term errors to the gate after cleanup", () => {
+    const termError = exact.replace("build", "bild");
+    const checked = [
+      ...runsOf("baseline", [oneError, oneError, oneError]),
+      ...runsOf("unprompted", [termError, termError, termError]),
+    ];
+    const baseline = summarize("baseline", checked, [], longIds);
+    const unprompted = summarize("unprompted", checked, [], longIds);
+    expect(unprompted.modes.one.wer).toBe(baseline.modes.one.wer);
+    expect(unprompted.modes.one.termErrorRate).toBeGreaterThan(baseline.modes.one.termErrorRate);
+    expect(relativeGate(unprompted, baseline)).toEqual({ passed: true, reasons: [] });
+  });
+
   it("fails a candidate whose calls fail more often than the baseline's plus its spread", () => {
     const checked = [
       ...runsOf("baseline", [exact, exact, exact]),

@@ -138,3 +138,16 @@ Decisions not in the plan:
 
 Pending: suite 1 run after the fixture review; `chained-checks.json` and chained fixtures (review); suite 2; `eval:dictate`; summary; `report.md`.
 Estimated: Groq turbo spans about two days at 5 a minute; Groq `gpt-oss-20b@low` needs about 3 days of its 10K-reserve allowance with the chained cases.
+
+### Round 2
+
+Applied all 6 findings of round 1:
+
+1. Suite 1's relative gate checks WER and failed calls only; raw domain-term errors stay in the suite 1 report, labelled as gated after cleanup, and `combinationCleanupGate` on the transcriber's own raws is the only term gate; test: equal WER with more raw term errors passes.
+2. The run cap checks the sum of every stage's estimate before a call; test: a second stage alone over the cap refuses the call before it runs.
+3. Reported durations are billed per started second (`Math.ceil`) in both paths; test of the usage path.
+4. Each overhead sample now adds that dictation's storage stages from the same 0017 run (the larger of quota and profile, plus save; 12 to 185 ms), which the eval Lambda fakes; the constant's meaning says so and the summary prints it.
+5. The providers secret output names the four keys.
+6. `extended-en-45` no longer lists "merged" as a term; the suite 1 fixtures freeze here.
+
+`pnpm tf dev plan` and `pnpm tf prd plan` still "No changes" (`evidence/{dev,prd}-plan-round2.txt`); verify ran on 9f03767, the code of this round.

@@ -68,7 +68,7 @@ function accuracyRows(
   summaries: ReadonlyMap<string, CandidateSummary>,
 ): string[] {
   const rows = [
-    "| Candidate | Languages | WER | WER per run | Domain-term errors | Language flips | Dropped by guard | Failed calls | Rate limited |",
+    "| Candidate | Languages | WER | WER per run | Domain-term errors, raw (gated after cleanup) | Language flips | Dropped by guard | Failed calls | Rate limited |",
     "|---|---|---|---|---|---|---|---|---|",
   ];
   for (const candidate of candidates) {
@@ -181,7 +181,8 @@ export function transcriptionReport(
   push("## Quality gate", "");
   push(
     "Hard gate, any occurrence fails: invented content (3 or more inserted words in a row), a known hallucination phrase or any text on noise that survives production's level and phrase guards, and wrong language: text that reads as the other language, text with letters outside the Latin script, or Latin text whose function words read as neither es nor en.",
-    `Relative gate: WER, domain-term errors and failed calls no worse than today's model plus its run-to-run spread, per language setting, over every case and again over the ${extendedBucket} samples alone.`,
+    `Relative gate: WER and failed calls no worse than today's model plus its run-to-run spread, per language setting, over every case and again over the ${extendedBucket} samples alone.`,
+    "Raw domain-term errors are reported here but gated only after cleanup, on each transcriber's own raws (suite 2 and the summary), since a transcriber that takes no prompt leaves the dictionary to cleanup.",
     "",
   );
   push(

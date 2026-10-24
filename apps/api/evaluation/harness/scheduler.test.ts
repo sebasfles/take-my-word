@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   BudgetExceededError,
   CostGuard,
@@ -235,6 +235,33 @@ describe("runSchedule across two stages", () => {
       ["cerebras:qwen", 0.002],
     ]);
     expect(guard.spentUsd).toBeCloseTo(0.024, 10);
+  });
+
+  it("stops before a call whose second stage alone would pass the budget", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const run = vi.fn(() => Promise.resolve(ok("d1")));
+    await expect(
+      runSchedule(
+        [
+          {
+            ...item("d1", "fast", run),
+            alsoPaced: [
+              {
+                pacingKey: "fast",
+                estimate: { requests: 1, audioSeconds: 0, tokens: 0, costUsd: 0.5 },
+              },
+            ],
+          },
+        ],
+        new Pacer(keys, []),
+        new CostGuard(0.2),
+        recorder.hooks,
+        time.now,
+        time.wait,
+      ),
+    ).rejects.toThrow(BudgetExceededError);
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("pauses an item whose second stage would take a prepaid balance under its floor", async () => {
