@@ -22,6 +22,8 @@ export type OverlayState =
   | { state: "processing" }
   | { state: "error"; message: MessageId; action: "microphoneSettings" | null };
 
+export type OverlayShown = OverlayState & { seq: number };
+
 export interface AccountView {
   signedIn: boolean;
   username: string | null;
@@ -90,6 +92,8 @@ export const bridge = {
   setAutostart: (enabled: boolean) => invoke<boolean>("set_autostart", { enabled }),
   openMicrophoneSettings: () => invoke<undefined>("open_microphone_settings"),
   dismissOverlay: () => invoke<undefined>("dismiss_overlay"),
+  overlayReady: () => invoke<undefined>("overlay_ready"),
+  overlayPainted: (seq: number) => invoke<undefined>("overlay_painted", { seq }),
   stopDictation: () => invoke<undefined>("stop_dictation"),
   insertAck: (id: number, inserted: boolean) => invoke<undefined>("insert_ack", { id, inserted }),
   forwardKey: (code: string, down: boolean) => invoke<undefined>("forward_key", { code, down }),
@@ -126,8 +130,8 @@ export const bridge = {
     listen<UpdateView>("update", (event) => {
       handler(event.payload);
     }),
-  onOverlay: (handler: (state: OverlayState) => void): Promise<UnlistenFn> =>
-    listen<OverlayState>("overlay", (event) => {
+  onOverlay: (handler: (shown: OverlayShown) => void): Promise<UnlistenFn> =>
+    listen<OverlayShown>("overlay", (event) => {
       handler(event.payload);
     }),
   onOverlayLevel: (handler: (level: number) => void): Promise<UnlistenFn> =>
@@ -168,15 +172,25 @@ export const bridge = {
     }),
 };
 
-export function keepListening(subscribe: () => Promise<UnlistenFn>): () => void {
+export function keepListening(subscribe: () => Promise<UnlistenFn>, retryAfter = 500): () => void {
   let unlisten: UnlistenFn | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
-  void subscribe().then((stop) => {
-    if (stopped) stop();
-    else unlisten = stop;
-  });
+  const attempt = () => {
+    void subscribe().then(
+      (stop) => {
+        if (stopped) stop();
+        else unlisten = stop;
+      },
+      () => {
+        if (!stopped) retry = setTimeout(attempt, retryAfter);
+      },
+    );
+  };
+  attempt();
   return () => {
     stopped = true;
+    clearTimeout(retry);
     unlisten?.();
   };
 }

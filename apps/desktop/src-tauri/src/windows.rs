@@ -309,24 +309,42 @@ fn view_url(label: &str, query: &str) -> String {
     format!("index.html?view={label}&lang={language}{theme}{query}")
 }
 
-pub fn create_overlay(app: &AppHandle) -> tauri::Result<()> {
-    WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App(view_url(OVERLAY, "").into()))
-        .title(product_name(app))
-        .additional_browser_args(BROWSER_ARGS)
-        .inner_size(SIZES.overlay.width, SIZES.overlay.height)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .focusable(false)
-        .focused(false)
-        .visible(false)
-        .build()
-        .map(|overlay| {
-            crate::overlay::set_memory_target(&overlay, crate::overlay::MemoryTarget::Low)
-        })
+pub fn create_overlay(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+    let overlay =
+        WebviewWindowBuilder::new(app, OVERLAY, WebviewUrl::App(view_url(OVERLAY, "").into()))
+            .title(product_name(app))
+            .additional_browser_args(BROWSER_ARGS)
+            .inner_size(SIZES.overlay.width, SIZES.overlay.height)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .focusable(false)
+            .focused(false)
+            .visible(false)
+            .build()?;
+    drop_frame(&overlay);
+    crate::overlay::set_memory_target(&overlay, crate::overlay::MemoryTarget::Low);
+    Ok(overlay)
+}
+
+fn drop_frame(window: &WebviewWindow) {
+    #[cfg(windows)]
+    if let Ok(handle) = window.hwnd() {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
+        };
+        let flags = SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER;
+        if let Err(error) = unsafe { SetWindowPos(HWND(handle.0.cast()), None, 0, 0, 0, 0, flags) }
+        {
+            log::warn!("removing the overlay's frame failed: {error}");
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = window;
 }
 
 #[cfg(test)]

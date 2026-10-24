@@ -522,6 +522,97 @@ public static class TmwSmoke
         File.Delete(file);
         return "restored and verified sha256=" + now;
     }
+
+    [StructLayout(LayoutKind.Sequential)] struct RECT { public int left, top, right, bottom; }
+    [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out RECT rect);
+    [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr window, out RECT rect);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr window);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr window, IntPtr dc);
+    [DllImport("gdi32.dll")] static extern bool BitBlt(IntPtr dest, int x, int y, int width, int height, IntPtr source, int sx, int sy, uint op);
+
+    const long WS_EX_NOACTIVATE = 0x08000000;
+
+    public static void PhysicalPixels() { SetProcessDpiAwarenessContext(new IntPtr(-4)); }
+
+    public static long OverlayOf(int pid)
+    {
+        long found = 0;
+        EnumWindows((window, parameter) =>
+        {
+            uint owner;
+            GetWindowThreadProcessId(window, out owner);
+            var cls = new StringBuilder(256);
+            GetClassName(window, cls, cls.Capacity);
+            if (owner == pid && cls.ToString() == "Tauri Window" && (GetWindowLongPtr(window, -20).ToInt64() & WS_EX_NOACTIVATE) != 0) { found = window.ToInt64(); return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    public static string Frame(long handle)
+    {
+        var window = new IntPtr(handle);
+        RECT outer, inner;
+        GetWindowRect(window, out outer);
+        GetClientRect(window, out inner);
+        int width = outer.right - outer.left, height = outer.bottom - outer.top;
+        bool frameless = inner.right == width && inner.bottom == height;
+        bool noActivate = (GetWindowLongPtr(window, -20).ToInt64() & WS_EX_NOACTIVATE) != 0;
+        return string.Format("{0} window={1}x{2} client={3}x{4} visible={5} noactivate={6}",
+            frameless ? "frameless" : "framed", width, height, inner.right, inner.bottom, IsWindowVisible(window), noActivate);
+    }
+
+    public static int[] RectOf(long handle)
+    {
+        RECT outer;
+        GetWindowRect(new IntPtr(handle), out outer);
+        return new[] { outer.left, outer.top, outer.right - outer.left, outer.bottom - outer.top };
+    }
+
+    public static System.Drawing.Bitmap Grab(int[] rect)
+    {
+        var bitmap = new System.Drawing.Bitmap(rect[2], rect[3]);
+        using (var g = System.Drawing.Graphics.FromImage(bitmap))
+        {
+            var dest = g.GetHdc();
+            var screen = GetDC(IntPtr.Zero);
+            BitBlt(dest, 0, 0, rect[2], rect[3], screen, rect[0], rect[1], 0x00CC0020 | 0x40000000);
+            ReleaseDC(IntPtr.Zero, screen);
+            g.ReleaseHdc(dest);
+        }
+        return bitmap;
+    }
+
+    public static int Accent(System.Drawing.Bitmap shot)
+    {
+        int count = 0;
+        for (int x = 0; x < shot.Width; x++)
+            for (int y = 0; y < shot.Height; y++)
+            {
+                var p = shot.GetPixel(x, y);
+                if (p.R > 170 && p.R - p.G > 60 && p.R - p.B > 90) count++;
+            }
+        return count;
+    }
+
+    public static int TopBandChanges(System.Drawing.Bitmap shot, System.Drawing.Bitmap baseline)
+    {
+        int changed = 0, rows = shot.Height / 3;
+        for (int x = 0; x < shot.Width; x++)
+            for (int y = 0; y < rows; y++)
+            {
+                var p = shot.GetPixel(x, y); var q = baseline.GetPixel(x, y);
+                if (Math.Abs(p.R - q.R) + Math.Abs(p.G - q.G) + Math.Abs(p.B - q.B) > 48) changed++;
+            }
+        return changed;
+    }
+
+    public static void Send(ushort vk, bool up)
+    {
+        SendInput(1, new[] { Key(vk, up) }, Marshal.SizeOf(typeof(INPUT)));
+    }
 }
 '@
 
@@ -529,7 +620,7 @@ $cache = $PSScriptRoot
 $hash = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($source))).Replace('-', '').Substring(0, 16)
 $assembly = Join-Path $cache "TmwSmoke-$hash.dll"
 if (-not (Test-Path $assembly)) {
-    Add-Type -TypeDefinition $source -ReferencedAssemblies UIAutomationClient, UIAutomationTypes, WindowsBase, System.Windows.Forms, System.Security -OutputAssembly $assembly -OutputType Library
+    Add-Type -TypeDefinition $source -ReferencedAssemblies UIAutomationClient, UIAutomationTypes, WindowsBase, System.Windows.Forms, System.Security, System.Drawing -OutputAssembly $assembly -OutputType Library
 }
 Add-Type -Path $assembly
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -561,6 +652,65 @@ switch ($Command) {
     'fill-env' { if ([TmwSmoke]::Fill([long]$Rest[0], [int]$Rest[1], [Environment]::GetEnvironmentVariable($Rest[2]))) { 'filled' } else { 'no field'; exit 4 } }
     'invoke' { $found = [TmwSmoke]::Invoke([long]$Rest[0], $Rest[1]); if ($found) { $found } else { '<none>'; exit 4 } }
     'race' { [TmwSmoke]::Race($Rest[0], $Rest[1]) }
+    'overlay-frame' {
+        [TmwSmoke]::PhysicalPixels()
+        $overlay = [TmwSmoke]::OverlayOf([int]$Rest[0])
+        if ($overlay -eq 0) { 'no overlay'; exit 4 }
+        [TmwSmoke]::Frame($overlay)
+    }
+    'overlay-take' {
+        [TmwSmoke]::PhysicalPixels()
+        $appPid = [int]$Rest[0]; $mode = $Rest[1]; $target = [long]$Rest[3]; $dir = $Rest[4]
+        $chord = [uint16[]]($Rest[2].Split(',') | ForEach-Object { $keys[$_] })
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        if (-not [TmwSmoke]::Focus($target)) { 'not focused'; exit 4 }
+        $shots = [ordered]@{}
+        $script:held = $false
+        $script:focusKept = $true
+        function Down { $script:held = $true; foreach ($k in $chord) { [TmwSmoke]::Send($k, $false); Start-Sleep -Milliseconds 10 } }
+        function Up { for ($i = $chord.Count - 1; $i -ge 0; $i--) { [TmwSmoke]::Send($chord[$i], $true); Start-Sleep -Milliseconds 10 }; $script:held = $false }
+        function Tap { Down; Start-Sleep -Milliseconds 60; Up }
+        function Peak($name, $milliseconds) {
+            $deadline = (Get-Date).AddMilliseconds($milliseconds)
+            $best = $null
+            do {
+                $overlay = [TmwSmoke]::OverlayOf($appPid)
+                $frame = [TmwSmoke]::Frame($overlay)
+                if ($frame -match 'visible=True') {
+                    $rect = [TmwSmoke]::RectOf($overlay)
+                    $shot = [TmwSmoke]::Grab($rect)
+                    $accent = [TmwSmoke]::Accent($shot)
+                    if ($null -eq $best -or $accent -gt $best.Accent) { $best = @{ Rect = $rect; Shot = $shot; Frame = $frame; Accent = $accent } }
+                }
+                if (-not [TmwSmoke]::IsForeground($target)) { $script:focusKept = $false }
+            } while ((Get-Date) -lt $deadline)
+            if ($null -eq $best) { $shots[$name] = $null; return }
+            $best.Shot.Save((Join-Path $dir "$name.png"))
+            $shots[$name] = $best
+        }
+        try {
+            switch ($mode) {
+                'hold' { Down; Start-Sleep -Milliseconds 300; Peak 'listening' 400; Up; Peak 'processing' 600 }
+                'hands-free' { Tap; Start-Sleep -Milliseconds 80; Tap; Start-Sleep -Milliseconds 500; Peak 'listening' 400; Tap; Peak 'processing' 600 }
+                'no-frames' { Down; Start-Sleep -Milliseconds 200; Peak 'unpainted' 300; Start-Sleep -Milliseconds 2000; Peak 'listening' 400; Up; Peak 'processing' 600 }
+                default { throw "unknown take mode $mode" }
+            }
+        }
+        finally { if ($script:held) { Up } }
+        for ($i = 0; $i -lt 100 -and [TmwSmoke]::Frame([TmwSmoke]::OverlayOf($appPid)) -match 'visible=True'; $i++) { Start-Sleep -Milliseconds 100 }
+        Start-Sleep -Milliseconds 300
+        $parts = foreach ($name in $shots.Keys) {
+            if ($null -eq $shots[$name]) { '{0}=hidden' -f $name; continue }
+            $baseline = [TmwSmoke]::Grab($shots[$name].Rect)
+            $baseline.Save((Join-Path $dir "$name-baseline.png"))
+            $accent = $shots[$name].Accent
+            $band = [TmwSmoke]::TopBandChanges($shots[$name].Shot, $baseline)
+            $painted = if ($accent -gt 0) { 'painted' } else { 'unpainted' }
+            '{0}={1} accent={2} band={3} {4}' -f $name, $painted, $accent, $band, ($shots[$name].Frame -split ' ')[0]
+        }
+        $focus = if ($script:focusKept) { 'kept' } else { 'taken' }
+        'take mode={0} focus={1} {2}' -f $mode, $focus, ($parts -join ' ')
+    }
     'edit-text' { $text = [TmwSmoke]::EditText([long]$Rest[0]); if ($null -eq $text) { '<none>' } else { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($text)) } }
     'scratch' {
         Add-Type -AssemblyName System.Windows.Forms

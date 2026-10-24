@@ -67,8 +67,9 @@ impl Shell {
         settings_path: PathBuf,
         mut settings: Settings,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        windows::create_overlay(app)?;
-        let overlay = GatedOverlay::new(WindowOverlay::new(app.clone()), TrayNotifier(app.clone()));
+        let window_overlay = WindowOverlay::new(app.clone());
+        window_overlay.create()?;
+        let overlay = GatedOverlay::new(window_overlay, TrayNotifier(app.clone()));
         let microphone = Microphone::spawn()?;
         let microphone_status = microphone.status();
         let waveform = Waveform::new(

@@ -101,8 +101,50 @@ Constraints:
 - `docs/modules/desktop/ard.md` 2026-10-23 "A user launch opens the main window and autostart stays in the tray" stays as is.
 - `docs/modules/desktop/trd.md` Releases: tags never rewritten; `Cargo.toml`, `package.json` and `Cargo.lock` versions equal; `rust:*` runs from WSL through `scripts/windows.sh`, cargo with `--test-threads=1`.
 
+Decided 2026-10-24 before round 1 (om-reviewer, on the om-developer's questions):
+- pid 21460 inspected and recorded in `replication.md`; released to the om-manager.
+- Scope, added: the title bar a start by hand leaves around the overlay (no frame recalculation after creation, since the overlay is shown with `ShowWindow`) is fixed in this task, with a pixel check in the smoke that the overlay shows no frame; it is a lifecycle defect of the same window, not a change of its look.
+- Probing, added: on dev instances only (never pid 21460 or a prd build), under the same idle guard, more secondary-display scale changes, each restored even on abort, and at most 2 display power off and on cycles while the dev overlay is hidden; stop at the first real input.
+
 Review focus beyond the Pipeline: the "usable or recreate" rule is a pure function whose unit tests fail on the base code; recreation keeps the overlay non-focusable, never steals focus and never holds the gate lock while building; the Windows smoke checks pixels; no 0019 code in the diff; the release round changes only the version.
 
 clearance: full: the Windows host under the idle guard; pid 21460 read-only plus the 4 takes and the one scale change; dev release builds as `crew-e2e-b`; GitHub push, PR, `desktop-ci`, and `desktop-release` for 0.3.1 after the om-manager's go; no prd build launched, no AWS, no Terraform, no restart or sign-out.
 
 ## om-developer notes
+
+### Round 1
+
+Did:
+- Inspected pid 21460 (see `replication.md`): the overlay is shown and its page receives every state, but the WebView2 paints no frame; a display change and a foreground change do not repair it.
+- Looked for an equivalent start on `develop` with dev release builds as `crew-e2e-b`, none reproduced: `--autostart` by hand, a display power cycle with the overlay hidden, a start with the displays off, a DPI round trip across monitors, 25 minutes hidden at the Low memory target, a cold WebView2 profile under CPU load.
+  So the fallback of Context & decisions applies: the cause is the 21460 evidence, the trigger at sign-in stays unknown, and Sebastian's next restart on 0.3.1 closes the real path.
+- Repair: each shown state carries a `seq`; the page confirms it from a second animation frame (`overlay_painted`), which only runs when the WebView2 produces frames, and reports `overlay_ready` once it listens, retrying until the shell answers.
+  `overlay_health.rs` holds the pure rule: a state shown and unconfirmed for 1 s, a page not ready 20 s after creation, or a failed WebView2 browser, renderer or GPU process recreates the overlay; after 3 recreations without a frame it stops and logs.
+  Recreation is queued with `run_on_main_thread`, never built under the gate lock: the old window is destroyed and the new one built on its `Destroyed` event with the same label, hidden, non-focusable and at Low; when its page is ready the current state is shown again, so a take in progress gets its overlay back.
+  The lifecycle logs creation, recreation with its reason, a show before the page is ready and every WebView2 process failure; never text.
+- `keepListening` retries a refused `listen()` every 500 ms instead of dropping it.
+- Title bar: `create_overlay` refreshes the frame once with `SWP_FRAMECHANGED | SWP_NOACTIVATE` after building, because raw `ShowWindow` never runs tao's frame refresh; the overlay is frameless on every start (client 600x120).
+- Smoke: `scripts/overlay-smoke.sh` with `overlay-frame` and `overlay-take` in `terminal-smoke.ps1`; it starts by hand and with `--autostart`, checks the frameless non-activating window, and per take the painted pill (accent pixels) in listening and processing, no title bar band and the focus kept; debug builds take `--overlay-no-frames`, which hides the overlay's WebView2 controller with the window shown (no frames, page still updating, as on 21460) and must be repaired within the hold.
+
+Evidence (workspace `evidence/probe`, untracked):
+- Smoke on a debug build of this round: 14 of 14 pass, 5 takes per start path plus the no-frames take on each, recreated about 1.1 s into the hold and painted again by 2.5 s; the first run's failures were the smoke's own timing (a 150 ms processing shot after a 170 ms "no text", a double tap past 300 ms), fixed by peak sampling.
+- Acceptance 3, key down to first painted pill (accent pixels below the top third), dev release builds by hand, same session: base medians 47 and 42 ms, fixed 48 ms.
+  A first run counted the base build's title-bar icon as painted and read base 72 ms against fixed 101 ms; that measured the title bar, not the pill.
+- Acceptance 4, private working set of app plus WebView2 after opening and closing the main window, and CPU over 5 idle minutes: base 27.2 and 26.2 MB, 0.19 and 0.38 s; fixed 25.6 MB, 0.39 s.
+- The release build measured was built from this round's tree before `cargo fmt`; the smoke's debug build predates the page's ready retry and the formatting.
+
+Decisions the plan did not record:
+- Paint detection by the page's animation frame confirmation, not by reading pixels in Rust: it costs nothing while hidden and fails exactly when the WebView2 stops producing frames.
+- Deadlines: 1 s for a frame, 20 s for a ready page, 3 recreations without a frame before giving up.
+- A GPU process exit also recreates the overlay.
+- The recreated window keeps the label `overlay` (the capability lists exact labels), so it is built only after the old one's `Destroyed`.
+- The smoke extends `terminal-smoke.ps1` instead of a second helper, and the no-frames fault is a debug-only argument like `--stub-mode`.
+
+Pending:
+- Acceptance 2 on the real sign-in path closes with Sebastian's next restart on 0.3.1; acceptance 5 is the release round.
+
+Deferred:
+- The first show after the overlay moves to a monitor with another scale lands off-centre (720,894 instead of 660,870 on 125 %) because `place_above_taskbar` uses the size from before the DPI change.
+- `place_above_taskbar` and `set_shown` run window getters from the session thread inside the gate lock during `begin_recording`; they wait on the main thread during a hold (pre-existing).
+- A dev release build's first run writes the `Take My Word Dev` Run entry (`refresh_autostart` with `firstRunDone` false); I removed the one my probe build wrote.
+- The shell's default Node is 22 while `.nvmrc` pins 24; `release.test.ts` fails on 22.
