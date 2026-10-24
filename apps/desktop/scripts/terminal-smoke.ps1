@@ -551,6 +551,21 @@ public static class TmwSmoke
         return found;
     }
 
+    public static long MainOf(int pid)
+    {
+        long found = 0;
+        EnumWindows((window, parameter) =>
+        {
+            uint owner;
+            GetWindowThreadProcessId(window, out owner);
+            var cls = new StringBuilder(256);
+            GetClassName(window, cls, cls.Capacity);
+            if (owner == pid && IsWindowVisible(window) && cls.ToString() == "Tauri Window" && (GetWindowLongPtr(window, -20).ToInt64() & WS_EX_NOACTIVATE) == 0) { found = window.ToInt64(); return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
     public static string Frame(long handle)
     {
         var window = new IntPtr(handle);
@@ -618,6 +633,15 @@ public static class TmwSmoke
             for (int y = 0; y < shot.Height; y++)
                 if (IsAccent(shot.GetPixel(x, y)) && !IsAccent(baseline.GetPixel(x, y))) count++;
         return count;
+    }
+
+    public static int NewAccentWidth(System.Drawing.Bitmap shot, System.Drawing.Bitmap baseline)
+    {
+        int left = int.MaxValue, right = -1;
+        for (int x = 0; x < shot.Width; x++)
+            for (int y = 0; y < shot.Height; y++)
+                if (IsAccent(shot.GetPixel(x, y)) && !IsAccent(baseline.GetPixel(x, y))) { if (x < left) left = x; if (x > right) right = x; }
+        return right < 0 ? 0 : right - left + 1;
     }
 
     [StructLayout(LayoutKind.Sequential)] struct MONITORINFO { public int size; public RECT monitor; public RECT work; public uint flags; }
@@ -758,6 +782,7 @@ switch ($Command) {
     'fill-env' { if ([TmwSmoke]::Fill([long]$Rest[0], [int]$Rest[1], [Environment]::GetEnvironmentVariable($Rest[2]))) { 'filled' } else { 'no field'; exit 4 } }
     'invoke' { $found = [TmwSmoke]::Invoke([long]$Rest[0], $Rest[1]); if ($found) { $found } else { '<none>'; exit 4 } }
     'race' { [TmwSmoke]::Race($Rest[0], $Rest[1]) }
+    'main-of' { [TmwSmoke]::MainOf([int]$Rest[0]) }
     'overlay-frame' {
         [TmwSmoke]::PhysicalPixels()
         $overlay = [TmwSmoke]::OverlayOf([int]$Rest[0])
@@ -790,7 +815,7 @@ switch ($Command) {
     'overlay-take' {
         [TmwSmoke]::PhysicalPixels()
         $appPid = [int]$Rest[0]; $mode = $Rest[1]; $target = [long]$Rest[3]; $dir = $Rest[4]
-        $size = $Rest[5].Split('x') | ForEach-Object { [double]$_ }; $margin = [double]$Rest[6]
+        $size = $Rest[5].Split('x') | ForEach-Object { [double]$_ }; $margin = [double]$Rest[6]; $share = [double]$Rest[7]
         $chord = [uint16[]]($Rest[2].Split(',') | ForEach-Object { $keys[$_] })
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
         if (-not [TmwSmoke]::Focus($target)) { 'not focused'; exit 4 }
@@ -837,7 +862,13 @@ switch ($Command) {
             $behind = [TmwSmoke]::Accent($baseline)
             $band = [TmwSmoke]::TopBandChanges($shots[$name].Shot, $baseline)
             $painted = if ($accent -gt 0) { 'painted' } else { 'unpainted' }
-            '{0}={1} accent={2} baseline={3} band={4} {5} {6}' -f $name, $painted, $accent, $behind, $band, ($shots[$name].Frame -split ' ')[0], $shots[$name].Place
+            $scale = ''
+            if ($name -eq 'listening' -and $mode -ne 'hands-free' -and $accent -gt 0) {
+                $ratio = [TmwSmoke]::NewAccentWidth($shots[$name].Shot, $baseline) / [double]$shots[$name].Shot.Width
+                $fits = [math]::Abs($ratio - $share) -le $share * 0.05
+                $scale = ' scale={0}({1:F3} of the window, expected {2:F3})' -f $(if ($fits) { 'ok' } else { 'off' }), $ratio, $share
+            }
+            '{0}={1} accent={2} baseline={3} band={4} {5} {6}{7}' -f $name, $painted, $accent, $behind, $band, ($shots[$name].Frame -split ' ')[0], $shots[$name].Place, $scale
         }
         $focus = if ($script:focusKept) { 'kept' } else { 'taken' }
         'take mode={0} focus={1} {2}' -f $mode, $focus, ($parts -join ' ')

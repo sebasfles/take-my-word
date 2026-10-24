@@ -11,7 +11,8 @@ Starts the dev app each way it starts and checks the overlay's pixels on every t
   autostart  --autostart by hand, which stays in the tray
 After each start the overlay must be frameless; then near-silent takes into a scratch window, alternating hold and
 hands-free, must each paint listening and processing (accent pixels the hidden baseline lacks), draw no title bar,
-sit centred above the taskbar of the monitor it shows on and leave the focus on the scratch window.
+sit centred above the taskbar of the monitor it shows on, draw its waveform at that monitor's scale (0.109 of the
+window's width while listening in a hold) and leave the focus on the scratch window.
 --no-frames (debug builds only) makes the overlay paint nothing before one extra hold, which must paint again within
 that hold once the overlay is recreated.
 --displays adds, after the last start's takes, a hold on the secondary display (the cursor moved there), one after
@@ -57,6 +58,7 @@ ps1="$(wslpath -w "$scratch/terminal-smoke.ps1")"
 app_log="$local_app_data/dev.fless.takemyword.dev/logs/Take My Word Dev.log"
 overlay_size="$(node -p "const o = require('$here/../src/windows.json').overlay; o.width + 'x' + o.height")"
 overlay_margin="$(grep -oP 'const BOTTOM_MARGIN: f64 = \K[0-9.]+' "$here/../src-tauri/src/overlay.rs")"
+waveform_share=0.109
 
 log() {
   printf '%s %s\n' "$(date -u +%H:%M:%S.%3N)" "$*" | tee -a "$out/run.log" >&2
@@ -99,16 +101,25 @@ start_app() {
   act start "$app" "$(printf '%s' "$*" | base64 -w0)" | tail -1
 }
 
+forward() {
+  start_app "$@" >/dev/null
+  sleep 2
+  local running
+  running="$(dev_instances | grep -c .)"
+  (( running == 1 )) || fail "forwarding $* left $running dev instances running; the single-instance handoff failed"
+}
+
 stop_app() {
   [[ -n "${app_pid:-}" ]] || return 0
   log "stopped the app ($app_pid) and its WebView2: $(psw stop-tree "$app_pid")"
   app_pid=""
+  sleep 3
 }
 
 main_window() {
   local deadline=$((SECONDS + 20)) window=0
   while (( SECONDS < deadline )); do
-    window="$(psw find-process "$app_pid")"
+    window="$(psw main-of "$app_pid")"
     [[ "$window" != 0 ]] && break
     sleep 0.5
   done
@@ -146,8 +157,7 @@ sign_in() {
 sign_out() {
   local window offset
   offset="$(app_log_size)"
-  [[ -n "${app_pid:-}" ]] || app_pid="$(start_app)"
-  start_app >/dev/null
+  if [[ -n "${app_pid:-}" ]]; then forward; else app_pid="$(start_app)"; fi
   window="$(main_window)"
   [[ "$window" != 0 ]] || { log "WARNING: the main window never opened, sign out by hand"; return; }
   sleep 2
@@ -208,7 +218,7 @@ judge() {
   local line="$1" mode="$2"
   [[ "$line" == *"focus=kept"* ]] || return 1
   [[ "$line" == *"listening=painted"* && "$line" == *"processing=painted"* ]] || return 1
-  [[ "$line" != *"framed"* && "$line" != *"off-centre"* ]] || return 1
+  [[ "$line" != *"framed"* && "$line" != *"off-centre"* && "$line" != *"scale=off"* ]] || return 1
   local band
   for band in $(grep -o 'band=[0-9]*' <<<"$line" | cut -d= -f2); do
     (( band <= 200 )) || return 1
@@ -220,7 +230,7 @@ take() {
   local start="$1" n="$2" mode="$3" offset line verdict
   guard_ok
   offset="$(app_log_size)"
-  line="$(act overlay-take "$app_pid" "$mode" "$keys" "$target" "$(wslpath -w "$out/$start-$n-$mode")" "$overlay_size" "$overlay_margin")"
+  line="$(act overlay-take "$app_pid" "$mode" "$keys" "$target" "$(wslpath -w "$out/$start-$n-$mode")" "$overlay_size" "$overlay_margin" "$waveform_share")"
   sleep 2
   if judge "$line" "$mode"; then verdict=PASS; else verdict=FAIL; fi
   if [[ "$mode" == no-frames ]] && ! app_log_since "$offset" | grep -q 'recreating the overlay'; then verdict=FAIL; fi
@@ -255,7 +265,7 @@ for start in "${paths[@]}"; do
     window="$(main_window)"
     [[ "$window" != 0 ]] || fail "a start by hand opened no main window"
   else
-    window="$(psw find-process "$app_pid")"
+    window="$(psw main-of "$app_pid")"
   fi
   if [[ "$window" != 0 ]]; then
     if psw tree "$window" | grep -qE "Edit '(Usuario|Username)'|Button '(Empezar|Get started)'"; then
@@ -273,8 +283,7 @@ for start in "${paths[@]}"; do
     if (( n % 2 )); then take "$start" "$n" hold; else take "$start" "$n" hands-free; fi
   done
   if (( no_frames )); then
-    start_app --overlay-no-frames >/dev/null
-    sleep 1
+    forward --overlay-no-frames
     take "$start" "$((takes + 1))" no-frames
   fi
   if (( displays )) && [[ "$start" == "${paths[-1]}" ]]; then

@@ -114,6 +114,7 @@ struct Lifecycle {
     health: Health,
     current: OverlayState,
     rebuilding: bool,
+    content_scale: Option<f64>,
 }
 
 #[derive(Clone)]
@@ -132,6 +133,7 @@ impl WindowOverlay {
                 health: Health::new(Instant::now()),
                 current: OverlayState::Hidden,
                 rebuilding: false,
+                content_scale: None,
             })),
         }
     }
@@ -145,6 +147,8 @@ impl WindowOverlay {
     pub fn create(&self) -> tauri::Result<()> {
         let window = crate::windows::create_overlay(&self.app)?;
         log::info!("created the overlay");
+        keep_content_scale(&window);
+        self.lifecycle().content_scale = window.scale_factor().ok();
         let overlay = self.clone();
         window.on_window_event(move |event| {
             if matches!(event, WindowEvent::Destroyed) {
@@ -180,6 +184,34 @@ impl WindowOverlay {
 
     pub fn painted(&self, seq: u64) {
         self.lifecycle().health.painted(seq);
+    }
+
+    fn show_at_scale(&self, window: &tauri::WebviewWindow, scale: f64, generation: u64) {
+        #[cfg(windows)]
+        {
+            let overlay = self.clone();
+            let target = window.clone();
+            let queued = window.with_webview(move |webview| {
+                use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller3;
+                use windows::core::Interface;
+                let applied = webview
+                    .controller()
+                    .cast::<ICoreWebView2Controller3>()
+                    .and_then(|controller| unsafe { controller.SetRasterizationScale(scale) });
+                if let Err(error) = applied {
+                    log::warn!("scaling the overlay's content failed: {error}");
+                }
+                if overlay.generation.load(Ordering::SeqCst) == generation {
+                    set_shown(&target, true);
+                }
+            });
+            if queued.is_ok() {
+                return;
+            }
+        }
+        let _ = scale;
+        let _ = generation;
+        set_shown(window, true);
     }
 
     #[cfg(debug_assertions)]
@@ -280,8 +312,13 @@ impl Overlay for WindowOverlay {
             return;
         }
         set_memory_target(&window, MemoryTarget::Normal);
-        place_above_taskbar(&self.app, &window);
-        set_shown(&window, true);
+        let scale = place_above_taskbar(&self.app, &window);
+        let rescale =
+            scale.filter(|scale| self.lifecycle().content_scale.replace(*scale) != Some(*scale));
+        match rescale {
+            Some(scale) => self.show_at_scale(&window, scale, generation),
+            None => set_shown(&window, true),
+        }
         let overlay = self.clone();
         thread::spawn(move || {
             thread::sleep(PAINT_DEADLINE);
@@ -350,18 +387,16 @@ fn pump(level: &Level, running: &AtomicBool, every: Duration, mut emit: impl FnM
     }
 }
 
-fn place_above_taskbar(app: &AppHandle, window: &tauri::WebviewWindow) {
+fn place_above_taskbar(app: &AppHandle, window: &tauri::WebviewWindow) -> Option<f64> {
     let monitor = app
         .cursor_position()
         .ok()
         .and_then(|cursor| app.monitor_from_point(cursor.x, cursor.y).ok().flatten())
-        .or_else(|| window.primary_monitor().ok().flatten());
-    let Some(monitor) = monitor else {
-        return;
-    };
+        .or_else(|| window.primary_monitor().ok().flatten())?;
     let scale = monitor.scale_factor();
     let _ = window.set_position(above_taskbar(monitor.work_area(), scale));
     let _ = window.set_size(crate::windows::overlay_size(scale));
+    Some(scale)
 }
 
 fn above_taskbar(area: &PhysicalRect<i32, u32>, scale: f64) -> PhysicalPosition<i32> {
@@ -411,6 +446,23 @@ pub fn set_memory_target(window: &tauri::WebviewWindow, target: MemoryTarget) {
     });
     #[cfg(not(windows))]
     let _ = (window, target);
+}
+
+fn keep_content_scale(window: &tauri::WebviewWindow) {
+    #[cfg(windows)]
+    let _ = window.with_webview(|webview| {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller3;
+        use windows::core::Interface;
+        let kept = webview
+            .controller()
+            .cast::<ICoreWebView2Controller3>()
+            .and_then(|controller| unsafe { controller.SetShouldDetectMonitorScaleChanges(false) });
+        if let Err(error) = kept {
+            log::warn!("taking over the overlay's content scale failed: {error}");
+        }
+    });
+    #[cfg(not(windows))]
+    let _ = window;
 }
 
 fn watch_processes(

@@ -183,3 +183,24 @@ Did:
 
 Evidence (workspace `evidence/probe`):
 - `smoke-73011ba`: the debug build of the app at b8f6b5c (no app code changed since), `--starts autostart --takes 1 --displays`: 5 of 5 pass, exit 0; the primary take lands at 660,870, 600x120 at 125 %, after the takes on the secondary display at 100 % and 125 %.
+
+### Round 4
+
+Did:
+- The overlay owns its content scale: at creation it turns off WebView2's monitor scale detection (`SetShouldDetectMonitorScaleChanges(false)`) and records the scale it starts at; a show whose monitor has another scale sets `RasterizationScale` and shows the window in one step on the main thread, so the first frame is drawn at that scale, and a show whose state was superseded meanwhile is skipped; shows at an unchanged scale keep the direct path.
+- The smoke judges the waveform's scale: on listening in a hold, the new accent pixels must span 0.109 of the window's width within 5 % (0.108 at 100 %, 0.110 at 125 %; 0.087 when the content stays at 100 % in a 125 % window).
+- Smoke hygiene, each of which invalidated a run:
+  - The main window is found by class (`main-of`: a visible `Tauri Window` without `WS_EX_NOACTIVATE`); `find-process` returned the single-instance plugin's 14x14 IPC window, which the smoke then closed, so every later launch became a second instance (`smoke-b6f444b-full`, `smoke-2590aaa`, `smoke-diag` with `monitor.log`).
+  - Launches that must hand over to the running instance go through `forward`, which fails the run if a second instance stays; the smoke waits 3 s after stopping an instance.
+- My measurement script (probe tooling, not in the repo) stops the app's whole tree on exit and logs any instance left: its abort at 17:43:44Z left the base dev build (pid 14404) running until I stopped it; it also found the main window with `find-process`, so the round 1 and round 2 idle figures may have been taken with the main window still open.
+
+Evidence (workspace `evidence/probe`):
+- `smoke-b6f444b-on-b8f6b5c`: the new scale check on the round 3 app fails the primary take (0.087 of the window), exit 1.
+- `smoke-dd512b2-3`: debug build of the app at b6f444b (dd512b2 changes only the smoke), `--starts hand,autostart --takes 5 --no-frames --displays`: 17 of 17 pass, exit 0; waveform at 0.108 to 0.110 of the window in every hold; the primary take at 660,870, 600x120 at 125 % after the secondary takes at 100 % and 125 %.
+- `measure-*` of 17:58 to 18:10Z, dev release builds of `develop` (1a77433) and b6f444b, same session, main window closed by class: first painted pill median 43 and 35 ms; private working set 28.8 and 25.5 MB; CPU over 5 idle minutes 0.27 and 0.38 s; no instance left.
+
+Decisions the plan did not record:
+- The overlay sets its own rasterization scale instead of WebView2 detecting it: after a move across monitors while hidden, detection left the content at the old scale.
+
+Deferred:
+- `tauri-plugin-single-instance` 2.5.4 on Windows carries on as a full instance, with no IPC window, when the mutex exists but the window does not (a start while the previous instance is dying, or after its IPC window is closed); normal exits and starts never meet it.
