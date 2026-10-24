@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0016_self_hosting
+updated: 2026-10-24
+source: 0017_eval_harness
 ---
 
 # Infra: technical
@@ -31,6 +31,7 @@ The official deployment runs `core`, `dev` and `prd` from Sebastian's machine an
 | Cognito user pool | Configured by the auth module, created here. |
 | Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`; `<deployment>-{env}/web` holds the web's `COOKIE_KEY`; prd's recovery window is 7 days, 0 under `removal`. |
 | S3 debug bucket | Dev only, optional raw audio for debugging, one-day lifecycle. |
+| Lambda `eval` | Dev only, when `evalFunction` is on: the evaluation harness swaps its code from the checkout that runs it and invokes it with the deployment profile; no route, 1024 MB like `dictate`, 120 s, allowed only to read the providers secret; CI and the deploy role never touch it. |
 | Web hosting | Lambda `web` (OpenNext server, 512 MB, 30 s) behind an `AWS_IAM` Function URL, the private bucket `<deployment>-{env}-web-assets-{account}` for `/_next/static/*` and `/static/*`, and one CloudFront distribution with OAC to both, caching disabled for the server and a headers policy (HSTS, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`); its certificate comes from an `aws.us_east_1` provider alias, so any region works. |
 | Route 53 records | `<domain>` for prd and `dev.<domain>` for dev (A and AAAA to CloudFront), and an `api.` alias in front of each, each with its ACM certificate, in the zone named by `hostedZone`, which Terraform reads and never owns. |
 | CloudWatch | Structured logs and EMF metrics per provider; every log group keeps 30 days. |
@@ -64,6 +65,7 @@ Jobs, listeners or scheduled work: none.
 
 - `deployment.json`: see `deployment.example.json`; `pnpm tf` refuses a profile that resolves to another account than `aws.accountId`.
 - Lambda environment variables are wired by `stacks/app`; `DEBUG_BUCKET` only while the dev variable `debug_audio` is on.
+- `evalFunction` in `deployment.json` (off by default, refused without dev) makes `pnpm tf dev` pass `TF_VAR_eval_function`; prd and core never receive it, and the stack refuses it outside dev.
 - Repository Actions variables, set by hand: `DESKTOP_DEV_SERVER` and `DESKTOP_PRD_SERVER` (the discovery JSON each desktop build signs in to), `DESKTOP_UPDATER_PUBKEY` and `WEB_INDEXED_ORIGIN` (the prd origin search engines may index).
 - `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME`, `DICTIONARY_USAGE_FUNCTION_NAME`, `WEB_FUNCTION_NAME`, `WEB_ASSETS_BUCKET` and `WEB_DISTRIBUTION_ID` are written by `stacks/app` into the env's Actions environment, which `core` creates.
 - Repository Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (the updater key, minisign, password-protected) are set by hand with `gh secret set` from stdin, outside Terraform; the values also sit in the root `.env` and Sebastian's password manager, and the public half in `DESKTOP_UPDATER_PUBKEY` and `deployment.json`.

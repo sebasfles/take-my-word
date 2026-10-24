@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0015_user_context
+updated: 2026-10-24
+source: 0017_eval_harness
 ---
 
 # Dictation: architecture and debt
@@ -196,3 +196,58 @@ source: 0015_user_context
 - Debt created: none.
 - Revisit when: per-user caps arrive, or users ask for seconds.
 - Source: 0015_user_context
+
+## 2026-10-24: Provider latency is measured in a dev eval Lambda through an instrumented undici fetch
+
+- Decision: the eval Lambda gives each adapter a fetch built on userland undici, with a new Agent for a fresh call and a kept-alive one otherwise; it encodes multipart bodies itself, counts new TLS connections through the `undici:client:connected` channel, and records time to headers, status and rate-limit headers; latency is grouped by the connection a call actually got.
+- Alternatives rejected: measuring from the laptop or through `dictate`; the global fetch, which cannot force a fresh connection.
+- Reason: production's numbers come from us-east-1, and whether a call paid a TLS handshake changes them; userland undici sends Node's global FormData as text, hence the encoding.
+- Debt created: none.
+- Revisit when: production adopts a dispatcher of its own, or Node's bundled undici exposes per-call agents.
+- Source: 0017_eval_harness
+
+## 2026-10-24: Evaluation gates are deterministic and relative to today's models
+
+- Decision: the hard gate fails a candidate on any output that would paste wrong after production's level and phrase guards: 3 or more new words in a row, a known hallucination phrase, any text on noise, or text whose function words read as the other language; the relative gate compares WER, domain-term errors, meaning changes, single new words and failed attempts (429s apart) with today's models plus the spread of their per-run values.
+- Alternatives rejected: an LLM judge; failing on any single new word, which measured how complete the allowed lists were.
+- Reason: checks a reviewer can read in the report, the same definition of invented content in both suites, and a bar set by what users get today.
+- Debt created: none.
+- Revisit when: a suite needs judgments these checks cannot express, such as tone.
+- Source: 0017_eval_harness
+
+## 2026-10-24: Transcripts may carry the usage they were billed by
+
+- Decision: `Transcript` has an optional `usage` (seconds or input and output tokens); `openai-transcribe` fills it and tolerates an unknown shape, production ignores it, and the evaluation prices token-billed models from it.
+- Alternatives rejected: per-minute estimates for every model.
+- Reason: the gpt-4o transcription models bill audio tokens, and the cost of a choice should come from measured use.
+- Debt created: none.
+- Revisit when: production records transcription cost per dictation.
+- Source: 0017_eval_harness
+
+## 2026-10-24: The evaluation paces itself to keep production's share of every free plan
+
+- Decision: a ledger shared by every run counts the runner's own calls; per model it keeps half of each per-minute, hourly and daily limit free, daily ones over any trailing 24 hours, and Groq's own headers pause it further; Groq chat models, which production does not call, keep 10K tokens a day instead of half; a one-off `--whisper-daily-kept` lets Whisper go down to 10% left and is recorded in the run's report; a run seeds its 3 USD budget with what it already spent and resumes only when a digest of its requests and the eval bundle's hash match.
+- Alternatives rejected: daily limits per UTC day, which Groq does not use; resuming by code commit, which refused resumes after changes that do not touch a request.
+- Reason: dev, prd and the evaluation share one Groq and one OpenAI account; an unpaced attempt of this task hit turbo's per-minute limit.
+- Debt created: none.
+- Revisit when: production moves off Groq's free plan, or the evaluation gets accounts of its own.
+- Source: 0017_eval_harness
+
+## 2026-10-24: The eval request contract stays in `apps/api`
+
+- Decision: the zod contract between the runner and the eval Lambda lives in `apps/api/src/eval/contract.ts`, not in `packages/shared`.
+- Alternatives rejected: `packages/shared`, the home of client contracts.
+- Reason: only `apps/api` uses it, on both sides, and no client calls the eval Lambda.
+- Debt created: none.
+- Revisit when: anything outside `apps/api` invokes the eval Lambda.
+- Source: 0017_eval_harness
+
+## 2026-10-24: Production's transcriber shares one per-minute limit across every user and environment
+
+- Decision: no change in this task; the evaluation measured and reported that Groq's free plan allows 20 transcriptions a minute per account, shared by every user of prd and by dev.
+- Alternatives rejected: none in this task; the switch to `gpt-transcribe` recommended by its report would move transcription to OpenAI's per-account limits.
+- Reason: switching models is a separate task, and the limit is a property of the provider plan.
+- Debt created: a few users dictating at once, or one `pnpm e2e` run on dev, can make prd dictations fail with 429.
+- Revisit when: the transcriber switch task, or a 429 from the transcriber in prd logs.
+- Source: 0017_eval_harness
+

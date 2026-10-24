@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0016_self_hosting
+updated: 2026-10-24
+source: 0017_eval_harness
 ---
 
 # Infra: architecture and debt
@@ -194,4 +194,13 @@ source: 0016_self_hosting
 - Debt created: none.
 - Revisit when: a third language arrives.
 - Source: 0016_self_hosting
+
+## 2026-10-24: The eval Lambda is opted in through `deployment.json`
+
+- Decision: `evalFunction` in `deployment.json`, off by default and refused without dev, makes `pnpm tf dev` pass `eval_function`; the stack validates it only for dev, and the Lambda's code is swapped by the evaluation, never by CI or the deploy role.
+- Alternatives rejected: a `-var` flag on each apply, which the next apply without it would undo; the Lambda always on in dev.
+- Reason: the official dev keeps the Lambda across every apply while self-hosted deployments and prd never get it.
+- Debt created: none.
+- Revisit when: a second dev-only resource needs the same switch.
+- Source: 0017_eval_harness
 
