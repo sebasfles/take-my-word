@@ -204,3 +204,18 @@ Decisions the plan did not record:
 
 Deferred:
 - `tauri-plugin-single-instance` 2.5.4 on Windows carries on as a full instance, with no IPC window, when the mutex exists but the window does not (a start while the previous instance is dying, or after its IPC window is closed); normal exits and starts never meet it.
+
+### Round 5
+
+Did:
+- `pnpm release:desktop 0.3.1 --notes` from 7d647f2 with a clean tree: version commit ddf2c89 (`Cargo.toml`, `Cargo.lock`, `package.json` only) and the annotated tag `desktop-v0.3.1`, pushed together; nothing else changed on the branch.
+
+Evidence:
+- `desktop-release` run 40121285150 (https://github.com/sebasfles/take-my-word/actions/runs/40121285150): success.
+- GitHub Release `desktop-v0.3.1` published 2026-10-24T18:43:03Z as latest, not a draft or prerelease, with `take-my-word-windows-x64-setup.exe`, `Take.My.Word_0.3.1_x64-setup.exe`, its `.sig` and `latest.json`.
+- `releases/latest/download/latest.json` reads 0.3.1 (pub_date 2026-10-24T18:42:57Z, `windows-x86_64` and `windows-x86_64-nsis`).
+- The prd landing serves 0.3.1 at 18:43:54Z on `/es` and `/en`, with the installer link and no 0.3.0.
+
+Pending:
+- The 0.3.0 to 0.3.1 update on Sebastian's install, checked from his log when it takes the offer; no prd build was launched and pid 21460 was not touched.
+- Acceptance 2 on the real sign-in path, at Sebastian's next restart on 0.3.1.
