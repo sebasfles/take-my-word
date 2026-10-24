@@ -16,7 +16,13 @@ import {
   type PacingKey,
   type PacingOverrides,
 } from "./pacing.ts";
-import { complimentaryDailyTokens, modelFacts, prepaidBalances, runBudgetUsd } from "./prices.ts";
+import {
+  complimentaryDailyTokens,
+  freePlanAt,
+  modelFacts,
+  prepaidBalances,
+  runBudgetUsd,
+} from "./prices.ts";
 import { runSchedule, type PlannedItem } from "./scheduler.ts";
 import { appendJsonl, readJsonl, type ResultsDir } from "./store.ts";
 import { fromInvocation, type Workspace } from "./workspace.ts";
@@ -78,11 +84,12 @@ export function pacingKeys(models: readonly string[]): Map<string, PacingKey> {
       const facts = modelFacts(model);
       const group = facts.complimentaryGroup;
       const prepaid = prepaidBalances[facts.provider];
+      const plan = freePlanAt(facts);
       return [
         pacingKeyOf(model),
         {
           provider: facts.provider,
-          ...(facts.freePlan && { plan: facts.freePlan }),
+          ...(plan && { plan }),
           ...(prepaid && { prepaid }),
           ...(group && {
             complimentary: { group, tokensPerDay: complimentaryDailyTokens[group].tokens },

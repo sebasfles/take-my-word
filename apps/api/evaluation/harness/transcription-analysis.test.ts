@@ -176,6 +176,24 @@ describe("relativeGate", () => {
     expect(relativeGate(unprompted, baseline)).toEqual({ passed: true, reasons: [] });
   });
 
+  it("counts provider failures, not the harness's own failed calls to the eval Lambda", () => {
+    const checked = runsOf("candidate", [exact, exact, exact]);
+    const failures = [
+      {
+        id: "candidate|dev-es-4/Lupe|one|1",
+        message: "groq-whisper:whisper-large-v3-turbo request failed: TimeoutError",
+      },
+      {
+        id: "candidate|dev-es-4/Lupe|one|2",
+        message: "Signature expired: 20261024T123841Z is now earlier than 20261024T124959Z",
+      },
+    ];
+    expect(summarize("candidate", checked, failures, longIds).modes.one).toMatchObject({
+      failedAttempts: 1,
+      attempts: 4,
+    });
+  });
+
   it("fails a candidate whose calls fail more often than the baseline's plus its spread", () => {
     const checked = [
       ...runsOf("baseline", [exact, exact, exact]),

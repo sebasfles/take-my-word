@@ -5,6 +5,7 @@ import { modelFacts, notServed, pricesCheckedFor, transcriptionCallUsd } from ".
 import type { FailureRecord } from "./suite.ts";
 import {
   actualConnection,
+  isProviderFailure,
   itemKey,
   pct,
   transcriptionGate,
@@ -16,6 +17,7 @@ import {
 
 export interface RunContext {
   command: string;
+  planNotes: string[];
   generatedAt: string;
   codeCommit: string;
   fixturesSha256: string;
@@ -137,7 +139,8 @@ export function transcriptionReport(
     `Every provider call ran inside the dev eval Lambda \`${context.functionName}\` (${context.region}, ${context.memoryMb} MB, arm64), through the production adapters and production's \`transcribeIn\`, ${String(context.runs)} runs per clip and language setting; run 1 opens a fresh connection, later runs reuse the Lambda's kept-alive one.`,
     `Clips are Polly neural speech generated at run time (voices ${[...new Set([...fixtures.voices.es, ...fixtures.voices.en, ...fixtures.voices.mixed])].join(", ")}) and seeded noise; every candidate got the same bytes and the transcriber prompt of the case's fixture dictionary.`,
     `"one" sends the case's language; "both" lets the transcriber detect among es and en and transcribes again in es when it reports neither, as production does.`,
-    `Prices and plans as checked on ${pricesCheckedFor(candidates.map((candidate) => candidate.spec.model))}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan, prepaid balances at list price).`,
+    `Prices and plans as checked on ${pricesCheckedFor(candidates.map((candidate) => candidate.spec.model))}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan unless noted below, prepaid balances at list price).`,
+    ...context.planNotes.map((note) => `${note}.`),
     ...context.overrides.map((note) => `Override for part of this run: ${note}.`),
     `Reproduce from the repository root: \`${context.command}\`.`,
     "",
@@ -259,7 +262,7 @@ export function transcriptionReport(
   else {
     const counts = new Map<string, number>();
     for (const failure of context.failedAttempts) {
-      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}`;
+      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}${isProviderFailure(failure) ? "" : " (the harness's own call to the eval Lambda, not a provider answer; not counted as a failed call)"}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     for (const [key, count] of counts) push(`- ${key}, ${String(count)} attempts`);

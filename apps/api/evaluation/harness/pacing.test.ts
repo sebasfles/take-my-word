@@ -71,6 +71,21 @@ describe("Pacer", () => {
     });
   });
 
+  it("paces a Groq model on a paid plan only by Groq's headers, with no free-plan windows", () => {
+    const paid = new Map<string, PacingKey>([["groq:whisper", { provider: "groq" }]]);
+    const pacer = new Pacer(
+      paid,
+      entries("groq:whisper", 40, (index) => noon - 50_000 + index * 1_000, {
+        requests: 1,
+        audioSeconds: 7_200,
+        tokens: 0,
+      }),
+    );
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "now" });
+    pacer.observe("groq:whisper", { "retry-after": "2" }, noon);
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "at", at: noon + 2_000 });
+  });
+
   it("paces Groq Whisper at a quarter of its per-minute limit, 5 of 20", () => {
     const ledger = entries("groq:whisper", 5, (index) => noon - 50_000 + index * 1_000);
     expect(new Pacer(keys, ledger).readiness("groq:whisper", call, noon)).toEqual({

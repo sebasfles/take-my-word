@@ -40,7 +40,11 @@ export interface TranscriptionResult {
 export interface AttemptFailure {
   id: string;
   status?: number;
+  message?: string;
 }
+
+export const isProviderFailure = (failure: AttemptFailure): boolean =>
+  failure.message === undefined || /^[a-z-]+:\S+ /.test(failure.message);
 
 export const caseIdOf = (itemId: string): string =>
   (itemId.split("|")[1] ?? "").split("/")[0] ?? "";
@@ -182,6 +186,7 @@ export function summarize(
 ): CandidateSummary {
   const mine = checked.filter((entry) => entry.result.candidate === candidate);
   const myFailures = failures
+    .filter(isProviderFailure)
     .map((failure) => ({ ...failure, ...itemKey(failure.id) }))
     .filter((failure) => failure.candidate === candidate);
   const flags: Record<GateFlag, number> = {

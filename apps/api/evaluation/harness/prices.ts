@@ -351,6 +351,43 @@ export function tokenCostUsd(facts: ModelFacts, inputTokens: number, outputToken
   );
 }
 
-export function chargedUsd(facts: ModelFacts, listUsd: number): number {
-  return facts.freePlan === undefined ? listUsd : 0;
+export interface PaidPlan {
+  since: string;
+  plan: string;
+  monthlySpendLimitUsd: number;
+}
+
+export type PaidPlans = Readonly<Partial<Record<Provider, PaidPlan>>>;
+
+export const paidPlans: PaidPlans = {};
+
+export function freePlanAt(
+  facts: ModelFacts,
+  at: number = Date.now(),
+  plans: PaidPlans = paidPlans,
+): FreePlanLimits | undefined {
+  const paid = plans[facts.provider];
+  return paid !== undefined && at >= Date.parse(paid.since) ? undefined : facts.freePlan;
+}
+
+export function chargedUsd(
+  facts: ModelFacts,
+  listUsd: number,
+  at: number = Date.now(),
+  plans: PaidPlans = paidPlans,
+): number {
+  return freePlanAt(facts, at, plans) === undefined ? listUsd : 0;
+}
+
+export function planNotes(
+  ledger: readonly { key: string; at: number; usd?: number }[],
+  plans: PaidPlans = paidPlans,
+): string[] {
+  return Object.entries(plans).map(([provider, paid]) => {
+    const since = Date.parse(paid.since);
+    const spent = ledger
+      .filter((entry) => entry.key.startsWith(`${provider}:`) && entry.at >= since)
+      .reduce((total, entry) => total + (entry.usd ?? 0), 0);
+    return `${providerNames[provider as Provider]} moved from its free plan to its ${paid.plan} on ${paid.since}; its calls from then on are charged at list price and count in the run cap; this task's ${providerNames[provider as Provider]} spend since then is ${spent.toFixed(3)} USD of the ${paid.monthlySpendLimitUsd.toFixed(2)} USD monthly spend limit, which the account shares with production`;
+  });
 }

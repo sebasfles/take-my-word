@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   billedAudioSeconds,
   chargedUsd,
+  freePlanAt,
   modelFacts,
+  planNotes,
   pricesCheckedFor,
   tokenCostUsd,
   transcriptionCallUsd,
@@ -55,5 +57,34 @@ describe("pricesCheckedFor", () => {
     expect(
       pricesCheckedFor(["whisper-large-v3-turbo", "gpt-transcribe", "nvidia/parakeet-tdt-0.6b-v3"]),
     ).toBe("2026-10-23 (Groq, OpenAI) and 2026-10-24 (Together)");
+  });
+});
+
+describe("a provider's move to a paid plan", () => {
+  const paid = {
+    groq: { since: "2026-10-25T00:00:00.000Z", plan: "Developer tier", monthlySpendLimitUsd: 5 },
+  };
+  const before = Date.parse("2026-10-24T23:59:59.000Z");
+  const after = Date.parse("2026-10-25T00:00:01.000Z");
+
+  it("keeps calls before the date free and charges the ones after at list price", () => {
+    const turbo = modelFacts("whisper-large-v3-turbo");
+    expect(chargedUsd(turbo, 0.01, before, paid)).toBe(0);
+    expect(chargedUsd(turbo, 0.01, after, paid)).toBe(0.01);
+    expect(freePlanAt(turbo, after, paid)).toBeUndefined();
+    expect(freePlanAt(turbo, before, paid)).toBe(turbo.freePlan);
+    expect(chargedUsd(turbo, 0.01, after)).toBe(0);
+  });
+
+  it("states the task's spend since the move against the shared monthly limit", () => {
+    const ledger = [
+      { key: "groq:whisper-large-v3-turbo", at: before, usd: 0 },
+      { key: "groq:whisper-large-v3-turbo", at: after, usd: 0.25 },
+      { key: "groq:openai/gpt-oss-20b", at: after, usd: 0.5 },
+      { key: "openai:gpt-transcribe", at: after, usd: 1 },
+    ];
+    expect(planNotes(ledger, paid)).toEqual([
+      "Groq moved from its free plan to its Developer tier on 2026-10-25T00:00:00.000Z; its calls from then on are charged at list price and count in the run cap; this task's Groq spend since then is 0.750 USD of the 5.00 USD monthly spend limit, which the account shares with production",
+    ]);
   });
 });

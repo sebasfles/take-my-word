@@ -21,7 +21,8 @@ import {
   loadTranscriptionFixtures,
   transcriptionFixturesPath,
 } from "./harness/fixtures.ts";
-import { chargedUsd, modelFacts, tokenCostUsd } from "./harness/prices.ts";
+import { chargedUsd, modelFacts, planNotes, tokenCostUsd } from "./harness/prices.ts";
+import type { LedgerEntry } from "./harness/pacing.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
 import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
 import {
@@ -209,6 +210,7 @@ function render(
     reportPath,
     cleanupReport(
       {
+        planNotes: planNotes(readJsonl<LedgerEntry>(dir.ledger)),
         command: `pnpm --filter @take-my-word/api eval:cleanup --results ${fromRoot(results)} --report ${fromRoot(reportPath)} --runs ${String(dir.meta.runs)}`,
         generatedAt: new Date().toISOString(),
         codeCommit: [dir.meta.codeCommit, ...(dir.meta.resumedWith ?? [])].join(

@@ -18,8 +18,10 @@ import {
   billedAudioSeconds,
   chargedUsd,
   modelFacts,
+  planNotes,
   transcriptionCallUsd,
 } from "./harness/prices.ts";
+import type { LedgerEntry } from "./harness/pacing.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
 import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
 import {
@@ -266,6 +268,7 @@ function render(dir: ResultsDir, results: string, reportPath: string): void {
     reportPath,
     transcriptionReport(
       {
+        planNotes: planNotes(readJsonl<LedgerEntry>(dir.ledger)),
         command: `pnpm --filter @take-my-word/api eval:transcription --results ${fromRoot(results)} --report ${fromRoot(reportPath)} --runs ${String(dir.meta.runs)}`,
         generatedAt: new Date().toISOString(),
         codeCommit: [dir.meta.codeCommit, ...(dir.meta.resumedWith ?? [])].join(

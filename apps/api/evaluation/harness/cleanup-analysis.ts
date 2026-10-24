@@ -11,6 +11,7 @@ import {
 } from "./metrics.ts";
 import {
   caseIdOf,
+  isProviderFailure,
   itemKey,
   latency,
   pct,
@@ -178,6 +179,7 @@ export function summarizeCleanup(
   const mine = checked.filter((entry) => entry.result.candidate === candidate);
   const ok = mine.filter((entry) => entry.result.ok);
   const myFailures = failures
+    .filter(isProviderFailure)
     .map((failure) => ({ ...failure, ...itemKey(failure.id) }))
     .filter((failure) => failure.candidate === candidate);
   const failed = myFailures.filter((failure) => failure.status !== 429);

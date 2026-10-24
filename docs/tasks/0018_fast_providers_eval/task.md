@@ -106,6 +106,8 @@ Consolidated 2026-10-24 by the om-reviewer; answers from the om-manager.
 - Review beyond the Pipeline: tf plan evidence, fixture and chained-case commits before results, the balance floor and the cost guard tested, the gate tests above, the production byte-identity tests.
 - Overhead samples (om-reviewer, before round 1): the client-to-API overhead (client time minus server total) of 0017's warm end-to-end dictations is read once, read-only, from 0017's workspace results and committed as a dated constant in `evaluation/harness` with its run and report as source; the summary sums it with the in-Lambda distribution. Why: a single P50 constant loses the P95 shape.
 - Naming (om-reviewer, before round 1): one adapter `together-transcribe` serves both Together models, with eval candidates `together-parakeet` and `together-whisper-large-v3`; `cerebras-chat` shares a chat-completions helper with `groq-chat`, whose request a test pins. Acceptance 1's `together-parakeet` is the candidate id.
+- Groq plan change (om-manager, 2026-10-24): the Groq organization moves to the paid Developer tier with a 5 USD monthly spend limit; from the om-manager's "groq paid", the free-plan daily reserves no longer apply, the paused suite 1 finishes at once pacing only on Groq's rate-limit headers, and the plan change and its date go into `prices.ts` and the reports. Groq calls from that date are charged at list price and count in the 3 USD run cap; the report states the task's Groq spend against the shared 5 USD limit (om-reviewer).
+- Work order while Groq Whisper waits (om-manager, 2026-10-24): what needs no Groq Whisper runs meanwhile; suite 2 still starts only after the om-reviewer has reviewed the chained cases.
 - clearance: full: `pnpm tf dev plan` and `pnpm tf prd plan` only; code swap and invoke of the dev eval Lambda; Polly; provider calls through the eval Lambda with the Groq, OpenAI, Together and Cerebras keys of the dev providers secret. No dev API run, no change to shared dev Lambdas, no apply.
 
 ## om-developer notes
@@ -156,3 +158,16 @@ Applied all 6 findings of round 1:
 
 Applied the finding of round 2: rebased on `origin/develop` (1a77433) with no conflicts; rounds 1 and 2 are now d241e82 and 6e03bab, and verify ran on 6e03bab, the rebased code.
 This round's commit holds only these notes and `verify.log`, so the verified commit stays in the branch's history.
+
+### Round 4
+
+Suite 1 measured on 6e03bab's frozen fixtures (`results/transcription-1` in the workspace): 3100 of 3120 calls, 1.48 USD charged, then paused by the Groq Whisper daily audio reserve until 2026-10-25T08:31Z; the 20 pending calls are all turbo run 5 (extended es and mixed under both languages, quiet-en-1, noise), none a run-1 one-language first-voice call, so the chained cases are complete.
+The report is rendered when those calls land.
+
+- `chained-checks.json`: hand-written required and forbidden words per speech case (36); required words leave out the case's dictionary terms, which the term check already measures, so one recognition error counts once.
+- `chained.fixtures.json`: 98 cases from run 1 of turbo, gpt-transcribe and Parakeet (36 each, 7 raws shared by two or three transcribers).
+- Tests: every chained case's expected texts pass its own checks; every speech case has checks its expected text passes.
+- Failure rates count only provider failures (a message from an adapter label); the harness's own failed calls to the eval Lambda (two AWS signature errors from clock drift in this run, both retried) are listed apart in the reports, with a test.
+- Groq paid plan, ready but off: `paidPlans` in `prices.ts` (empty); with a dated entry, Groq calls from that date get no free plan (no daily reserve, no quarter-minute pace; pacing by Groq's headers only), are charged at list price into the run cap, and every report states the task's Groq spend since then against the monthly limit; tests.
+- `eval:dictate --smoke --combinations ...`: one end-to-end case through production's `dictate()` in the eval Lambda, no baseline forced; run with three non-Groq pairs, all ok.
+- The 08:33Z resume is scheduled behind an STS check (`scripts/sts-check.sh` in the workspace) that leaves the run paused on stale credentials.

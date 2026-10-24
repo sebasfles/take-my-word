@@ -1,11 +1,12 @@
 import { clientOverhead } from "./client-overhead.ts";
 import type { DictateChecked, DictateSummary } from "./dictate-analysis.ts";
 import { extendedBucket, type SpeechCase } from "./fixtures.ts";
-import { itemKey, pct, type LatencyStats } from "./transcription-analysis.ts";
+import { isProviderFailure, itemKey, pct, type LatencyStats } from "./transcription-analysis.ts";
 import type { FailureRecord } from "./suite.ts";
 
 export interface DictateReportInput {
   command: string;
+  planNotes: string[];
   generatedAt: string;
   codeCommit: string;
   fixturesSha256: string;
@@ -54,6 +55,7 @@ export function dictateReport(input: DictateReportInput): string {
     `Cases: the end-to-end cases and the ${extendedBucket} samples, first voice of each (${input.cases.map((item) => item.id).join(", ")}).`,
     `"In the Lambda" is \`dictate()\`'s own total: probe, level, profile, transcription, silence guard, cleanup and save. "Release to text" adds the client-to-API overhead measured by round 1's dev end-to-end run (${clientOverhead.run}, ${clientOverhead.measuredAt}, ${clientOverhead.source}: ${String(clientOverhead.samplesMs.length)} warm dictations, ${clientOverhead.meaning}); P50 / P95 come from the distribution of every sum, never from adding percentiles, and the overhead is that client's network, labelled as such.`,
     `This run's calls cost ${input.chargedUsd.toFixed(3)} USD charged.`,
+    ...input.planNotes.map((note) => `${note}.`),
     `Reproduce from the repository root: \`${input.command}\`.`,
     "",
   );
@@ -66,7 +68,7 @@ export function dictateReport(input: DictateReportInput): string {
   else {
     const counts = new Map<string, number>();
     for (const failure of input.failedAttempts) {
-      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}`;
+      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}${isProviderFailure(failure) ? "" : " (the harness's own call to the eval Lambda, not a provider answer; not counted as a failed call)"}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     for (const [key, count] of counts) push(`- ${key}, ${String(count)} attempts`);

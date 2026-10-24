@@ -253,7 +253,7 @@ export class Pacer {
       const limit = number(`x-ratelimit-limit-${budget}`);
       const remaining = number(`x-ratelimit-remaining-${budget}`);
       if (limit === undefined || remaining === undefined) continue;
-      if (provider === "groq" && budget === "requests") {
+      if (provider === "groq" && plan !== undefined && budget === "requests") {
         if (remaining < limit * dailyRequestsKept) {
           block(now + (parseResetMs(headers["x-ratelimit-reset-requests"]) ?? hourMs));
         }

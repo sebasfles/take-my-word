@@ -9,10 +9,11 @@ import type { CleanupFixtures } from "./cleanup-fixtures.ts";
 import { extendedBucket } from "./fixtures.ts";
 import { modelFacts, notServed, pricesCheckedFor } from "./prices.ts";
 import type { FailureRecord } from "./suite.ts";
-import { itemKey, pct, type LatencyStats } from "./transcription-analysis.ts";
+import { isProviderFailure, itemKey, pct, type LatencyStats } from "./transcription-analysis.ts";
 
 export interface CleanupRunContext {
   command: string;
+  planNotes: string[];
   generatedAt: string;
   codeCommit: string;
   fixturesSha256: string;
@@ -72,7 +73,8 @@ export function cleanupReport(
     `Every call ran inside the dev eval Lambda \`${context.functionName}\` (${context.region}, ${context.memoryMb} MB, arm64) through the production adapters, with production's \`refinerInstructions\` for the case's language, style and fixture dictionary, unchanged for every model; ${String(context.runs)} runs per case, run 1 on a fresh connection.`,
     "Latency is the whole non-streamed call, as production makes it.",
     `Cases: round 1's ${String(round1Cases)} plus ${String(chainedCount)} chained raws, which suite 1's run 1 of ${chainedTranscribers.join(", ")} produced for each speech case (first voice, the case's own language, identical raws counted once), checked against that case's expected text and terms.`,
-    `Prices as checked on ${pricesCheckedFor(candidates.map((candidate) => candidate.spec.model))}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan, prepaid balances at list price).`,
+    `Prices as checked on ${pricesCheckedFor(candidates.map((candidate) => candidate.spec.model))}; this run's calls cost ${context.listUsd.toFixed(3)} USD at list price, ${context.chargedUsd.toFixed(3)} USD charged (Groq on its free plan unless noted below, prepaid balances at list price).`,
+    ...context.planNotes.map((note) => `${note}.`),
     `Reproduce from the repository root: \`${context.command}\`.`,
     "",
   );
@@ -171,7 +173,7 @@ export function cleanupReport(
   else {
     const counts = new Map<string, number>();
     for (const failure of context.failedAttempts) {
-      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}`;
+      const key = `${itemKey(failure.id).candidate}: ${failure.status === undefined ? failure.message : String(failure.status)}${isProviderFailure(failure) ? "" : " (the harness's own call to the eval Lambda, not a provider answer; not counted as a failed call)"}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     for (const [key, count] of counts) push(`- ${key}, ${String(count)} attempts`);
