@@ -202,7 +202,11 @@ export class Pacer {
   }
 
   observe(key: string, headers: Readonly<Record<string, string>>, now: number): void {
-    const { provider } = this.config(key);
+    const { provider, plan } = this.config(key);
+    const dailyRequestsKept =
+      plan?.audioSecondsPerDay !== undefined && this.overrides.whisperDailyKept !== undefined
+        ? this.overrides.whisperDailyKept
+        : 1 - this.share;
     const number = (name: string) => {
       const value = headers[name];
       return value === undefined ? undefined : Number(value);
@@ -217,12 +221,14 @@ export class Pacer {
     for (const budget of budgets) {
       const limit = number(`x-ratelimit-limit-${budget}`);
       const remaining = number(`x-ratelimit-remaining-${budget}`);
-      if (limit === undefined || remaining === undefined || remaining >= limit * this.share)
-        continue;
+      if (limit === undefined || remaining === undefined) continue;
       if (provider === "groq" && budget === "requests") {
-        block(now + (parseResetMs(headers["x-ratelimit-reset-requests"]) ?? hourMs));
+        if (remaining < limit * dailyRequestsKept) {
+          block(now + (parseResetMs(headers["x-ratelimit-reset-requests"]) ?? hourMs));
+        }
         continue;
       }
+      if (remaining >= limit * this.share) continue;
       block(now + (parseResetMs(headers[`x-ratelimit-reset-${budget}`]) ?? minuteMs));
     }
   }

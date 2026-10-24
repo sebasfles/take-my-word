@@ -233,6 +233,25 @@ describe("whisper daily override", () => {
     expect(() => new Pacer(keys, [], undefined, { whisperDailyKept: 0.05 })).toThrow(/between 0.1/);
   });
 
+  it("lets Groq's daily-requests header fall to the kept share before pausing", () => {
+    const headers = (remaining: number) => ({
+      "x-ratelimit-limit-requests": "2000",
+      "x-ratelimit-remaining-requests": String(remaining),
+      "x-ratelimit-reset-requests": "32m24s",
+    });
+    const overridden = new Pacer(keys, [], undefined, { whisperDailyKept: 0.1 });
+    overridden.observe("groq:whisper", headers(400), noon);
+    expect(overridden.readiness("groq:whisper", call, noon)).toEqual({ kind: "now" });
+    overridden.observe("groq:whisper", headers(199), noon);
+    expect(overridden.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 1_944_000,
+    });
+    const standard = new Pacer(keys, []);
+    standard.observe("groq:whisper", headers(400), noon);
+    expect(standard.readiness("groq:whisper", call, noon)).toMatchObject({ kind: "at" });
+  });
+
   it("leaves the per-minute half, the chat reserve and OpenAI's half untouched", () => {
     const recent = entries("groq:whisper", 10, (index) => noon - 50_000 + index * 1_000);
     expect(
