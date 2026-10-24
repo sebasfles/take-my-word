@@ -14,6 +14,7 @@ use crate::shell::Shell;
 const DUMP_DIR_FLAG: &str = "--dump-dir";
 const DICTATE_WAV_FLAG: &str = "--dictate-wav";
 const STUB_MODE_FLAG: &str = "--stub-mode";
+const OVERLAY_NO_FRAMES_FLAG: &str = "--overlay-no-frames";
 
 fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
     let position = args.iter().position(|arg| arg == flag)?;
@@ -55,7 +56,12 @@ pub fn handle_args(app: &AppHandle, args: &[String]) -> bool {
             None => log::warn!("dev: unknown stub mode {id}"),
         }
     }
-    dictate(app, args) || stub_mode.is_some()
+    let no_frames = args.iter().any(|arg| arg == OVERLAY_NO_FRAMES_FLAG);
+    if no_frames {
+        app.state::<Shell>().overlay.window().stop_frames();
+        log::info!("dev: the overlay paints no frames until it is recreated");
+    }
+    dictate(app, args) || stub_mode.is_some() || no_frames
 }
 
 fn dictate(app: &AppHandle, args: &[String]) -> bool {

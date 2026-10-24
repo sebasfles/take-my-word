@@ -7,9 +7,16 @@ export interface TranscribeInput {
   prompt?: string;
 }
 
+export interface TranscriptionUsage {
+  seconds?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
 export interface Transcript {
   text: string;
   language?: Language;
+  usage?: TranscriptionUsage;
 }
 
 export interface Transcriber {

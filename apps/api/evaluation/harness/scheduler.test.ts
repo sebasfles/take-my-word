@@ -1,0 +1,232 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  BudgetExceededError,
+  CostGuard,
+  Pacer,
+  type LedgerEntry,
+  type PacingKey,
+} from "./pacing.ts";
+import { maxAttempts, runSchedule, type Attempt, type PlannedItem } from "./scheduler.ts";
+import { appendJsonl, openResultsDir, readJsonl } from "./store.ts";
+import { executePlan } from "./suite.ts";
+
+const keys = new Map<string, PacingKey>([
+  [
+    "slow",
+    { provider: "groq", plan: { requestsPerMinute: 2, requestsPerDay: 1_000, source: "test" } },
+  ],
+  ["fast", { provider: "openai" }],
+  [
+    "tiny",
+    { provider: "groq", plan: { requestsPerMinute: 100, requestsPerDay: 2, source: "test" } },
+  ],
+]);
+
+function clock() {
+  let now = Date.parse("2026-10-23T12:00:00.000Z");
+  return {
+    now: () => now,
+    wait: (ms: number) => {
+      now += ms;
+      return Promise.resolve();
+    },
+    advance: (ms: number) => {
+      now += ms;
+    },
+  };
+}
+
+const ok = (id: string): Attempt<string> => ({
+  result: id,
+  usage: { requests: 1, audioSeconds: 0, tokens: 0 },
+  costUsd: 0.01,
+  headers: {},
+});
+
+function item(
+  id: string,
+  key: string,
+  run: () => Promise<Attempt<string>> = () => Promise.resolve(ok(id)),
+): PlannedItem<string> {
+  return {
+    id,
+    pacingKey: key,
+    estimate: { requests: 1, audioSeconds: 0, tokens: 0, costUsd: 0.01 },
+    run,
+    exhausted: (failure) => `${id} exhausted: ${failure.message}`,
+  };
+}
+
+function hooks() {
+  const done: string[] = [];
+  const failed: string[] = [];
+  const ledger: LedgerEntry[] = [];
+  return {
+    done,
+    failed,
+    ledger,
+    hooks: {
+      done: (_id: string, result: string) => done.push(result),
+      failed: (id: string, failure: { message: string }) =>
+        failed.push(`${id}: ${failure.message}`),
+      usage: (entry: LedgerEntry) => ledger.push(entry),
+    },
+  };
+}
+
+describe("runSchedule", () => {
+  it("fills the wait of a paced provider with calls to another", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const items = [item("s1", "slow"), item("s2", "slow"), item("f1", "fast"), item("f2", "fast")];
+    const outcome = await runSchedule(
+      items,
+      new Pacer(keys, []),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(outcome).toEqual({ kind: "complete" });
+    expect(recorder.done).toEqual(["s1", "f1", "f2", "s2"]);
+    expect(
+      recorder.ledger.find(
+        (entry) => entry.key === "slow" && entry.at > Date.parse("2026-10-23T12:00:30.000Z"),
+      ),
+    ).toBeDefined();
+  });
+
+  it("pauses for the day with the reason when a daily limit leaves nothing to run", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const items = [item("t1", "tiny"), item("t2", "tiny")];
+    const outcome = await runSchedule(
+      items,
+      new Pacer(keys, []),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(recorder.done).toEqual(["t1"]);
+    expect(outcome).toMatchObject({ kind: "paused" });
+    expect(outcome.kind === "paused" && outcome.reasons[0]).toMatch(/^tiny: requests per day/);
+  });
+
+  it("retries a failed call and keeps the failure apart from the result", async () => {
+    const time = clock();
+    const recorder = hooks();
+    let calls = 0;
+    const flaky = item("x", "fast", () => {
+      calls += 1;
+      return Promise.resolve(
+        calls === 1
+          ? {
+              usage: { requests: 1, audioSeconds: 0, tokens: 0 },
+              costUsd: 0,
+              headers: {},
+              failure: { status: 500, message: "boom" },
+            }
+          : ok("x"),
+      );
+    });
+    await runSchedule(
+      [flaky],
+      new Pacer(keys, []),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(recorder.failed).toEqual(["x: boom"]);
+    expect(recorder.done).toEqual(["x"]);
+  });
+
+  it("stops before a call that would pass the budget", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const items = [item("a", "fast"), item("b", "fast")];
+    await expect(
+      runSchedule(
+        items,
+        new Pacer(keys, []),
+        new CostGuard(0.015),
+        recorder.hooks,
+        time.now,
+        time.wait,
+      ),
+    ).rejects.toThrow(BudgetExceededError);
+    expect(recorder.done).toEqual(["a"]);
+  });
+
+  it("stores an item that exhausts its retries as a failed result", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const broken = item("y", "fast", () => Promise.reject(new Error("unreachable")));
+    const throwing: PlannedItem<string> = {
+      ...broken,
+      run: () =>
+        Promise.resolve({
+          usage: { requests: 0, audioSeconds: 0, tokens: 0 },
+          costUsd: 0,
+          headers: {},
+          failure: { message: "invoke failed" },
+        }),
+    };
+    await runSchedule(
+      [throwing],
+      new Pacer(keys, []),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(recorder.failed).toHaveLength(maxAttempts);
+    expect(recorder.done).toEqual(["y exhausted: invoke failed"]);
+  });
+});
+
+describe("executePlan", () => {
+  it("counts what earlier days of the same run already spent, failed attempts included", async () => {
+    const root = mkdtempSync(join(tmpdir(), "tmw-plan-"));
+    try {
+      const dir = openResultsDir(
+        join(root, "run"),
+        {
+          suite: "test",
+          fixturesSha256: "f",
+          codeCommit: "c",
+          runs: 3,
+          requestsSha256: "r",
+          evalBundleSha256: "b",
+        },
+        new Date(),
+      );
+      appendJsonl(dir.results, { chargedUsd: 2.5 });
+      const pending: PlannedItem<{ chargedUsd: number }> = {
+        id: "b",
+        pacingKey: "openai:gpt-6-luna",
+        estimate: { requests: 1, audioSeconds: 0, tokens: 0, costUsd: 0.01 },
+        run: () =>
+          Promise.resolve({
+            result: { chargedUsd: 0.01 },
+            usage: { requests: 1, audioSeconds: 0, tokens: 0 },
+            costUsd: 0.01,
+            headers: {},
+          }),
+        exhausted: () => ({ chargedUsd: 0 }),
+      };
+      expect(await executePlan(dir, ["gpt-6-luna"], [pending])).toBe(true);
+      appendJsonl(dir.failures, { id: "a", attempt: 1, message: "x", chargedUsd: 0.485, at: "" });
+      await expect(executePlan(dir, ["gpt-6-luna"], [{ ...pending, id: "c" }])).rejects.toThrow(
+        BudgetExceededError,
+      );
+      expect(readJsonl(dir.results)).toHaveLength(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

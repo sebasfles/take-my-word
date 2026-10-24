@@ -105,6 +105,16 @@ pub fn dismiss_overlay(shell: State<'_, Shell>) {
 }
 
 #[tauri::command]
+pub fn overlay_ready(shell: State<'_, Shell>) {
+    shell.overlay.window().ready();
+}
+
+#[tauri::command]
+pub fn overlay_painted(shell: State<'_, Shell>, seq: u64) {
+    shell.overlay.window().painted(seq);
+}
+
+#[tauri::command]
 pub fn forward_key(shell: State<'_, Shell>, code: String, down: bool) {
     shell.forward_key(&code, down);
 }

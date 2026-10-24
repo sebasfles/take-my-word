@@ -64,4 +64,29 @@ describe("terraform roots", () => {
     expect(core.TF_VAR_github_app_pem).toBe("pem");
     expect(terraformVariables(withCi, "dev", "pem").TF_VAR_hosted_zone).toBe("words.example.org");
   });
+
+  it("gives the eval Lambda to dev only, and only when the config asks for it", () => {
+    const withEval = parseConfig({
+      ...{
+        aws: { profile: "me", accountId: "210987654321", region: "us-east-1" },
+        domain: "words.example.org",
+        environments: ["dev", "prd"],
+        releases: "someone/take-my-word",
+      },
+      evalFunction: true,
+    });
+    expect(terraformVariables(withEval, "dev", undefined).TF_VAR_eval_function).toBe("true");
+    expect(terraformVariables(withEval, "prd", undefined)).not.toHaveProperty(
+      "TF_VAR_eval_function",
+    );
+    expect(terraformVariables(withCi, "dev", "pem")).not.toHaveProperty("TF_VAR_eval_function");
+    expect(() =>
+      parseConfig({
+        aws: { profile: "me", accountId: "210987654321", region: "us-east-1" },
+        domain: "words.example.org",
+        releases: "someone/take-my-word",
+        evalFunction: true,
+      }),
+    ).toThrow(/evalFunction needs the dev environment/);
+  });
 });

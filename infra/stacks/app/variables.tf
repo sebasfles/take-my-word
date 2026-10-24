@@ -90,3 +90,14 @@ variable "secret_recovery_window_in_days" {
   type        = number
   default     = 7
 }
+
+variable "eval_function" {
+  description = "Whether the environment has the eval Lambda that calls provider adapters directly for the evaluation harness (dev only)"
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.eval_function || var.env == "dev"
+    error_message = "eval_function exists only in dev."
+  }
+}

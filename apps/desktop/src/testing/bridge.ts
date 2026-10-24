@@ -8,7 +8,7 @@ import type {
   AppState,
   MicStatus,
   Onboarding,
-  OverlayState,
+  OverlayShown,
   Overview,
   Theme,
   UiLanguage,
@@ -16,7 +16,7 @@ import type {
 } from "../bridge.ts";
 
 export const listeners: {
-  overlay?: (state: OverlayState) => void;
+  overlay?: (shown: OverlayShown) => void;
   overlayLevel?: (level: number) => void;
   microphoneLevel?: (level: number) => void;
   microphoneStatus?: (status: MicStatus) => void;
@@ -94,6 +94,8 @@ export const fakeBridge = {
   setAutostart: vi.fn((enabled: boolean) => Promise.resolve(enabled)),
   openMicrophoneSettings: vi.fn(() => Promise.resolve(undefined)),
   dismissOverlay: vi.fn(() => Promise.resolve(undefined)),
+  overlayReady: vi.fn(() => Promise.resolve(undefined)),
+  overlayPainted: vi.fn<(seq: number) => Promise<undefined>>(() => Promise.resolve(undefined)),
   stopDictation: vi.fn(() => Promise.resolve(undefined)),
   insertAck: vi.fn<(id: number, inserted: boolean) => Promise<undefined>>(() =>
     Promise.resolve(undefined),
@@ -144,7 +146,7 @@ export const fakeBridge = {
     listeners.update = handler;
     return Promise.resolve(() => undefined);
   }),
-  onOverlay: vi.fn((handler: (state: OverlayState) => void) => {
+  onOverlay: vi.fn((handler: (shown: OverlayShown) => void) => {
     listeners.overlay = handler;
     return Promise.resolve(() => undefined);
   }),

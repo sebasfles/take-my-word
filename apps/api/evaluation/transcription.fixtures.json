@@ -1,0 +1,475 @@
+{
+  "voices": {
+    "es": ["Lupe", "Andres"],
+    "en": ["Joanna", "Matthew"],
+    "mixed": ["Pedro", "Mia"]
+  },
+  "dictionaryUsedAt": "2026-10-23T00:00:00.000Z",
+  "dictionaries": {
+    "developer": [
+      {
+        "term": "build",
+        "aliases": ["bild"]
+      },
+      {
+        "term": "CI/CD",
+        "aliases": ["CI CD", "sí sí dí"]
+      },
+      {
+        "term": "deadline",
+        "aliases": ["dedlain"]
+      },
+      {
+        "term": "deploy",
+        "aliases": ["deplói", "diploy"]
+      },
+      {
+        "term": "hotfix",
+        "aliases": ["hot fix", "jotfix"]
+      },
+      {
+        "term": "kubectl",
+        "aliases": ["kube control", "cube CTL", "kubecontrol"]
+      },
+      {
+        "term": "Lambda",
+        "aliases": ["lamda"]
+      },
+      {
+        "term": "logs",
+        "aliases": ["logos"]
+      },
+      {
+        "term": "merge",
+        "aliases": ["merch", "mersh"]
+      },
+      {
+        "term": "namespace",
+        "aliases": ["name space"]
+      },
+      {
+        "term": "pipeline",
+        "aliases": ["pipe line", "paiplain"]
+      },
+      {
+        "term": "pods",
+        "aliases": ["pots"]
+      },
+      {
+        "term": "PR",
+        "aliases": ["pe erre", "P.R."]
+      },
+      {
+        "term": "rebase",
+        "aliases": ["re base", "ribeis"]
+      },
+      {
+        "term": "roadmap",
+        "aliases": ["road map", "roudmap"]
+      },
+      {
+        "term": "sprint",
+        "aliases": ["esprint"]
+      },
+      {
+        "term": "staging",
+        "aliases": ["esteiyin", "stage in"]
+      },
+      {
+        "term": "standup",
+        "aliases": ["stand up"]
+      },
+      {
+        "term": "Terraform",
+        "aliases": ["terra form", "terraformar"]
+      }
+    ],
+    "biology": [
+      {
+        "term": "Arabidopsis thaliana",
+        "aliases": ["arabidopsis taliana"]
+      },
+      {
+        "term": "chlorophyll",
+        "aliases": []
+      },
+      {
+        "term": "clorofila",
+        "aliases": []
+      },
+      {
+        "term": "CRISPR-Cas9",
+        "aliases": ["crisper cas nine", "crisper cas nueve"]
+      },
+      {
+        "term": "GAPDH",
+        "aliases": ["gap DH", "G A P D H"]
+      },
+      {
+        "term": "HEK293",
+        "aliases": ["HEK 293", "hek two ninety three"]
+      },
+      {
+        "term": "knockout",
+        "aliases": ["knock out", "nocaut"]
+      },
+      {
+        "term": "p53",
+        "aliases": ["P 53", "pe cincuenta y tres"]
+      },
+      {
+        "term": "pez cebra",
+        "aliases": []
+      },
+      {
+        "term": "primers",
+        "aliases": ["praimers"]
+      },
+      {
+        "term": "qPCR",
+        "aliases": ["q PCR", "cu PCR"]
+      },
+      {
+        "term": "transfected",
+        "aliases": ["trans fected"]
+      },
+      {
+        "term": "transfectamos",
+        "aliases": ["trans fectamos"]
+      },
+      {
+        "term": "Western blot",
+        "aliases": ["western blood", "wester blot"]
+      },
+      {
+        "term": "zebrafish",
+        "aliases": ["zebra fish"]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "dev-en-1",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "text": "I opened a PR to fix the CI/CD pipeline, can you review it before the deploy?",
+      "terms": ["PR", "CI/CD", "pipeline", "deploy"]
+    },
+    {
+      "id": "dev-en-2",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "text": "Run kubectl get pods in the staging namespace and send me the logs.",
+      "terms": ["kubectl", "pods", "staging", "namespace", "logs"]
+    },
+    {
+      "id": "dev-en-3",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "text": "The Terraform plan shows the Lambda will be replaced, so let's not merge yet.",
+      "terms": ["Terraform", "Lambda", "merge"],
+      "endToEnd": true
+    },
+    {
+      "id": "dev-en-4",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "text": "Rebase on main, push the hotfix and tell me when the build is green.",
+      "terms": ["Rebase", "main", "hotfix", "build"]
+    },
+    {
+      "id": "dev-es-1",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "text": "Abrí un PR para arreglar el pipeline de CI/CD, ¿lo puedes revisar antes del deploy?",
+      "terms": ["PR", "pipeline", "CI/CD", "deploy"],
+      "endToEnd": true
+    },
+    {
+      "id": "dev-es-2",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "text": "Corre kubectl get pods en el namespace de staging y mándame los logs.",
+      "terms": ["kubectl", "pods", "namespace", "staging", "logs"]
+    },
+    {
+      "id": "dev-es-3",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "text": "El plan de Terraform dice que la Lambda se va a reemplazar, así que no hagamos merge todavía.",
+      "terms": ["Terraform", "Lambda", "merge"]
+    },
+    {
+      "id": "dev-es-4",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "text": "Haz rebase sobre main, sube el hotfix y avísame cuando el build esté en verde.",
+      "terms": ["rebase", "main", "hotfix", "build"]
+    },
+    {
+      "id": "bio-en-1",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "biology",
+      "text": "We transfected the HEK293 cells and ran a Western blot after forty-eight hours.",
+      "variants": ["We transfected the HEK293 cells and ran a Western blot after 48 hours."],
+      "terms": ["transfected", "HEK293", "Western blot"]
+    },
+    {
+      "id": "bio-en-2",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "biology",
+      "text": "The CRISPR-Cas9 knockout reduced the expression of the p53 gene in zebrafish.",
+      "terms": ["CRISPR-Cas9", "knockout", "p53", "zebrafish"]
+    },
+    {
+      "id": "bio-en-3",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "biology",
+      "text": "Run the qPCR with the new primers and normalize against GAPDH.",
+      "terms": ["qPCR", "primers", "GAPDH"]
+    },
+    {
+      "id": "bio-en-4",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "biology",
+      "text": "The Arabidopsis thaliana mutants showed less chlorophyll under drought stress.",
+      "terms": ["Arabidopsis thaliana", "chlorophyll"]
+    },
+    {
+      "id": "bio-es-1",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "biology",
+      "text": "Transfectamos las células HEK293 e hicimos un Western blot a las cuarenta y ocho horas.",
+      "variants": ["Transfectamos las células HEK293 e hicimos un Western blot a las 48 horas."],
+      "terms": ["Transfectamos", "HEK293", "Western blot"]
+    },
+    {
+      "id": "bio-es-2",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "biology",
+      "text": "El knockout con CRISPR-Cas9 redujo la expresión del gen p53 en el pez cebra.",
+      "terms": ["knockout", "CRISPR-Cas9", "p53", "pez cebra"]
+    },
+    {
+      "id": "bio-es-3",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "biology",
+      "text": "Corre la qPCR con los nuevos primers y normaliza contra GAPDH.",
+      "terms": ["qPCR", "primers", "GAPDH"]
+    },
+    {
+      "id": "bio-es-4",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "biology",
+      "text": "Las mutantes de Arabidopsis thaliana mostraron menos clorofila bajo estrés hídrico.",
+      "terms": ["Arabidopsis thaliana", "clorofila"]
+    },
+    {
+      "id": "control-en-1",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "text": "Let's meet tomorrow at three in the office, and bring the report.",
+      "variants": ["Let's meet tomorrow at 3 in the office, and bring the report."],
+      "terms": []
+    },
+    {
+      "id": "control-en-2",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "biology",
+      "text": "I'll call my mother after lunch to plan the weekend trip.",
+      "terms": []
+    },
+    {
+      "id": "control-es-1",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "text": "Nos vemos mañana a las tres en la oficina, y trae el informe.",
+      "variants": ["Nos vemos mañana a las 3 en la oficina, y trae el informe."],
+      "terms": []
+    },
+    {
+      "id": "control-es-2",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "biology",
+      "text": "Voy a llamar a mi mamá después de almuerzo para planear el viaje del fin de semana.",
+      "terms": [],
+      "endToEnd": true
+    },
+    {
+      "id": "mixed-1",
+      "kind": "speech",
+      "language": "es",
+      "mixed": true,
+      "dictionary": "developer",
+      "text": "Mañana tengo un meeting con el team de marketing para revisar el roadmap.",
+      "terms": ["meeting", "team", "marketing", "roadmap"],
+      "endToEnd": true
+    },
+    {
+      "id": "mixed-2",
+      "kind": "speech",
+      "language": "es",
+      "mixed": true,
+      "dictionary": "developer",
+      "text": "Mándame el link del dashboard y el feedback del cliente antes del deadline.",
+      "terms": ["link", "dashboard", "feedback", "deadline"]
+    },
+    {
+      "id": "mixed-3",
+      "kind": "speech",
+      "language": "es",
+      "mixed": true,
+      "dictionary": "developer",
+      "text": "El sprint termina el viernes, así que hagamos el standup a las nueve.",
+      "variants": ["El sprint termina el viernes, así que hagamos el standup a las 9."],
+      "terms": ["sprint", "standup"]
+    },
+    {
+      "id": "mixed-4",
+      "kind": "speech",
+      "language": "es",
+      "mixed": true,
+      "dictionary": "developer",
+      "text": "Hoy estoy trabajando from home, pero igual puedo hacer la call de las cuatro.",
+      "variants": ["Hoy estoy trabajando from home, pero igual puedo hacer la call de las 4."],
+      "terms": ["from home", "call"]
+    },
+    {
+      "id": "mixed-5",
+      "kind": "speech",
+      "language": "es",
+      "mixed": true,
+      "dictionary": "developer",
+      "text": "Subí los slides al drive compartido, échales un look cuando puedas.",
+      "terms": ["slides", "drive", "look"]
+    },
+    {
+      "id": "long-es-1",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "text": "Bueno, te cuento que ayer revisé el pipeline de deploy y encontré que el build falla cuando corre los tests de integración, así que voy a abrir un PR con el hotfix y te aviso cuando esté en verde para que hagamos el merge.",
+      "terms": ["pipeline", "deploy", "build", "PR", "hotfix", "merge"],
+      "endToEnd": true
+    },
+    {
+      "id": "long-en-1",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "text": "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least two days of testing before we can deploy to production.",
+      "variants": [
+        "So I talked to the team this morning, and we agreed to move the release to Thursday, because the staging environment is still down and we need at least 2 days of testing before we can deploy to production."
+      ],
+      "terms": ["staging", "deploy"],
+      "endToEnd": true
+    },
+    {
+      "id": "long-mixed-1",
+      "kind": "speech",
+      "language": "es",
+      "mixed": true,
+      "dictionary": "developer",
+      "text": "Oye, acuérdate de que el kickoff con el cliente es el lunes, así que necesito que prepares el deck con el roadmap del próximo quarter y me lo mandes antes del viernes para darle feedback.",
+      "terms": ["kickoff", "deck", "roadmap", "quarter", "feedback"]
+    },
+    {
+      "id": "quiet-es-1",
+      "kind": "speech",
+      "language": "es",
+      "dictionary": "developer",
+      "levelDbfs": -46,
+      "text": "Gracias, ya revisé el informe y está todo bien.",
+      "terms": []
+    },
+    {
+      "id": "quiet-en-1",
+      "kind": "speech",
+      "language": "en",
+      "dictionary": "developer",
+      "levelDbfs": -46,
+      "text": "Thank you, I already checked the report and it looks fine.",
+      "terms": []
+    },
+    {
+      "id": "noise-floor-es",
+      "kind": "noise",
+      "language": "es",
+      "dictionary": "developer",
+      "color": "white",
+      "levelDbfs": -53,
+      "seconds": 4,
+      "seed": 1
+    },
+    {
+      "id": "noise-floor-en",
+      "kind": "noise",
+      "language": "en",
+      "dictionary": "developer",
+      "color": "white",
+      "levelDbfs": -53,
+      "seconds": 4,
+      "seed": 1
+    },
+    {
+      "id": "noise-room-es",
+      "kind": "noise",
+      "language": "es",
+      "dictionary": "developer",
+      "color": "brown",
+      "levelDbfs": -45,
+      "seconds": 4,
+      "seed": 2
+    },
+    {
+      "id": "noise-room-en",
+      "kind": "noise",
+      "language": "en",
+      "dictionary": "developer",
+      "color": "brown",
+      "levelDbfs": -45,
+      "seconds": 4,
+      "seed": 2
+    },
+    {
+      "id": "noise-loud-es",
+      "kind": "noise",
+      "language": "es",
+      "dictionary": "developer",
+      "color": "brown",
+      "levelDbfs": -30,
+      "seconds": 4,
+      "seed": 3
+    },
+    {
+      "id": "noise-loud-en",
+      "kind": "noise",
+      "language": "en",
+      "dictionary": "developer",
+      "color": "brown",
+      "levelDbfs": -30,
+      "seconds": 4,
+      "seed": 3
+    }
+  ]
+}

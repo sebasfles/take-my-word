@@ -1,25 +1,48 @@
 import { useEffect, useState } from "react";
 import { OverlayPill } from "@take-my-word/brand";
-import { bridge, type OverlayState, keepListening } from "../bridge.ts";
+import { bridge, type OverlayShown, keepListening } from "../bridge.ts";
 import { t } from "../i18n.ts";
 
 const BARS = 9;
 const flat = () => Array.from({ length: BARS }, () => 0);
 
 export function Overlay() {
-  const [overlay, setOverlay] = useState<OverlayState>({ state: "hidden" });
+  const [overlay, setOverlay] = useState<OverlayShown>({ state: "hidden", seq: 0 });
   const [levels, setLevels] = useState(flat);
 
-  useEffect(
-    () =>
-      keepListening(() =>
-        bridge.onOverlay((state) => {
-          if (state.state === "listening") setLevels(flat());
-          setOverlay(state);
+  useEffect(() => {
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const announce = () => {
+      void bridge.overlayReady().catch(() => {
+        retry = setTimeout(announce, 500);
+      });
+    };
+    const stop = keepListening(() =>
+      bridge
+        .onOverlay((shown) => {
+          if (shown.state === "listening") setLevels(flat());
+          setOverlay(shown);
+        })
+        .then((unlisten) => {
+          announce();
+          return unlisten;
         }),
-      ),
-    [],
-  );
+    );
+    return () => {
+      clearTimeout(retry);
+      stop();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (overlay.state === "hidden") return;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => void bridge.overlayPainted(overlay.seq));
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [overlay]);
 
   useEffect(
     () =>

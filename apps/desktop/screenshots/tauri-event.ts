@@ -41,7 +41,7 @@ export function listen(
   const state = requested === null ? undefined : overlayStates[requested];
   if (event === "overlay" && state !== undefined) {
     setTimeout(() => {
-      handler({ payload: state });
+      handler({ payload: { seq: 1, ...(state as object) } });
     }, 0);
   }
   if (event === "microphone-level") {
