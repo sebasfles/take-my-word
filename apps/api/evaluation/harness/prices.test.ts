@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import {
+  billedAudioSeconds,
+  chargedUsd,
+  modelFacts,
+  tokenCostUsd,
+  transcriptionCallUsd,
+} from "./prices.ts";
+
+describe("transcription prices", () => {
+  it("bills Groq by duration with its 10 s minimum", () => {
+    const turbo = modelFacts("whisper-large-v3-turbo");
+    expect(billedAudioSeconds(turbo, 4.2)).toBe(10);
+    expect(billedAudioSeconds(turbo, 14.2)).toBe(15);
+    expect(transcriptionCallUsd(turbo, 4.2)).toBeCloseTo((10 / 3600) * 0.04, 10);
+  });
+
+  it("bills gpt-transcribe by the seconds the provider reports", () => {
+    const facts = modelFacts("gpt-transcribe");
+    expect(transcriptionCallUsd(facts, 2.07, { seconds: 3 })).toBeCloseTo((3 / 60) * 0.0045, 10);
+  });
+
+  it("bills the gpt-4o models by measured audio and text tokens, estimating only before a call", () => {
+    const facts = modelFacts("gpt-4o-transcribe");
+    expect(transcriptionCallUsd(facts, 2, { inputTokens: 20, outputTokens: 10 })).toBeCloseTo(
+      (20 * 2.5 + 10 * 10) / 1_000_000,
+      12,
+    );
+    expect(transcriptionCallUsd(facts, 60)).toBeCloseTo(0.006, 10);
+  });
+
+  it("charges nothing on a free plan while keeping the list price", () => {
+    const list = tokenCostUsd(modelFacts("openai/gpt-oss-20b"), 1_000_000, 0);
+    expect(list).toBeCloseTo(0.075, 10);
+    expect(chargedUsd(modelFacts("openai/gpt-oss-20b"), list)).toBe(0);
+    expect(chargedUsd(modelFacts("gpt-6-luna"), 0.5)).toBe(0.5);
+  });
+});

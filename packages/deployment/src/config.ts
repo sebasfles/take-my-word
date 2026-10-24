@@ -65,6 +65,10 @@ export const deploymentConfigSchema = z
       description:
         "Let search engines index the prd web at https://<domain>; off, every page answers noindex. dev is never indexed.",
     }),
+    evalFunction: z.boolean().default(false).meta({
+      description:
+        "Give dev the eval Lambda that the evaluation harness (apps/api/evaluation) swaps and invokes; needs dev, never reaches prd.",
+    }),
     releases: repositorySchema.meta({
       description:
         "GitHub repository, as owner/name, whose releases hold the desktop app the web links to.",
@@ -106,7 +110,11 @@ export const deploymentConfigSchema = z
       config.domain === config.hostedZone ||
       config.domain.endsWith(`.${config.hostedZone}`),
     { message: "the domain must be the hosted zone or inside it", path: ["hostedZone"] },
-  );
+  )
+  .refine((config) => !config.evalFunction || config.environments.includes("dev"), {
+    message: "evalFunction needs the dev environment",
+    path: ["evalFunction"],
+  });
 
 export type DeploymentConfig = z.infer<typeof deploymentConfigSchema>;
 
