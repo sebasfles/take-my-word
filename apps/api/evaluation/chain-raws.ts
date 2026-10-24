@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -11,7 +12,7 @@ import {
 import { loadTranscriptionFixtures } from "./harness/fixtures.ts";
 import { readJsonl } from "./harness/store.ts";
 import type { TranscriptionResult } from "./harness/transcription-analysis.ts";
-import { fromInvocation, fromRoot } from "./harness/workspace.ts";
+import { apiRoot, fromInvocation, fromRoot } from "./harness/workspace.ts";
 
 const { values } = parseArgs({ options: { transcription: { type: "string" } } });
 if (values.transcription === undefined) {
@@ -24,4 +25,8 @@ const results = readJsonl<TranscriptionResult>(
 const checks = chainedChecksSchema.parse(JSON.parse(readFileSync(chainedChecksPath, "utf8")));
 const cases = chainedCases(loadTranscriptionFixtures(), results, chainedTranscribers, checks);
 writeFileSync(chainedFixturesPath, `${JSON.stringify({ cases }, null, 2)}\n`);
+execFileSync("pnpm", ["exec", "prettier", "--write", chainedFixturesPath], {
+  cwd: apiRoot,
+  stdio: "ignore",
+});
 console.log(`${String(cases.length)} chained cases written to ${fromRoot(chainedFixturesPath)}`);
