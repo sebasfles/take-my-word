@@ -23,14 +23,22 @@ import {
 } from "./harness/prices.ts";
 import type { LedgerEntry } from "./harness/pacing.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
-import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
+import {
+  openFinishedRun,
+  openResultsDir,
+  paths,
+  readJsonl,
+  type ResultsDir,
+} from "./harness/store.ts";
 import {
   deployAndWarm,
   executePlan,
   headersOf,
   pacingKeyOf,
   recordedSpendUsd,
+  recordSynthesis,
   requestsSha256,
+  requireSynthesisBudget,
   suiteArgs,
   type FailureRecord,
 } from "./harness/suite.ts";
@@ -314,6 +322,12 @@ async function measure(results: string, reportPath: string): Promise<void> {
     }
   }
 
+  const characters = fixtures.cases.reduce(
+    (sum, item) =>
+      sum + (item.kind === "speech" ? item.text.length * voicesFor(fixtures, item).length : 0),
+    0,
+  );
+  requireSynthesisBudget(paths(results, "transcription"), characters);
   const clips: Clip[] = [];
   for (const item of fixtures.cases) {
     for (const voice of voicesFor(fixtures, item)) {
@@ -341,6 +355,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
     },
     new Date(),
   );
+  recordSynthesis(dir, characters);
   console.log(`code ${codeCommit} (HEAD ${state.commit}), fixtures ${fixturesSha256.slice(0, 16)}`);
 
   const done = new Set(readJsonl<TranscriptionResult>(dir.results).map((result) => result.id));

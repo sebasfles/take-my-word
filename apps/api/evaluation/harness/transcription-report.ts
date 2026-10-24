@@ -221,7 +221,7 @@ export function transcriptionReport(
   push(`## Samples of ${extendedBucket}`, "");
   const extendedCases = fixtures.cases.filter((item) => isExtended(item.id));
   push(
-    `${String(extendedCases.length)} cases (${extendedCases.map((item) => item.id).join(", ")}), each with its bucket's two voices; they count in the totals above and pass both gates on their own.`,
+    `${String(extendedCases.length)} cases (${extendedCases.map((item) => item.id).join(", ")}), each with its bucket's two voices; they count in the totals above, and a candidate must also pass both gates on them alone.`,
     "",
   );
   push("| Candidate | Invented content | Hallucination | Wrong language |", "|---|---|---|---|");

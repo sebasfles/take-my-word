@@ -86,6 +86,51 @@ describe("Pacer", () => {
     expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "at", at: noon + 2_000 });
   });
 
+  it("keeps a fixed production floor of a paid plan's reported allowance instead of half", () => {
+    const floors = { requests: 1_000, "audio-seconds": 7_200, tokens: 20_000 };
+    const paid = new Map<string, PacingKey>([
+      ["groq:whisper", { provider: "groq", paidFloors: floors }],
+    ]);
+    const headers = {
+      "x-ratelimit-limit-requests": "200000",
+      "x-ratelimit-remaining-requests": "2320",
+      "x-ratelimit-reset-requests": "23h43m17.76s",
+      "x-ratelimit-limit-audio-seconds": "400000",
+      "x-ratelimit-remaining-audio-seconds": "48481",
+      "x-ratelimit-reset-audio-seconds": "52m43.671s",
+    };
+    const pacer = new Pacer(paid, []);
+    pacer.observe("groq:whisper", headers, noon);
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({ kind: "now" });
+    pacer.observe(
+      "groq:whisper",
+      { ...headers, "x-ratelimit-remaining-audio-seconds": "7199" },
+      noon,
+    );
+    expect(pacer.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 3_163_671,
+    });
+    const requests = new Pacer(paid, []);
+    requests.observe("groq:whisper", { ...headers, "x-ratelimit-remaining-requests": "999" }, noon);
+    expect(requests.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 85_397_760,
+    });
+    requests.observe("groq:whisper", { "retry-after": "90000" }, noon);
+    expect(requests.readiness("groq:whisper", call, noon)).toEqual({
+      kind: "at",
+      at: noon + 90_000_000,
+    });
+    const free = new Pacer(keys, []);
+    free.observe(
+      "openai:nano",
+      { "x-ratelimit-limit-tokens": "200000", "x-ratelimit-remaining-tokens": "90000" },
+      noon,
+    );
+    expect(free.readiness("openai:nano", call, noon).kind).toBe("at");
+  });
+
   it("paces Groq Whisper at a quarter of its per-minute limit, 5 of 20", () => {
     const ledger = entries("groq:whisper", 5, (index) => noon - 50_000 + index * 1_000);
     expect(new Pacer(keys, ledger).readiness("groq:whisper", call, noon)).toEqual({

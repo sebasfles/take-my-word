@@ -41,6 +41,7 @@ export interface WordErrors {
   deletions: number;
   insertions: number;
   longestInsertionRun: number;
+  longestInsertion: string[];
 }
 
 export function align(reference: readonly string[], hypothesis: readonly string[]): EditOp[] {
@@ -90,13 +91,21 @@ export const recognitionTokens = (text: string): string[] =>
   wordsOf(text).flatMap((word) => word.split(/[-\u2010\u2011]/).filter((part) => part !== ""));
 
 export function wordErrors(reference: string, hypothesis: string): WordErrors {
-  const ops = align(recognitionTokens(reference), recognitionTokens(hypothesis));
-  let longestInsertionRun = 0;
-  let run = 0;
+  const said = recognitionTokens(hypothesis);
+  const ops = align(recognitionTokens(reference), said);
+  let longestInsertion: string[] = [];
+  let run: string[] = [];
+  let position = 0;
   for (const op of ops) {
-    run = op === "I" ? run + 1 : 0;
-    longestInsertionRun = Math.max(longestInsertionRun, run);
+    if (op === "D") {
+      run = [];
+      continue;
+    }
+    run = op === "I" ? [...run, said[position] ?? ""] : [];
+    if (run.length > longestInsertion.length) longestInsertion = run;
+    position += 1;
   }
+  const longestInsertionRun = longestInsertion.length;
   const count = (op: EditOp) => ops.filter((candidate) => candidate === op).length;
   const substitutions = count("S");
   const deletions = count("D");
@@ -108,6 +117,7 @@ export function wordErrors(reference: string, hypothesis: string): WordErrors {
     deletions,
     insertions,
     longestInsertionRun,
+    longestInsertion,
   };
 }
 

@@ -20,6 +20,8 @@ import {
   complimentaryDailyTokens,
   freePlanAt,
   modelFacts,
+  paidPlans,
+  pollyNeuralUsdPerMillionCharacters,
   prepaidBalances,
   runBudgetUsd,
 } from "./prices.ts";
@@ -85,12 +87,14 @@ export function pacingKeys(models: readonly string[]): Map<string, PacingKey> {
       const group = facts.complimentaryGroup;
       const prepaid = prepaidBalances[facts.provider];
       const plan = freePlanAt(facts);
+      const paidFloors = plan === undefined ? paidPlans[facts.provider]?.headerFloors : undefined;
       return [
         pacingKeyOf(model),
         {
           provider: facts.provider,
           ...(plan && { plan }),
           ...(prepaid && { prepaid }),
+          ...(paidFloors && { paidFloors }),
           ...(group && {
             complimentary: { group, tokensPerDay: complimentaryDailyTokens[group].tokens },
           }),
@@ -148,10 +152,37 @@ export interface FailureRecord extends Charged {
   at: string;
 }
 
-export function recordedSpendUsd(dir: ResultsDir): number {
+export function recordedSpendUsd(dir: Omit<ResultsDir, "meta">): number {
   const sum = (records: readonly Charged[]) =>
     records.reduce((total, record) => total + record.chargedUsd, 0);
-  return sum(readJsonl<Charged>(dir.results)) + sum(readJsonl<FailureRecord>(dir.failures));
+  return (
+    sum(readJsonl<Charged>(dir.results)) +
+    sum(readJsonl<FailureRecord>(dir.failures)) +
+    sum(readJsonl<Charged>(dir.synthesis))
+  );
+}
+
+export const synthesisUsd = (characters: number): number =>
+  (characters * pollyNeuralUsdPerMillionCharacters) / 1_000_000;
+
+export function requireSynthesisBudget(
+  dir: Omit<ResultsDir, "meta">,
+  characters: number,
+  budgetUsd = runBudgetUsd,
+): void {
+  const spent = recordedSpendUsd(dir);
+  console.log(
+    `synthesizing ${String(characters)} characters with Polly, ${synthesisUsd(characters).toFixed(3)} USD at list price, after ${spent.toFixed(3)} USD already spent`,
+  );
+  new CostGuard(budgetUsd, spent).check(synthesisUsd(characters));
+}
+
+export function recordSynthesis(dir: ResultsDir, characters: number): void {
+  appendJsonl(dir.synthesis, {
+    at: new Date().toISOString(),
+    characters,
+    chargedUsd: synthesisUsd(characters),
+  });
 }
 
 export async function executePlan<R extends Charged>(

@@ -18,7 +18,7 @@ describe("monthly scenarios", () => {
   it("prices Groq per dictation with its billing minimum and finds its free plan covers a heavy month", () => {
     const stage = transcriptionStage("whisper-large-v3-turbo", 1.2);
     expect(stage.usdPerDictation).toBeCloseTo((15 / 3600) * 0.04 * 1.2, 10);
-    const month = stageMonth(stage, heavy);
+    const month = stageMonth(stage, heavy, {});
     expect(month.listUsd).toBeCloseTo(stage.usdPerDictation * 7200, 8);
     expect(month.covered).toBe(true);
   });
@@ -36,10 +36,10 @@ describe("monthly scenarios", () => {
       usdPerDictation: 0.0001,
       tokensPerCall: 700,
     };
-    expect(stageMonth(small, heavy).covered).toBe(true);
+    expect(stageMonth(small, heavy, {}).covered).toBe(true);
     const large = { ...small, tokensPerCall: 900 };
-    expect(stageMonth(large, heavy)).toMatchObject({ covered: false });
-    expect(stageMonth(large, heavy).why).toMatch(/216000 of 200000 tokens per day/);
+    expect(stageMonth(large, heavy, {})).toMatchObject({ covered: false });
+    expect(stageMonth(large, heavy, {}).why).toMatch(/216000 of 200000 tokens per day/);
   });
 
   it("uses OpenAI's complimentary group for the models in it", () => {
@@ -79,5 +79,25 @@ describe("rankPassing", () => {
       covered: false,
       why: "prepaid balance, billed at list price",
     });
+  });
+});
+
+describe("monthly cost on a paid plan", () => {
+  it("bills Groq at list price once it moved to its paid tier", () => {
+    const stage = transcriptionStage("whisper-large-v3-turbo", 1);
+    const paid = {
+      groq: {
+        since: "2026-10-01T00:00:00.000Z",
+        plan: "paid Developer tier",
+        monthlySpendLimitUsd: 5,
+        creditUsd: 10,
+        headerFloors: { requests: 1_000, "audio-seconds": 7_200, tokens: 20_000 },
+      },
+    };
+    expect(stageMonth(stage, heavy, paid)).toMatchObject({
+      covered: false,
+      why: "paid Developer tier since 2026-10-01T00:00:00.000Z, billed at list price",
+    });
+    expect(stageMonth(stage, heavy, {}).covered).toBe(true);
   });
 });

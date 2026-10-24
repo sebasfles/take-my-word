@@ -29,18 +29,20 @@ export interface ResultsDir {
   results: string;
   failures: string;
   overrides: string;
+  synthesis: string;
   ledger: string;
   meta: StoredMeta;
 }
 
 export type StoredMeta = RunMeta & { startedAt: string; resumedWith?: string[] };
 
-function paths(dir: string, suite: string): Omit<ResultsDir, "meta"> {
+export function paths(dir: string, suite: string): Omit<ResultsDir, "meta"> {
   return {
     dir,
     results: join(dir, `${suite}.jsonl`),
     failures: join(dir, `${suite}.failures.jsonl`),
     overrides: join(dir, "overrides.jsonl"),
+    synthesis: join(dir, "synthesis.jsonl"),
     ledger: join(dirname(dir), "ledger.jsonl"),
   };
 }

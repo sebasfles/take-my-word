@@ -1,4 +1,4 @@
-import type { FreePlanLimits, PrepaidBalance, Provider } from "./prices.ts";
+import type { FreePlanLimits, HeaderFloors, PrepaidBalance, Provider } from "./prices.ts";
 
 export const productionShare = 0.5;
 
@@ -20,6 +20,7 @@ export interface PacingKey {
   plan?: FreePlanLimits;
   complimentary?: { group: string; tokensPerDay: number };
   prepaid?: PrepaidBalance;
+  paidFloors?: HeaderFloors;
 }
 
 interface Window {
@@ -233,7 +234,7 @@ export class Pacer {
   }
 
   observe(key: string, headers: Readonly<Record<string, string>>, now: number): void {
-    const { provider, plan } = this.config(key);
+    const { provider, plan, paidFloors } = this.config(key);
     const dailyRequestsKept =
       plan?.audioSecondsPerDay !== undefined && this.overrides.whisperDailyKept !== undefined
         ? this.overrides.whisperDailyKept
@@ -259,7 +260,7 @@ export class Pacer {
         }
         continue;
       }
-      if (remaining >= limit * this.share) continue;
+      if (paidFloors ? remaining >= paidFloors[budget] : remaining >= limit * this.share) continue;
       block(now + (parseResetMs(headers[`x-ratelimit-reset-${budget}`]) ?? minuteMs));
     }
   }

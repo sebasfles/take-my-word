@@ -351,15 +351,31 @@ export function tokenCostUsd(facts: ModelFacts, inputTokens: number, outputToken
   );
 }
 
+export interface HeaderFloors {
+  requests: number;
+  "audio-seconds": number;
+  tokens: number;
+}
+
 export interface PaidPlan {
   since: string;
   plan: string;
   monthlySpendLimitUsd: number;
+  creditUsd: number;
+  headerFloors: HeaderFloors;
 }
 
 export type PaidPlans = Readonly<Partial<Record<Provider, PaidPlan>>>;
 
-export const paidPlans: PaidPlans = {};
+export const paidPlans: PaidPlans = {
+  groq: {
+    since: "2026-10-24T18:25:00.000Z",
+    plan: "paid Developer tier",
+    monthlySpendLimitUsd: 5,
+    creditUsd: 10,
+    headerFloors: { requests: 1_000, "audio-seconds": 7_200, tokens: 20_000 },
+  },
+};
 
 export function freePlanAt(
   facts: ModelFacts,
@@ -388,6 +404,6 @@ export function planNotes(
     const spent = ledger
       .filter((entry) => entry.key.startsWith(`${provider}:`) && entry.at >= since)
       .reduce((total, entry) => total + (entry.usd ?? 0), 0);
-    return `${providerNames[provider as Provider]} moved from its free plan to its ${paid.plan} on ${paid.since}; its calls from then on are charged at list price and count in the run cap; this task's ${providerNames[provider as Provider]} spend since then is ${spent.toFixed(3)} USD of the ${paid.monthlySpendLimitUsd.toFixed(2)} USD monthly spend limit, which the account shares with production`;
+    return `${providerNames[provider as Provider]} moved from its free plan to its ${paid.plan} at ${paid.since}, with ${paid.creditUsd.toFixed(2)} USD of credit and a ${paid.monthlySpendLimitUsd.toFixed(2)} USD monthly spend limit that the account shares with production; its calls from then on are charged at list price and count in the run cap, and pace on its rate-limit headers, keeping ${String(paid.headerFloors.requests)} requests, ${String(paid.headerFloors["audio-seconds"])} audio seconds and ${String(paid.headerFloors.tokens)} tokens of each reported allowance for production; this task's ${providerNames[provider as Provider]} spend since then is ${spent.toFixed(3)} USD`;
   });
 }

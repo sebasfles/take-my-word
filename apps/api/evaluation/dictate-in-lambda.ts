@@ -36,14 +36,22 @@ import {
 } from "./harness/prices.ts";
 import type { LedgerEntry } from "./harness/pacing.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
-import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
+import {
+  openFinishedRun,
+  openResultsDir,
+  paths,
+  readJsonl,
+  type ResultsDir,
+} from "./harness/store.ts";
 import {
   deployAndWarm,
   executePlan,
   headersOf,
   pacingKeyOf,
   recordedSpendUsd,
+  recordSynthesis,
   requestsSha256,
+  requireSynthesisBudget,
   type FailureRecord,
 } from "./harness/suite.ts";
 import {
@@ -367,6 +375,8 @@ if (finished !== undefined) {
     process.exit(0);
   }
 }
+const characters = cases.reduce((sum, item) => sum + item.text.length, 0);
+requireSynthesisBudget(paths(resultsDir, "dictate"), characters);
 const clips: Clip[] = [];
 for (const item of cases) {
   const [voice] = voicesFor(fixtures, item);
@@ -389,6 +399,7 @@ const dir = openResultsDir(
   },
   new Date(),
 );
+recordSynthesis(dir, characters);
 const done = new Set(readJsonl<DictateResult>(dir.results).map((result) => result.id));
 const pending = items.filter((item) => !done.has(item.id));
 const models = [

@@ -10,8 +10,14 @@ import {
   type PacingKey,
 } from "./pacing.ts";
 import { maxAttempts, runSchedule, type Attempt, type PlannedItem } from "./scheduler.ts";
-import { appendJsonl, openResultsDir, readJsonl } from "./store.ts";
-import { executePlan } from "./suite.ts";
+import { appendJsonl, openResultsDir, paths, readJsonl } from "./store.ts";
+import {
+  executePlan,
+  recordedSpendUsd,
+  recordSynthesis,
+  requireSynthesisBudget,
+  synthesisUsd,
+} from "./suite.ts";
 
 const keys = new Map<string, PacingKey>([
   [
@@ -337,6 +343,37 @@ describe("executePlan", () => {
         BudgetExceededError,
       );
       expect(readJsonl(dir.results)).toHaveLength(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("speech synthesis spend", () => {
+  it("counts each run's Polly characters in its cap, before synthesizing again", () => {
+    const root = mkdtempSync(join(tmpdir(), "tmw-polly-"));
+    try {
+      const at = join(root, "run");
+      expect(synthesisUsd(1_000_000)).toBeCloseTo(19.2, 10);
+      requireSynthesisBudget(paths(at, "test"), 20_000);
+      const dir = openResultsDir(
+        at,
+        {
+          suite: "test",
+          fixturesSha256: "f",
+          codeCommit: "c",
+          runs: 3,
+          requestsSha256: "r",
+          evalBundleSha256: "b",
+        },
+        new Date(),
+      );
+      recordSynthesis(dir, 20_000);
+      appendJsonl(dir.results, { chargedUsd: 2.3 });
+      expect(recordedSpendUsd(dir)).toBeCloseTo(2.3 + synthesisUsd(20_000), 10);
+      expect(() => {
+        requireSynthesisBudget(paths(at, "test"), 20_000);
+      }).toThrow(BudgetExceededError);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
