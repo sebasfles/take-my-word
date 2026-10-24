@@ -21,3 +21,15 @@
 - typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-24T08:23:51Z by om-developer target api on 6e03bab
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (324 tests, pnpm test, --no-file-parallelism)
+- e2e: n/a (pnpm e2e dictates through the dev API, which this task's clearance excludes)
+
+## 2026-10-24T08:23:51Z by om-developer target infra on 6e03bab
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
