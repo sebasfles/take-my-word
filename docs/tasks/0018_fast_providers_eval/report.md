@@ -8,6 +8,8 @@ Generated reports, each reproducible with the command printed in it:
 - [end-to-end-1.md](reports/end-to-end-1.md): production's `dictate()` inside the eval Lambda for 7 combinations on the 6 end-to-end cases and the 6 long ones, 5 runs, every call on a fresh connection, 420 dictations.
 - [summary-1.md](reports/summary-1.md): every combination with gates, errors after cleanup, release to text and monthly cost.
 
+The code commits the reports and run metas record (6e03bab, 8d9b882, 787a4b1, f494986, adf32ee) are kept as measured; the branch was rebased afterwards, and those commits stay reachable by the `eval/0018/*` tags.
+
 ## Spend
 
 | Run | Provider calls, charged | Speech synthesis (Polly, list price) | Total |

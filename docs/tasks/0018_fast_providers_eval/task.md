@@ -195,3 +195,8 @@ Changes and decisions not in the plan:
 - Polly was never counted in the run cap (since 0017, `pollyNeuralUsdPerMillionCharacters` was unused): each synthesis is now recorded in the run's `synthesis.jsonl`, counted in its spend and checked against the cap before synthesizing; the report states this round's synthesis from the logs (about 1.19 USD in suite 1, 0.33 USD end to end).
 - The monthly cost functions take the paid plans as a parameter so tests do not depend on today's plan.
 - The long-sample section of the transcription report says a candidate must pass both gates on them, not that they pass.
+
+### Round 7
+
+Applied the finding of round 6: before rebasing, one lightweight tag per commit that a report or `meta.json` records (`eval/0018/6e03bab`, `8d9b882`, `787a4b1`, `f494986`, `adf32ee`); then rebased on `origin/develop` (dd517e8) with no conflicts, so round 6's code is now e8dae15, which verify ran on.
+The reports keep the hashes as measured, and `report.md` says the tags keep them reachable; no other change.
