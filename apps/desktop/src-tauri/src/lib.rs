@@ -17,6 +17,7 @@ mod i18n;
 mod keychain;
 mod locale;
 mod overlay;
+mod overlay_health;
 mod own_window;
 mod paste;
 mod rules;
@@ -82,6 +83,8 @@ pub fn run() {
             commands::set_autostart,
             commands::open_microphone_settings,
             commands::dismiss_overlay,
+            commands::overlay_ready,
+            commands::overlay_painted,
             commands::forward_key,
             commands::stop_dictation,
             commands::insert_ack,
