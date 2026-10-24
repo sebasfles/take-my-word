@@ -151,3 +151,8 @@ Applied all 6 findings of round 1:
 6. `extended-en-45` no longer lists "merged" as a term; the suite 1 fixtures freeze here.
 
 `pnpm tf dev plan` and `pnpm tf prd plan` still "No changes" (`evidence/{dev,prd}-plan-round2.txt`); verify ran on 9f03767, the code of this round.
+
+### Round 3
+
+Applied the finding of round 2: rebased on `origin/develop` (1a77433) with no conflicts; rounds 1 and 2 are now d241e82 and 6e03bab, and verify ran on 6e03bab, the rebased code.
+This round's commit holds only these notes and `verify.log`, so the verified commit stays in the branch's history.
