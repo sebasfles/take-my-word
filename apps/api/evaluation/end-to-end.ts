@@ -19,9 +19,9 @@ import {
 } from "./harness/fixtures.ts";
 import {
   bestWordErrors,
-  dominantLanguage,
   hallucinatedPhrases,
   inventedRunThreshold,
+  languageIssue,
   missedTerms,
   percentile,
 } from "./harness/metrics.ts";
@@ -240,10 +240,7 @@ function report(
         ...hallucinatedPhrases(response.text, references).map(
           (phrase) => `hallucination "${phrase}"`,
         ),
-        ...(dominantLanguage(response.text) !== undefined &&
-        dominantLanguage(response.text) !== item.language
-          ? ["wrong language"]
-          : []),
+        ...(languageIssue(response.text, item.language) !== undefined ? ["wrong language"] : []),
       ];
       push(
         `- ${entry.phase} ${String(entry.run)}${entry.cold ? `, cold (init ${ms(entry.cold.initMs)})` : ""}: ${ms(entry.clientMs)} release to text, raw WER ${String(raw.errors)}/${String(raw.words)}, missed raw [${missedTerms(response.raw, item.terms).join(", ")}], text [${missedTerms(response.text, item.terms).join(", ")}]${flags.length > 0 ? `, **${flags.join(", ")}**` : ""}`,

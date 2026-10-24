@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   checkCleanup,
+  cleanupGate,
   cleanupRelativeGate,
+  combinationCleanupGate,
   summarizeCleanup,
+  summarizeCleanupBuckets,
   type CleanupResult,
 } from "./cleanup-analysis.ts";
 import type { CleanupCase } from "./cleanup-fixtures.ts";
@@ -168,5 +171,68 @@ describe("cleanup gates", () => {
     expect(chatty.flags["invented content"]).toBe(0);
     const gate = cleanupRelativeGate(chatty, summarizeCleanup("baseline", checked, []));
     expect(gate.reasons).toEqual([expect.stringMatching(/^outputs with new words 66\.7%/)]);
+  });
+});
+
+describe("cleanup buckets", () => {
+  const changed = "Corre kubectl get pods en el namespace de staging y borra los logs.";
+  const chainedFrom = (caseId: string, transcribers: string[]): CleanupCase => ({
+    ...item,
+    id: `chained-${caseId}`,
+    allowed: ["borra"],
+    chain: { caseId, transcribers },
+  });
+  const round1 = { ...item, allowed: ["borra"] };
+  const longCase = chainedFrom("extended-es-45", ["turbo"]);
+  const parakeetCase = chainedFrom("dev-es-2", ["parakeet"]);
+  const run = (candidate: string, target: CleanupCase, texts: string[]) =>
+    texts.map((text, index) =>
+      checkCleanup(
+        result(text, {
+          candidate,
+          caseId: target.id,
+          run: index + 1,
+          id: `${candidate}|${target.id}|one|${String(index + 1)}`,
+        }),
+        target,
+      ),
+    );
+  const isExtended = (caseId: string) => caseId.startsWith("extended-");
+
+  it("fails a refiner whose long cases alone change meaning, though round 1's cases pass", () => {
+    const checked = [
+      ...run("baseline", round1, [expected, expected, expected]),
+      ...run("baseline", longCase, [expected, expected, expected]),
+      ...run("candidate", round1, [expected, expected, expected]),
+      ...run("candidate", longCase, [changed, changed, changed]),
+    ];
+    const buckets = summarizeCleanupBuckets(["baseline", "candidate"], checked, [], isExtended);
+    expect(buckets.round1.get("candidate")?.meaningChangeRate).toBe(0);
+    const gate = cleanupGate("candidate", "baseline", buckets, "30 to 120 s");
+    expect(gate?.hard).toBe(true);
+    expect(gate?.relative.reasons).toEqual([
+      expect.stringMatching(/^30 to 120 s, meaning changes 100\.0%/),
+    ]);
+    expect(cleanupGate("baseline", "baseline", buckets, "30 to 120 s")?.relative.passed).toBe(true);
+  });
+
+  it("judges a combination on its own transcriber's raws against today's pair", () => {
+    const checked = [
+      ...run("baseline", longCase, [expected, expected, expected]),
+      ...run("candidate", longCase, [expected, expected, expected]),
+      ...run("candidate", parakeetCase, [changed, expected, expected]),
+    ];
+    const buckets = summarizeCleanupBuckets(["baseline", "candidate"], checked, [], isExtended);
+    const today = buckets.chainedBy("turbo").get("baseline");
+    const onParakeet = buckets.chainedBy("parakeet").get("candidate");
+    const onTurbo = buckets.chainedBy("turbo").get("candidate");
+    if (today === undefined || onParakeet === undefined || onTurbo === undefined) {
+      throw new Error("missing bucket");
+    }
+    expect(onParakeet.results).toBe(3);
+    expect(combinationCleanupGate(onParakeet, today).reasons).toEqual([
+      expect.stringMatching(/^meaning changes 33\.3% on its transcriber's raws/),
+    ]);
+    expect(combinationCleanupGate(onTurbo, today).passed).toBe(true);
   });
 });

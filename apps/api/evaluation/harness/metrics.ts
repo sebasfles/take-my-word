@@ -159,6 +159,39 @@ export function dominantLanguage(text: string): Language | undefined {
   return es > en ? "es" : "en";
 }
 
+const otherLanguageWords: ReadonlySet<string> = new Set(
+  [
+    "e em não você vocês eu isso vai vão ser estar pode podem seja isto ele ela nós muito também ou uma com sem dos das nas ao aos à pelo pela é são estão foi ter tem fazer agora então onde já seu sua meu minha obrigado obrigada até hoje ainda",
+    "du et est sont je il elle nous vous ils elles cette ces pas ne qui dans pour avec au aux mais donc très aussi merci oui c'est j'ai",
+    "gli di per tra fra è sono non che chi io lui noi voi loro questo questa molto anche perché grazie sì",
+    "der das und ist nicht ich du er sie wir ihr ein eine mit auf für von zu den dem auch aber oder wenn dann sehr danke ja nein",
+  ]
+    .join(" ")
+    .split(" ")
+    .filter((word) => !stopwords.es.has(word) && !stopwords.en.has(word)),
+);
+
+export const nonLatinLetters = (text: string): string[] => [
+  ...new Set(text.match(/(?![\p{Script=Latin}])\p{L}/gu) ?? []),
+];
+
+export function readsAsNeither(text: string): boolean {
+  const words = wordsOf(text);
+  const es = words.filter((word) => stopwords.es.has(word)).length;
+  const en = words.filter((word) => stopwords.en.has(word)).length;
+  const other = words.filter((word) => otherLanguageWords.has(word)).length;
+  return other >= minimumStopwordsForVerdict && other > es + en;
+}
+
+export function languageIssue(text: string, expected: Language): string | undefined {
+  const letters = nonLatinLetters(text);
+  if (letters.length > 0) return `non-Latin script (${letters.slice(0, 5).join("")})`;
+  if (readsAsNeither(text)) return "reads as neither es nor en";
+  const dominant = dominantLanguage(text);
+  if (dominant !== undefined && dominant !== expected) return `reads as ${dominant}`;
+  return undefined;
+}
+
 export function percentile(values: readonly number[], p: number): number | undefined {
   if (values.length === 0) return undefined;
   const sorted = [...values].sort((a, b) => a - b);

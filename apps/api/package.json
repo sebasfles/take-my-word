@@ -13,8 +13,10 @@
     "eval:context": "node evaluation/user-context.ts",
     "eval:transcription": "node evaluation/transcription.ts",
     "eval:e2e": "node evaluation/end-to-end.ts",
+    "eval:dictate": "node evaluation/dictate-in-lambda.ts",
     "eval:cleanup": "node evaluation/cleanup.ts",
     "eval:capture": "node evaluation/capture-raws.ts",
+    "eval:chain": "node evaluation/chain-raws.ts",
     "eval:summary": "node evaluation/summary.ts",
     "eval:reproduce": "node evaluation/reproduce.ts"
   },

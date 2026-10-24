@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { dictationsPerMonth, scenarios, stageMonth, transcriptionStage } from "./combinations.ts";
+import {
+  dictationsPerMonth,
+  rankPassing,
+  scenarios,
+  stageMonth,
+  transcriptionStage,
+} from "./combinations.ts";
 
 const [light, heavy] = scenarios;
 
@@ -45,5 +51,33 @@ describe("monthly scenarios", () => {
     };
     expect(stageMonth(nano, heavy).covered).toBe(true);
     expect(stageMonth({ ...nano, model: "gpt-6-luna" }, heavy).covered).toBe(false);
+  });
+});
+
+describe("rankPassing", () => {
+  it("ranks only combinations that pass both gates, fastest release to text first", () => {
+    const row = (transcriber: string, passed: boolean, releaseP50: number | undefined) => ({
+      transcriber,
+      refiner: "r",
+      passed,
+      releaseP50,
+    });
+    expect(
+      rankPassing([
+        row("slow", true, 1_900),
+        row("fast but failing", false, 900),
+        row("fast", true, 1_100),
+        row("unmeasured", true, undefined),
+      ]).map((ranked) => ranked.transcriber),
+    ).toEqual(["fast", "slow"]);
+  });
+
+  it("bills a prepaid provider at list price with no free allowance", () => {
+    const stage = transcriptionStage("nvidia/parakeet-tdt-0.6b-v3", 1);
+    expect(stage.usdPerDictation).toBeCloseTo((15 / 60) * 0.0015, 10);
+    expect(stageMonth(stage, heavy)).toMatchObject({
+      covered: false,
+      why: "prepaid balance, billed at list price",
+    });
   });
 });

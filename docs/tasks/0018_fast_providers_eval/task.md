@@ -104,6 +104,37 @@ Consolidated 2026-10-24 by the om-reviewer; answers from the om-manager.
 - Production unchanged (om-reviewer): `transcriberIds`, `refinerIds`, the registry, `providerKeysSchema` in `apps/api/src/lib/secrets.ts` and selfhost's `providerKeys` stay as they are; if shared helpers change, unit tests pin `groq-whisper` and `openai` requests (URL, headers, body) byte for byte; `production-bundles.test.ts` keeps eval code out of the four bundles.
 - Constraints: `docs/modules/dictation/ard.md` (ports and adapters, deterministic gates, pacing, eval contract in `apps/api`); reports in this task folder, raw JSON in the workspace; neutral wording, no personal names or whose account; key values are never read locally.
 - Review beyond the Pipeline: tf plan evidence, fixture and chained-case commits before results, the balance floor and the cost guard tested, the gate tests above, the production byte-identity tests.
+- Overhead samples (om-reviewer, before round 1): the client-to-API overhead (client time minus server total) of 0017's warm end-to-end dictations is read once, read-only, from 0017's workspace results and committed as a dated constant in `evaluation/harness` with its run and report as source; the summary sums it with the in-Lambda distribution. Why: a single P50 constant loses the P95 shape.
+- Naming (om-reviewer, before round 1): one adapter `together-transcribe` serves both Together models, with eval candidates `together-parakeet` and `together-whisper-large-v3`; `cerebras-chat` shares a chat-completions helper with `groq-chat`, whose request a test pins. Acceptance 1's `together-parakeet` is the candidate id.
 - clearance: full: `pnpm tf dev plan` and `pnpm tf prd plan` only; code swap and invoke of the dev eval Lambda; Polly; provider calls through the eval Lambda with the Groq, OpenAI, Together and Cerebras keys of the dev providers secret. No dev API run, no change to shared dev Lambdas, no apply.
 
 ## om-developer notes
+
+### Round 1
+
+Done (code and suite 1 fixtures only; no measured run yet, so the fixtures are reviewed first):
+
+- Infra: `TOGETHER_API_KEY` and `CEREBRAS_API_KEY` in `placeholder_keys`; `pnpm tf dev plan` and `pnpm tf prd plan` both "No changes", saved as `evidence/dev-plan-round1.txt` and `evidence/prd-plan-round1.txt` in the workspace; no apply.
+- Adapters in `apps/api/src/dictation/providers/`: `together-transcribe` (one adapter for `nvidia/parakeet-tdt-0.6b-v3` and `openai/whisper-large-v3`; `prompted` decides whether the prompt is sent; with no requested language it sends `language=auto` and `verbose_json` and reads the detected language and `duration`), `cerebras-chat` and `groq-chat` on a shared `chat-completions.ts`.
+  Tests pin `groq-whisper`, `openai` and `groq-chat` requests (URL, headers, form fields in order or body string); `transcriberIds`, `refinerIds`, the registry and `providerKeysSchema` are unchanged.
+- Eval Lambda: its own key loader (`src/eval/keys.ts`, all four keys required) over a generic `cachedSecretJson` in `lib/secrets.ts`; a `dictate` request kind that runs production's `dictate()` with the candidate adapters, a fake quota, store and profile, no metrics and a silent logger; every call carries its `stage` and usage.
+- Harness: dated Together and Cerebras prices (`checkedOn` 2026-10-24) and prepaid balances (15 USD each since 2026-10-24, floor 5 USD); the ledger records each call's charged USD; a call is refused when start minus the provider's ledger spend minus its estimate goes under the floor, and a run states each prepaid provider's estimate and refuses up front if it would cross the floor.
+  Groq Whisper paces at a quarter of its per-minute limit (`minuteShare` 0.25, 5 a minute) for every run; daily reserve stays at half.
+- Hard gate: "wrong language" also fails letters outside the Latin script and Latin text whose function words read as neither es nor en (pt, fr, it, de lists, words shared with es or en removed); a test keeps every committed expected text clear of it.
+- Long samples: `extended-{es,en,mixed}-{45,100}` in `transcription.fixtures.json`, two voices each, measured 41 to 49 s and 87 to 106 s, at most 3.39 MB; `buildClip` refuses a clip over production's 4 MiB.
+  Reports show them as their own bucket ("30 to 120 s"), which must pass the relative gate on its own; latency of the main tables uses clips under 30 s so it stays comparable with 0017.
+- Suite 2: `pnpm eval:chain --transcription <dir>` writes `chained.fixtures.json` from suite 1's run 1 (first voice, one language, guard-dropped and failed raws left out, identical raws merged) with hand-written `chained-checks.json`; both still to come, after suite 1. `eval:cleanup` refuses to measure without chained cases; reports add per-transcriber and long buckets.
+- `pnpm eval:dictate --combinations a+b,...`: production `dictate()` in the eval Lambda on the `endToEnd` and long cases, fresh connections, baseline pair always included, paced on both providers.
+- `eval:summary [--dictate <dir>]`: ranks combinations passing every gate by release-to-text P50 (in-Lambda total plus 0017's client overhead as a distribution, `harness/client-overhead.ts`), with light and heavy month cost.
+- Smoke through the dev eval Lambda: all four transcribers and six refiners answer; Together detected Spanish under `auto` in one call (not echoed); Together sent no rate-limit headers.
+
+Decisions not in the plan:
+
+- Candidate lists in `harness/candidates.ts` now hold round 2's candidates only; round 1's reports reproduce from their recorded commit, and `notRerun` cites 0017 for the dropped transcribers.
+- The scheduler paces one item on two providers (`alsoPaced`, `alsoUsed`) for dictations.
+- Together is billed per started second at its per-minute price (no minimum), stated in the summary.
+- `providerCall.stage` is optional in the contract so 0017's stored results still type-check.
+- `pnpm e2e` (dev API) is not run in verify, per this task's clearance.
+
+Pending: suite 1 run after the fixture review; `chained-checks.json` and chained fixtures (review); suite 2; `eval:dictate`; summary; `report.md`.
+Estimated: Groq turbo spans about two days at 5 a minute; Groq `gpt-oss-20b@low` needs about 3 days of its 10K-reserve allowance with the chained cases.

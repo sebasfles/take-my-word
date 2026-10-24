@@ -3,6 +3,7 @@ import {
   billedAudioSeconds,
   chargedUsd,
   modelFacts,
+  pricesCheckedFor,
   tokenCostUsd,
   transcriptionCallUsd,
 } from "./prices.ts";
@@ -34,5 +35,23 @@ describe("transcription prices", () => {
     expect(list).toBeCloseTo(0.075, 10);
     expect(chargedUsd(modelFacts("openai/gpt-oss-20b"), list)).toBe(0);
     expect(chargedUsd(modelFacts("gpt-6-luna"), 0.5)).toBe(0.5);
+  });
+
+  it("bills Together per started second with no minimum and charges prepaid calls at list price", () => {
+    const parakeet = modelFacts("nvidia/parakeet-tdt-0.6b-v3");
+    expect(billedAudioSeconds(parakeet, 4.2)).toBe(5);
+    const list = transcriptionCallUsd(parakeet, 4.2);
+    expect(list).toBeCloseTo((5 / 60) * 0.0015, 12);
+    expect(chargedUsd(parakeet, list)).toBe(list);
+    const qwen = modelFacts("qwen-3.8-27b");
+    expect(chargedUsd(qwen, tokenCostUsd(qwen, 1_000_000, 1_000_000))).toBeCloseTo(2.48, 10);
+  });
+});
+
+describe("pricesCheckedFor", () => {
+  it("dates each provider's prices by the day they were checked", () => {
+    expect(
+      pricesCheckedFor(["whisper-large-v3-turbo", "gpt-transcribe", "nvidia/parakeet-tdt-0.6b-v3"]),
+    ).toBe("2026-10-23 (Groq, OpenAI) and 2026-10-24 (Together)");
   });
 });

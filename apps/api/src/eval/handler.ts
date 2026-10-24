@@ -1,10 +1,11 @@
 import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { z } from "zod";
 import { createLogger } from "../lib/log.ts";
-import { cachedProviderKeys } from "../lib/secrets.ts";
+
 import { evalRequestSchema, type EvalResponse } from "./contract.ts";
 import { execute } from "./execute.ts";
 import { dispatcherFor, probedFetch } from "./http-probe.ts";
+import { cachedEvalKeys } from "./keys.ts";
 
 const config = z
   .object({
@@ -13,7 +14,7 @@ const config = z
     AWS_LAMBDA_FUNCTION_MEMORY_SIZE: z.coerce.number().int().positive(),
   })
   .parse(process.env);
-const keys = cachedProviderKeys(new SecretsManagerClient({}), config.PROVIDERS_SECRET_ID);
+const keys = cachedEvalKeys(new SecretsManagerClient({}), config.PROVIDERS_SECRET_ID);
 const log = createLogger({ function: "eval" });
 const elapsed = () => performance.now();
 const where = { region: config.AWS_REGION, memoryMb: config.AWS_LAMBDA_FUNCTION_MEMORY_SIZE };
