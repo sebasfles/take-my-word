@@ -6,6 +6,7 @@ import {
   prepaidBalances,
   transcriptionCallUsd,
   type ModelFacts,
+  type PaidPlans,
 } from "./prices.ts";
 
 export const dictationSeconds = 15;
@@ -50,9 +51,10 @@ function freeCoverage(
   facts: ModelFacts,
   stage: StageUse,
   perDay: number,
+  plans: PaidPlans,
 ): { covered: boolean; why: string } {
   const requests = perDay * stage.callsPerDictation;
-  const plan = freePlanAt(facts);
+  const plan = freePlanAt(facts, Date.now(), plans);
   if (plan !== undefined) {
     const checks: [string, number, number | undefined][] = [
       ["requests per day", requests, plan.requestsPerDay],
@@ -94,7 +96,7 @@ function freeCoverage(
           why: `complimentary tokens exceeded: ${String(Math.round(tokens))} of ${String(group.tokens)} per day`,
         };
   }
-  const paid = paidPlans[facts.provider];
+  const paid = plans[facts.provider];
   if (paid !== undefined) {
     return { covered: false, why: `${paid.plan} since ${paid.since}, billed at list price` };
   }
@@ -104,10 +106,14 @@ function freeCoverage(
   return { covered: false, why: "no free allowance" };
 }
 
-export function stageMonth(stage: StageUse, scenario: Scenario): StageMonth {
+export function stageMonth(
+  stage: StageUse,
+  scenario: Scenario,
+  plans: PaidPlans = paidPlans,
+): StageMonth {
   const facts = modelFacts(stage.model);
   const dictations = dictationsPerMonth(scenario);
-  const coverage = freeCoverage(facts, stage, dictations / daysPerMonth);
+  const coverage = freeCoverage(facts, stage, dictations / daysPerMonth, plans);
   return { listUsd: stage.usdPerDictation * dictations, ...coverage };
 }
 
