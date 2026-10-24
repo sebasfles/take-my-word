@@ -7,9 +7,9 @@ Generated reports, each reproducible with the command printed in it:
 - [cleanup-1.md](reports/cleanup-1.md): 5 models in 2 settings each, 33 raws (13 captured from suite 1), 3 runs, 990 calls.
 - [summary-1.md](reports/summary-1.md): every transcriber and cleanup combination with gates, error rates, combined latency and monthly cost.
 - [end-to-end-1.md](reports/end-to-end-1.md): 6 sentences through the dev API with today's pipeline.
-- [reproduction-1.md](reports/reproduction-1.md): a second transcription run against the first.
+- [transcription-2.md](reports/transcription-2.md) and [reproduction-1.md](reports/reproduction-1.md): a second transcription run (3 runs) and its comparison with the first.
 
-Spend of all runs so far: 1.59 USD charged (OpenAI and Polly); Groq on its free plan.
+Spend of all runs: 1.59 USD charged (OpenAI and Polly); Groq on its free plan.
 
 ## What decides it
 
@@ -44,14 +44,11 @@ The production switch is a separate task: a `gpt-transcribe` adapter is now in t
 - Groq's free plan is per account and shared by dev and prd: an unpaced end-to-end attempt of this task sent dictations 1.6 s apart and 9 of 33 got 429 from turbo's 20 requests per minute, for about a minute at 21:28 UTC on 2026-10-23; the suite now paces itself, and the attempt is kept out of the reports.
   Whether prd dictations failed in that minute is not verified, since prd logs are outside this task's clearance; prd's `dictate` logs show it, as "provider failed" lines with status 429 between about 21:27 and 21:30 UTC on 2026-10-23.
 - That limit is account-wide: 20 transcriptions per minute across every user and both environments, so a few users dictating at once, or one `pnpm e2e` run on dev, can make prd dictations fail with 429 today; the switch task should weigh it, since `gpt-transcribe` runs under OpenAI's per-account limits instead.
-- Latency a user feels on dev (client to us-east-1, warm Lambda): 1.6 to 1.8 s P50 release to text; in the unpaced attempt's three cold requests a cold `dictate` added about 1.4 s, with 430 to 570 ms of init; the paced run found the Lambdas warm, and its cold rerun is pending.
+- Latency a user feels on dev (client to us-east-1): 1.8 to 1.9 s P50 release to text with a warm Lambda; after hours idle, three cold requests took about 3.4 s, with 560 to 590 ms of `dictate` init and 250 ms of authorizer init.
   A normal dictation pays fresh provider connections, since Node's default keep-alive drops them after about 4 s; on fresh connections turbo was 385 ms and gpt-transcribe 592 ms at P50.
 
 ## Reproduction
 
-The second transcription run reproduces the quality numbers: gpt-transcribe 0.5% and 0.8% WER in both runs, gpt-4o-mini within 0.2 points, Whisper within 0.3 points on the calls done so far, the same hard-gate failures and the same language flips.
-`gpt-4o-transcribe` under both languages moved from 1.8% to 0.7% WER, inside the 0.1% to 1.8% per-run spread of the first run.
-
-## Pending
-
-- The second run's Groq calls (205) and a cold-start end-to-end run resume after 2026-10-24 19:08 UTC, when Whisper's 24-hour share allows; both update `reproduction-1.md` and `end-to-end-1.md`.
+The second transcription run reproduces the first on every candidate over the runs both have: Whisper turbo 3.6% and whisper-large-v3 2.8% WER in both, gpt-transcribe 0.5% and 0.8%, gpt-4o-mini within 0.2 points, the same hard-gate flags and the same language flips.
+`gpt-4o-transcribe` under both languages moved from 1.8% to 0.7% WER, inside the 0.1% to 1.8% per-run spread of the first run, and its hard-gate flags from 24 to 20.
+The second run's last 200 Groq calls ran under a one-off allowance recorded in its report: Whisper's daily limits kept 10% free for production instead of half, with the per-minute pace unchanged.

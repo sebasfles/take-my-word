@@ -230,7 +230,11 @@ Changes and decisions not in the plan:
 
 Pending: the second run's Groq calls and a cold-start end-to-end run after 2026-10-24 19:08 UTC, then re-rendering `reproduction-1.md` and `end-to-end-1.md`.
 
-### Round 6 (in progress)
+### Round 6
 
 - `report.md`: Groq's 20 transcriptions per minute is account-wide (every user, dev and prd), named as a production risk for the switch task; the incident states that prd impact is not verified and how to check it.
 - For `document-task`, dictation debt: production's transcriber shares one free-plan rate limit across every user and both environments, so concurrent users or a dev e2e run can make prd dictations fail with 429.
+- `--whisper-daily-kept <fraction>` on `eval:transcription` and `eval:e2e`, opt-in and off by default (Context & decisions, second allowance entry): Groq Whisper's daily requests and audio seconds, in the ledger and in Groq's daily-requests header, keep that share free (at least 10%) instead of half; per-minute and hourly pacing, the Groq chat reserve and OpenAI's half are unchanged, with tests; runs record it in `overrides.jsonl` and their reports state it.
+- Ran with `--whisper-daily-kept 0.1`: the cold-start end-to-end run (`reports/end-to-end-1.md`, 33 dictations, 0 failed, 3 cold with 559 / 592 ms `dictate` init; the earlier warm run is kept in the workspace `results/end-to-end-1-warm/`) and the second transcription run's last 200 Groq calls (`reports/transcription-2.md`).
+- `reports/reproduction-1.md`: every candidate complete in both runs; the quality numbers reproduce (Whisper and gpt-transcribe identical WER, gpt-4o-mini within 0.2 points, gpt-4o-transcribe within its per-run spread).
+- `report.md` re-rendered with those results; nothing pending.
