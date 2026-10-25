@@ -133,8 +133,8 @@ function request(combination: Combination, clip: Clip): ProviderRequest {
   return {
     kind: "dictate",
     connection: "fresh",
-    transcriber: combination.transcriber.spec,
-    refiner: combination.refiner.spec,
+    transcriber: combination.transcriber.id,
+    refiner: combination.refiner.id,
     audioBase64: clip.audio.toString("base64"),
     container: "wav",
     languages: [item.language],

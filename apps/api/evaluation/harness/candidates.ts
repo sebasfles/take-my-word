@@ -1,92 +1,54 @@
-import type { RefinerSpec, TranscriberSpec } from "../../src/eval/contract.ts";
+import type { RefinerId, TranscriberId } from "@take-my-word/shared";
+import {
+  refiners,
+  transcribers,
+  type RefinerEntry,
+  type TranscriberEntry,
+} from "../../src/dictation/providers/registry.ts";
 
 export interface TranscriberCandidate {
-  id: string;
-  spec: TranscriberSpec;
+  id: TranscriberId;
+  spec: TranscriberEntry;
   baseline?: true;
 }
 
 export interface RefinerCandidate {
-  id: string;
-  spec: RefinerSpec;
+  id: RefinerId;
+  spec: RefinerEntry;
   setting: "production call" | "lowest effort";
   baseline?: true;
 }
 
+const transcriber = (id: TranscriberId, baseline?: true): TranscriberCandidate => ({
+  id,
+  spec: transcribers[id],
+  ...(baseline && { baseline }),
+});
+
+const refiner = (id: RefinerId, baseline?: true): RefinerCandidate => ({
+  id,
+  spec: refiners[id],
+  setting: refiners[id].reasoningEffort === undefined ? "production call" : "lowest effort",
+  ...(baseline && { baseline }),
+});
+
 export const transcriberCandidates: readonly TranscriberCandidate[] = [
-  {
-    id: "whisper-large-v3-turbo",
-    spec: { provider: "groq-whisper", model: "whisper-large-v3-turbo" },
-    baseline: true,
-  },
-  {
-    id: "gpt-transcribe",
-    spec: { provider: "openai-transcribe", model: "gpt-transcribe", languageField: "languages[]" },
-  },
-  {
-    id: "together-parakeet",
-    spec: {
-      provider: "together-transcribe",
-      model: "nvidia/parakeet-tdt-0.6b-v3",
-      prompted: false,
-    },
-  },
-  {
-    id: "together-whisper-large-v3",
-    spec: { provider: "together-transcribe", model: "openai/whisper-large-v3", prompted: true },
-  },
+  transcriber("whisper-large-v3-turbo", true),
+  transcriber("gpt-transcribe"),
+  transcriber("together-parakeet"),
 ];
 
 export const refinerCandidates: readonly RefinerCandidate[] = [
-  {
-    id: "gpt-5.4-nano",
-    spec: { provider: "openai", model: "gpt-5.4-nano" },
-    setting: "production call",
-    baseline: true,
-  },
-  {
-    id: "gpt-5.4-nano@none",
-    spec: { provider: "openai", model: "gpt-5.4-nano", reasoningEffort: "none", temperature: 0 },
-    setting: "lowest effort",
-  },
-  {
-    id: "gpt-5.6-luna@none",
-    spec: { provider: "openai", model: "gpt-5.6-luna", reasoningEffort: "none", temperature: 0 },
-    setting: "lowest effort",
-  },
-  {
-    id: "cerebras-qwen-3.8-27b@none",
-    spec: {
-      provider: "cerebras-chat",
-      model: "qwen-3.8-27b",
-      reasoningEffort: "none",
-      temperature: 0,
-    },
-    setting: "lowest effort",
-  },
-  {
-    id: "cerebras-gpt-oss-120b@low",
-    spec: {
-      provider: "cerebras-chat",
-      model: "gpt-oss-120b",
-      reasoningEffort: "low",
-      temperature: 0,
-    },
-    setting: "lowest effort",
-  },
-  {
-    id: "gpt-oss-20b@low",
-    spec: {
-      provider: "groq-chat",
-      model: "openai/gpt-oss-20b",
-      reasoningEffort: "low",
-      temperature: 0,
-    },
-    setting: "lowest effort",
-  },
+  refiner("gpt-5.4-nano", true),
+  refiner("gpt-5.4-nano@none"),
+  refiner("gpt-5.6-luna@none"),
+  refiner("cerebras-qwen-3.8-27b@none"),
+  refiner("cerebras-gpt-oss-120b@low"),
+  refiner("gpt-oss-20b@low"),
 ];
 
 const round1 = "docs/tasks/0017_eval_harness/report.md";
+const round2 = "docs/tasks/0018_fast_providers_eval/report.md";
 
 export const notRerun: readonly { id: string; reason: string }[] = [
   {
@@ -101,9 +63,13 @@ export const notRerun: readonly { id: string; reason: string }[] = [
     id: "gpt-4o-transcribe",
     reason: `not re-run; it failed round 1's hard gate on noise and language and retires on 2027-02-26 (${round1})`,
   },
+  {
+    id: "together-whisper-large-v3",
+    reason: `not re-run; it translated Spanish dictations into English in round 2 (${round2})`,
+  },
 ];
 
-export const chainedTranscribers: readonly string[] = [
+export const chainedTranscribers: readonly TranscriberId[] = [
   "whisper-large-v3-turbo",
   "gpt-transcribe",
   "together-parakeet",

@@ -6,9 +6,7 @@ import {
   type BuiltinStyleId,
   type DictionaryTerm,
   type PasteKeystroke,
-  type RefinerId,
   type Style,
-  type TranscriberId,
   type Usage,
   type UserContext,
 } from "@take-my-word/shared";
@@ -129,12 +127,6 @@ export function languageList(tags: readonly string[], locale: string): string {
   );
   return list.charAt(0).toLocaleUpperCase(locale) + list.slice(1);
 }
-
-export const transcriberNames: Readonly<Record<TranscriberId, string>> = {
-  "groq-whisper": "Groq Whisper",
-};
-
-export const refinerNames: Readonly<Record<RefinerId, string>> = { openai: "OpenAI" };
 
 export const keystrokeKeys: Readonly<Record<PasteKeystroke, readonly string[]>> = {
   "ctrl+v": ["Ctrl", "V"],

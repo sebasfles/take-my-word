@@ -32,7 +32,7 @@ export function chatCompletionsRefiner(
   { id, endpoint, timeoutMs }: ChatCompletionsProvider,
   { apiKey, model, reasoningEffort, temperature, ...http }: ChatCompletionsOptions,
 ): Refiner {
-  const label = `${id}:${model}`;
+  const label = `${id}:${model}${reasoningEffort === undefined ? "" : `@${reasoningEffort}`}`;
   return {
     label,
     async refine({ raw, instructions }: RefineInput) {

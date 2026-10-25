@@ -61,28 +61,24 @@ class World {
 
   handler = createDictateHandler({
     providers: {
-      transcribers: {
-        "groq-whisper": {
-          label: whisper,
-          transcribe: (input) => {
-            this.transcribed.push(input);
-            this.clock += 300;
-            if (this.transcribeError) return Promise.reject(this.transcribeError);
-            return Promise.resolve(this.transcript);
-          },
+      transcriber: {
+        label: whisper,
+        transcribe: (input) => {
+          this.transcribed.push(input);
+          this.clock += 300;
+          if (this.transcribeError) return Promise.reject(this.transcribeError);
+          return Promise.resolve(this.transcript);
         },
       },
-      refiners: {
-        openai: {
-          label: "openai:gpt-5.4-nano",
-          refine: (input) => {
-            this.refined.push(input);
-            this.clock += 400;
-            return Promise.resolve({
-              text: cleanText,
-              usage: { inputTokens: 150, outputTokens: 9 },
-            });
-          },
+      refiner: {
+        label: "openai:gpt-5.4-nano",
+        refine: (input) => {
+          this.refined.push(input);
+          this.clock += 400;
+          return Promise.resolve({
+            text: cleanText,
+            usage: { inputTokens: 150, outputTokens: 9 },
+          });
         },
       },
     },
@@ -169,9 +165,26 @@ describe("POST /dictations", () => {
       audioSeconds: 7,
       raw: rawTranscript,
       text: cleanText,
+      providers: { transcriber: whisper, refiner: "openai:gpt-5.4-nano" },
       tokens: { inputTokens: 150, outputTokens: 9 },
     });
   });
+
+  it.each([
+    { sttProvider: "groq-whisper", refineProvider: "openai" },
+    { sttProvider: "aws-transcribe", refineProvider: "bedrock-claude" },
+  ])(
+    "ignores the provider fields released desktops send and runs the selected pair: %j",
+    async (old) => {
+      const { status, json } = await world.post(
+        dictationBody({ audio: speech(3), meta: { locale: "es", ...old } }),
+      );
+      expect(status).toBe(200);
+      expect(ok(json).providers).toEqual({ transcriber: whisper, refiner: "openai:gpt-5.4-nano" });
+      expect(world.transcribed).toHaveLength(1);
+      expect(world.refined).toHaveLength(1);
+    },
+  );
 
   it("passes m4a to the transcriber as m4a and ignores the old meta locale", async () => {
     const body = dictationBody({
@@ -376,7 +389,6 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
     defaultStyleId,
     locale: dictationLanguages[0] ?? "en",
     dictationLanguages,
-    providers: { transcriber: "groq-whisper" as const, refiner: "openai" as const },
     context,
   });
   const post = (meta: Record<string, unknown>) =>

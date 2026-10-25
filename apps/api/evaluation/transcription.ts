@@ -72,7 +72,7 @@ function request(
   return {
     kind: "transcribe",
     connection,
-    transcriber: candidate.spec,
+    transcriber: candidate.id,
     audioBase64: clip.audio.toString("base64"),
     container: "wav",
     languages: languagesFor(clip.item, mode),

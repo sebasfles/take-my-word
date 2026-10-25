@@ -31,7 +31,6 @@ const full = {
     defaultStyleId: "c-slack",
     locale: "es-MX",
     dictationLanguages: ["es", "en"],
-    providers: { transcriber: "groq-whisper", refiner: "openai" },
     context: {
       picks: ["software-development", "biology-life-sciences"],
       detail: "bioinformática con Python y AWS",
@@ -108,7 +107,6 @@ const empty = {
     defaultStyleId: "plain",
     locale: "en",
     dictationLanguages: ["en"],
-    providers: { transcriber: "groq-whisper", refiner: "openai" },
     context: { picks: [], detail: "" },
   },
   usage: undefined,

@@ -1,7 +1,5 @@
-import { dictionaryHalfLifeDays } from "@take-my-word/shared";
+import { defaultRefiner, defaultTranscriber, dictionaryHalfLifeDays } from "@take-my-word/shared";
 import { z } from "zod";
-import { defaultGroqWhisperModel } from "../dictation/providers/groq-whisper.ts";
-import { defaultOpenaiModel } from "../dictation/providers/openai.ts";
 import { defaultSilenceLevels } from "../dictation/silence.ts";
 
 export const defaultSttPromptTokenBudget = 224;
@@ -12,8 +10,8 @@ const configSchema = z
     PROVIDERS_SECRET_ID: z.string().min(1),
     DAILY_QUOTA_MINUTES: z.coerce.number().int().positive(),
     DEBUG_BUCKET: z.string().min(1).optional(),
-    GROQ_WHISPER_MODEL: z.string().min(1).default(defaultGroqWhisperModel),
-    OPENAI_MODEL: z.string().min(1).default(defaultOpenaiModel),
+    TRANSCRIBER: z.string().default(defaultTranscriber),
+    REFINER: z.string().default(defaultRefiner),
     SILENCE_FLOOR_DBFS: z.coerce.number().max(0).default(defaultSilenceLevels.floorDbfs),
     SPEECH_LEVEL_DBFS: z.coerce.number().max(0).default(defaultSilenceLevels.speechLevelDbfs),
     DICTIONARY_HALF_LIFE_DAYS: z.coerce.number().positive().default(dictionaryHalfLifeDays),

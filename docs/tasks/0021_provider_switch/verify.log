@@ -1,0 +1,77 @@
+## 2026-10-24T23:53:27Z by om-developer target shared on 52c55d0
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (48 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-24T23:53:43Z by om-developer target deployment on 52c55d0
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (49 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-24T23:53:55Z by om-developer target infra on 52c55d0
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a
+
+## 2026-10-24T23:55:48Z by om-developer target api on 52c55d0
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (357 tests, pnpm test)
+- e2e: pass exit 0 (38 tests, pnpm e2e; dev on today's pair, its four api Lambdas on the build of b80c3c2, whose apps/api and packages sources equal 52c55d0)
+
+## 2026-10-24T23:57:58Z by om-developer target web on 52c55d0
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (255 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration), then pass exit 0 (16 tests, pnpm e2e); dev web on develop's build, dev api Lambdas on the branch build
+
+## 2026-10-25T00:06:27Z by om-developer target desktop on 52c55d0
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (240 vitest and 230 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-24T23:51:56Z by om-developer provider switches on dev (Acceptance 2), branch build of b80c3c2, targeted dictate applies
+- today's pair (whisper-large-v3-turbo + gpt-5.4-nano): pass, the api e2e blocks above
+- gpt-transcribe + gpt-5.4-nano: fail exit 1 (37 of 38, pnpm e2e; labels matched; the failure is model quality, raw "Hablé con Kelvaric sobre el contrato de mantenimiento." without the dictionary's Quelvarix, repeated by .verify/api-e2e-gpt-transcribe-rerun.out exit 1); counted as passed per Context & decisions
+- together-parakeet + cerebras-qwen-3.8-27b@none: pass exit 0 (38 tests, pnpm e2e)
+- dev ends on today's pair: TRANSCRIBER=whisper-large-v3-turbo, REFINER=gpt-5.4-nano
+
+## 2026-10-25T00:06:59Z by om-developer restore of dev's api Lambdas
+- dictate, api, authorizer, dictionary-usage restored from the zips saved before the swap (develop's sources); CodeSha256 after restore equals the pre-swap value for all four
+
+## 2026-10-24T23:32:29Z (started after this commit time) by om-developer earlier run of every target on b80c3c2, not logged at the time
+- every step passed (api e2e 38 of 38 on today's pair, web integration and e2e included) except deployment lint (prettier on selfhost.test.ts and terraform.test.ts) and desktop lint (rustfmt on one assert in api/mod.rs); both fixed in 52c55d0, and the runs above replaced those artifacts
+
+## 2026-10-25T00:13:16Z by om-developer rare-term e2e on dev under gpt-transcribe + gpt-5.4-nano, four api Lambdas on the build of 3071b80 (sources equal 13c1335), targeted dictate apply
+- e2e: fail exit 1 (pnpm e2e e2e/features.e2e.ts -t "rare term"); model quality, both checks report
+- raw: "Hablé con Kelvaric sobre el contrato de mantenimiento." (expected Quelvarix, soft)
+- clean text: "Hablé con Kelvarix sobre el contrato de mantenimiento." (expected Quelvarix)
+- before the term was added, raw and clean text both read "Hablé con Kelbaric sobre el contrato de mantenimiento."
+- dev back on today's pair: TRANSCRIBER=whisper-large-v3-turbo, REFINER=gpt-5.4-nano
+
+## 2026-10-25T00:14:25Z by om-developer target deployment on 13c1335
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (50 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-25T00:16:03Z by om-developer target api on 13c1335
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (356 tests, pnpm test)
+- e2e: pass exit 0 (38 tests, pnpm e2e; dev on today's pair, its four api Lambdas on the build of 3071b80, whose sources equal 13c1335)
+
+## 2026-10-25T00:18:12Z by om-developer target web on 13c1335
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (255 tests, pnpm test)
+- e2e: pass exit 0 (4 tests, pnpm integration), then pass exit 0 (16 tests, pnpm e2e); dev web on develop's build, dev api Lambdas on the branch build
+
+## 2026-10-25T00:18:39Z by om-developer restore of dev's api Lambdas
+- dictate, api, authorizer, dictionary-usage restored from the zips saved before the first swap (develop's sources); CodeSha256 after restore equals the pre-swap value for all four
+- shared, infra and desktop are unchanged since 1fd6b9b; their blocks above on 52c55d0 stand
+

@@ -130,7 +130,6 @@ function route(request: Record<string, unknown>): Promise<unknown> {
         defaultStyleId: "plain",
         locale: "es",
         dictationLanguages: ["es"],
-        providers: { transcriber: "groq-whisper", refiner: "openai" },
         context:
           params.get("context") === "empty"
             ? { picks: [], detail: "" }

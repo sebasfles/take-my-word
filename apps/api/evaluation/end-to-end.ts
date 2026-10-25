@@ -30,7 +30,8 @@ import { billedAudioSeconds, modelFacts } from "./harness/prices.ts";
 import { appendJsonl, readJsonl } from "./harness/store.ts";
 import { describeOverrides, overridesFrom, pacingKeyOf, pacingKeys } from "./harness/suite.ts";
 import { createThrowawayUser } from "./harness/throwaway-user.ts";
-import { defaultGroqWhisperModel } from "../src/dictation/providers/groq-whisper.ts";
+import { providerPair } from "@take-my-word/deployment";
+import { transcribers } from "../src/dictation/providers/registry.ts";
 import {
   evaluationCodePaths,
   fromInvocation,
@@ -271,12 +272,13 @@ const user = await createThrowawayUser(
   "eval-e2e",
 );
 const sent: Sent[] = [];
-const productionTranscriber = modelFacts(defaultGroqWhisperModel);
-const pacingKey = pacingKeyOf(defaultGroqWhisperModel);
+const devTranscriberModel = transcribers[providerPair(workspace.config, "dev").transcriber].model;
+const productionTranscriber = modelFacts(devTranscriberModel);
+const pacingKey = pacingKeyOf(devTranscriberModel);
 const ledgerPath = join(dirname(resultsDir), "ledger.jsonl");
 const overrides = overridesFrom(values["whisper-daily-kept"]);
 const pacer = new Pacer(
-  pacingKeys([defaultGroqWhisperModel]),
+  pacingKeys([devTranscriberModel]),
   readJsonl<LedgerEntry>(ledgerPath),
   undefined,
   overrides,

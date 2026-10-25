@@ -121,7 +121,6 @@ describe("authorization", () => {
       body: {
         defaultStyleId: style.id,
         locale: "en",
-        providers: { transcriber: "groq-whisper", refiner: "openai" },
       },
     });
     world.seedDictation("user-a", "2026-10-21T09:00:00.000Z", "r1");
@@ -328,7 +327,6 @@ describe("styles", () => {
       body: {
         defaultStyleId: style.id,
         locale: "es",
-        providers: { transcriber: "groq-whisper", refiner: "openai" },
       },
     });
 
@@ -414,34 +412,57 @@ describe("settings", () => {
       defaultStyleId: "plain",
       locale: "en",
       dictationLanguages: ["en"],
-      providers: { transcriber: "groq-whisper", refiner: "openai" },
       context: { picks: [], detail: "" },
     });
     expect(await world.stores.settings.get("user-a")).toEqual(first);
   });
 
+  it.each([
+    { transcriber: "groq-whisper", refiner: "openai" },
+    { transcriber: "retired", refiner: null },
+  ])(
+    "accepts the providers a released desktop sends and answers it the fixed pair it requires: %j",
+    async (providers) => {
+      const put = await world.call("PUT", "/me/settings", {
+        body: {
+          defaultStyleId: "formal",
+          locale: "es",
+          dictationLanguages: ["es"],
+          providers,
+          context: { picks: [], detail: "" },
+        },
+      });
+      expect(put.status).toBe(200);
+      const released = { transcriber: "groq-whisper", refiner: "openai" };
+      expect(put.json).toMatchObject({ defaultStyleId: "formal", providers: released });
+      expect((await world.call("GET", "/me/settings")).json).toMatchObject({
+        defaultStyleId: "formal",
+        providers: released,
+      });
+      expect(await world.stores.settings.get("user-a")).not.toHaveProperty("providers");
+    },
+  );
+
   it("saves the dictation languages and keeps them when an older client leaves them out", async () => {
-    const providers = { transcriber: "groq-whisper", refiner: "openai" };
     const chosen = await world.call("PUT", "/me/settings", {
-      body: { defaultStyleId: "plain", dictationLanguages: ["es", "en"], providers },
+      body: { defaultStyleId: "plain", dictationLanguages: ["es", "en"] },
     });
     expect(settingsSchema.parse(chosen.json)).toMatchObject({
       locale: "es",
       dictationLanguages: ["es", "en"],
     });
     const older = await world.call("PUT", "/me/settings", {
-      body: { defaultStyleId: "casual", locale: "en-US", providers },
+      body: { defaultStyleId: "casual", locale: "en-US" },
     });
     expect(older.status).toBe(200);
     expect(settingsSchema.parse((await world.call("GET", "/me/settings")).json)).toEqual({
       defaultStyleId: "casual",
       locale: "es",
       dictationLanguages: ["es", "en"],
-      providers,
       context: { picks: [], detail: "" },
     });
     const empty = await world.call("PUT", "/me/settings", {
-      body: { defaultStyleId: "plain", dictationLanguages: [], providers },
+      body: { defaultStyleId: "plain", dictationLanguages: [] },
     });
     expect(empty.status).toBe(400);
   });
@@ -451,7 +472,6 @@ describe("settings", () => {
       defaultStyleId: "formal",
       locale: "en",
       dictationLanguages: ["en"],
-      providers: { transcriber: "groq-whisper", refiner: "openai" },
       context: { picks: [], detail: "" },
     };
     expect((await world.call("PUT", "/me/settings", { body })).status).toBe(200);
@@ -464,7 +484,6 @@ describe("settings", () => {
 });
 
 describe("user context", () => {
-  const providers = { transcriber: "groq-whisper", refiner: "openai" };
   const read = async () =>
     settingsSchema.parse((await world.call("GET", "/me/settings")).json).context;
 
@@ -472,7 +491,6 @@ describe("user context", () => {
     const saved = await world.call("PUT", "/me/settings", {
       body: {
         defaultStyleId: "plain",
-        providers,
         context: { picks: ["software-development", "data-ai"], detail: "  backend with AWS  " },
       },
     });
@@ -482,21 +500,21 @@ describe("user context", () => {
       detail: "backend with AWS",
     });
     await world.call("PUT", "/me/settings", {
-      body: { defaultStyleId: "casual", locale: "en", providers },
+      body: { defaultStyleId: "casual", locale: "en" },
     });
     expect(await read()).toEqual({
       picks: ["software-development", "data-ai"],
       detail: "backend with AWS",
     });
     await world.call("PUT", "/me/settings", {
-      body: { defaultStyleId: "plain", providers, context: { picks: [], detail: "" } },
+      body: { defaultStyleId: "plain", context: { picks: [], detail: "" } },
     });
     expect(await read()).toEqual({ picks: [], detail: "" });
   });
 
   it("refuses more than three picks, a repeated pick, an unknown one and a long detail", async () => {
     const put = (context: unknown) =>
-      world.call("PUT", "/me/settings", { body: { defaultStyleId: "plain", providers, context } });
+      world.call("PUT", "/me/settings", { body: { defaultStyleId: "plain", context } });
     for (const context of [
       { picks: ["law", "sales", "design", "student"], detail: "" },
       { picks: ["law", "law"], detail: "" },

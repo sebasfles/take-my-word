@@ -1,7 +1,5 @@
 import {
   defaultDictationLanguages,
-  defaultRefiner,
-  defaultTranscriber,
   minAudioSeconds,
   type DictationResponse,
 } from "@take-my-word/shared";
@@ -13,18 +11,24 @@ import { AudioTooShortError, InvalidAudioError } from "./audio/invalid-audio.ts"
 import type { AudioSink } from "./audio-sink.ts";
 import type { DictationStore } from "./dictation-store.ts";
 import { ProviderError } from "./ports/provider-error.ts";
+import type { Refiner } from "./ports/refiner.ts";
+import type { Transcriber } from "./ports/transcriber.ts";
 import { transcriberPrompt } from "./dictionary-projection.ts";
 import { refinerInstructions } from "./instructions.ts";
 import { transcribeIn } from "./language-selection.ts";
 import type { ProfileStore } from "./profile.ts";
-import type { ProviderRegistry } from "./providers/registry.ts";
 import { quotaExceededMessage, quotaWindow, type QuotaStore } from "./quota.ts";
 import type { SilenceLevels } from "./silence.ts";
 import { resolveStyle } from "./style-resolution.ts";
 import type { DictationUpload } from "./upload.ts";
 
+export interface SelectedProviders {
+  transcriber: Transcriber;
+  refiner: Refiner;
+}
+
 export interface DictateDeps {
-  providers: ProviderRegistry;
+  providers: SelectedProviders;
   quota: QuotaStore;
   dailyQuotaMinutes: number;
   dictations: DictationStore;
@@ -139,12 +143,7 @@ export async function dictate(
   }
 
   const { settings } = profile;
-  const transcriber =
-    deps.providers.transcribers[
-      meta.sttProvider ?? settings?.providers.transcriber ?? defaultTranscriber
-    ];
-  const refiner =
-    deps.providers.refiners[meta.refineProvider ?? settings?.providers.refiner ?? defaultRefiner];
+  const { transcriber, refiner } = deps.providers;
   const style = resolveStyle({
     requested: meta.styleId,
     rule: profile.rule?.styleId,

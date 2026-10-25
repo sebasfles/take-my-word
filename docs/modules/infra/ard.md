@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-24
-source: 0017_eval_harness
+source: 0021_provider_switch
 ---
 
 # Infra: architecture and debt
@@ -204,3 +204,12 @@ source: 0017_eval_harness
 - Revisit when: a second dev-only resource needs the same switch.
 - Source: 0017_eval_harness
 
+
+## 2026-10-24: Terraform's transcriber and refiner have no default; pnpm tf always passes them
+
+- Decision: `environments/{dev,prd}` and `stacks/app` declare `transcriber` and `refiner` without defaults; `pnpm tf` passes them from `deployment.json`, resolved to today's pair from `packages/shared` when left out; `pnpm selfhost` asks for and requires only the selected providers' keys and keeps the others stored.
+- Alternatives rejected: Terraform defaults repeating today's ids.
+- Reason: the default and the list of ids live in one place, and every plan shows the pair it applies.
+- Debt created: none.
+- Revisit when: Terraform runs outside `pnpm tf`.
+- Source: 0021_provider_switch

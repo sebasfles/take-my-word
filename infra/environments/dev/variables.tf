@@ -53,3 +53,13 @@ variable "eval_function" {
   type        = bool
   default     = false
 }
+
+variable "transcriber" {
+  description = "Transcriber id dictate runs; pnpm tf passes it from providers in deployment.json, today's whisper-large-v3-turbo when left out"
+  type        = string
+}
+
+variable "refiner" {
+  description = "Refiner id dictate runs; pnpm tf passes it from providers in deployment.json, today's gpt-5.4-nano when left out"
+  type        = string
+}

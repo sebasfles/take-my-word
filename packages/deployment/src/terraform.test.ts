@@ -49,7 +49,40 @@ describe("terraform roots", () => {
       TF_VAR_aws_region: "eu-west-1",
       TF_VAR_domain: "dictation.example.com",
       TF_VAR_hosted_zone: "example.com",
+      TF_VAR_transcriber: "whisper-large-v3-turbo",
+      TF_VAR_refiner: "gpt-5.4-nano",
     });
+  });
+
+  it("gives each environment its own transcriber and refiner, today's pair where left out", () => {
+    const switched = parseConfig({
+      aws: { profile: "me", accountId: "210987654321", region: "us-east-1" },
+      domain: "words.example.org",
+      environments: ["dev", "prd"],
+      releases: "someone/take-my-word",
+      providers: {
+        dev: { transcriber: "together-parakeet", refiner: "cerebras-qwen-3.8-27b@none" },
+      },
+    });
+    expect(terraformVariables(switched, "dev", undefined)).toMatchObject({
+      TF_VAR_transcriber: "together-parakeet",
+      TF_VAR_refiner: "cerebras-qwen-3.8-27b@none",
+    });
+    expect(terraformVariables(switched, "prd", undefined)).toMatchObject({
+      TF_VAR_transcriber: "whisper-large-v3-turbo",
+      TF_VAR_refiner: "gpt-5.4-nano",
+    });
+    const refinerOnly = parseConfig({
+      ...{ aws: switched.aws, domain: switched.domain, releases: switched.releases },
+      providers: { prd: { refiner: "gpt-5.4-nano@none" } },
+    });
+    expect(terraformVariables(refinerOnly, "prd", undefined)).toMatchObject({
+      TF_VAR_transcriber: "whisper-large-v3-turbo",
+      TF_VAR_refiner: "gpt-5.4-nano@none",
+    });
+    expect(terraformVariables(switched, "core", undefined)).not.toHaveProperty(
+      "TF_VAR_transcriber",
+    );
   });
 
   it("passes the github object and the App key with CI, and no site to core", () => {

@@ -311,8 +311,6 @@ export const en = {
     defaultStyle: "Default style",
     language: "Language",
     dictationLanguages: "Dictation languages",
-    transcriber: "Transcription",
-    refiner: "Text cleanup",
     context: "What you do",
     contextEmpty: "Not set",
     contextPicks: {

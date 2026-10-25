@@ -60,7 +60,7 @@ function request(
   return {
     kind: "refine",
     connection,
-    refiner: candidate.spec,
+    refiner: candidate.id,
     raw: item.raw,
     language: item.language,
     instructions: instructionsFor(transcription, item),

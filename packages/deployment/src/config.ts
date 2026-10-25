@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { awsRegionSchema, discoverySchema, hostnameSchema } from "@take-my-word/shared";
+import {
+  awsRegionSchema,
+  discoverySchema,
+  hostnameSchema,
+  providerPairSchema,
+  refinerIds,
+  transcriberIds,
+  type ProviderPair,
+} from "@take-my-word/shared";
 import { z } from "zod";
 
 export const environments = ["dev", "prd"] as const;
@@ -69,6 +77,13 @@ export const deploymentConfigSchema = z
       description:
         "Give dev the eval Lambda that the evaluation harness (apps/api/evaluation) swaps and invokes; needs dev, never reaches prd.",
     }),
+    providers: z
+      .object({ dev: providerPairSchema.optional(), prd: providerPairSchema.optional() })
+      .strict()
+      .optional()
+      .meta({
+        description: `Transcriber and refiner each environment's dictate runs, set as its TRANSCRIBER and REFINER by Terraform; an environment left out runs whisper-large-v3-turbo and gpt-5.4-nano. Transcribers: ${transcriberIds.join(", ")}. Refiners: ${refinerIds.join(", ")}.`,
+      }),
     releases: repositorySchema.meta({
       description:
         "GitHub repository, as owner/name, whose releases hold the desktop app the web links to.",
@@ -114,7 +129,14 @@ export const deploymentConfigSchema = z
   .refine((config) => !config.evalFunction || config.environments.includes("dev"), {
     message: "evalFunction needs the dev environment",
     path: ["evalFunction"],
-  });
+  })
+  .refine(
+    (config) =>
+      Object.keys(config.providers ?? {}).every((env) =>
+        config.environments.includes(env as Environment),
+      ),
+    { message: "providers names an environment this deployment does not run", path: ["providers"] },
+  );
 
 export type DeploymentConfig = z.infer<typeof deploymentConfigSchema>;
 
@@ -143,6 +165,10 @@ export function loadConfig(root: string): DeploymentConfig {
     throw new ConfigError(`${path} is not JSON: ${(error as Error).message}`);
   }
   return parseConfig(value, path);
+}
+
+export function providerPair(config: DeploymentConfig, env: Environment): ProviderPair {
+  return config.providers?.[env] ?? providerPairSchema.parse({});
 }
 
 export function hostedZone(config: DeploymentConfig): string {
