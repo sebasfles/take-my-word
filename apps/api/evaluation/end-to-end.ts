@@ -19,9 +19,9 @@ import {
 } from "./harness/fixtures.ts";
 import {
   bestWordErrors,
-  dominantLanguage,
   hallucinatedPhrases,
   inventedRunThreshold,
+  languageIssue,
   missedTerms,
   percentile,
 } from "./harness/metrics.ts";
@@ -30,7 +30,8 @@ import { billedAudioSeconds, modelFacts } from "./harness/prices.ts";
 import { appendJsonl, readJsonl } from "./harness/store.ts";
 import { describeOverrides, overridesFrom, pacingKeyOf, pacingKeys } from "./harness/suite.ts";
 import { createThrowawayUser } from "./harness/throwaway-user.ts";
-import { defaultGroqWhisperModel } from "../src/dictation/providers/groq-whisper.ts";
+import { providerPair } from "@take-my-word/deployment";
+import { transcribers } from "../src/dictation/providers/registry.ts";
 import {
   evaluationCodePaths,
   fromInvocation,
@@ -240,10 +241,7 @@ function report(
         ...hallucinatedPhrases(response.text, references).map(
           (phrase) => `hallucination "${phrase}"`,
         ),
-        ...(dominantLanguage(response.text) !== undefined &&
-        dominantLanguage(response.text) !== item.language
-          ? ["wrong language"]
-          : []),
+        ...(languageIssue(response.text, item.language) !== undefined ? ["wrong language"] : []),
       ];
       push(
         `- ${entry.phase} ${String(entry.run)}${entry.cold ? `, cold (init ${ms(entry.cold.initMs)})` : ""}: ${ms(entry.clientMs)} release to text, raw WER ${String(raw.errors)}/${String(raw.words)}, missed raw [${missedTerms(response.raw, item.terms).join(", ")}], text [${missedTerms(response.text, item.terms).join(", ")}]${flags.length > 0 ? `, **${flags.join(", ")}**` : ""}`,
@@ -274,12 +272,13 @@ const user = await createThrowawayUser(
   "eval-e2e",
 );
 const sent: Sent[] = [];
-const productionTranscriber = modelFacts(defaultGroqWhisperModel);
-const pacingKey = pacingKeyOf(defaultGroqWhisperModel);
+const devTranscriberModel = transcribers[providerPair(workspace.config, "dev").transcriber].model;
+const productionTranscriber = modelFacts(devTranscriberModel);
+const pacingKey = pacingKeyOf(devTranscriberModel);
 const ledgerPath = join(dirname(resultsDir), "ledger.jsonl");
 const overrides = overridesFrom(values["whisper-daily-kept"]);
 const pacer = new Pacer(
-  pacingKeys([defaultGroqWhisperModel]),
+  pacingKeys([devTranscriberModel]),
   readJsonl<LedgerEntry>(ledgerPath),
   undefined,
   overrides,

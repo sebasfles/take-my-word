@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  type Language,
-  languages,
-  localeSchema,
-  refinerIds,
-  transcriberIds,
-} from "./dictations.ts";
+import { type Language, languages, localeSchema } from "./dictations.ts";
 import { styleIdSchema } from "./styles.ts";
 
 export const defaultDictationLanguages: readonly Language[] = ["en"];
@@ -60,10 +54,6 @@ export const settingsSchema = z.object({
   defaultStyleId: styleIdSchema,
   locale: localeSchema,
   dictationLanguages: dictationLanguagesSchema,
-  providers: z.object({
-    transcriber: z.enum(transcriberIds),
-    refiner: z.enum(refinerIds),
-  }),
   context: userContextSchema,
 });
 export type Settings = z.infer<typeof settingsSchema>;

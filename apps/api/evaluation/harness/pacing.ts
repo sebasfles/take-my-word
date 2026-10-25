@@ -1,4 +1,4 @@
-import type { FreePlanLimits, Provider } from "./prices.ts";
+import type { FreePlanLimits, HeaderFloors, PrepaidBalance, Provider } from "./prices.ts";
 
 export const productionShare = 0.5;
 
@@ -12,12 +12,15 @@ export interface LedgerEntry extends Usage {
   key: string;
   at: number;
   group?: string;
+  usd?: number;
 }
 
 export interface PacingKey {
   provider: Provider;
   plan?: FreePlanLimits;
   complimentary?: { group: string; tokensPerDay: number };
+  prepaid?: PrepaidBalance;
+  paidFloors?: HeaderFloors;
 }
 
 interface Window {
@@ -132,7 +135,13 @@ export class Pacer {
         name: "requests per minute",
         ms: minuteMs,
         field: "requests",
-        cap: half(plan.requestsPerMinute),
+        cap:
+          plan.minuteShare === undefined
+            ? half(plan.requestsPerMinute)
+            : {
+                limit: plan.requestsPerMinute,
+                allowed: plan.requestsPerMinute * plan.minuteShare,
+              },
       },
       {
         name: "audio seconds per hour",
@@ -149,8 +158,25 @@ export class Pacer {
     ];
   }
 
-  readiness(key: string, need: Usage, now: number): Readiness {
+  prepaidSpentUsd(provider: Provider, since: string): number {
+    const start = Date.parse(since);
+    return this.ledger
+      .filter((entry) => entry.key.startsWith(`${provider}:`) && entry.at >= start)
+      .reduce((total, entry) => total + (entry.usd ?? 0), 0);
+  }
+
+  readiness(key: string, need: Usage & { costUsd?: number }, now: number): Readiness {
     const config = this.config(key);
+    if (config.prepaid) {
+      const { startUsd, since, floorUsd } = config.prepaid;
+      const left = startUsd - this.prepaidSpentUsd(config.provider, since);
+      if (left - (need.costUsd ?? 0) < floorUsd) {
+        return {
+          kind: "tomorrow",
+          reason: `${config.provider} balance: ${left.toFixed(4)} of ${startUsd.toFixed(2)} USD left after the ledger's spend since ${since}; a call of ${(need.costUsd ?? 0).toFixed(4)} USD would go under the ${floorUsd.toFixed(2)} USD floor`,
+        };
+      }
+    }
     const own = this.ledger.filter((entry) => entry.key === key);
     const waits = [this.blockedUntil.get(key) ?? now];
     for (const window of config.plan ? this.windows(config.plan) : []) {
@@ -194,15 +220,21 @@ export class Pacer {
     return at <= now ? { kind: "now" } : { kind: "at", at };
   }
 
-  record(key: string, usage: Usage, at: number): LedgerEntry {
+  record(key: string, usage: Usage, at: number, usd?: number): LedgerEntry {
     const group = this.config(key).complimentary?.group;
-    const entry: LedgerEntry = { key, at, ...usage, ...(group !== undefined && { group }) };
+    const entry: LedgerEntry = {
+      key,
+      at,
+      ...usage,
+      ...(group !== undefined && { group }),
+      ...(usd !== undefined && { usd }),
+    };
     this.ledger.push(entry);
     return entry;
   }
 
   observe(key: string, headers: Readonly<Record<string, string>>, now: number): void {
-    const { provider, plan } = this.config(key);
+    const { provider, plan, paidFloors } = this.config(key);
     const dailyRequestsKept =
       plan?.audioSecondsPerDay !== undefined && this.overrides.whisperDailyKept !== undefined
         ? this.overrides.whisperDailyKept
@@ -222,14 +254,60 @@ export class Pacer {
       const limit = number(`x-ratelimit-limit-${budget}`);
       const remaining = number(`x-ratelimit-remaining-${budget}`);
       if (limit === undefined || remaining === undefined) continue;
-      if (provider === "groq" && budget === "requests") {
+      if (provider === "groq" && plan !== undefined && budget === "requests") {
         if (remaining < limit * dailyRequestsKept) {
           block(now + (parseResetMs(headers["x-ratelimit-reset-requests"]) ?? hourMs));
         }
         continue;
       }
-      if (remaining >= limit * this.share) continue;
+      if (paidFloors ? remaining >= paidFloors[budget] : remaining >= limit * this.share) continue;
       block(now + (parseResetMs(headers[`x-ratelimit-reset-${budget}`]) ?? minuteMs));
+    }
+  }
+}
+
+export class BalanceFloorError extends Error {
+  constructor(provider: Provider, leftUsd: number, estimateUsd: number, floorUsd: number) {
+    super(
+      `${provider}: the run's estimated ${estimateUsd.toFixed(4)} USD would leave ${(leftUsd - estimateUsd).toFixed(4)} of the ${leftUsd.toFixed(4)} USD left, under the ${floorUsd.toFixed(2)} USD floor`,
+    );
+    this.name = "BalanceFloorError";
+  }
+}
+
+export interface PrepaidOutlook {
+  provider: Provider;
+  leftUsd: number;
+  estimateUsd: number;
+  floorUsd: number;
+}
+
+export function prepaidOutlook(
+  keys: ReadonlyMap<string, PacingKey>,
+  pacer: Pacer,
+  planned: readonly { pacingKey: string; estimate: { costUsd: number } }[],
+): PrepaidOutlook[] {
+  const outlooks = new Map<Provider, PrepaidOutlook>();
+  for (const item of planned) {
+    const config = keys.get(item.pacingKey);
+    if (config?.prepaid === undefined) continue;
+    const outlook = outlooks.get(config.provider) ?? {
+      provider: config.provider,
+      leftUsd:
+        config.prepaid.startUsd - pacer.prepaidSpentUsd(config.provider, config.prepaid.since),
+      estimateUsd: 0,
+      floorUsd: config.prepaid.floorUsd,
+    };
+    outlook.estimateUsd += item.estimate.costUsd;
+    outlooks.set(config.provider, outlook);
+  }
+  return [...outlooks.values()];
+}
+
+export function requireAboveFloor(outlooks: readonly PrepaidOutlook[]): void {
+  for (const { provider, leftUsd, estimateUsd, floorUsd } of outlooks) {
+    if (leftUsd - estimateUsd < floorUsd) {
+      throw new BalanceFloorError(provider, leftUsd, estimateUsd, floorUsd);
     }
   }
 }

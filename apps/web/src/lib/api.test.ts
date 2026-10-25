@@ -8,7 +8,6 @@ const settings = {
   defaultStyleId: "formal",
   locale: "es",
   dictationLanguages: ["es"],
-  providers: { transcriber: "groq-whisper", refiner: "openai" },
   context: { picks: ["law"], detail: "contratos" },
 };
 

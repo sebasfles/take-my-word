@@ -7,18 +7,6 @@
         "type": "string",
         "pattern": "^(es|en)(-[A-Z]{2})?$"
       },
-      "sttProvider": {
-        "type": "string",
-        "enum": [
-          "groq-whisper"
-        ]
-      },
-      "refineProvider": {
-        "type": "string",
-        "enum": [
-          "openai"
-        ]
-      },
       "styleId": {
         "type": "string",
         "minLength": 1,
@@ -172,28 +160,6 @@
           ]
         }
       },
-      "providers": {
-        "type": "object",
-        "properties": {
-          "transcriber": {
-            "type": "string",
-            "enum": [
-              "groq-whisper"
-            ]
-          },
-          "refiner": {
-            "type": "string",
-            "enum": [
-              "openai"
-            ]
-          }
-        },
-        "required": [
-          "transcriber",
-          "refiner"
-        ],
-        "additionalProperties": false
-      },
       "context": {
         "type": "object",
         "properties": {
@@ -238,7 +204,6 @@
       "defaultStyleId",
       "locale",
       "dictationLanguages",
-      "providers",
       "context"
     ],
     "additionalProperties": false

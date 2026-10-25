@@ -92,6 +92,12 @@ export function sha256(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+export function sha256s(paths: readonly string[]): string {
+  const hash = createHash("sha256");
+  for (const path of paths) hash.update(readFileSync(path));
+  return hash.digest("hex");
+}
+
 export function requireCommittedFixtures(fixtures: string, code: readonly string[]): CodeState {
   if (!isTracked(fixtures))
     throw new Error(`${fixtures} is not committed; commit the fixtures first`);

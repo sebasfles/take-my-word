@@ -1,20 +1,11 @@
-import { audioContainers, languages } from "@take-my-word/shared";
+import {
+  audioContainers,
+  dictationResponseSchema,
+  languages,
+  refinerIds,
+  transcriberIds,
+} from "@take-my-word/shared";
 import { z } from "zod";
-
-export const transcriberSpecSchema = z.object({
-  provider: z.enum(["groq-whisper", "openai-transcribe"]),
-  model: z.string().min(1),
-  languageField: z.enum(["language", "languages[]"]).optional(),
-});
-export type TranscriberSpec = z.infer<typeof transcriberSpecSchema>;
-
-export const refinerSpecSchema = z.object({
-  provider: z.enum(["openai", "groq-chat"]),
-  model: z.string().min(1),
-  reasoningEffort: z.string().min(1).optional(),
-  temperature: z.number().min(0).optional(),
-});
-export type RefinerSpec = z.infer<typeof refinerSpecSchema>;
 
 export const connections = ["fresh", "reused"] as const;
 export type Connection = (typeof connections)[number];
@@ -24,7 +15,7 @@ export const evalRequestSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("transcribe"),
     connection: z.enum(connections),
-    transcriber: transcriberSpecSchema,
+    transcriber: z.enum(transcriberIds),
     audioBase64: z.string().min(1),
     container: z.enum(audioContainers),
     languages: z.array(z.enum(languages)).min(1),
@@ -33,16 +24,28 @@ export const evalRequestSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("refine"),
     connection: z.enum(connections),
-    refiner: refinerSpecSchema,
+    refiner: z.enum(refinerIds),
     raw: z.string(),
     language: z.enum(languages),
     instructions: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("dictate"),
+    connection: z.enum(connections),
+    transcriber: z.enum(transcriberIds),
+    refiner: z.enum(refinerIds),
+    audioBase64: z.string().min(1),
+    container: z.enum(audioContainers),
+    languages: z.array(z.enum(languages)).min(1),
+    terms: z.array(z.object({ term: z.string().min(1), aliases: z.array(z.string()) })),
+    termsUsedAt: z.iso.datetime(),
   }),
 ]);
 export type EvalRequest = z.infer<typeof evalRequestSchema>;
 export type ProviderRequest = Exclude<EvalRequest, { kind: "warmup" }>;
 
 export const providerCallSchema = z.object({
+  stage: z.enum(["transcribe", "refine"]).optional(),
   requested: z.enum(languages).optional(),
   usage: z
     .object({
@@ -66,6 +69,7 @@ export const evalResponseSchema = z.object({
   text: z.string().optional(),
   language: z.enum(languages).optional(),
   usage: z.object({ inputTokens: z.number(), outputTokens: z.number() }).optional(),
+  dictation: dictationResponseSchema.optional(),
   error: z.object({ status: z.number().optional(), message: z.string() }).optional(),
   calls: z.array(providerCallSchema),
   coldStart: z.boolean(),

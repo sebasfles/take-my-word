@@ -263,8 +263,6 @@ export const es: Dictionary = {
     defaultStyle: "Estilo por defecto",
     language: "Idioma",
     dictationLanguages: "Idiomas de dictado",
-    transcriber: "Transcripción",
-    refiner: "Limpieza del texto",
     context: "A qué te dedicas",
     contextEmpty: "Sin indicar",
     contextPicks: {

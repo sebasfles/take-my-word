@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0016_self_hosting
+updated: 2026-10-24
+source: 0021_provider_switch
 ---
 
 # Infra: database
@@ -13,7 +13,7 @@ Infra owns the table as a resource, not the items in it.
 | Table | Purpose |
 |---|---|
 | `<deployment>-{env}` | The single table per env: keys, TTL, stream, capacity mode; on-demand capacity. |
-| Secrets Manager blob per env | Groq and OpenAI keys. |
+| Secrets Manager blob per env | Groq, OpenAI, Together and Cerebras keys; each environment needs its pair's. |
 | S3 debug bucket, dev only | Optional raw audio, deleted after one day. |
 
 Infra owns no item kind.

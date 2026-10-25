@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   BudgetExceededError,
   CostGuard,
@@ -10,8 +10,14 @@ import {
   type PacingKey,
 } from "./pacing.ts";
 import { maxAttempts, runSchedule, type Attempt, type PlannedItem } from "./scheduler.ts";
-import { appendJsonl, openResultsDir, readJsonl } from "./store.ts";
-import { executePlan } from "./suite.ts";
+import { appendJsonl, openResultsDir, paths, readJsonl } from "./store.ts";
+import {
+  executePlan,
+  recordedSpendUsd,
+  recordSynthesis,
+  requireSynthesisBudget,
+  synthesisUsd,
+} from "./suite.ts";
 
 const keys = new Map<string, PacingKey>([
   [
@@ -19,6 +25,10 @@ const keys = new Map<string, PacingKey>([
     { provider: "groq", plan: { requestsPerMinute: 2, requestsPerDay: 1_000, source: "test" } },
   ],
   ["fast", { provider: "openai" }],
+  [
+    "cerebras:qwen",
+    { provider: "cerebras", prepaid: { startUsd: 15, since: "2026-10-23", floorUsd: 5 } },
+  ],
   [
     "tiny",
     { provider: "groq", plan: { requestsPerMinute: 100, requestsPerDay: 2, source: "test" } },
@@ -189,6 +199,114 @@ describe("runSchedule", () => {
   });
 });
 
+describe("runSchedule across two stages", () => {
+  it("waits for the slower of a dictation's two providers and records the use of both", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const dictation = (id: string): PlannedItem<string> => ({
+      ...item(id, "slow", () =>
+        Promise.resolve({
+          ...ok(id),
+          alsoUsed: [
+            {
+              pacingKey: "cerebras:qwen",
+              usage: { requests: 1, audioSeconds: 0, tokens: 500 },
+              costUsd: 0.002,
+              headers: {},
+            },
+          ],
+        }),
+      ),
+      alsoPaced: [
+        {
+          pacingKey: "cerebras:qwen",
+          estimate: { requests: 1, audioSeconds: 0, tokens: 500, costUsd: 0.002 },
+        },
+      ],
+    });
+    const guard = new CostGuard(3);
+    const outcome = await runSchedule(
+      [dictation("d1"), dictation("d2")],
+      new Pacer(keys, []),
+      guard,
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(outcome).toEqual({ kind: "complete" });
+    expect(recorder.ledger.map((entry) => [entry.key, entry.usd])).toEqual([
+      ["slow", 0.01],
+      ["cerebras:qwen", 0.002],
+      ["slow", 0.01],
+      ["cerebras:qwen", 0.002],
+    ]);
+    expect(guard.spentUsd).toBeCloseTo(0.024, 10);
+  });
+
+  it("stops before a call whose second stage alone would pass the budget", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const run = vi.fn(() => Promise.resolve(ok("d1")));
+    await expect(
+      runSchedule(
+        [
+          {
+            ...item("d1", "fast", run),
+            alsoPaced: [
+              {
+                pacingKey: "fast",
+                estimate: { requests: 1, audioSeconds: 0, tokens: 0, costUsd: 0.5 },
+              },
+            ],
+          },
+        ],
+        new Pacer(keys, []),
+        new CostGuard(0.2),
+        recorder.hooks,
+        time.now,
+        time.wait,
+      ),
+    ).rejects.toThrow(BudgetExceededError);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("pauses an item whose second stage would take a prepaid balance under its floor", async () => {
+    const time = clock();
+    const recorder = hooks();
+    const spent: LedgerEntry = {
+      key: "cerebras:qwen",
+      at: time.now() - 1_000,
+      requests: 1,
+      audioSeconds: 0,
+      tokens: 0,
+      usd: 9.999,
+    };
+    const outcome = await runSchedule(
+      [
+        {
+          ...item("d1", "fast"),
+          alsoPaced: [
+            {
+              pacingKey: "cerebras:qwen",
+              estimate: { requests: 1, audioSeconds: 0, tokens: 500, costUsd: 0.002 },
+            },
+          ],
+        },
+      ],
+      new Pacer(keys, [spent]),
+      new CostGuard(3),
+      recorder.hooks,
+      time.now,
+      time.wait,
+    );
+    expect(outcome.kind).toBe("paused");
+    expect(outcome.kind === "paused" && outcome.reasons[0]).toMatch(
+      /^cerebras:qwen: cerebras balance: 5\.0010 of 15\.00 USD left/,
+    );
+    expect(recorder.done).toEqual([]);
+  });
+});
+
 describe("executePlan", () => {
   it("counts what earlier days of the same run already spent, failed attempts included", async () => {
     const root = mkdtempSync(join(tmpdir(), "tmw-plan-"));
@@ -225,6 +343,37 @@ describe("executePlan", () => {
         BudgetExceededError,
       );
       expect(readJsonl(dir.results)).toHaveLength(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("speech synthesis spend", () => {
+  it("counts each run's Polly characters in its cap, before synthesizing again", () => {
+    const root = mkdtempSync(join(tmpdir(), "tmw-polly-"));
+    try {
+      const at = join(root, "run");
+      expect(synthesisUsd(1_000_000)).toBeCloseTo(19.2, 10);
+      requireSynthesisBudget(paths(at, "test"), 20_000);
+      const dir = openResultsDir(
+        at,
+        {
+          suite: "test",
+          fixturesSha256: "f",
+          codeCommit: "c",
+          runs: 3,
+          requestsSha256: "r",
+          evalBundleSha256: "b",
+        },
+        new Date(),
+      );
+      recordSynthesis(dir, 20_000);
+      appendJsonl(dir.results, { chargedUsd: 2.3 });
+      expect(recordedSpendUsd(dir)).toBeCloseTo(2.3 + synthesisUsd(20_000), 10);
+      expect(() => {
+        requireSynthesisBudget(paths(at, "test"), 20_000);
+      }).toThrow(BudgetExceededError);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

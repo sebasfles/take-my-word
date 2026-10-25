@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-24
-source: 0017_eval_harness
+source: 0021_provider_switch
 ---
 
 # Infra: technical
@@ -29,7 +29,7 @@ The official deployment runs `core`, `dev` and `prd` from Sebastian's machine an
 | Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream through an event source mapping filtered to inserts of `DICTATION#`, batch 10, retry 2, bisect, batch item failures (dictionary module). |
 | DynamoDB `<deployment>-{env}` | The single table, with TTL and a stream enabled. |
 | Cognito user pool | Configured by the auth module, created here. |
-| Secrets Manager blob | Groq and OpenAI keys in one secret, read by `dictate`; `<deployment>-{env}/web` holds the web's `COOKIE_KEY`; prd's recovery window is 7 days, 0 under `removal`. |
+| Secrets Manager blob | Provider keys in one secret: Groq, OpenAI, Together and Cerebras; `dictate` requires only its pair's, the dev eval Lambda each candidate's; values are written outside Terraform, whose placeholder names the keys only for new environments; `<deployment>-{env}/web` holds the web's `COOKIE_KEY`; prd's recovery window is 7 days, 0 under `removal`. |
 | S3 debug bucket | Dev only, optional raw audio for debugging, one-day lifecycle. |
 | Lambda `eval` | Dev only, when `evalFunction` is on: the evaluation harness swaps its code from the checkout that runs it and invokes it with the deployment profile; no route, 1024 MB like `dictate`, 120 s, allowed only to read the providers secret; CI and the deploy role never touch it. |
 | Web hosting | Lambda `web` (OpenNext server, 512 MB, 30 s) behind an `AWS_IAM` Function URL, the private bucket `<deployment>-{env}-web-assets-{account}` for `/_next/static/*` and `/static/*`, and one CloudFront distribution with OAC to both, caching disabled for the server and a headers policy (HSTS, nosniff, `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`); its certificate comes from an `aws.us_east_1` provider alias, so any region works. |
@@ -65,6 +65,7 @@ Jobs, listeners or scheduled work: none.
 
 - `deployment.json`: see `deployment.example.json`; `pnpm tf` refuses a profile that resolves to another account than `aws.accountId`.
 - Lambda environment variables are wired by `stacks/app`; `DEBUG_BUCKET` only while the dev variable `debug_audio` is on.
+- `providers.<env>` in `deployment.json` (`transcriber`, `refiner`, ids listed in its schema) becomes `dictate`'s `TRANSCRIBER` and `REFINER`; `pnpm tf` always passes both, today's pair when left out, and refuses an unknown id or an environment the deployment does not run.
 - `evalFunction` in `deployment.json` (off by default, refused without dev) makes `pnpm tf dev` pass `TF_VAR_eval_function`; prd and core never receive it, and the stack refuses it outside dev.
 - Repository Actions variables, set by hand: `DESKTOP_DEV_SERVER` and `DESKTOP_PRD_SERVER` (the discovery JSON each desktop build signs in to), `DESKTOP_UPDATER_PUBKEY` and `WEB_INDEXED_ORIGIN` (the prd origin search engines may index).
 - `AWS_ROLE_ARN`, `AWS_REGION`, `DICTATE_FUNCTION_NAME`, `AUTHORIZER_FUNCTION_NAME`, `API_FUNCTION_NAME`, `DICTIONARY_USAGE_FUNCTION_NAME`, `WEB_FUNCTION_NAME`, `WEB_ASSETS_BUCKET` and `WEB_DISTRIBUTION_ID` are written by `stacks/app` into the env's Actions environment, which `core` creates.

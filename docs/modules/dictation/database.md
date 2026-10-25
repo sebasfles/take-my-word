@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0015_user_context
+updated: 2026-10-24
+source: 0021_provider_switch
 ---
 
 # Dictation: database
@@ -14,7 +14,7 @@ Everything lives in the single DynamoDB table `take-my-word-{env}`, no ORM, no m
 |---|---|
 | `take-my-word-{env}`, `DICTATION#ts` | One saved dictation per user: raw and clean text, the style used, providers, latency per stage, tokens; TTL 90 days |
 | `take-my-word-{env}`, `QUOTA#date` | Audio seconds charged to a user on one UTC day; TTL two days after the day starts |
-| `take-my-word-{env}`, `SETTINGS` | The user's default style, dictation languages, default providers and context (picks and detail); created on the first `GET /me/settings`; no TTL |
+| `take-my-word-{env}`, `SETTINGS` | The user's default style, dictation languages and context (picks and detail); items saved before 0021 may still hold `providers`, never read and dropped on the next save; created on the first `GET /me/settings`; no TTL |
 
 ## Tables referenced
 

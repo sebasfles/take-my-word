@@ -12,6 +12,9 @@
   "environments": ["prd"],
   "indexed": false,
   "evalFunction": false,
+  "providers": {
+    "prd": { "transcriber": "whisper-large-v3-turbo", "refiner": "gpt-5.4-nano" }
+  },
   "releases": "owner/take-my-word",
   "github": {
     "owner": "owner",

@@ -10,9 +10,24 @@ export const sources = {
   groqDeprecations: "https://console.groq.com/docs/deprecations",
   pollyPricing: "https://aws.amazon.com/polly/pricing/",
   openaiModel: (model: string) => `https://developers.openai.com/api/docs/models/${model}`,
+  togetherPricing: "https://www.together.ai/pricing",
+  togetherSpeechToText: "https://docs.together.ai/docs/speech-to-text",
+  cerebrasModel: (page: string) => `https://inference-docs.cerebras.ai/models/${page}`,
+  cerebrasRateLimits: "https://inference-docs.cerebras.ai/support/rate-limits",
 } as const;
 
-export type Provider = "groq" | "openai";
+export type Provider = "groq" | "openai" | "together" | "cerebras";
+
+export interface PrepaidBalance {
+  startUsd: number;
+  since: string;
+  floorUsd: number;
+}
+
+export const prepaidBalances: Readonly<Partial<Record<Provider, PrepaidBalance>>> = {
+  together: { startUsd: 15, since: "2026-10-24", floorUsd: 5 },
+  cerebras: { startUsd: 15, since: "2026-10-24", floorUsd: 5 },
+};
 
 export interface AudioPrice {
   kind: "duration";
@@ -44,6 +59,7 @@ export interface FreePlanLimits {
   tokensPerMinute?: number;
   tokensPerDay?: number;
   tokensPerDayKept?: number;
+  minuteShare?: number;
   source: string;
 }
 
@@ -54,6 +70,7 @@ export interface ModelFacts {
   freePlan?: FreePlanLimits;
   complimentaryGroup?: keyof typeof complimentaryDailyTokens;
   retires?: { on: string; source: string };
+  checkedOn?: string;
 }
 
 const groqWhisperPlan: FreePlanLimits = {
@@ -61,6 +78,7 @@ const groqWhisperPlan: FreePlanLimits = {
   requestsPerDay: 2_000,
   audioSecondsPerHour: 7_200,
   audioSecondsPerDay: 28_800,
+  minuteShare: 0.25,
   source: sources.groqRateLimits,
 };
 
@@ -195,6 +213,50 @@ export const models: Readonly<Record<string, ModelFacts>> = {
     },
     freePlan: groqChatPlan,
   },
+  "nvidia/parakeet-tdt-0.6b-v3": {
+    provider: "together",
+    model: "nvidia/parakeet-tdt-0.6b-v3",
+    price: {
+      kind: "duration",
+      usdPerMinute: 0.0015,
+      minimumBilledSeconds: 0,
+      source: sources.togetherPricing,
+    },
+    checkedOn: "2026-10-24",
+  },
+  "openai/whisper-large-v3": {
+    provider: "together",
+    model: "openai/whisper-large-v3",
+    price: {
+      kind: "duration",
+      usdPerMinute: 0.0015,
+      minimumBilledSeconds: 0,
+      source: sources.togetherPricing,
+    },
+    checkedOn: "2026-10-24",
+  },
+  "qwen-3.8-27b": {
+    provider: "cerebras",
+    model: "qwen-3.8-27b",
+    price: {
+      kind: "tokens",
+      usdPerMillionInput: 0.99,
+      usdPerMillionOutput: 1.49,
+      source: sources.cerebrasModel("qwen-3.8-27b"),
+    },
+    checkedOn: "2026-10-24",
+  },
+  "gpt-oss-120b": {
+    provider: "cerebras",
+    model: "gpt-oss-120b",
+    price: {
+      kind: "tokens",
+      usdPerMillionInput: 0.35,
+      usdPerMillionOutput: 0.75,
+      source: sources.cerebrasModel("openai-oss"),
+    },
+    checkedOn: "2026-10-24",
+  },
 };
 
 export const notServed = [
@@ -217,6 +279,26 @@ export const pollyNeuralUsdPerMillionCharacters = 19.2;
 
 export const runBudgetUsd = 3;
 
+const providerNames: Readonly<Record<Provider, string>> = {
+  groq: "Groq",
+  openai: "OpenAI",
+  together: "Together",
+  cerebras: "Cerebras",
+};
+
+export function pricesCheckedFor(modelIds: readonly string[]): string {
+  const byDate = new Map<string, Set<string>>();
+  for (const model of modelIds) {
+    const facts = modelFacts(model);
+    const date = facts.checkedOn ?? pricesCheckedOn;
+    byDate.set(date, (byDate.get(date) ?? new Set()).add(providerNames[facts.provider]));
+  }
+  return [...byDate]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, providers]) => `${date} (${[...providers].join(", ")})`)
+    .join(" and ");
+}
+
 export function modelFacts(model: string): ModelFacts {
   const facts = models[model];
   if (facts === undefined) throw new Error(`no dated facts for ${model}`);
@@ -235,7 +317,7 @@ export function billedAudioSeconds(
   usage?: CallUsage,
 ): number {
   if (facts.price.kind !== "duration") return clipSeconds;
-  return Math.max(facts.price.minimumBilledSeconds, usage?.seconds ?? Math.ceil(clipSeconds));
+  return Math.max(facts.price.minimumBilledSeconds, Math.ceil(usage?.seconds ?? clipSeconds));
 }
 
 export function transcriptionCallUsd(
@@ -269,6 +351,59 @@ export function tokenCostUsd(facts: ModelFacts, inputTokens: number, outputToken
   );
 }
 
-export function chargedUsd(facts: ModelFacts, listUsd: number): number {
-  return facts.freePlan === undefined ? listUsd : 0;
+export interface HeaderFloors {
+  requests: number;
+  "audio-seconds": number;
+  tokens: number;
+}
+
+export interface PaidPlan {
+  since: string;
+  plan: string;
+  monthlySpendLimitUsd: number;
+  creditUsd: number;
+  headerFloors: HeaderFloors;
+}
+
+export type PaidPlans = Readonly<Partial<Record<Provider, PaidPlan>>>;
+
+export const paidPlans: PaidPlans = {
+  groq: {
+    since: "2026-10-24T18:25:00.000Z",
+    plan: "paid Developer tier",
+    monthlySpendLimitUsd: 5,
+    creditUsd: 10,
+    headerFloors: { requests: 1_000, "audio-seconds": 7_200, tokens: 20_000 },
+  },
+};
+
+export function freePlanAt(
+  facts: ModelFacts,
+  at: number = Date.now(),
+  plans: PaidPlans = paidPlans,
+): FreePlanLimits | undefined {
+  const paid = plans[facts.provider];
+  return paid !== undefined && at >= Date.parse(paid.since) ? undefined : facts.freePlan;
+}
+
+export function chargedUsd(
+  facts: ModelFacts,
+  listUsd: number,
+  at: number = Date.now(),
+  plans: PaidPlans = paidPlans,
+): number {
+  return freePlanAt(facts, at, plans) === undefined ? listUsd : 0;
+}
+
+export function planNotes(
+  ledger: readonly { key: string; at: number; usd?: number }[],
+  plans: PaidPlans = paidPlans,
+): string[] {
+  return Object.entries(plans).map(([provider, paid]) => {
+    const since = Date.parse(paid.since);
+    const spent = ledger
+      .filter((entry) => entry.key.startsWith(`${provider}:`) && entry.at >= since)
+      .reduce((total, entry) => total + (entry.usd ?? 0), 0);
+    return `${providerNames[provider as Provider]} moved from its free plan to its ${paid.plan} at ${paid.since}, with ${paid.creditUsd.toFixed(2)} USD of credit and a ${paid.monthlySpendLimitUsd.toFixed(2)} USD monthly spend limit that the account shares with production; its calls from then on are charged at list price and count in the run cap, and pace on its rate-limit headers, keeping ${String(paid.headerFloors.requests)} requests, ${String(paid.headerFloors["audio-seconds"])} audio seconds and ${String(paid.headerFloors.tokens)} tokens of each reported allowance for production; this task's ${providerNames[provider as Provider]} spend since then is ${spent.toFixed(3)} USD`;
+  });
 }

@@ -71,7 +71,7 @@ describe("requestsSha256", () => {
   const refine = (raw: string): ProviderRequest => ({
     kind: "refine",
     connection: "fresh",
-    refiner: { provider: "openai", model: "gpt-5.4-nano" },
+    refiner: "gpt-5.4-nano",
     raw,
     language: "es",
     instructions: "i",
@@ -79,7 +79,7 @@ describe("requestsSha256", () => {
   const transcribe = (audio: string): ProviderRequest => ({
     kind: "transcribe",
     connection: "fresh",
-    transcriber: { provider: "groq-whisper", model: "whisper-large-v3" },
+    transcriber: "whisper-large-v3-turbo",
     audioBase64: Buffer.from(audio).toString("base64"),
     container: "wav",
     languages: ["es"],

@@ -9,7 +9,7 @@ output "table_name" {
 }
 
 output "providers_secret_id" {
-  description = "Secret holding GROQ_API_KEY and OPENAI_API_KEY"
+  description = "Secret holding the provider keys: GROQ_API_KEY, OPENAI_API_KEY, TOGETHER_API_KEY and CEREBRAS_API_KEY"
   value       = module.providers_secret.arn
 }
 

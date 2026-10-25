@@ -10,11 +10,21 @@ import {
 import {
   CostGuard,
   Pacer,
+  prepaidOutlook,
+  requireAboveFloor,
   type LedgerEntry,
   type PacingKey,
   type PacingOverrides,
 } from "./pacing.ts";
-import { complimentaryDailyTokens, modelFacts, runBudgetUsd } from "./prices.ts";
+import {
+  complimentaryDailyTokens,
+  freePlanAt,
+  modelFacts,
+  paidPlans,
+  pollyNeuralUsdPerMillionCharacters,
+  prepaidBalances,
+  runBudgetUsd,
+} from "./prices.ts";
 import { runSchedule, type PlannedItem } from "./scheduler.ts";
 import { appendJsonl, readJsonl, type ResultsDir } from "./store.ts";
 import { fromInvocation, type Workspace } from "./workspace.ts";
@@ -75,11 +85,16 @@ export function pacingKeys(models: readonly string[]): Map<string, PacingKey> {
     models.map((model) => {
       const facts = modelFacts(model);
       const group = facts.complimentaryGroup;
+      const prepaid = prepaidBalances[facts.provider];
+      const plan = freePlanAt(facts);
+      const paidFloors = plan === undefined ? paidPlans[facts.provider]?.headerFloors : undefined;
       return [
         pacingKeyOf(model),
         {
           provider: facts.provider,
-          ...(facts.freePlan && { plan: facts.freePlan }),
+          ...(plan && { plan }),
+          ...(prepaid && { prepaid }),
+          ...(paidFloors && { paidFloors }),
           ...(group && {
             complimentary: { group, tokensPerDay: complimentaryDailyTokens[group].tokens },
           }),
@@ -137,10 +152,37 @@ export interface FailureRecord extends Charged {
   at: string;
 }
 
-export function recordedSpendUsd(dir: ResultsDir): number {
+export function recordedSpendUsd(dir: Omit<ResultsDir, "meta">): number {
   const sum = (records: readonly Charged[]) =>
     records.reduce((total, record) => total + record.chargedUsd, 0);
-  return sum(readJsonl<Charged>(dir.results)) + sum(readJsonl<FailureRecord>(dir.failures));
+  return (
+    sum(readJsonl<Charged>(dir.results)) +
+    sum(readJsonl<FailureRecord>(dir.failures)) +
+    sum(readJsonl<Charged>(dir.synthesis))
+  );
+}
+
+export const synthesisUsd = (characters: number): number =>
+  (characters * pollyNeuralUsdPerMillionCharacters) / 1_000_000;
+
+export function requireSynthesisBudget(
+  dir: Omit<ResultsDir, "meta">,
+  characters: number,
+  budgetUsd = runBudgetUsd,
+): void {
+  const spent = recordedSpendUsd(dir);
+  console.log(
+    `synthesizing ${String(characters)} characters with Polly, ${synthesisUsd(characters).toFixed(3)} USD at list price, after ${spent.toFixed(3)} USD already spent`,
+  );
+  new CostGuard(budgetUsd, spent).check(synthesisUsd(characters));
+}
+
+export function recordSynthesis(dir: ResultsDir, characters: number): void {
+  appendJsonl(dir.synthesis, {
+    at: new Date().toISOString(),
+    characters,
+    chargedUsd: synthesisUsd(characters),
+  });
 }
 
 export async function executePlan<R extends Charged>(
@@ -155,17 +197,29 @@ export async function executePlan<R extends Charged>(
 ): Promise<boolean> {
   const ledger = readJsonl<LedgerEntry>(dir.ledger);
   const overrides = options.overrides ?? {};
-  const pacer = new Pacer(pacingKeys(models), ledger, undefined, overrides);
+  const keys = pacingKeys(models);
+  const pacer = new Pacer(keys, ledger, undefined, overrides);
   for (const line of describeOverrides(overrides)) {
     appendJsonl(dir.overrides, { at: new Date().toISOString(), note: line });
     console.log(`override: ${line}`);
   }
   const guard = new CostGuard(runBudgetUsd, recordedSpendUsd(dir));
-  const estimate = items.reduce((sum, item) => sum + item.estimate.costUsd, 0);
+  const stages = items.flatMap((item) => [
+    { pacingKey: item.pacingKey, estimate: item.estimate },
+    ...(item.alsoPaced ?? []),
+  ]);
+  const estimate = stages.reduce((sum, stage) => sum + stage.estimate.costUsd, 0);
   console.log(
     `${String(items.length)} calls pending, estimated ${estimate.toFixed(3)} USD charged after ${guard.spentUsd.toFixed(3)} USD already spent (budget ${runBudgetUsd.toFixed(2)} USD per run)`,
   );
   guard.check(estimate);
+  const outlooks = prepaidOutlook(keys, pacer, stages);
+  for (const { provider, leftUsd, estimateUsd, floorUsd } of outlooks) {
+    console.log(
+      `${provider}: estimated ${estimateUsd.toFixed(3)} USD of ${leftUsd.toFixed(3)} USD left by the ledger (floor ${floorUsd.toFixed(2)} USD)`,
+    );
+  }
+  requireAboveFloor(outlooks);
   const outcome = await runSchedule(
     items,
     pacer,

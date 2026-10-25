@@ -1,7 +1,9 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
+import type { RefinerId } from "@take-my-word/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { pcmToWav } from "../../e2e/speech.ts";
 import type { ProviderRequest } from "./contract.ts";
 import { execute, type ExecuteDeps } from "./execute.ts";
 import { dispatcherFor, probedFetch, urlOf } from "./http-probe.ts";
@@ -38,7 +40,13 @@ function answer(seenRequest: Seen): {
     "x-request-id": "not kept",
   };
   if (seenRequest.path.endsWith("/audio/transcriptions")) {
-    const language = seenRequest.fields?.language;
+    const language = seenRequest.fields?.language ?? seenRequest.fields?.["languages[]"];
+    if (language === "auto")
+      return {
+        status: 200,
+        body: { text: " hola ", language: "spanish", duration: 1 },
+        headers: {},
+      };
     if (language === undefined)
       return { status: 200, body: { text: "bonjour", language: "french" }, headers: limits };
     return {
@@ -47,7 +55,7 @@ function answer(seenRequest: Seen): {
       headers: limits,
     };
   }
-  if (seenRequest.json?.model === "limited") {
+  if (seenRequest.json?.model === "gpt-oss-120b") {
     return {
       status: 429,
       body: { error: { message: "slow down" } },
@@ -93,7 +101,13 @@ afterAll(async () => {
 });
 
 const deps: ExecuteDeps = {
-  keys: () => Promise.resolve({ GROQ_API_KEY: "groq-key", OPENAI_API_KEY: "openai-key" }),
+  keys: () =>
+    Promise.resolve({
+      GROQ_API_KEY: "groq-key",
+      OPENAI_API_KEY: "openai-key",
+      TOGETHER_API_KEY: "together-key",
+      CEREBRAS_API_KEY: "cerebras-key",
+    }),
   dispatcherFor,
   probedFetch: (dispatcher, records) => {
     const fetch = probedFetch(dispatcher, () => performance.now(), records);
@@ -105,17 +119,20 @@ const deps: ExecuteDeps = {
 const transcribe = (connection: "fresh" | "reused"): ProviderRequest => ({
   kind: "transcribe",
   connection,
-  transcriber: { provider: "groq-whisper", model: "whisper-large-v3" },
+  transcriber: "whisper-large-v3-turbo",
   audioBase64: Buffer.from("RIFF-bytes").toString("base64"),
   container: "wav",
   languages: ["es", "en"],
   prompt: "kubectl, Terraform",
 });
 
-const refine = (model: string, connection: "fresh" | "reused" = "fresh"): ProviderRequest => ({
+const refine = (
+  refiner: RefinerId = "gpt-oss-20b@low",
+  connection: "fresh" | "reused" = "fresh",
+): ProviderRequest => ({
   kind: "refine",
   connection,
-  refiner: { provider: "groq-chat", model, reasoningEffort: "low", temperature: 0 },
+  refiner,
   raw: "eh clean text",
   language: "en",
   instructions: "clean it",
@@ -127,7 +144,7 @@ describe("execute", () => {
     const result = await execute(transcribe("fresh"), deps);
     expect(result).toMatchObject({
       ok: true,
-      label: "groq-whisper:whisper-large-v3",
+      label: "groq-whisper:whisper-large-v3-turbo",
       text: "in es",
       language: "es",
     });
@@ -150,7 +167,7 @@ describe("execute", () => {
     const result = await execute(
       {
         ...transcribe("fresh"),
-        transcriber: { provider: "openai-transcribe", model: "gpt-transcribe" },
+        transcriber: "gpt-transcribe",
         languages: ["en"],
       } as ProviderRequest,
       deps,
@@ -161,23 +178,23 @@ describe("execute", () => {
   });
 
   it("opens a new connection for every fresh call and keeps one for reused calls", async () => {
-    const fresh = await execute(refine("model"), deps);
-    const freshAgain = await execute(refine("model"), deps);
+    const fresh = await execute(refine(), deps);
+    const freshAgain = await execute(refine(), deps);
     expect(fresh.calls[0]?.newConnections).toBe(1);
     expect(freshAgain.calls[0]?.newConnections).toBe(1);
 
-    await execute(refine("model", "reused"), deps);
+    await execute(refine("gpt-oss-20b@low", "reused"), deps);
     await sleep(20);
-    const reused = await execute(refine("model", "reused"), deps);
+    const reused = await execute(refine("gpt-oss-20b@low", "reused"), deps);
     expect(reused.calls[0]?.newConnections).toBe(0);
   });
 
   it("returns text and token usage of a refiner with its tuning applied", async () => {
     seen.length = 0;
-    const result = await execute(refine("openai/gpt-oss-20b"), deps);
+    const result = await execute(refine(), deps);
     expect(result).toMatchObject({
       ok: true,
-      label: "groq-chat:openai/gpt-oss-20b",
+      label: "groq-chat:openai/gpt-oss-20b@low",
       text: "Clean text.",
       usage: { inputTokens: 40, outputTokens: 3 },
     });
@@ -185,13 +202,77 @@ describe("execute", () => {
   });
 
   it("reports a provider failure with its status and rate-limit headers instead of throwing", async () => {
-    const result = await execute(refine("limited"), deps);
+    const result = await execute(refine("cerebras-gpt-oss-120b@low"), deps);
     expect(result.ok).toBe(false);
-    expect(result.error).toEqual({ status: 429, message: "groq-chat:limited answered 429" });
+    expect(result.error).toEqual({
+      status: 429,
+      message: "cerebras-chat:gpt-oss-120b@low answered 429",
+    });
     expect(result.calls[0]).toMatchObject({
       status: 429,
-      error: "groq-chat:limited answered 429",
+      error: "cerebras-chat:gpt-oss-120b@low answered 429",
       headers: { "retry-after": "7" },
     });
+  });
+});
+
+function tone(seconds: number): Buffer {
+  const samples = new Int16Array(16_000 * seconds).map((_, index) =>
+    Math.round(Math.sin((index / 16_000) * 2 * Math.PI * 220) * 6_000),
+  );
+  return pcmToWav(Buffer.from(samples.buffer));
+}
+
+const dictateRequest = (refiner: RefinerId): ProviderRequest => ({
+  kind: "dictate",
+  connection: "fresh",
+  transcriber: "together-parakeet",
+  refiner,
+  audioBase64: tone(1).toString("base64"),
+  container: "wav",
+  languages: ["es", "en"],
+  terms: [{ term: "Terraform", aliases: ["terra form"] }],
+  termsUsedAt: "2026-10-24T00:00:00.000Z",
+});
+
+describe("execute dictate", () => {
+  it("runs production's pipeline with the candidate adapters and measures each stage", async () => {
+    seen.length = 0;
+    const result = await execute(dictateRequest("cerebras-qwen-3.8-27b@none"), deps);
+    expect(result).toMatchObject({
+      ok: true,
+      label: "together-transcribe:nvidia/parakeet-tdt-0.6b-v3 + cerebras-chat:qwen-3.8-27b@none",
+      text: "Clean text.",
+      dictation: {
+        raw: "hola",
+        text: "Clean text.",
+        providers: {
+          transcriber: "together-transcribe:nvidia/parakeet-tdt-0.6b-v3",
+          refiner: "cerebras-chat:qwen-3.8-27b@none",
+        },
+      },
+    });
+    expect(result.calls.map((call) => call.stage)).toEqual(["transcribe", "refine"]);
+    expect(result.calls[0]?.usage).toEqual({ seconds: 1 });
+    expect(result.calls[1]?.usage).toEqual({ inputTokens: 40, outputTokens: 3 });
+    expect(seen[0]?.fields).toMatchObject({ language: "auto", response_format: "verbose_json" });
+    expect(seen[0]?.fields).not.toHaveProperty("prompt");
+    const messages = seen[1]?.json?.messages as { role: string; content: string }[];
+    expect(messages[0]?.content).toContain("Terraform");
+    expect(messages[1]).toEqual({ role: "user", content: "hola" });
+    const latency = result.dictation?.latencyMs;
+    expect(latency?.total).toBeGreaterThanOrEqual(
+      (latency?.transcribe ?? 0) + (latency?.refine ?? 0),
+    );
+  });
+
+  it("reports the failing provider's status instead of the API error", async () => {
+    const result = await execute(dictateRequest("cerebras-gpt-oss-120b@low"), deps);
+    expect(result.ok).toBe(false);
+    expect(result.error).toEqual({
+      status: 429,
+      message: "cerebras-chat:gpt-oss-120b@low answered 429",
+    });
+    expect(result.calls.map((call) => call.stage)).toEqual(["transcribe", "refine"]);
   });
 });

@@ -1,4 +1,10 @@
-import { hostedZone, stateBucket, type DeploymentConfig, type Environment } from "./config.ts";
+import {
+  hostedZone,
+  providerPair,
+  stateBucket,
+  type DeploymentConfig,
+  type Environment,
+} from "./config.ts";
 
 export type Root = "core" | Environment;
 
@@ -46,7 +52,14 @@ export function terraformVariables(
           ...(githubAppPem === undefined ? {} : { TF_VAR_github_app_pem: githubAppPem }),
         };
   const site =
-    root === "core" ? {} : { TF_VAR_domain: config.domain, TF_VAR_hosted_zone: hostedZone(config) };
+    root === "core"
+      ? {}
+      : {
+          TF_VAR_domain: config.domain,
+          TF_VAR_hosted_zone: hostedZone(config),
+          TF_VAR_transcriber: providerPair(config, root).transcriber,
+          TF_VAR_refiner: providerPair(config, root).refiner,
+        };
   return {
     TF_VAR_deployment: config.name,
     TF_VAR_aws_account_id: config.aws.accountId,

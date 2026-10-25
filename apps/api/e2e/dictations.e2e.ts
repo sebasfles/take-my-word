@@ -16,12 +16,14 @@ import {
   signInCrewE2eSession,
 } from "../scripts/sign-in.ts";
 import { wav } from "../src/testing/audio.ts";
+import { configuredPair, type ConfiguredPair } from "./configured-pair.ts";
 import { synthesize } from "./speech.ts";
 
 const fillers = /\b(eh|este|mmm)\b/i;
 let url: string;
 let token: string;
 let speech: Buffer;
+let pair: ConfiguredPair;
 
 async function post(
   parts: { meta?: unknown; audio?: Buffer; audioType?: string },
@@ -51,6 +53,7 @@ function errorOf(json: unknown): ApiError["error"] {
 beforeAll(async () => {
   token = await signInCrewE2e();
   url = requiredEnv("API_URL");
+  pair = configuredPair(url);
   speech = await synthesize(
     "Eh, bueno, este, quería decirte que, mmm, mañana nos vemos a las tres en la oficina.",
   );
@@ -69,8 +72,7 @@ describe("POST /dictations in a deployed environment", () => {
     expect(body.raw).toMatch(fillers);
     expect(body.text).toMatch(/mañana/i);
     expect(body.text).not.toMatch(fillers);
-    expect(body.providers.transcriber).toMatch(/^groq-whisper:/);
-    expect(body.providers.refiner).toMatch(/^openai:/);
+    expect(body.providers).toEqual({ transcriber: pair.transcriber, refiner: pair.refiner });
   });
 
   it("skips near-silence without transcribing it", async () => {
@@ -102,10 +104,20 @@ describe("POST /dictations in a deployed environment", () => {
     expect(status).toBe(415);
   });
 
-  it("answers 400 for a missing meta part and for an unknown provider", async () => {
+  it("answers 400 for a missing meta part", async () => {
     expect((await post({ audio: speech })).status).toBe(400);
-    const unknown = await post({ meta: { locale: "es", refineProvider: "nope" }, audio: speech });
-    expect(unknown.status).toBe(400);
+  });
+
+  it("ignores the provider fields released desktops send and runs the configured pair", async () => {
+    const { status, json } = await post({
+      meta: { locale: "es", sttProvider: "groq-whisper", refineProvider: "openai" },
+      audio: speech,
+    });
+    expect(status).toBe(200);
+    expect(dictationResponseSchema.parse(json).providers).toEqual({
+      transcriber: pair.transcriber,
+      refiner: pair.refiner,
+    });
   });
 
   it("refreshes a confirmed device's session with rotation and rejects the old refresh token after the grace period", async () => {

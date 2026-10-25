@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-24
-source: 0020_fix_overlay_after_reboot
+source: 0021_provider_switch
 ---
 
 # Desktop: architecture and debt
@@ -436,6 +436,7 @@ source: 0020_fix_overlay_after_reboot
 - Alternatives rejected: an API version in discovery now, before any incompatible change exists.
 - Reason: D5 of 0016 keeps discovery minimal; every route so far exists since 0008.
 - Debt created: an app newer than a self-hosted deployment can call a route the server does not have yet, and shows a generic error.
+- Debt created: since 0021 the app no longer sends `providers`, so a self-hosted server older than 0021 answers its settings save with 400 (0021_provider_switch, 2026-10-24).
 - Revisit when: a release adds or changes a route the app depends on.
 - Source: 0016_self_hosting
 

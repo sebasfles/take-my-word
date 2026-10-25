@@ -2,14 +2,6 @@ import { z } from "zod";
 import { appIdSchema } from "./app-rules.ts";
 import { styleIdSchema } from "./styles.ts";
 
-export const transcriberIds = ["groq-whisper"] as const;
-export const refinerIds = ["openai"] as const;
-export type TranscriberId = (typeof transcriberIds)[number];
-export type RefinerId = (typeof refinerIds)[number];
-
-export const defaultTranscriber: TranscriberId = "groq-whisper";
-export const defaultRefiner: RefinerId = "openai";
-
 export const dictationFields = { audio: "audio", meta: "meta" } as const;
 
 export const maxAudioBytes = 4 * 1024 * 1024;
@@ -37,8 +29,6 @@ export const localeSchema = z
 
 export const dictationMetaSchema = z.object({
   locale: localeSchema.optional(),
-  sttProvider: z.enum(transcriberIds).optional(),
-  refineProvider: z.enum(refinerIds).optional(),
   styleId: styleIdSchema.optional(),
   appId: appIdSchema.optional(),
 });

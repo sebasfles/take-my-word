@@ -41,6 +41,7 @@ export interface WordErrors {
   deletions: number;
   insertions: number;
   longestInsertionRun: number;
+  longestInsertion: string[];
 }
 
 export function align(reference: readonly string[], hypothesis: readonly string[]): EditOp[] {
@@ -90,13 +91,21 @@ export const recognitionTokens = (text: string): string[] =>
   wordsOf(text).flatMap((word) => word.split(/[-\u2010\u2011]/).filter((part) => part !== ""));
 
 export function wordErrors(reference: string, hypothesis: string): WordErrors {
-  const ops = align(recognitionTokens(reference), recognitionTokens(hypothesis));
-  let longestInsertionRun = 0;
-  let run = 0;
+  const said = recognitionTokens(hypothesis);
+  const ops = align(recognitionTokens(reference), said);
+  let longestInsertion: string[] = [];
+  let run: string[] = [];
+  let position = 0;
   for (const op of ops) {
-    run = op === "I" ? run + 1 : 0;
-    longestInsertionRun = Math.max(longestInsertionRun, run);
+    if (op === "D") {
+      run = [];
+      continue;
+    }
+    run = op === "I" ? [...run, said[position] ?? ""] : [];
+    if (run.length > longestInsertion.length) longestInsertion = run;
+    position += 1;
   }
+  const longestInsertionRun = longestInsertion.length;
   const count = (op: EditOp) => ops.filter((candidate) => candidate === op).length;
   const substitutions = count("S");
   const deletions = count("D");
@@ -108,6 +117,7 @@ export function wordErrors(reference: string, hypothesis: string): WordErrors {
     deletions,
     insertions,
     longestInsertionRun,
+    longestInsertion,
   };
 }
 
@@ -157,6 +167,39 @@ export function dominantLanguage(text: string): Language | undefined {
   const en = words.filter((word) => stopwords.en.has(word)).length;
   if (es + en < minimumStopwordsForVerdict || es === en) return undefined;
   return es > en ? "es" : "en";
+}
+
+const otherLanguageWords: ReadonlySet<string> = new Set(
+  [
+    "e em não você vocês eu isso vai vão ser estar pode podem seja isto ele ela nós muito também ou uma com sem dos das nas ao aos à pelo pela é são estão foi ter tem fazer agora então onde já seu sua meu minha obrigado obrigada até hoje ainda",
+    "du et est sont je il elle nous vous ils elles cette ces pas ne qui dans pour avec au aux mais donc très aussi merci oui c'est j'ai",
+    "gli di per tra fra è sono non che chi io lui noi voi loro questo questa molto anche perché grazie sì",
+    "der das und ist nicht ich du er sie wir ihr ein eine mit auf für von zu den dem auch aber oder wenn dann sehr danke ja nein",
+  ]
+    .join(" ")
+    .split(" ")
+    .filter((word) => !stopwords.es.has(word) && !stopwords.en.has(word)),
+);
+
+export const nonLatinLetters = (text: string): string[] => [
+  ...new Set(text.match(/(?![\p{Script=Latin}])\p{L}/gu) ?? []),
+];
+
+export function readsAsNeither(text: string): boolean {
+  const words = wordsOf(text);
+  const es = words.filter((word) => stopwords.es.has(word)).length;
+  const en = words.filter((word) => stopwords.en.has(word)).length;
+  const other = words.filter((word) => otherLanguageWords.has(word)).length;
+  return other >= minimumStopwordsForVerdict && other > es + en;
+}
+
+export function languageIssue(text: string, expected: Language): string | undefined {
+  const letters = nonLatinLetters(text);
+  if (letters.length > 0) return `non-Latin script (${letters.slice(0, 5).join("")})`;
+  if (readsAsNeither(text)) return "reads as neither es nor en";
+  const dominant = dominantLanguage(text);
+  if (dominant !== undefined && dominant !== expected) return `reads as ${dominant}`;
+  return undefined;
 }
 
 export function percentile(values: readonly number[], p: number): number | undefined {

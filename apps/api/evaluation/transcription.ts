@@ -4,6 +4,7 @@ import { transcriberCandidates, type TranscriberCandidate } from "./harness/cand
 import { buildEvalBundle, type EvalFunction } from "./harness/eval-lambda.ts";
 import {
   buildClip,
+  isExtended,
   languageModes,
   languagesFor,
   loadTranscriptionFixtures,
@@ -17,24 +18,33 @@ import {
   billedAudioSeconds,
   chargedUsd,
   modelFacts,
+  planNotes,
   transcriptionCallUsd,
 } from "./harness/prices.ts";
+import type { LedgerEntry } from "./harness/pacing.ts";
 import type { Attempt, PlannedItem } from "./harness/scheduler.ts";
-import { openFinishedRun, openResultsDir, readJsonl, type ResultsDir } from "./harness/store.ts";
+import {
+  openFinishedRun,
+  openResultsDir,
+  paths,
+  readJsonl,
+  type ResultsDir,
+} from "./harness/store.ts";
 import {
   deployAndWarm,
   executePlan,
   headersOf,
   pacingKeyOf,
   recordedSpendUsd,
+  recordSynthesis,
   requestsSha256,
+  requireSynthesisBudget,
   suiteArgs,
   type FailureRecord,
 } from "./harness/suite.ts";
 import {
   check,
-  summarize,
-  type CandidateSummary,
+  summarizeBuckets,
   type TranscriptionResult,
 } from "./harness/transcription-analysis.ts";
 import { transcriptionReport } from "./harness/transcription-report.ts";
@@ -62,7 +72,7 @@ function request(
   return {
     kind: "transcribe",
     connection,
-    transcriber: candidate.spec,
+    transcriber: candidate.id,
     audioBase64: clip.audio.toString("base64"),
     container: "wav",
     languages: languagesFor(clip.item, mode),
@@ -72,41 +82,56 @@ function request(
 
 async function smoke(): Promise<void> {
   const evalFunction = await deployAndWarm(workspace);
-  const clip = await buildClip(
-    workspace.polly,
+  const spoken = [
     {
-      id: "smoke",
-      kind: "speech",
       language: "en",
-      dictionary: "developer",
       text: "This is a short smoke test of the evaluation harness.",
-      variants: [],
-      terms: [],
-      mixed: false,
-      endToEnd: false,
+      voice: "Joanna",
     },
-    "Joanna",
-  );
+    { language: "es", text: "Esta es una prueba corta del arnés de evaluación.", voice: "Lupe" },
+  ] as const;
+  const clips: Clip[] = [];
+  for (const { language, text, voice } of spoken) {
+    clips.push(
+      await buildClip(
+        workspace.polly,
+        {
+          id: `smoke-${language}`,
+          kind: "speech",
+          language,
+          dictionary: "developer",
+          text,
+          variants: [],
+          terms: [],
+          mixed: false,
+          endToEnd: false,
+        },
+        voice,
+      ),
+    );
+  }
   for (const candidate of transcriberCandidates) {
-    for (const mode of languageModes) {
-      const response = await evalFunction.invoke(request(candidate, clip, mode, "fresh"));
-      console.log(
-        JSON.stringify({
-          candidate: candidate.id,
-          mode,
-          ok: response.ok,
-          text: response.text,
-          language: response.language,
-          error: response.error,
-          calls: response.calls.map((call) => ({
-            requested: call.requested,
-            ms: Math.round(call.ms),
-            newConnections: call.newConnections,
-            headers: call.headers,
-          })),
-        }),
-      );
-    }
+    for (const clip of clips)
+      for (const mode of languageModes) {
+        const response = await evalFunction.invoke(request(candidate, clip, mode, "fresh"));
+        console.log(
+          JSON.stringify({
+            candidate: candidate.id,
+            clip: clip.id,
+            mode,
+            ok: response.ok,
+            text: response.text,
+            language: response.language,
+            error: response.error,
+            calls: response.calls.map((call) => ({
+              requested: call.requested,
+              ms: Math.round(call.ms),
+              newConnections: call.newConnections,
+              headers: call.headers,
+            })),
+          }),
+        );
+      }
   }
 }
 
@@ -240,16 +265,18 @@ function render(dir: ResultsDir, results: string, reportPath: string): void {
     fixtures.cases.filter((item) => item.id.startsWith("long-")).map((item) => item.id),
   );
   const failures = readJsonl<FailureRecord>(dir.failures);
-  const summaries = new Map<string, CandidateSummary>(
-    transcriberCandidates.map((candidate) => [
-      candidate.id,
-      summarize(candidate.id, checked, failures, longIds),
-    ]),
+  const buckets = summarizeBuckets(
+    transcriberCandidates.map((candidate) => candidate.id),
+    checked,
+    failures,
+    longIds,
+    isExtended,
   );
   writeFileSync(
     reportPath,
     transcriptionReport(
       {
+        planNotes: planNotes(readJsonl<LedgerEntry>(dir.ledger)),
         command: `pnpm --filter @take-my-word/api eval:transcription --results ${fromRoot(results)} --report ${fromRoot(reportPath)} --runs ${String(dir.meta.runs)}`,
         generatedAt: new Date().toISOString(),
         codeCommit: [dir.meta.codeCommit, ...(dir.meta.resumedWith ?? [])].join(
@@ -271,7 +298,7 @@ function render(dir: ResultsDir, results: string, reportPath: string): void {
       },
       fixtures,
       transcriberCandidates,
-      summaries,
+      buckets,
       checked,
     ),
   );
@@ -295,6 +322,12 @@ async function measure(results: string, reportPath: string): Promise<void> {
     }
   }
 
+  const characters = fixtures.cases.reduce(
+    (sum, item) =>
+      sum + (item.kind === "speech" ? item.text.length * voicesFor(fixtures, item).length : 0),
+    0,
+  );
+  requireSynthesisBudget(paths(results, "transcription"), characters);
   const clips: Clip[] = [];
   for (const item of fixtures.cases) {
     for (const voice of voicesFor(fixtures, item)) {
@@ -322,6 +355,7 @@ async function measure(results: string, reportPath: string): Promise<void> {
     },
     new Date(),
   );
+  recordSynthesis(dir, characters);
   console.log(`code ${codeCommit} (HEAD ${state.commit}), fixtures ${fixturesSha256.slice(0, 16)}`);
 
   const done = new Set(readJsonl<TranscriptionResult>(dir.results).map((result) => result.id));
