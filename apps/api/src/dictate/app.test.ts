@@ -1,29 +1,33 @@
 import {
   apiErrorSchema,
   dictationResponseSchema,
+  segmentResponseSchema,
   maxAudioBytes,
   type ApiError,
   type DictationResponse,
   type UserContext,
 } from "@take-my-word/shared";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { DictateDeps } from "../dictation/dictate.ts";
 import type { DictationRecord } from "../dictation/dictation-store.ts";
 import type { DictationProfile } from "../dictation/profile.ts";
 import { ProviderError } from "../dictation/ports/provider-error.ts";
 import type { RefineInput } from "../dictation/ports/refiner.ts";
 import type { TranscribeInput, Transcript } from "../dictation/ports/transcriber.ts";
 import type { QuotaCharge } from "../dictation/quota.ts";
+import { receiptMaxAgeSeconds } from "../dictation/receipt.ts";
 import { createSilenceGuard, defaultSilenceLevels } from "../dictation/silence.ts";
 import { createLogger } from "../lib/log.ts";
 import { createMetrics } from "../lib/metrics.ts";
 import { m4a, wav } from "../testing/audio.ts";
-import { dictationBody, multipartContentType } from "../testing/multipart.ts";
-import { createDictateHandler, type DictateEvent } from "./app.ts";
+import { dictationBody, multipart, multipartContentType } from "../testing/multipart.ts";
+import { createDictateHandler, segmentRouteKey, type DictateEvent } from "./app.ts";
 
 const rawTranscript = "eh bueno este quería decir que mañana nos vemos";
 const cleanText = "Quería decir que mañana nos vemos.";
 const whisper = "groq-whisper:whisper-large-v3-turbo";
 const speech = (seconds: number) => wav({ seconds, toneDbfs: -20 });
+const receiptSecret = "s".repeat(32);
 
 class Rendezvous {
   private readonly started = new Set<string>();
@@ -48,6 +52,8 @@ class World {
   now = new Date("2026-10-20T15:00:00.000Z");
   clock = 0;
   transcript: Transcript = { text: rawTranscript };
+  queued: Transcript[] = [];
+  sunk: string[] = [];
   transcribeError: Error | undefined;
   transcribed: TranscribeInput[] = [];
   refined: RefineInput[] = [];
@@ -59,65 +65,81 @@ class World {
   profileLoads: { userId: string; appId: string | undefined }[] = [];
   rendezvous: Rendezvous | undefined;
 
-  handler = createDictateHandler({
-    providers: {
-      transcriber: {
-        label: whisper,
-        transcribe: (input) => {
-          this.transcribed.push(input);
-          this.clock += 300;
-          if (this.transcribeError) return Promise.reject(this.transcribeError);
-          return Promise.resolve(this.transcript);
+  deps(): DictateDeps {
+    return {
+      providers: {
+        transcriber: {
+          label: whisper,
+          transcribe: (input) => {
+            this.transcribed.push(input);
+            this.clock += 300;
+            if (this.transcribeError) return Promise.reject(this.transcribeError);
+            return Promise.resolve(this.queued.shift() ?? this.transcript);
+          },
+        },
+        refiner: {
+          label: "openai:gpt-5.4-nano",
+          refine: (input) => {
+            this.refined.push(input);
+            this.clock += 400;
+            return Promise.resolve({
+              text: cleanText,
+              usage: { inputTokens: 150, outputTokens: 9 },
+            });
+          },
         },
       },
-      refiner: {
-        label: "openai:gpt-5.4-nano",
-        refine: (input) => {
-          this.refined.push(input);
-          this.clock += 400;
-          return Promise.resolve({
-            text: cleanText,
-            usage: { inputTokens: 150, outputTokens: 9 },
-          });
+      quota: {
+        charge: async (charge) => {
+          await this.rendezvous?.arrive("quota");
+          this.charges.push(charge);
+          const key = `${charge.userId}/${charge.day}`;
+          const used = this.used.get(key);
+          const capped = charge.capSeconds !== undefined && (used ?? 0) >= charge.capSeconds;
+          if (used !== undefined && capped) return false;
+          this.used.set(key, (used ?? 0) + charge.seconds);
+          return true;
         },
       },
-    },
-    quota: {
-      charge: async (charge) => {
-        await this.rendezvous?.arrive("quota");
-        this.charges.push(charge);
-        const key = `${charge.userId}/${charge.day}`;
-        const used = this.used.get(key);
-        if (used !== undefined && used >= charge.capSeconds) return false;
-        this.used.set(key, (used ?? 0) + charge.seconds);
-        return true;
+      dailyQuotaMinutes: 60,
+      dictations: {
+        save: (record) => {
+          this.saved.push(record);
+          return Promise.resolve();
+        },
       },
-    },
-    dailyQuotaMinutes: 60,
-    dictations: {
-      save: (record) => {
-        this.saved.push(record);
-        return Promise.resolve();
+      profile: {
+        load: async (userId, appId) => {
+          await this.rendezvous?.arrive("profile");
+          this.profileLoads.push({ userId, appId });
+          return this.profile;
+        },
       },
-    },
-    profile: {
-      load: async (userId, appId) => {
-        await this.rendezvous?.arrive("profile");
-        this.profileLoads.push({ userId, appId });
-        return this.profile;
+      dictionary: { halfLifeDays: 30, promptTokenBudget: 224 },
+      isSilence: createSilenceGuard(),
+      silenceLevels: defaultSilenceLevels,
+      receipts: { secret: receiptSecret, maxAgeSeconds: receiptMaxAgeSeconds },
+      usage: {
+        usedSeconds: (userId, day) => Promise.resolve(this.used.get(`${userId}/${day}`) ?? 0),
       },
-    },
-    dictionary: { halfLifeDays: 30, promptTokenBudget: 224 },
-    isSilence: createSilenceGuard(),
-    silenceLevels: defaultSilenceLevels,
-    metrics: createMetrics((line) => this.lines.push(line)),
-    log: createLogger({}, (line) => this.lines.push(line)),
-    now: () => this.now,
-    elapsed: () => this.clock,
-  });
+      audioSink: {
+        put: ({ requestId }) => {
+          this.sunk.push(requestId);
+          return Promise.resolve();
+        },
+      },
+      metrics: createMetrics((line) => this.lines.push(line)),
+      log: createLogger({}, (line) => this.lines.push(line)),
+      now: () => this.now,
+      elapsed: () => this.clock,
+    };
+  }
 
-  async post(body: Buffer, contentType = multipartContentType) {
+  handler = createDictateHandler(this.deps());
+
+  async post(body: Buffer, contentType = multipartContentType, routeKey = "POST /dictations") {
     const event = {
+      routeKey,
       headers: { "content-type": contentType },
       body: body.toString("base64"),
       isBase64Encoded: true,
@@ -545,5 +567,282 @@ describe("POST /dictations with the user's dictionary, styles and settings", () 
       expect(instructions[3]).toBe(instructions[1]);
       expect(instructions.join("\n")).not.toContain("backend");
     });
+  });
+});
+
+describe("segments", () => {
+  const segmentBody = (audio: Buffer, meta: Record<string, unknown> = {}, previous?: string) =>
+    multipart([
+      { name: "meta", body: JSON.stringify(meta) },
+      ...(previous === undefined ? [] : [{ name: "previous", body: previous }]),
+      { name: "audio", body: audio, filename: "segment.wav", contentType: "audio/wav" },
+    ]);
+  const finalBody = (
+    audio: Buffer,
+    segments: { text: string; receipt: string }[],
+    meta: Record<string, unknown> = { appId: "notepad.exe" },
+  ) =>
+    multipart([
+      { name: "meta", body: JSON.stringify(meta) },
+      { name: "segments", body: JSON.stringify(segments) },
+      { name: "audio", body: audio, filename: "dictation.wav", contentType: "audio/wav" },
+    ]);
+  const postSegment = async (audio: Buffer, meta?: Record<string, unknown>, previous?: string) => {
+    const { status, json } = await world.post(
+      segmentBody(audio, meta, previous),
+      multipartContentType,
+      segmentRouteKey,
+    );
+    return { status, json };
+  };
+  const segmentOf = async (text: string, seconds = 10) => {
+    world.queued.push({ text, language: "es" });
+    const { json } = await postSegment(speech(seconds));
+    const body = segmentResponseSchema.parse(json);
+    return { text: body.raw, receipt: body.receipt ?? "" };
+  };
+  const bothLanguages = () => {
+    world.profile = {
+      settings: {
+        defaultStyleId: "plain",
+        locale: "en",
+        dictationLanguages: ["en", "es"],
+        context: { picks: [], detail: "" },
+      },
+      styles: [],
+      terms: [],
+    };
+  };
+
+  it("transcribes a segment to raw text only: charged, not refined, not saved, no debug audio", async () => {
+    const { status, json } = await postSegment(speech(10));
+    expect(status).toBe(200);
+    const body = segmentResponseSchema.parse(json);
+    expect(body).toMatchObject({
+      raw: rawTranscript,
+      language: "en",
+      providers: { transcriber: whisper },
+    });
+    expect(body.receipt).toEqual(expect.any(String));
+    expect(world.charges).toEqual([
+      expect.objectContaining({ seconds: 10, capSeconds: undefined }),
+    ]);
+    expect(world.refined).toHaveLength(0);
+    expect(world.saved).toHaveLength(0);
+    expect(world.sunk).toHaveLength(0);
+    expect(world.lines.join("\n")).not.toContain("nos vemos");
+    expect(world.logs()).toContainEqual(expect.objectContaining({ message: "segment done" }));
+  });
+
+  it("detects the language on the first segment and keeps the one sent on later ones", async () => {
+    bothLanguages();
+    world.queued.push({ text: "hola", language: "es" });
+    const first = segmentResponseSchema.parse((await postSegment(speech(10))).json);
+    expect(first.language).toBe("es");
+    expect(world.transcribed[0]?.language).toBeUndefined();
+    await postSegment(speech(10), { language: "es" }, "hola");
+    expect(world.transcribed[1]?.language).toBe("es");
+    expect(world.transcribed).toHaveLength(2);
+  });
+
+  it("ignores a sent language outside the user's dictation languages", async () => {
+    await postSegment(speech(10), { language: "es" });
+    expect(world.transcribed[0]?.language).toBe("en");
+  });
+
+  it("prompts with the dictionary terms and the tail of the previous raw text", async () => {
+    world.profile.terms = [
+      {
+        key: "kubernetes",
+        term: "Kubernetes",
+        aliases: [],
+        useCount: 3,
+        lastUsedAt: "2026-10-19T00:00:00.000Z",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ];
+    await postSegment(speech(10), {}, `${"palabra ".repeat(100)}final del segmento`);
+    const prompt = world.transcribed[0]?.prompt ?? "";
+    expect(prompt.startsWith("Kubernetes. palabra")).toBe(true);
+    expect(prompt.endsWith("final del segmento")).toBe(true);
+    expect(Buffer.byteLength(prompt)).toBeLessThanOrEqual(224);
+  });
+
+  it("refuses a segment at the cap before any provider call", async () => {
+    world.used.set("user-1/2026-10-20", 3600);
+    const { status, json } = await postSegment(speech(10));
+    expect(status).toBe(429);
+    expect(failure(json).code).toBe("quota_exceeded");
+    expect(world.transcribed).toHaveLength(0);
+  });
+
+  it("answers a segment under the level floor with no text, no receipt and no charge", async () => {
+    const { json } = await postSegment(wav({ seconds: 10, toneDbfs: -70 }));
+    const body = segmentResponseSchema.parse(json);
+    expect(body).toMatchObject({ raw: "", skipped: "silence" });
+    expect(body.receipt).toBeUndefined();
+    expect(world.charges).toHaveLength(0);
+  });
+
+  it("answers a hallucinated segment with empty text and a receipt for the seconds charged", async () => {
+    world.transcript = { text: "Subtítulos realizados por la comunidad de Amara.org" };
+    const body = segmentResponseSchema.parse((await postSegment(speech(10))).json);
+    expect(body).toMatchObject({ raw: "", skipped: "silence" });
+    world.transcript = { text: "y el final" };
+    await world.post(finalBody(speech(3), [{ text: "", receipt: body.receipt ?? "" }]));
+    expect(world.saved[0]).toMatchObject({ raw: "y el final", audioSeconds: 13 });
+  });
+
+  it("answers 404 on a server without a receipt key, so the desktop turns segments off", async () => {
+    const plain = new World();
+    const deps = plain.deps();
+    delete deps.receipts;
+    plain.handler = createDictateHandler(deps);
+    const { status } = await plain.post(
+      segmentBody(speech(10)),
+      multipartContentType,
+      segmentRouteKey,
+    );
+    expect(status).toBe(404);
+    expect(plain.transcribed).toHaveLength(0);
+  });
+
+  it("joins the earlier texts with the last segment, refines once and saves one dictation", async () => {
+    const first = await segmentOf("primera parte");
+    const second = await segmentOf("segunda parte");
+    world.queued.push({ text: "y la última" });
+    world.charges = [];
+    const { status, json } = await world.post(
+      finalBody(speech(4), [first, second], { appId: "notepad.exe", language: "en" }),
+    );
+    expect(status).toBe(200);
+    expect(ok(json)).toMatchObject({
+      raw: "primera parte segunda parte y la última",
+      text: cleanText,
+    });
+    expect(world.transcribed).toHaveLength(3);
+    expect(world.transcribed[2]?.prompt).toBe("primera parte segunda parte");
+    expect(world.refined).toHaveLength(1);
+    expect(world.refined[0]?.raw).toBe("primera parte segunda parte y la última");
+    expect(world.saved).toHaveLength(1);
+    expect(world.saved[0]).toMatchObject({ audioSeconds: 24, locale: "en" });
+    expect(world.charges).toEqual([expect.objectContaining({ seconds: 4, capSeconds: undefined })]);
+    expect(world.used.get("user-1/2026-10-20")).toBe(24);
+    expect(world.logs()).toContainEqual(
+      expect.objectContaining({ message: "dictation done", segments: 2, segmentSeconds: 20 }),
+    );
+  });
+
+  it("transcribes the last segment in the take's language without detecting again", async () => {
+    bothLanguages();
+    const first = await segmentOf("hola");
+    await world.post(finalBody(speech(3), [first], { language: "es" }));
+    expect(world.transcribed[1]?.language).toBe("es");
+    expect(world.saved[0]?.locale).toBe("es");
+  });
+
+  it("lets a take that started under the cap finish past it", async () => {
+    const first = await segmentOf("antes del límite", 20);
+    world.used.set("user-1/2026-10-20", 3600);
+    const { status } = await world.post(finalBody(speech(5), [first]));
+    expect(status).toBe(200);
+    expect(world.used.get("user-1/2026-10-20")).toBe(3605);
+    expect(world.saved).toHaveLength(1);
+  });
+
+  it.each([
+    ["a changed text", (receipt: string) => ({ text: "otra cosa", receipt })],
+    ["a forged receipt", () => ({ text: "primera parte", receipt: "e30.AAAA" })],
+  ])("refuses %s before charging or transcribing", async (_, tamper) => {
+    const { receipt } = await segmentOf("primera parte");
+    world.charges = [];
+    world.transcribed = [];
+    const { status, json } = await world.post(finalBody(speech(3), [tamper(receipt)]));
+    expect(status).toBe(400);
+    expect(failure(json).message).toBe("A segment receipt is invalid or expired.");
+    expect(world.charges).toHaveLength(0);
+    expect(world.transcribed).toHaveLength(0);
+  });
+
+  it("refuses a receipt replayed by another user", async () => {
+    const segment = await segmentOf("primera parte");
+    const other = new World();
+    other.handler = createDictateHandler(other.deps());
+    const event = {
+      routeKey: "POST /dictations",
+      headers: { "content-type": multipartContentType },
+      body: finalBody(speech(3), [segment]).toString("base64"),
+      isBase64Encoded: true,
+      requestContext: { authorizer: { lambda: { userId: "user-2" } } },
+    } as unknown as DictateEvent;
+    const result = await other.handler(event, { awsRequestId: "req-x" });
+    expect(result.statusCode).toBe(400);
+  });
+
+  it("refuses a receipt older than three minutes", async () => {
+    const segment = await segmentOf("primera parte");
+    world.now = new Date(world.now.getTime() + 180_000);
+    expect((await world.post(finalBody(speech(3), [segment]))).status).toBe(200);
+    world.now = new Date(world.now.getTime() + 1_000);
+    expect((await world.post(finalBody(speech(3), [segment]))).status).toBe(400);
+  });
+
+  it("charges nothing for a segment the provider fails, and the whole take once", async () => {
+    world.transcribeError = new ProviderError(whisper, `${whisper} answered 429`, 429);
+    expect((await postSegment(speech(10))).status).toBe(502);
+    expect(world.charges).toHaveLength(0);
+    world.transcribeError = undefined;
+    await world.post(dictationBody({ audio: speech(14) }));
+    expect(world.used.get("user-1/2026-10-20")).toBe(14);
+  });
+
+  it("refuses a final that repeats a receipt, before charging", async () => {
+    const segment = await segmentOf("primera parte");
+    world.charges = [];
+    const { status, json } = await world.post(finalBody(speech(3), [segment, segment]));
+    expect(status).toBe(400);
+    expect(failure(json).message).toBe("A segment receipt is repeated.");
+    expect(world.charges).toHaveLength(0);
+  });
+
+  it("refuses a final whose segments and last part add up to more than one take", async () => {
+    const segments = [];
+    for (const text of ["uno", "dos", "tres", "cuatro", "cinco", "seis"]) {
+      segments.push(await segmentOf(text, 20));
+    }
+    world.charges = [];
+    expect((await world.post(finalBody(speech(2), segments))).status).toBe(200);
+    const { status, json } = await world.post(finalBody(speech(5), segments));
+    expect(status).toBe(400);
+    expect(failure(json).message).toBe("A take is limited to 120 s of audio.");
+  });
+
+  it("refines the earlier texts when the last segment is too short or silent, charging nothing more", async () => {
+    for (const last of [speech(0.2), wav({ seconds: 2, toneDbfs: -70 }), wav({ seconds: 0 })]) {
+      world = new World();
+      const segment = await segmentOf("todo lo dicho");
+      world.charges = [];
+      const { status, json } = await world.post(finalBody(last, [segment]));
+      expect(status).toBe(200);
+      expect(ok(json).raw).toBe("todo lo dicho");
+      expect(world.transcribed).toHaveLength(1);
+      expect(world.charges).toHaveLength(0);
+      expect(world.saved[0]).toMatchObject({ raw: "todo lo dicho", audioSeconds: 10 });
+    }
+  });
+
+  it("skips a take whose segments and last part are all silence", async () => {
+    const segment = await segmentOf("");
+    const { json } = await world.post(finalBody(wav({ seconds: 2, toneDbfs: -70 }), [segment]));
+    expect(ok(json)).toMatchObject({ text: "", skipped: "silence" });
+    expect(world.refined).toHaveLength(0);
+    expect(world.saved).toHaveLength(0);
+  });
+
+  it("keeps a whole take without segments identical to today, including under 0.5 s", async () => {
+    expect((await world.post(dictationBody({ audio: speech(0.3) }))).status).toBe(400);
+    const { json } = await world.post(dictationBody({ audio: speech(5) }));
+    expect(ok(json).raw).toBe(rawTranscript);
+    expect(world.charges[0]?.capSeconds).toBe(3600);
   });
 });

@@ -7,7 +7,10 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use super::routes::{Method, Request};
-use super::{AUDIO_FIELD, ApiErrorBody, ApiFailure, DictationMeta, DictationResponse, META_FIELD};
+use super::{
+    AUDIO_FIELD, ApiErrorBody, ApiFailure, DictationMeta, DictationResponse, EarlierSegment,
+    META_FIELD, PREVIOUS_FIELD, SEGMENTS_FIELD, SEGMENTS_PATH, SegmentMeta, SegmentResponse,
+};
 use crate::auth::Secret;
 
 const DICTATION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -56,17 +59,38 @@ impl HttpApi {
         token: Option<&Secret>,
         wav: Vec<u8>,
         meta: &DictationMeta,
+        earlier: &[EarlierSegment],
     ) -> Result<DictationResponse, ApiFailure> {
-        let audio = Part::bytes(wav)
-            .file_name("dictation.wav")
-            .mime_str("audio/wav")
-            .map_err(invalid)?;
-        let meta = serde_json::to_string(meta).map_err(invalid)?;
-        let form = Form::new().part(AUDIO_FIELD, audio).text(META_FIELD, meta);
+        let mut form = audio_form(wav, "dictation.wav", meta)?;
+        if !earlier.is_empty() {
+            form = form.text(
+                SEGMENTS_FIELD,
+                serde_json::to_string(earlier).map_err(invalid)?,
+            );
+        }
         let request = self
             .client
             .post(self.url("/dictations"))
             .timeout(DICTATION_TIMEOUT)
+            .multipart(form);
+        send(request, token)
+    }
+
+    pub fn segment(
+        &self,
+        token: Option<&Secret>,
+        wav: Vec<u8>,
+        meta: &SegmentMeta,
+        previous: &str,
+    ) -> Result<SegmentResponse, ApiFailure> {
+        let mut form = audio_form(wav, "segment.wav", meta)?;
+        if !previous.is_empty() {
+            form = form.text(PREVIOUS_FIELD, previous.to_owned());
+        }
+        let request = self
+            .client
+            .post(self.url(SEGMENTS_PATH))
+            .timeout(REQUEST_TIMEOUT)
             .multipart(form);
         send(request, token)
     }
@@ -118,6 +142,15 @@ impl HttpApi {
         let base_url = self.base_url.read().unwrap_or_else(PoisonError::into_inner);
         format!("{base_url}{path}")
     }
+}
+
+fn audio_form(wav: Vec<u8>, name: &'static str, meta: &impl Serialize) -> Result<Form, ApiFailure> {
+    let audio = Part::bytes(wav)
+        .file_name(name)
+        .mime_str("audio/wav")
+        .map_err(invalid)?;
+    let meta = serde_json::to_string(meta).map_err(invalid)?;
+    Ok(Form::new().part(AUDIO_FIELD, audio).text(META_FIELD, meta))
 }
 
 fn send<T: DeserializeOwned>(

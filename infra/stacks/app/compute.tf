@@ -2,6 +2,11 @@ locals {
   debug_audio_bucket = var.debug_audio ? aws_s3_bucket.debug[0] : null
 }
 
+resource "random_password" "segment_receipt_key" {
+  length  = 64
+  special = false
+}
+
 module "dictate" {
   source = "../../modules/aws/lambda"
 
@@ -19,6 +24,7 @@ module "dictate" {
       STT_PROMPT_TOKEN_BUDGET   = tostring(var.stt_prompt_token_budget)
       TRANSCRIBER               = var.transcriber
       REFINER                   = var.refiner
+      SEGMENT_RECEIPT_KEY       = random_password.segment_receipt_key.result
       NODE_OPTIONS              = "--enable-source-maps"
     },
     local.debug_audio_bucket == null ? {} : { DEBUG_BUCKET = local.debug_audio_bucket.id },
@@ -27,7 +33,7 @@ module "dictate" {
   policy_statements = merge(
     {
       Table = {
-        actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:BatchGetItem"]
+        actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:BatchGetItem"]
         resources = [module.table.arn]
       }
       ProvidersSecret = {

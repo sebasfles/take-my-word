@@ -33,12 +33,14 @@ export function dynamoQuotaStore(client: DynamoDBDocumentClient, tableName: stri
             TableName: tableName,
             Key: { PK: userKey(userId), SK: quotaKey(day) },
             UpdateExpression: "ADD #seconds :seconds SET #expiresAt = :expiresAt",
-            ConditionExpression: "attribute_not_exists(#seconds) OR #seconds < :cap",
+            ...(capSeconds !== undefined && {
+              ConditionExpression: "attribute_not_exists(#seconds) OR #seconds < :cap",
+            }),
             ExpressionAttributeNames: { "#seconds": "seconds", "#expiresAt": "expiresAt" },
             ExpressionAttributeValues: {
               ":seconds": seconds,
-              ":cap": capSeconds,
               ":expiresAt": expiresAt,
+              ...(capSeconds !== undefined && { ":cap": capSeconds }),
             },
           }),
         );

@@ -1,5 +1,5 @@
 ---
-updated: 2026-10-24
+updated: 2026-10-25
 source: setup
 ---
 
@@ -76,6 +76,8 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | dictation | 2026-10-24 | prd's turbo dictations are billed on Groq's paid tier and run against a daily allowance the evaluation cannot explain | prd moves off turbo, or Groq's console shows the paid-tier limits |
 | dictation | 2026-10-24 | Settings routes answer a fixed `providers` for released desktops | No released desktop older than 0021's build remains |
 | dictation | 2026-10-24 | Under Parakeet rare terms depend on the refiner alone | Parakeet is chosen for prd, or terms go missing under it |
+| dictation | 2026-10-25 | A user can replay their own segment receipts within 180 s for one more refine without charge | Refines without charge show up in usage |
+| dictation | 2026-10-25 | A segment re-sent as audio after answering late is charged twice, at most one per take | The desktop sends more than one segment in flight |
 | dictionary | 2026-10-21 | Folding merges ñ and umlauts with their base letter; such terms cannot coexist | A user needs two terms that differ only by ñ or an umlaut |
 | dictionary | 2026-10-21 | The byte budget leaves part of Whisper's 224 prompt tokens unused | Users keep more top terms than fit and transcription misses them |
 | styles | 2026-10-20 | Elevated windows on Windows reject synthetic input (UIPI) | Sebastian needs to dictate into elevated windows |
@@ -106,6 +108,7 @@ Rebuilt by `write-ard` on every run, kept current by `document-task` on every ta
 | desktop | 2026-10-24 | A self-hosted server older than 0021 answers the app's settings save with 400 | A release adds or changes a route the app depends on |
 | desktop | 2026-10-24 | A hold waits on the main thread inside the gate lock to place the overlay, now possibly behind a queued recreation | A hold's first frame shows a delay after a recreation, or the gate lock appears in a hang |
 | desktop | 2026-10-24 | The single-instance plugin can carry on as a second full instance when its mutex exists without its window | A user sees two tray icons, or a second launch does not bring the main window forward |
+| desktop | 2026-10-25 | Segmentation ships off; a forced cut mid-sentence makes the transcriber invent the sentence end | A VAD model or a shorter `pauseMs` passes the gate for prd's transcriber |
 | mobile | 2026-10-20 | Phone dictation needs an extra copy or share step | v2 keyboard extension |
 | infra | 2026-10-20 | Infra changes wait for Sebastian's machine; no drift detection | Someone else needs to change infrastructure |
 | infra | 2026-10-20 | A rotated key reaches warm Lambdas only on environment recycle | A key is rotated or leaked |

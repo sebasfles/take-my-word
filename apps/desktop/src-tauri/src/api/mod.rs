@@ -11,12 +11,17 @@ use serde::{Deserialize, Serialize};
 use crate::locale::Language;
 
 pub use authed::AuthedApi;
+#[cfg(test)]
+pub use authed::Credentials;
 pub use http::HttpApi;
 #[cfg(debug_assertions)]
 pub use stub::{Stub, StubMode, Stubbed};
 
 pub const AUDIO_FIELD: &str = "audio";
 pub const META_FIELD: &str = "meta";
+pub const PREVIOUS_FIELD: &str = "previous";
+pub const SEGMENTS_FIELD: &str = "segments";
+pub const SEGMENTS_PATH: &str = "/dictations/segments";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(test, derive(schemars::JsonSchema))]
@@ -28,6 +33,60 @@ pub struct DictationMeta {
     pub style_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub app_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<Language>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct SegmentMeta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<Language>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[allow(dead_code, reason = "mirrors segmentResponseSchema in packages/shared")]
+pub struct SegmentProviders {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcriber: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[allow(dead_code, reason = "mirrors segmentResponseSchema in packages/shared")]
+pub struct SegmentLatencyMs {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quota: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcribe: Option<u64>,
+    pub total: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code, reason = "mirrors segmentResponseSchema in packages/shared")]
+pub struct SegmentResponse {
+    pub raw: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skipped: Option<Skipped>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<Language>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<String>,
+    pub providers: SegmentProviders,
+    pub latency_ms: SegmentLatencyMs,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(test, derive(schemars::JsonSchema))]
+pub struct EarlierSegment {
+    pub text: String,
+    pub receipt: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -229,7 +288,21 @@ pub enum ApiFailure {
 }
 
 pub trait DictationApi {
-    fn dictate(&self, wav: Vec<u8>, meta: &DictationMeta) -> Result<DictationResponse, ApiFailure>;
+    fn dictate(
+        &self,
+        wav: Vec<u8>,
+        meta: &DictationMeta,
+        earlier: &[EarlierSegment],
+    ) -> Result<DictationResponse, ApiFailure>;
+}
+
+pub trait SegmentApi {
+    fn segment(
+        &self,
+        wav: Vec<u8>,
+        meta: &SegmentMeta,
+        previous: &str,
+    ) -> Result<SegmentResponse, ApiFailure>;
 }
 
 #[cfg(test)]
@@ -260,6 +333,24 @@ mod tests {
                 .unwrap()
                 .contains("providers")
         );
+    }
+
+    #[test]
+    fn a_final_carries_the_take_language_and_a_segment_answer_parses() {
+        let meta = DictationMeta {
+            language: Some(Language::Es),
+            ..DictationMeta::default()
+        };
+        assert_eq!(
+            serde_json::to_string(&meta).unwrap(),
+            r#"{"language":"es"}"#
+        );
+        let segment: SegmentResponse = serde_json::from_str(
+            r#"{"raw":"hola","language":"es","receipt":"abc.def","providers":{"transcriber":"groq-whisper:x"},"latencyMs":{"total":5}}"#,
+        )
+        .unwrap();
+        assert_eq!(segment.receipt.as_deref(), Some("abc.def"));
+        assert_eq!(segment.language, Some(Language::Es));
     }
 
     #[test]

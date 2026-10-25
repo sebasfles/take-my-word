@@ -55,6 +55,23 @@ describe("dynamoQuotaStore", () => {
     );
   });
 
+  it("adds the seconds without a condition for a take that started under the cap", async () => {
+    let input: Partial<UpdateInput> | undefined;
+    const store = dynamoQuotaStore(
+      client((command) => {
+        input = command.input;
+        return Promise.resolve({});
+      }),
+      "t",
+    );
+    expect(await store.charge({ ...charge, capSeconds: undefined })).toBe(true);
+    expect(input?.ConditionExpression).toBeUndefined();
+    expect(input?.ExpressionAttributeValues).toEqual({
+      ":seconds": 12,
+      ":expiresAt": 1_792_800_000,
+    });
+  });
+
   it("refuses the charge when the cap condition fails", async () => {
     const failed = new ConditionalCheckFailedException({ message: "failed", $metadata: {} });
     const store = dynamoQuotaStore(

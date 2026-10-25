@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { estimateTokens, transcriberPrompt, type ProjectedTerm } from "./dictionary-projection.ts";
+import {
+  estimateTokens,
+  promptWithPreviousText,
+  transcriberPrompt,
+  type ProjectedTerm,
+} from "./dictionary-projection.ts";
 
 const now = new Date("2026-10-21T00:00:00.000Z");
 const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
@@ -39,5 +44,31 @@ describe("transcriberPrompt", () => {
       prompt: "",
       terms: 0,
     });
+  });
+});
+
+describe("promptWithPreviousText", () => {
+  it("keeps the terms and fills what is left of the budget with whole words from the tail", () => {
+    expect(promptWithPreviousText("Kubernetes, Groq", "uno dos tres cuatro", 30)).toEqual({
+      prompt: "Kubernetes, Groq. tres cuatro",
+      tailBytes: 11,
+    });
+  });
+
+  it("uses the whole previous text when it fits and nothing when the terms fill the budget", () => {
+    expect(promptWithPreviousText("", "  hola   mundo ", 224)).toEqual({
+      prompt: "hola mundo",
+      tailBytes: 10,
+    });
+    expect(promptWithPreviousText("x".repeat(222), "hola", 224)).toEqual({
+      prompt: "x".repeat(222),
+      tailBytes: 0,
+    });
+  });
+
+  it("never splits an accented letter or exceeds the budget", () => {
+    const { prompt } = promptWithPreviousText("", "canción ".repeat(60), 224);
+    expect(estimateTokens(prompt)).toBeLessThanOrEqual(224);
+    expect(prompt.startsWith("canción")).toBe(true);
   });
 });

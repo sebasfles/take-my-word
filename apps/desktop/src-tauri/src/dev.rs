@@ -73,7 +73,12 @@ fn dictate(app: &AppHandle, args: &[String]) -> bool {
             let held = captured.duration();
             let shell = app.state::<Shell>();
             let job = Job {
-                take: Take::Recorded { captured, held },
+                take: Take::Recorded {
+                    captured,
+                    held,
+                    segments: None,
+                    released: std::time::Instant::now(),
+                },
                 target: SystemWindow.foreground(),
                 busy: shell.activity.start(),
             };
@@ -85,7 +90,7 @@ fn dictate(app: &AppHandle, args: &[String]) -> bool {
     true
 }
 
-fn read_wav(path: &Path) -> Result<Captured, hound::Error> {
+pub fn read_wav(path: &Path) -> Result<Captured, hound::Error> {
     let mut reader = hound::WavReader::open(path)?;
     let spec = reader.spec();
     let samples = match spec.sample_format {
