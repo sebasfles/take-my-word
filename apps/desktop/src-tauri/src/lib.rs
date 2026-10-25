@@ -20,7 +20,10 @@ mod overlay;
 mod overlay_health;
 mod own_window;
 mod paste;
+#[cfg(test)]
+mod replay;
 mod rules;
+mod segments;
 mod server;
 mod session;
 mod shell;

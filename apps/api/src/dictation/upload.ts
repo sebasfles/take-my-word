@@ -3,24 +3,46 @@ import {
   audioContentTypes,
   dictationFields,
   dictationMetaSchema,
+  earlierSegmentsSchema,
   maxAudioBytes,
+  maxSegmentTextBytes,
+  segmentMetaSchema,
   type AudioContainer,
   type DictationMeta,
+  type EarlierSegments,
+  type SegmentMeta,
 } from "@take-my-word/shared";
+import type { z } from "zod";
 import { HttpError } from "../lib/http-error.ts";
+
+export interface UploadedAudio {
+  container: AudioContainer;
+  bytes: Buffer;
+}
 
 export interface DictationUpload {
   meta: DictationMeta;
-  audio: { container: AudioContainer; bytes: Buffer };
+  audio: UploadedAudio;
+  earlier?: EarlierSegments;
 }
+
+export interface SegmentUpload {
+  meta: SegmentMeta;
+  audio: UploadedAudio;
+  previous: string;
+}
+
+type TextField = typeof dictationFields.previous | typeof dictationFields.segments;
 
 interface Parts {
   meta: string | undefined;
   audio: { bytes: Buffer; mimeType: string } | undefined;
+  texts: Map<TextField, string>;
 }
 
 const maxMetaBytes = 4096;
-const multipartOverheadBytes = 64 * 1024;
+const multipartOverheadBytes = 64 * 1024 + 2 * maxSegmentTextBytes;
+const textFields: readonly string[] = [dictationFields.previous, dictationFields.segments];
 
 function mediaType(contentType: string | undefined): string {
   return (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
@@ -42,7 +64,7 @@ function readParts(contentType: string, body: Buffer): Promise<Parts> {
         headers: { "content-type": contentType },
         limits: {
           fileSize: maxAudioBytes + 1,
-          fieldSize: maxMetaBytes,
+          fieldSize: maxSegmentTextBytes + 1,
           files: 2,
           fields: 4,
           parts: 6,
@@ -53,7 +75,7 @@ function readParts(contentType: string, body: Buffer): Promise<Parts> {
       return;
     }
 
-    const parts: Parts = { meta: undefined, audio: undefined };
+    const parts: Parts = { meta: undefined, audio: undefined, texts: new Map() };
     const pending: Promise<void>[] = [];
     let failure: HttpError | undefined;
     const fail = (error: HttpError) => {
@@ -67,7 +89,16 @@ function readParts(contentType: string, body: Buffer): Promise<Parts> {
     };
 
     parser.on("field", (name, value, info) => {
-      if (name === dictationFields.meta) setMeta(value, info.valueTruncated);
+      if (name === dictationFields.meta) {
+        setMeta(value, info.valueTruncated || Buffer.byteLength(value) > maxMetaBytes);
+      } else if (textFields.includes(name)) {
+        if (info.valueTruncated || Buffer.byteLength(value) > maxSegmentTextBytes) {
+          fail(new HttpError("bad_request", `The ${name} part is too large.`));
+        }
+        if (parts.texts.has(name as TextField))
+          fail(new HttpError("bad_request", `Send one ${name} part.`));
+        parts.texts.set(name as TextField, value);
+      }
     });
 
     parser.on("file", (name, stream, info) => {
@@ -119,27 +150,31 @@ function readParts(contentType: string, body: Buffer): Promise<Parts> {
   });
 }
 
-function parseMeta(raw: string | undefined): DictationMeta {
-  if (raw === undefined) throw new HttpError("bad_request", "The meta part is missing.");
+function parseJson<T>(raw: string, part: string, schema: z.ZodType<T>): T {
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new HttpError("bad_request", "The meta part is not JSON.");
+    throw new HttpError("bad_request", `The ${part} part is not JSON.`);
   }
-  const parsed = dictationMetaSchema.safeParse(json);
+  const parsed = schema.safeParse(json);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    const where = issue?.path.join(".") || "meta";
+    const where = issue?.path.join(".") || part;
     throw new HttpError("bad_request", `Invalid ${where}: ${issue?.message ?? "invalid value"}.`);
   }
   return parsed.data;
 }
 
-export async function readDictationUpload(
+function parseMeta<T>(raw: string | undefined, schema: z.ZodType<T>): T {
+  if (raw === undefined) throw new HttpError("bad_request", "The meta part is missing.");
+  return parseJson(raw, dictationFields.meta, schema);
+}
+
+async function readUpload(
   contentType: string | undefined,
   body: Buffer,
-): Promise<DictationUpload> {
+): Promise<{ parts: Parts; audio: UploadedAudio }> {
   if (contentType === undefined || mediaType(contentType) !== "multipart/form-data") {
     throw new HttpError(
       "unsupported_media_type",
@@ -157,5 +192,32 @@ export async function readDictationUpload(
       "Audio must be WAV (audio/wav) or m4a (audio/mp4).",
     );
   }
-  return { meta: parseMeta(parts.meta), audio: { container, bytes: parts.audio.bytes } };
+  return { parts, audio: { container, bytes: parts.audio.bytes } };
+}
+
+export async function readDictationUpload(
+  contentType: string | undefined,
+  body: Buffer,
+): Promise<DictationUpload> {
+  const { parts, audio } = await readUpload(contentType, body);
+  const meta = parseMeta(parts.meta, dictationMetaSchema);
+  const segments = parts.texts.get(dictationFields.segments);
+  if (segments === undefined) return { meta, audio };
+  return {
+    meta,
+    audio,
+    earlier: parseJson(segments, dictationFields.segments, earlierSegmentsSchema),
+  };
+}
+
+export async function readSegmentUpload(
+  contentType: string | undefined,
+  body: Buffer,
+): Promise<SegmentUpload> {
+  const { parts, audio } = await readUpload(contentType, body);
+  return {
+    meta: parseMeta(parts.meta, segmentMetaSchema),
+    audio,
+    previous: parts.texts.get(dictationFields.previous) ?? "",
+  };
 }

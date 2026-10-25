@@ -4,7 +4,7 @@ export interface QuotaCharge {
   userId: string;
   day: string;
   seconds: number;
-  capSeconds: number;
+  capSeconds: number | undefined;
   expiresAt: number;
 }
 

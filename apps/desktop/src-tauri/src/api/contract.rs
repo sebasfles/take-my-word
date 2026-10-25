@@ -3,7 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use schemars::{JsonSchema, schema_for};
 use serde_json::Value;
 
-use super::{ApiErrorBody, AppRuleList, DictationMeta, DictationResponse, StyleList, UserSettings};
+use super::{
+    ApiErrorBody, AppRuleList, DictationMeta, DictationResponse, EarlierSegment, SegmentMeta,
+    SegmentResponse, StyleList, UserSettings,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 enum Shape {
@@ -134,6 +137,9 @@ fn the_rust_mirror_matches_the_shared_contract() {
     let mirrors = BTreeMap::from([
         ("dictationMeta", rust::<DictationMeta>()),
         ("dictationResponse", rust::<DictationResponse>()),
+        ("segmentMeta", rust::<SegmentMeta>()),
+        ("segmentResponse", rust::<SegmentResponse>()),
+        ("earlierSegments", rust::<Vec<EarlierSegment>>()),
         ("apiError", rust::<ApiErrorBody>()),
         ("settings", rust::<UserSettings>()),
         ("styleList", rust::<StyleList>()),

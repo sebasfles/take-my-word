@@ -14,8 +14,11 @@ use axum::routing::post;
 
 use super::{
     AUDIO_FIELD, ApiErrorBody, ApiErrorCode, ApiErrorDetail, ApiFailure, DictationApi,
-    DictationMeta, DictationResponse, HttpApi, LatencyMs, META_FIELD, Providers, Skipped,
+    DictationMeta, DictationResponse, EarlierSegment, HttpApi, LatencyMs, META_FIELD, Providers,
+    SEGMENTS_FIELD, SEGMENTS_PATH, SegmentApi, SegmentLatencyMs, SegmentMeta, SegmentResponse,
+    Skipped,
 };
+use crate::locale::Language;
 
 const MAX_AUDIO_BYTES: usize = 4 * 1024 * 1024;
 const MIN_AUDIO_SECONDS: f64 = 0.5;
@@ -103,6 +106,7 @@ impl Stub {
         };
         let router = Router::new()
             .route("/dictations", post(dictations))
+            .route(SEGMENTS_PATH, post(segments))
             .layer(DefaultBodyLimit::max(MAX_AUDIO_BYTES + 1024 * 1024))
             .with_state(shared);
         tauri::async_runtime::spawn(async move {
@@ -148,10 +152,29 @@ impl<A> Stubbed<A> {
 }
 
 impl<A: DictationApi> DictationApi for Stubbed<A> {
-    fn dictate(&self, wav: Vec<u8>, meta: &DictationMeta) -> Result<DictationResponse, ApiFailure> {
+    fn dictate(
+        &self,
+        wav: Vec<u8>,
+        meta: &DictationMeta,
+        earlier: &[EarlierSegment],
+    ) -> Result<DictationResponse, ApiFailure> {
         match self.stub.mode() {
-            StubMode::Off => self.real.dictate(wav, meta),
-            _ => self.stub_api.dictate(None, wav, meta),
+            StubMode::Off => self.real.dictate(wav, meta, earlier),
+            _ => self.stub_api.dictate(None, wav, meta, earlier),
+        }
+    }
+}
+
+impl<A: SegmentApi> SegmentApi for Stubbed<A> {
+    fn segment(
+        &self,
+        wav: Vec<u8>,
+        meta: &SegmentMeta,
+        previous: &str,
+    ) -> Result<SegmentResponse, ApiFailure> {
+        match self.stub.mode() {
+            StubMode::Off => self.real.segment(wav, meta, previous),
+            _ => self.stub_api.segment(None, wav, meta, previous),
         }
     }
 }
@@ -160,6 +183,7 @@ impl<A: DictationApi> DictationApi for Stubbed<A> {
 struct Upload {
     audio: Option<(String, Bytes)>,
     meta: Option<String>,
+    segments: Option<String>,
 }
 
 type Rejection = (ApiErrorCode, &'static str);
@@ -177,13 +201,20 @@ async fn dictations(
             "Send multipart/form-data with audio and meta parts.",
         )),
     };
-    let meta = match upload.and_then(|upload| validate(&upload)) {
-        Ok(meta) => meta,
+    let (meta, earlier) = match upload.and_then(|upload| {
+        let earlier = earlier_of(&upload)?;
+        Ok((validate(&upload)?, earlier))
+    }) {
+        Ok(read) => read,
         Err((code, message)) => return api_error(code, message),
     };
     match mode {
         StubMode::Off | StubMode::Normal => {
-            axum::Json(canned(meta.locale.as_deref().unwrap_or("es"), shared.delay)).into_response()
+            let mut answer = canned(meta.locale.as_deref().unwrap_or("es"), shared.delay);
+            if !earlier.is_empty() {
+                answer.text = format!("{} ({} segments)", answer.text, earlier.len());
+            }
+            axum::Json(answer).into_response()
         }
         StubMode::TwoLines => axum::Json(two_lines(
             meta.locale.as_deref().unwrap_or("es"),
@@ -199,6 +230,57 @@ async fn dictations(
     }
 }
 
+async fn segments(
+    State(shared): State<Shared>,
+    multipart: Result<Multipart, MultipartRejection>,
+) -> Response {
+    let mode = StubMode::from_index(shared.mode.load(Ordering::SeqCst));
+    tokio::time::sleep(shared.delay).await;
+    let upload = match multipart {
+        Ok(multipart) => read(multipart).await,
+        Err(_) => Err((
+            ApiErrorCode::UnsupportedMediaType,
+            "Send multipart/form-data.",
+        )),
+    };
+    if let Err((code, message)) = upload.and_then(|upload| validate_audio(&upload)) {
+        return api_error(code, message);
+    }
+    match mode {
+        StubMode::Off | StubMode::Normal | StubMode::TwoLines => axum::Json(SegmentResponse {
+            raw: "segmento de prueba".into(),
+            language: Some(Language::Es),
+            receipt: Some("stub".into()),
+            latency_ms: SegmentLatencyMs {
+                total: shared.delay.as_millis() as u64,
+                ..SegmentLatencyMs::default()
+            },
+            ..SegmentResponse::default()
+        })
+        .into_response(),
+        StubMode::Silence => axum::Json(SegmentResponse {
+            skipped: Some(Skipped::Silence),
+            ..SegmentResponse::default()
+        })
+        .into_response(),
+        StubMode::QuotaExceeded => api_error(
+            ApiErrorCode::QuotaExceeded,
+            "The daily dictation quota is used up.",
+        ),
+        StubMode::NetworkError => dropped_connection(),
+    }
+}
+
+fn earlier_of(upload: &Upload) -> Result<Vec<EarlierSegment>, Rejection> {
+    upload
+        .segments
+        .as_deref()
+        .map_or(Ok(Vec::new()), |segments| {
+            serde_json::from_str(segments)
+                .map_err(|_| (ApiErrorCode::BadRequest, "The segments part is not valid."))
+        })
+}
+
 async fn read(mut multipart: Multipart) -> Result<Upload, Rejection> {
     const MALFORMED: Rejection = (ApiErrorCode::BadRequest, "Malformed multipart body.");
     let mut upload = Upload::default();
@@ -210,6 +292,9 @@ async fn read(mut multipart: Multipart) -> Result<Upload, Rejection> {
                 upload.audio = Some((content_type, bytes));
             }
             Some(META_FIELD) => upload.meta = Some(field.text().await.map_err(|_| MALFORMED)?),
+            Some(SEGMENTS_FIELD) => {
+                upload.segments = Some(field.text().await.map_err(|_| MALFORMED)?);
+            }
             _ => {}
         }
     }
@@ -217,6 +302,26 @@ async fn read(mut multipart: Multipart) -> Result<Upload, Rejection> {
 }
 
 fn validate(upload: &Upload) -> Result<DictationMeta, Rejection> {
+    validate_audio(upload)?;
+    let Some(meta) = &upload.meta else {
+        return Err((ApiErrorCode::BadRequest, "The meta part is missing."));
+    };
+    let meta: DictationMeta = serde_json::from_str(meta)
+        .map_err(|_| (ApiErrorCode::BadRequest, "The meta part is not valid JSON."))?;
+    if meta
+        .locale
+        .as_deref()
+        .is_some_and(|locale| !valid_locale(locale))
+    {
+        return Err((
+            ApiErrorCode::BadRequest,
+            "Invalid locale: expected es or en, optionally with a region.",
+        ));
+    }
+    Ok(meta)
+}
+
+fn validate_audio(upload: &Upload) -> Result<(), Rejection> {
     let Some((content_type, bytes)) = &upload.audio else {
         return Err((ApiErrorCode::BadRequest, "The audio part is missing."));
     };
@@ -254,22 +359,7 @@ fn validate(upload: &Upload) -> Result<DictationMeta, Rejection> {
             "The audio is shorter than half a second.",
         ));
     }
-    let Some(meta) = &upload.meta else {
-        return Err((ApiErrorCode::BadRequest, "The meta part is missing."));
-    };
-    let meta: DictationMeta = serde_json::from_str(meta)
-        .map_err(|_| (ApiErrorCode::BadRequest, "The meta part is not valid JSON."))?;
-    if meta
-        .locale
-        .as_deref()
-        .is_some_and(|locale| !valid_locale(locale))
-    {
-        return Err((
-            ApiErrorCode::BadRequest,
-            "Invalid locale: expected es or en, optionally with a region.",
-        ));
-    }
-    Ok(meta)
+    Ok(())
 }
 
 fn valid_locale(locale: &str) -> bool {
@@ -386,6 +476,7 @@ mod tests {
         Upload {
             audio: Some((content_type.into(), Bytes::from(audio))),
             meta: Some(meta.into()),
+            segments: None,
         }
     }
 
@@ -470,10 +561,29 @@ mod tests {
     struct RealApi;
 
     impl DictationApi for RealApi {
-        fn dictate(&self, _: Vec<u8>, _: &DictationMeta) -> Result<DictationResponse, ApiFailure> {
+        fn dictate(
+            &self,
+            _: Vec<u8>,
+            _: &DictationMeta,
+            _: &[EarlierSegment],
+        ) -> Result<DictationResponse, ApiFailure> {
             Ok(DictationResponse {
                 text: "real".into(),
                 ..DictationResponse::default()
+            })
+        }
+    }
+
+    impl SegmentApi for RealApi {
+        fn segment(
+            &self,
+            _: Vec<u8>,
+            _: &SegmentMeta,
+            _: &str,
+        ) -> Result<SegmentResponse, ApiFailure> {
+            Ok(SegmentResponse {
+                raw: "real".into(),
+                ..SegmentResponse::default()
             })
         }
     }
@@ -483,23 +593,26 @@ mod tests {
         let stub = Stub::start(Duration::ZERO).unwrap();
         let api = Stubbed::new(stub.clone(), RealApi).unwrap();
 
-        assert_eq!(api.dictate(wav(1.0), &meta("en-US")).unwrap().text, "real");
+        assert_eq!(
+            api.dictate(wav(1.0), &meta("en-US"), &[]).unwrap().text,
+            "real"
+        );
 
         stub.set_mode(StubMode::Normal);
-        let normal = api.dictate(wav(1.0), &meta("en-US")).unwrap();
+        let normal = api.dictate(wav(1.0), &meta("en-US"), &[]).unwrap();
         assert!(normal.has_text());
         assert!(normal.text.starts_with("Hello"));
 
         stub.set_mode(StubMode::TwoLines);
-        let two_lines = api.dictate(wav(1.0), &meta("es")).unwrap();
+        let two_lines = api.dictate(wav(1.0), &meta("es"), &[]).unwrap();
         assert_eq!(two_lines.text.lines().count(), 2);
 
         stub.set_mode(StubMode::Silence);
-        assert!(!api.dictate(wav(1.0), &meta("es")).unwrap().has_text());
+        assert!(!api.dictate(wav(1.0), &meta("es"), &[]).unwrap().has_text());
 
         stub.set_mode(StubMode::QuotaExceeded);
         assert!(matches!(
-            api.dictate(wav(1.0), &meta("es")),
+            api.dictate(wav(1.0), &meta("es"), &[]),
             Err(ApiFailure::Rejected {
                 status: 429,
                 code: Some(ApiErrorCode::QuotaExceeded)
@@ -508,13 +621,13 @@ mod tests {
 
         stub.set_mode(StubMode::NetworkError);
         assert!(matches!(
-            api.dictate(wav(1.0), &meta("es")),
+            api.dictate(wav(1.0), &meta("es"), &[]),
             Err(ApiFailure::Network(_))
         ));
 
         stub.set_mode(StubMode::Normal);
         assert!(matches!(
-            api.dictate(wav(1.0), &meta("fr")),
+            api.dictate(wav(1.0), &meta("fr"), &[]),
             Err(ApiFailure::Rejected {
                 status: 400,
                 code: Some(ApiErrorCode::BadRequest)
@@ -522,6 +635,32 @@ mod tests {
         ));
 
         stub.set_mode(StubMode::Off);
-        assert_eq!(api.dictate(wav(1.0), &meta("es")).unwrap().text, "real");
+        assert_eq!(
+            api.dictate(wav(1.0), &meta("es"), &[]).unwrap().text,
+            "real"
+        );
+    }
+
+    #[test]
+    fn the_stub_answers_segments_and_finals_that_carry_them() {
+        let stub = Stub::start(Duration::ZERO).unwrap();
+        let api = Stubbed::new(stub.clone(), RealApi).unwrap();
+        assert_eq!(
+            api.segment(wav(1.0), &SegmentMeta::default(), "")
+                .unwrap()
+                .raw,
+            "real"
+        );
+        stub.set_mode(StubMode::Normal);
+        let segment = api
+            .segment(wav(1.0), &SegmentMeta::default(), "antes")
+            .unwrap();
+        assert_eq!(segment.language, Some(Language::Es));
+        let earlier = [EarlierSegment {
+            text: segment.raw,
+            receipt: segment.receipt.unwrap(),
+        }];
+        let final_text = api.dictate(wav(1.0), &meta("es"), &earlier).unwrap().text;
+        assert!(final_text.ends_with("(1 segments)"), "{final_text}");
     }
 }

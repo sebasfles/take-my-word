@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hotkey::Hotkey;
 use crate::locale::Language;
+use crate::segments::Policy;
 use crate::server::SelfHosted;
 use crate::theme::Theme;
 
@@ -36,6 +37,8 @@ pub struct Settings {
     pub hands_free_note_seen: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<SelfHosted>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub segmentation: Option<Policy>,
 }
 
 pub fn load(path: &Path) -> Settings {
@@ -208,6 +211,10 @@ mod tests {
                     user_pool_id: "eu-west-2_AbC123xyZ".into(),
                     client_id: "1example23client45id6789ab".into(),
                 },
+            }),
+            segmentation: Some(crate::segments::Policy {
+                enabled: false,
+                ..crate::segments::Policy::default()
             }),
         };
         save(&path, &settings).unwrap();

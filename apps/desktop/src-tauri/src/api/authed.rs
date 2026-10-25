@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use super::routes::Route;
 use super::{
-    ApiFailure, AppRuleList, DictationApi, DictationMeta, DictationResponse, HttpApi, StyleList,
-    UserSettings,
+    ApiFailure, AppRuleList, DictationApi, DictationMeta, DictationResponse, EarlierSegment,
+    HttpApi, SegmentApi, SegmentMeta, SegmentResponse, StyleList, UserSettings,
 };
 use crate::auth::Secret;
 use crate::auth::account::{Account, AccountError, IdentityProvider};
@@ -90,8 +90,24 @@ impl<C: Credentials> AuthedApi<C> {
 }
 
 impl<C: Credentials> DictationApi for AuthedApi<C> {
-    fn dictate(&self, wav: Vec<u8>, meta: &DictationMeta) -> Result<DictationResponse, ApiFailure> {
-        self.authorized(|token| self.http.dictate(Some(token), wav.clone(), meta))
+    fn dictate(
+        &self,
+        wav: Vec<u8>,
+        meta: &DictationMeta,
+        earlier: &[EarlierSegment],
+    ) -> Result<DictationResponse, ApiFailure> {
+        self.authorized(|token| self.http.dictate(Some(token), wav.clone(), meta, earlier))
+    }
+}
+
+impl<C: Credentials> SegmentApi for AuthedApi<C> {
+    fn segment(
+        &self,
+        wav: Vec<u8>,
+        meta: &SegmentMeta,
+        previous: &str,
+    ) -> Result<SegmentResponse, ApiFailure> {
+        self.authorized(|token| self.http.segment(Some(token), wav.clone(), meta, previous))
     }
 }
 
@@ -288,6 +304,91 @@ mod tests {
         );
         let deleted = api.forward(&route(json!({"route": "deleteTerm", "id": "a b"})));
         assert_eq!(deleted.unwrap(), Value::Null);
+    }
+
+    #[test]
+    fn a_final_adds_its_segments_part_only_when_segments_were_transcribed() {
+        use axum::extract::Multipart;
+
+        type Seen = Arc<Mutex<Vec<(String, Vec<String>)>>>;
+        let seen: Seen = Arc::default();
+        let record = |path: &'static str, seen: Seen| {
+            move |mut multipart: Multipart| {
+                let seen = Arc::clone(&seen);
+                async move {
+                    let mut parts = Vec::new();
+                    while let Some(field) = multipart.next_field().await.unwrap() {
+                        let name = field.name().unwrap().to_owned();
+                        let text = if name == "audio" {
+                            String::new()
+                        } else {
+                            field.text().await.unwrap()
+                        };
+                        parts.push(format!("{name}={text}"));
+                    }
+                    seen.lock().unwrap().push((path.to_owned(), parts));
+                    if path == "/dictations" {
+                        Json(
+                            json!({"raw": "", "text": "", "providers": {}, "latencyMs": {"total": 1}}),
+                        )
+                    } else {
+                        Json(json!({"raw": "uno", "providers": {}, "latencyMs": {"total": 1}}))
+                    }
+                }
+            }
+        };
+        let http = serve(
+            Router::new()
+                .route(
+                    "/dictations",
+                    post(record("/dictations", Arc::clone(&seen))),
+                )
+                .route(
+                    "/dictations/segments",
+                    post(record("/dictations/segments", Arc::clone(&seen))),
+                ),
+        );
+        let api = AuthedApi::new(http, credentials("token-0"));
+        let meta = DictationMeta::default();
+        api.dictate(b"RIFF".to_vec(), &meta, &[]).unwrap();
+        let earlier = [crate::api::EarlierSegment {
+            text: "uno".into(),
+            receipt: "r".into(),
+        }];
+        api.dictate(b"RIFF".to_vec(), &meta, &earlier).unwrap();
+        api.segment(b"RIFF".to_vec(), &SegmentMeta::default(), "")
+            .unwrap();
+        api.segment(b"RIFF".to_vec(), &SegmentMeta::default(), "uno")
+            .unwrap();
+        assert_eq!(
+            *seen.lock().unwrap(),
+            [
+                (
+                    "/dictations".to_owned(),
+                    vec!["audio=".to_owned(), "meta={}".to_owned()]
+                ),
+                (
+                    "/dictations".to_owned(),
+                    vec![
+                        "audio=".to_owned(),
+                        "meta={}".to_owned(),
+                        r#"segments=[{"text":"uno","receipt":"r"}]"#.to_owned()
+                    ]
+                ),
+                (
+                    "/dictations/segments".to_owned(),
+                    vec!["audio=".to_owned(), "meta={}".to_owned()]
+                ),
+                (
+                    "/dictations/segments".to_owned(),
+                    vec![
+                        "audio=".to_owned(),
+                        "meta={}".to_owned(),
+                        "previous=uno".to_owned()
+                    ]
+                ),
+            ]
+        );
     }
 
     #[test]

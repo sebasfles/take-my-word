@@ -9,7 +9,12 @@ export interface ChosenTranscript {
 export async function transcribeIn(
   languages: readonly Language[],
   transcribe: (language?: Language) => Promise<Transcript>,
+  requested?: Language,
 ): Promise<ChosenTranscript> {
+  if (requested !== undefined && languages.includes(requested)) {
+    const transcript = await transcribe(requested);
+    return { text: transcript.text, language: requested };
+  }
   const first = languages[0] ?? "en";
   if (languages.length > 1) {
     const detected = await transcribe();

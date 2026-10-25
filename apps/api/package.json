@@ -12,6 +12,7 @@
     "e2e": "vitest run --config vitest.e2e.config.ts --no-file-parallelism",
     "eval:context": "node evaluation/user-context.ts",
     "eval:transcription": "node evaluation/transcription.ts",
+    "eval:segmentation": "node evaluation/segmentation.ts",
     "eval:e2e": "node evaluation/end-to-end.ts",
     "eval:dictate": "node evaluation/dictate-in-lambda.ts",
     "eval:cleanup": "node evaluation/cleanup.ts",

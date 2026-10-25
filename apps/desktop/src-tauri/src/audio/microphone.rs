@@ -12,6 +12,8 @@ enum Command {
     Start,
     Monitor(bool),
     Stop(mpsc::Sender<Result<Captured, AudioError>>),
+    Levels(usize, mpsc::Sender<Vec<f32>>),
+    Between(usize, usize, mpsc::Sender<Option<Captured>>),
 }
 
 pub struct Microphone {
@@ -63,6 +65,20 @@ impl Capture for Microphone {
             .send(Command::Stop(reply))
             .map_err(|_| gone())?;
         answer.recv().map_err(|_| gone())?
+    }
+
+    fn levels(&mut self, from: usize) -> Vec<f32> {
+        let (reply, answer) = mpsc::channel();
+        if self.commands.send(Command::Levels(from, reply)).is_err() {
+            return Vec::new();
+        }
+        answer.recv().unwrap_or_default()
+    }
+
+    fn between_levels(&mut self, from: usize, to: usize) -> Option<Captured> {
+        let (reply, answer) = mpsc::channel();
+        self.commands.send(Command::Between(from, to, reply)).ok()?;
+        answer.recv().ok().flatten()
     }
 }
 
@@ -136,6 +152,10 @@ impl Armed {
     fn play(self) -> Result<Self, AudioError> {
         self.stream.play().map_err(device_error)?;
         Ok(self)
+    }
+
+    fn buffer(&self) -> std::sync::MutexGuard<'_, CaptureBuffer> {
+        self.buffer.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     fn finish(self) -> Result<Captured, AudioError> {
@@ -215,6 +235,20 @@ fn serve(inbox: mpsc::Receiver<Command>, status: &MicrophoneStatus, level: &Leve
                 level.set(0.0);
                 let _ = reply.send(result);
                 armed = arm(status, level);
+            }
+            Command::Levels(from, reply) => {
+                let levels = match &recording {
+                    Some(Ok(recording)) => recording.buffer().levels_from(from),
+                    _ => Vec::new(),
+                };
+                let _ = reply.send(levels);
+            }
+            Command::Between(from, to, reply) => {
+                let captured = match &recording {
+                    Some(Ok(recording)) => Some(recording.buffer().between_levels(from, to)),
+                    _ => None,
+                };
+                let _ = reply.send(captured);
             }
         }
     }

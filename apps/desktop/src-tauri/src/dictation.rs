@@ -1,11 +1,17 @@
+use std::borrow::Cow;
+use std::time::{Duration, Instant};
+
 use crate::activity::Busy;
-use crate::api::{ApiErrorCode, ApiFailure, DictationApi, DictationMeta, PasteKeystroke};
+use crate::api::{
+    ApiErrorCode, ApiFailure, DictationApi, DictationMeta, DictationResponse, PasteKeystroke,
+};
 use crate::audio::{self, AudioError, Captured};
 use crate::foreground::ForegroundApp;
 use crate::i18n::Message;
 use crate::overlay::{Overlay, OverlayAction, OverlayState};
 use crate::paste::{PasteResult, Undelivered};
 use crate::rules::Keystrokes;
+use crate::segments::Finished;
 use crate::session::Take;
 
 pub struct Job {
@@ -33,6 +39,7 @@ pub struct Worker<A, P, O, N, K> {
     pub overlay: O,
     pub notifier: N,
     pub keystrokes: K,
+    pub grace: Duration,
 }
 
 impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A, P, O, N, K> {
@@ -44,42 +51,113 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A
                 log::warn!("dictation failed: {error}");
                 self.overlay.set(microphone_error(&error));
             }
-            Take::Recorded { captured, held } => {
+            Take::Recorded {
+                captured,
+                held,
+                segments,
+                released,
+            } => {
                 log::info!("dictating a {} ms hold", held.as_millis());
-                self.dictate(&captured, target);
+                let finished = segments
+                    .as_ref()
+                    .map(|segments| segments.finish(self.grace))
+                    .unwrap_or_default();
+                let report = self.dictate(&captured, &finished, target);
+                let answered = report.answered.map_or_else(
+                    || "no answer".to_owned(),
+                    |at| {
+                        format!(
+                            "answered {} ms",
+                            at.saturating_duration_since(released).as_millis()
+                        )
+                    },
+                );
+                log::info!(
+                    "take: {} ms of audio, {} segments sent, {} used{}{}, {answered} and {} {} ms after release",
+                    captured.duration().as_millis(),
+                    finished.sent,
+                    finished.earlier.len(),
+                    if finished.late { ", one late" } else { "" },
+                    if report.resent { ", resent whole" } else { "" },
+                    report.outcome,
+                    released.elapsed().as_millis(),
+                );
             }
         }
         drop(busy);
     }
 
-    fn dictate(&mut self, captured: &Captured, target: ForegroundApp) {
-        self.overlay.set(OverlayState::Processing);
-        let wav = match audio::encode_wav(captured) {
-            Ok(wav) => wav,
-            Err(error) => {
-                log::warn!("dictation failed: {error}");
-                self.overlay.set(error_state(Message::Generic, None));
-                return;
-            }
+    fn send(
+        &self,
+        captured: &Captured,
+        finished: &Finished,
+        target: &ForegroundApp,
+    ) -> Result<DictationResponse, Unanswered> {
+        let audio = if finished.earlier.is_empty() {
+            Cow::Borrowed(captured)
+        } else {
+            Cow::Owned(captured.between_levels(finished.covered, usize::MAX))
         };
+        let wav = audio::encode_wav(&audio).map_err(Unanswered::Encode)?;
         #[cfg(debug_assertions)]
         crate::dev::dump_recording(&wav);
         let meta = DictationMeta {
             app_id: target.app_id.clone(),
+            language: finished.language.filter(|_| !finished.earlier.is_empty()),
             ..DictationMeta::default()
         };
-        let response = match self.api.dictate(wav, &meta) {
+        self.api
+            .dictate(wav, &meta, &finished.earlier)
+            .map_err(Unanswered::Api)
+    }
+
+    fn dictate(
+        &mut self,
+        captured: &Captured,
+        finished: &Finished,
+        target: ForegroundApp,
+    ) -> Report {
+        self.overlay.set(OverlayState::Processing);
+        let mut report = Report {
+            outcome: "failed",
+            answered: None,
+            resent: false,
+        };
+        let answer = match self.send(captured, finished, &target) {
+            Err(Unanswered::Api(ApiFailure::Rejected { status: 400, code }))
+                if !finished.earlier.is_empty() =>
+            {
+                log::warn!(
+                    "the final with segments was refused ({code:?}), sending the whole take"
+                );
+                report.resent = true;
+                self.send(captured, &Finished::default(), &target)
+            }
+            other => other,
+        };
+        let response = match answer {
             Ok(response) => response,
-            Err(failure) => {
+            Err(Unanswered::Encode(error)) => {
+                log::warn!("dictation failed: {error}");
+                self.overlay.set(error_state(Message::Generic, None));
+                return report;
+            }
+            Err(Unanswered::Api(failure)) => {
                 log::warn!("dictation failed: {failure}");
                 self.overlay.set(api_error(&failure));
-                return;
+                return report;
             }
         };
+        report.answered = Some(Instant::now());
+        report.outcome = self.deliver(&response, &target);
+        report
+    }
+
+    fn deliver(&mut self, response: &DictationResponse, target: &ForegroundApp) -> &'static str {
         self.overlay.set(OverlayState::Hidden);
         if !response.has_text() {
             log::info!("dictation returned no text");
-            return;
+            return "empty";
         }
         let keystroke = self.keystrokes.for_app(target.app_id.as_deref());
         log::info!(
@@ -99,10 +177,26 @@ impl<A: DictationApi, P: Paste, O: Overlay, N: Notifier, K: Keystrokes> Worker<A
                     Undelivered::Elevated => Message::NotPastedElevated,
                     Undelivered::KeysHeld | Undelivered::NotRead => Message::NotPasted,
                 }]);
+                return "left in the clipboard";
             }
-            PasteResult::Failed => self.overlay.set(error_state(Message::PasteFailed, None)),
+            PasteResult::Failed => {
+                self.overlay.set(error_state(Message::PasteFailed, None));
+                return "failed";
+            }
         }
+        "pasted"
     }
+}
+
+enum Unanswered {
+    Encode(AudioError),
+    Api(ApiFailure),
+}
+
+struct Report {
+    outcome: &'static str,
+    answered: Option<Instant>,
+    resent: bool,
 }
 
 fn error_state(message: Message, action: Option<OverlayAction>) -> OverlayState {
@@ -145,11 +239,13 @@ fn api_error(failure: &ApiFailure) -> OverlayState {
 mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
-    use std::time::Duration;
+    use std::sync::mpsc;
 
     use super::*;
     use crate::activity::Activity;
-    use crate::api::{DictationResponse, LatencyMs, Skipped};
+    use crate::api::{DictationResponse, EarlierSegment, LatencyMs, Skipped};
+    use crate::locale::Language;
+    use crate::segments::{Support, TakeSegments};
 
     #[derive(Default)]
     struct World {
@@ -160,6 +256,8 @@ mod tests {
         keystrokes: Vec<PasteKeystroke>,
         notices: usize,
         sent: Vec<DictationMeta>,
+        earlier: Vec<Vec<EarlierSegment>>,
+        seconds: Vec<f64>,
     }
 
     type Shared = Rc<RefCell<World>>;
@@ -171,9 +269,19 @@ mod tests {
             &self,
             wav: Vec<u8>,
             meta: &DictationMeta,
+            earlier: &[EarlierSegment],
         ) -> Result<DictationResponse, ApiFailure> {
             assert!(wav.starts_with(b"RIFF"));
-            self.0.borrow_mut().sent.push(meta.clone());
+            let mut world = self.0.borrow_mut();
+            world.sent.push(meta.clone());
+            world.earlier.push(earlier.to_vec());
+            world.seconds.push((wav.len() - 44) as f64 / 32_000.0);
+            if earlier.iter().any(|segment| segment.receipt == "expired") {
+                return Err(ApiFailure::Rejected {
+                    status: 400,
+                    code: Some(ApiErrorCode::BadRequest),
+                });
+            }
             self.1.clone().map_err(|failure| failure())
         }
     }
@@ -249,6 +357,7 @@ mod tests {
             overlay: FakeOverlay(Rc::clone(&world)),
             notifier: FakeNotifier(Rc::clone(&world)),
             keystrokes: Rules,
+            grace: Duration::from_millis(20),
         };
         worker.handle(Job {
             take,
@@ -265,13 +374,26 @@ mod tests {
     }
 
     fn recorded() -> Take {
+        segmented(1, None)
+    }
+
+    fn segmented(seconds: usize, segments: Option<TakeSegments>) -> Take {
         Take::Recorded {
             captured: Captured {
-                samples: vec![0.1; 48_000],
+                samples: vec![0.1; 48_000 * seconds],
                 channels: 1,
                 sample_rate: 48_000,
             },
-            held: Duration::from_secs(1),
+            held: Duration::from_secs(seconds as u64),
+            segments,
+            released: Instant::now(),
+        }
+    }
+
+    fn segment(text: &str) -> EarlierSegment {
+        EarlierSegment {
+            text: text.into(),
+            receipt: format!("receipt-{text}"),
         }
     }
 
@@ -418,6 +540,121 @@ mod tests {
                 ..
             }]
         ));
+    }
+
+    #[test]
+    fn a_segmented_take_sends_the_earlier_texts_with_only_the_audio_after_them() {
+        let (jobs, _inbox) = mpsc::channel();
+        let segments = TakeSegments::answered(
+            jobs,
+            Support::default(),
+            vec![segment("uno"), segment("dos")],
+            2_100,
+            Some(Language::Es),
+            false,
+        );
+        let world = run(
+            segmented(25, Some(segments)),
+            Ok(response("Uno dos tres.", None)),
+            PasteResult::Pasted,
+        );
+        assert_eq!(world.pasted, vec!["Uno dos tres."]);
+        assert_eq!(world.earlier, vec![vec![segment("uno"), segment("dos")]]);
+        assert_eq!(world.sent[0].language, Some(Language::Es));
+        assert!(
+            (world.seconds[0] - 4.0).abs() < 0.05,
+            "{}",
+            world.seconds[0]
+        );
+    }
+
+    #[test]
+    fn a_take_whose_segments_all_failed_goes_whole_exactly_as_before() {
+        let (jobs, _inbox) = mpsc::channel();
+        let segments = TakeSegments::answered(jobs, Support::default(), vec![], 0, None, false);
+        let world = run(
+            segmented(25, Some(segments)),
+            Ok(response("Todo.", None)),
+            PasteResult::Pasted,
+        );
+        assert_eq!(world.earlier, vec![Vec::<EarlierSegment>::new()]);
+        assert_eq!(
+            world.sent[0],
+            DictationMeta {
+                app_id: Some("notepad.exe".into()),
+                ..DictationMeta::default()
+            }
+        );
+        assert!((world.seconds[0] - 25.0).abs() < 0.05);
+    }
+
+    #[test]
+    fn a_segment_still_in_flight_at_release_goes_as_audio_inside_the_final() {
+        let (jobs, _inbox) = mpsc::channel();
+        let segments = TakeSegments::answered(
+            jobs,
+            Support::default(),
+            vec![segment("uno")],
+            1_000,
+            Some(Language::En),
+            true,
+        );
+        let world = run(
+            segmented(25, Some(segments)),
+            Ok(response("Uno y el resto.", None)),
+            PasteResult::Pasted,
+        );
+        assert_eq!(world.earlier, vec![vec![segment("uno")]]);
+        assert!((world.seconds[0] - 15.0).abs() < 0.05);
+        assert_eq!(world.pasted.len(), 1);
+    }
+
+    #[test]
+    fn a_final_refused_for_its_segments_is_sent_again_as_the_whole_take() {
+        let (jobs, _inbox) = mpsc::channel();
+        let expired = EarlierSegment {
+            text: "uno".into(),
+            receipt: "expired".into(),
+        };
+        let segments = TakeSegments::answered(
+            jobs,
+            Support::default(),
+            vec![expired],
+            1_000,
+            Some(Language::Es),
+            false,
+        );
+        let world = run(
+            segmented(25, Some(segments)),
+            Ok(response("Todo.", None)),
+            PasteResult::Pasted,
+        );
+        assert_eq!(world.earlier.len(), 2);
+        assert!(world.earlier[1].is_empty());
+        assert_eq!(world.sent[1].language, None);
+        assert!((world.seconds[0] - 15.0).abs() < 0.05);
+        assert!((world.seconds[1] - 25.0).abs() < 0.05);
+        assert_eq!(world.pasted, vec!["Todo."]);
+        assert_eq!(kinds(&world), vec!["processing", "hidden"]);
+    }
+
+    #[test]
+    fn a_failed_final_after_segments_still_shows_its_error() {
+        let (jobs, _inbox) = mpsc::channel();
+        let segments = TakeSegments::answered(
+            jobs,
+            Support::default(),
+            vec![segment("uno")],
+            1_000,
+            None,
+            false,
+        );
+        let world = run(
+            segmented(12, Some(segments)),
+            Err(|| ApiFailure::Network("refused".into())),
+            PasteResult::Pasted,
+        );
+        assert_eq!(kinds(&world), vec!["processing", "error"]);
     }
 
     #[test]
