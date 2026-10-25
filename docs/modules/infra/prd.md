@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0016_self_hosting
+updated: 2026-10-24
+source: 0021_provider_switch
 ---
 
 # Infra: product
@@ -26,7 +26,7 @@ Errors: a failed deploy leaves the previous version serving and shows as a faile
 
 ### Run your own
 
-1. A person with an AWS account, a domain in Route 53 and Groq and OpenAI keys follows `self-host/README.md`, with the Claude Code skill (recommended) or `pnpm selfhost`.
+1. A person with an AWS account, a domain in Route 53 and the keys of the providers they pick (Groq and OpenAI by default) follows `self-host/README.md`, with the Claude Code skill (recommended) or `pnpm selfhost`.
 2. The setup asks for the profile, region, domain and keys, shows the plan, and after agreement creates prd (and dev if asked), deploys the code, creates the first user and prints the address and its temporary password.
 3. Running it again updates the deployment and changes only what differs; `pnpm selfhost remove` deletes everything it created and nothing else.
 

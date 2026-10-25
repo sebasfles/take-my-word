@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-24
-source: 0018_fast_providers_eval
+source: 0021_provider_switch
 ---
 
 # Dictation: architecture and debt
@@ -248,7 +248,7 @@ source: 0018_fast_providers_eval
 - Alternatives rejected: none in this task; the switch to `gpt-transcribe` recommended by its report would move transcription to OpenAI's per-account limits.
 - Reason: switching models is a separate task, and the limit is a property of the provider plan.
 - Debt created: a few users dictating at once, or one `pnpm e2e` run on dev, can make prd dictations fail with 429.
-- Revisit when: the transcriber switch task, or a 429 from the transcriber in prd logs.
+- Revisit when: prd moves off `whisper-large-v3-turbo`, or a 429 from the transcriber in prd logs.
 - Source: 0017_eval_harness
 
 ## 2026-10-24: The eval Lambda reads its provider keys through a loader of its own
@@ -302,6 +302,33 @@ source: 0018_fast_providers_eval
 - Alternatives rejected: none in this task.
 - Reason: the switch is its own task, and the limits belong to the provider plan.
 - Debt created: prd's turbo dictations are now billed (about 1.20 USD in a heavy month) and run against a daily allowance this task cannot explain.
-- Revisit when: the transcriber switch task, or Groq's console shows the paid-tier limits.
+- Revisit when: prd moves off `whisper-large-v3-turbo`, or Groq's console shows the paid-tier limits.
 - Source: 0018_fast_providers_eval
 
+
+## 2026-10-24: Provider choice is server-side only; each environment runs one pair
+
+- Decision: `dictate` runs the transcriber and refiner named by `TRANSCRIBER` and `REFINER`, set per environment from `deployment.json` through Terraform; settings and the dictation meta no longer carry providers, old fields are accepted and ignored, and stored `providers` are dropped on the user's next save; this supersedes the per-request and per-user choice of 2026-10-20.
+- Alternatives rejected: per-user providers in `SETTINGS`; a per-request override; an SSM parameter read at cold start.
+- Reason: the pair is an operator's cost and quality choice, kept in one recorded config and switched without a code change.
+- Debt created: both settings routes answer a fixed `providers` (`groq-whisper`, `openai`) because released desktops require it to parse.
+- Revisit when: no released desktop older than 0021's build remains.
+- Source: 0021_provider_switch
+
+## 2026-10-24: One registry of ids and adapters for production and the evaluation, selected at cold start
+
+- Decision: `packages/shared/src/providers.ts` lists the ids and the provider key each one needs; `providers/registry.ts` maps each id to an adapter, model, effort and temperature, and the eval Lambda and runner build candidates from it; `dictate` selects its pair during init with a top-level await, reading the secret once, and requires only the selected pair's keys; this revises "The eval Lambda reads its provider keys through a loader of its own" (2026-10-24), whose trigger fired.
+- Alternatives rejected: eval-only adapter copies; selecting on the first request; requiring every key of the secret.
+- Reason: a provider is written once and is both measurable and selectable; a wrong id or key fails visibly before any dictation, and the ids in shared let `deployment.json` refuse an unknown one before any apply.
+- Debt created: none.
+- Revisit when: a provider needs settings per environment beyond the id.
+- Source: 0021_provider_switch
+
+## 2026-10-24: With Parakeet selected, the dictionary reaches only the refiner
+
+- Decision: `together-parakeet` is registered unprompted, so the Whisper prompt of top terms is not sent; the refiner still gets the full dictionary.
+- Alternatives rejected: holding Parakeet out of the registry until it takes a vocabulary.
+- Reason: 0018 measured it without a prompt; the 2026-10-20 entry on the two dictionary projections names this case as its trigger.
+- Debt created: rare terms depend on the refiner alone under Parakeet.
+- Revisit when: Parakeet is chosen for prd, or a user's terms go missing under it.
+- Source: 0021_provider_switch

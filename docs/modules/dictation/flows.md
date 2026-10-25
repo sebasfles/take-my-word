@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-21
-source: 0008_desktop_features
+updated: 2026-10-24
+source: 0021_provider_switch
 ---
 
 # Dictation: flows
@@ -17,8 +17,8 @@ sequenceDiagram
   participant G as API Gateway and authorizer
   participant D as dictate Lambda
   participant T as Table take-my-word-env
-  participant S as Groq whisper
-  participant R as OpenAI refiner
+  participant S as Transcriber of the environment
+  participant R as Refiner of the environment
   C->>G: POST /dictations, audio and Cognito JWT
   G->>D: request with user id
   alt WAV under the level floor

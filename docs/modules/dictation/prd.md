@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-23
-source: 0015_user_context
+updated: 2026-10-24
+source: 0021_provider_switch
 ---
 
 # Dictation: product
@@ -68,7 +68,7 @@ Errors and empty states: with no dictations, the list is empty.
 - A new user's settings start with the `plain` style and English; users who existed before dictation languages keep the language they had.
 - With both languages chosen, a dictation recognized as neither is transcribed in the first one; the allowance is charged once.
 - The language comes from the user's settings, never from the device; older clients that still send one are ignored.
-- The transcription and cleanup providers follow the user's settings; a dictation may override them.
+- Users have no provider choice: each environment runs one transcriber and one refiner, picked by the operator.
 - The result is the cleaned text and nothing else.
 - The user's context never changes a dictation until a follow-up proves it helps.
 - Used minutes are shown rounded up and never above the allowance.
