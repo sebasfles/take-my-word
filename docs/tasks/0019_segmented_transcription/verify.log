@@ -118,3 +118,39 @@
 - typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
 - unit: n/a
 - e2e: n/a
+
+## 2026-10-25T04:30:00Z by om-developer target shared on a55c8d7
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (51 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-25T04:30:00Z by om-developer target deployment on a55c8d7
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (50 tests, pnpm test)
+- e2e: n/a
+
+## 2026-10-25T04:30:00Z by om-developer target api on a55c8d7
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (412 tests, pnpm test)
+- e2e: pass exit 0 (40 tests, pnpm e2e against dev running this branch's dictate built from e8b5d33, whose apps/api is the same in a55c8d7)
+
+## 2026-10-25T04:30:00Z by om-developer target web on a55c8d7
+- lint: pass exit 0 (pnpm lint)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (255 tests, pnpm test)
+- e2e: n/a (no web change)
+
+## 2026-10-25T04:30:00Z by om-developer target desktop on a55c8d7
+- lint: pass exit 0 (pnpm lint && pnpm rust:lint, TMW_WINDOWS_CHECKOUT=/mnt/c/dev/tmw-0019)
+- typecheck: pass exit 0 (pnpm typecheck)
+- unit: pass exit 0 (240 vitest and 256 cargo tests, pnpm test && pnpm rust:test)
+- e2e: n/a
+
+## 2026-10-25T04:30:00Z by om-developer target infra on a55c8d7
+- lint: pass exit 0 (terraform fmt -check -recursive)
+- typecheck: pass exit 0 (terraform -chdir=environments/{core,dev,prd} validate)
+- unit: n/a
+- e2e: n/a

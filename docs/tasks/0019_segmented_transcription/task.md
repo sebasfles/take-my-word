@@ -123,6 +123,9 @@ Runs in parallel with 0018, which adds the long samples (30 to 120 s); this task
 - Order (om-manager): 0021 (every transcriber and refiner in production, selected by Lambda env vars) merges before 0019; 0019 holds with develop's `dictate` restored on dev and runs nothing on dev until "0021 merged, resume".
 - Then (om-manager): rebase on develop and run Acceptance 7 and 8 for three combinations switched by 0021's env vars on dev: whisper-large-v3-turbo + gpt-5.4-nano (today's), gpt-transcribe + gpt-5.4-nano, Parakeet + Cerebras qwen-3.8-27b.
   Parakeet takes no prompt, so its segments run without the previous text; the report says so per combination.
+- Detector (om-reviewer, round 4): the floor does not also skip levels at or below -60 dBFS, because breath there sits next to the quietest real speech (-47.9 dBFS, `docs/modules/dictation/ard.md`); `pauseMs` stays 600.
+- Ship default (om-reviewer, 2026-10-25): the gate measures transcription, so the desktop default follows the transcriber prd runs at publish time (operator switches moved prd to gpt-transcribe, then to whisper-large-v3-turbo + cerebras qwen-3.8-27b@none); the report gives the verdict per transcriber so a later switch can enable it by config.
+- OpenAI out of credit (om-manager, 2026-10-25 02:50Z): no OpenAI-dependent run until the credit is back; the whisper replay arm uses cerebras qwen-3.8-27b@none as refiner instead of nano.
 
 ## om-developer notes
 
@@ -187,19 +190,7 @@ Done on dev:
 - Receipt and cap checks, as `crew-e2e` and `crew-e2e-b`, all as expected: a segment under the cap 200; a receipt sent by another user 400; a repeated receipt 400; a forged signature 400; earlier seconds plus 120 s of own audio 400; a segment at the cap 429; a final with a valid receipt at the cap 200, charged only its own 1.9 s; a plain final at the cap 429; the same receipt 185 s after issue 400.
   `crew-e2e`'s day usage was set to the cap for the test and put back to its earlier value (164.01 s).
 - Injected faults (Acceptance 4), through the replay below: a segment refused with 429 and a segment held 30 s (in flight at release, counted late) each ended in one final with no earlier texts carrying the whole take (673 KB for 21.6 s), status 200, every word pasted (65 of 65).
-- Release-to-paste (Acceptance 8), 10/20, Spanish Polly samples, segmentation off and on interleaved per sample:
-
-  | Samples | Bucket | Segmentation | Takes | With a segment used | P50 ms | P95 ms |
-  |---|---|---|---|---|---|---|
-  | clean | under 10 s | off | 11 | 0 | 1407 | 2055 |
-  | clean | under 10 s | on | 11 | 0 | 1490 | 2320 |
-  | clean | 10 to 30 s | off | 9 | 0 | 2503 | 3236 |
-  | clean | 10 to 30 s | on | 9 | 1 | 2047 | 2879 |
-  | white noise at -60 dBFS | 10 to 30 s | off | 9 | 0 | 2351 | 4455 |
-  | white noise at -60 dBFS | 10 to 30 s | on | 9 | 1 | 2295 | 3005 |
-
-  Under 30 s the policy fired on one take in nine (21.6 s): 2188 to 1380 ms clean, 2714 to 1507 ms noisy; every other take sends the same single request either way, so those on/off gaps are run-to-run spread.
-  The long buckets were started and stopped after the first long take (old detector, so not reported as a result): 105.8 s took 12168 ms after release whole and 3886 ms with 5 segments.
+- Release-to-paste (Acceptance 8): a first measurement under 30 s on clean and noisy Polly samples, superseded by `reports/release-to-paste.md` (round 5).
 - Idle RAM and CPU (Acceptance 9), release builds of `tauri:build:dev` from this branch (round 3 code) and develop 1a77433, started with `--autostart`, 60 s warm-up, 187 s measured over the process tree (the app and 7 WebView2 processes), five pairs interleaved: working set 436 to 443 MB branch, 428 to 444 MB base; private 204 to 212 MB branch, 199 to 210 MB base; CPU 0.147 to 0.168 % branch, 0.139 to 0.173 % base.
   The app's own process used 0 ms of CPU in every branch window (base 0 and 16 ms) and holds 31 to 33 MB in both, so idle CPU is WebView2's and does not rise.
   While measuring, the dev flavor's hotkey was Shift+F24 so Sebastian's prd hotkey could not reach it; its `settings.json` was restored byte for byte (sha256 checked).
@@ -229,3 +220,23 @@ Decisions not in the plan:
 Pending (on "0021 merged, resume"): rebase on develop; the gate on both sets for the three combinations in Reiteration 1 (Parakeet without the previous text); the long buckets of Acceptance 8 with the fixed detector, before and after; the ship decision by the rule in Reiteration 1 (on only if a policy passes both sets); dev again for the replay, then develop's `dictate` restored.
 Deferred: none.
 `verify.log`'s round 4 blocks were written on 85768c5; the amend adds only them, these notes, Reiteration 1 and `reports/gate-2.md`.
+
+### Round 5
+
+Rebased on 37dc186 (0021). 0021 replaced the per-request provider registry with one pair chosen by `TRANSCRIBER` and `REFINER` and dropped `sttProvider` and `refineProvider` from the meta and `providers` from the settings, all of which rounds 1 to 4 touched.
+So rounds 1 to 4 were squashed into one commit before the rebase and resolved once (e8b5d33); the original round commits stay on the local branch `0019/rounds-1-4` (30eefc6).
+The resolution: `SelectedProviders` moves into `dictation/stages.ts` and is re-exported from `dictate.ts`; `transcriberFor` and every `sttProvider` path are gone; the segment meta has only `language`; `SEGMENT_RECEIPT_KEY` sits next to `TRANSCRIBER` and `REFINER` in config and Terraform; 0021's tests (selected pair, released desktops' provider fields ignored) are ported into the restructured `dictate` tests; the desktop contract is regenerated.
+`pnpm eval:segmentation` takes its transcriber from `SEGMENTATION_TRANSCRIBER` (today's when unset), and an unprompted transcriber records no prompt split.
+
+Done on dev:
+- `pnpm tf dev plan` and apply from the rebased branch: only `dictate`'s environment gained `SEGMENT_RECEIPT_KEY` back.
+- `pnpm e2e` on the branch `dictate` (e8b5d33, today's pair): 3 files, 40 tests, `.verify/api-e2e.out` ends in `EXIT=0` (round 4 finding 1).
+- The pair is switched with `providers.dev` in the workspace's `deployment.json` and `pnpm tf dev apply`; each plan changed only `TRANSCRIBER` and `REFINER`.
+- Gates and replays: `report.md`, `reports/gate-*.md` and `reports/release-to-paste.md`.
+- Dev at the end: develop's `dictate` (deploy-dev's build of 37dc186, CodeSha256 `lsqJsFiZmT5bAANExEdsqwbrYC+cXiAkwhewcr4NiDE=`) with the environment Terraform gives it, whisper-large-v3-turbo + gpt-5.4-nano; `deployment.json` back as it was; that refiner fails on dev until OpenAI has credit.
+
+Decision: segmentation ships off; prd's transcriber, whisper-large-v3-turbo, fails both sets (Reiteration 1, restated by the om-reviewer on 2026-10-25).
+
+Held (OpenAI out of credit): the gpt-transcribe gate on both sets (clean stopped at 278 of 360, -60 dBFS at 7; the exhausted rows were removed so a resume re-runs them, their spend stays in each run's failures) and the gpt-transcribe + gpt-5.4-nano replays.
+Deferred: none.
+`verify.log`'s round 5 blocks were written on a55c8d7; the amend adds only them.

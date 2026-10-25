@@ -1,17 +1,18 @@
 # Segmentation quality gate
 
-Generated 2026-10-24T21:34:18.269Z by `pnpm --filter @take-my-word/api eval:segmentation --results ../.verify/gate/run-2 --report docs/tasks/0019_segmented_transcription/reports/gate-2.md --runs 5` on code `833c38a18502cd8803d71f4cb94845f34aab9a44`.
+Generated 2026-10-25T01:20:29.945Z by `pnpm --filter @take-my-word/api eval:segmentation --results ../.verify/gate/r5-whisper-large-v3-turbo-clean --report docs/tasks/0019_segmented_transcription/reports/gate-whisper-large-v3-turbo-clean.md --runs 5` on code `e8b5d33685dd14661c2db718ad4a5c8712b95ee3`.
 5 runs of 12 clips (the extended samples, every voice), each language setting, transcribed whole and segment by segment with whisper-large-v3-turbo.
-Cuts come from the desktop's detector as a session makes them with no request in flight; each segment is prompted with today's terms plus the previous raw text's tail within 224 bytes, later segments use the first segment's language, and segments go through the level floor and the silence guard.
+Cuts come from the desktop's detector as a session makes them with no request in flight; later segments use the first segment's language, and segments go through the level floor and the silence guard.
+Each segment is prompted with today's terms plus the previous raw text's tail within 224 bytes.
 The clips are the fixtures as Polly speaks them, with digital silence between words.
 Spend charged: 0.290 USD.
-Groq moved from its free plan to its paid Developer tier at 2026-10-24T18:25:00.000Z, with 10.00 USD of credit and a 5.00 USD monthly spend limit that the account shares with production; its calls from then on are charged at list price and count in the run cap, and pace on its rate-limit headers, keeping 1000 requests, 7200 audio seconds and 20000 tokens of each reported allowance for production; this task's Groq spend since then is 0.871 USD
+Groq moved from its free plan to its paid Developer tier at 2026-10-24T18:25:00.000Z, with 10.00 USD of credit and a 5.00 USD monthly spend limit that the account shares with production; its calls from then on are charged at list price and count in the run cap, and pace on its rate-limit headers, keeping 1000 requests, 7200 audio seconds and 20000 tokens of each reported allowance for production; this task's Groq spend since then is 1.258 USD
 
 ## Verdict
 
 Neither policy passes on this set.
 
-- 10/20: one: 13 hard-gate flags against the whole take's 4; both: 14 hard-gate flags against the whole take's 1
+- 10/20: one: 15 hard-gate flags against the whole take's 4; both: 13 hard-gate flags against the whole take's 1
 - 20/30: one: 10 hard-gate flags against the whole take's 4; both: 10 hard-gate flags against the whole take's 1
 
 Gate: WER away from the cuts and term errors within the whole take's value plus its run-to-run spread, per language setting; no more hard-gate flags or failed takes than the whole take.
@@ -21,10 +22,10 @@ Words within two words of a cut are counted apart, for both arms, in the same pl
 
 | Policy | Languages | WER whole | WER segmented | Away from cuts, whole (spread) | Away from cuts, segmented | Boundary errors whole | Boundary errors segmented | Term errors whole | Term errors segmented | Flags whole / segmented |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 10/20 | one | 2.0% | 2.7% | 1.9% (1.9%) | 1.3% | 23 of 760 | 214 of 760 | 6.9% | 6.0% | 4 / 13 |
-| 10/20 | both | 1.3% | 2.8% | 1.2% (0.5%) | 1.3% | 15 of 760 | 214 of 760 | 6.8% | 6.0% | 1 / 14 |
-| 20/30 | one | 2.0% | 1.3% | 2.0% (1.9%) | 0.9% | 15 of 460 | 60 of 460 | 6.9% | 6.6% | 4 / 10 |
-| 20/30 | both | 1.3% | 1.3% | 1.2% (0.5%) | 0.9% | 10 of 460 | 60 of 460 | 6.8% | 6.6% | 1 / 10 |
+| 10/20 | one | 1.8% | 2.7% | 1.5% (0.5%) | 1.3% | 48 of 760 | 215 of 760 | 6.6% | 6.1% | 4 / 15 |
+| 10/20 | both | 2.1% | 3.6% | 2.0% (2.7%) | 2.1% | 27 of 760 | 221 of 760 | 7.2% | 6.7% | 1 / 13 |
+| 20/30 | one | 1.8% | 1.3% | 1.7% (0.9%) | 0.9% | 13 of 460 | 60 of 460 | 6.6% | 6.6% | 4 / 10 |
+| 20/30 | both | 2.1% | 1.3% | 2.1% (2.6%) | 0.9% | 20 of 460 | 60 of 460 | 7.2% | 6.6% | 1 / 10 |
 
 ## Prompt split
 

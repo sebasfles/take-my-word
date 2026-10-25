@@ -199,7 +199,6 @@ impl TakeSegments {
                     .join(" ");
                 let meta = SegmentMeta {
                     language: state.language,
-                    ..SegmentMeta::default()
                 };
                 (meta, previous)
             })
