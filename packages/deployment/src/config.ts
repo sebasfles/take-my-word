@@ -129,7 +129,14 @@ export const deploymentConfigSchema = z
   .refine((config) => !config.evalFunction || config.environments.includes("dev"), {
     message: "evalFunction needs the dev environment",
     path: ["evalFunction"],
-  });
+  })
+  .refine(
+    (config) =>
+      Object.keys(config.providers ?? {}).every((env) =>
+        config.environments.includes(env as Environment),
+      ),
+    { message: "providers names an environment this deployment does not run", path: ["providers"] },
+  );
 
 export type DeploymentConfig = z.infer<typeof deploymentConfigSchema>;
 

@@ -59,6 +59,7 @@ describe("deployment config", () => {
     { providers: { prd: { refiner: "openai" } } },
     { providers: { prd: { refiner: "gpt-5.4-nano", model: "gpt-6" } } },
     { providers: { staging: {} } },
+    { providers: { dev: { transcriber: "gpt-transcribe" } } },
     { github: { owner: "o", repository: "r", appId: "x", appInstallationId: "1" } },
     {
       desktop: {

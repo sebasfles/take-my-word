@@ -157,3 +157,17 @@ Deferred:
 - A desktop built from this task no longer sends `providers`, so a server older than this task (an un-updated self-host) answers its settings `PUT` with 400.
 - `defaultGroqWhisperModel` and `defaultOpenaiModel` stay as adapter defaults used only by adapter tests.
 - `infra/environments/dev/.terraform.lock.hcl` gained the `random` provider from 0019's state during these plans; it is left out of the commit.
+
+### Round 2
+
+Applied the four findings:
+1. Settings `PUT` is again the `PutCommand` that replaces the item whole (`settings/dynamo.ts` equals develop's); a stored `providers` disappears on that user's next save. `settings/dynamo.test.ts` is deleted; `api/app.test.ts` still checks the stored item has no `providers` after a `PUT`. The round 1 decision on `UpdateCommand` is withdrawn.
+2. The raw dictionary check in `features.e2e.ts` is `expect.soft`, so the clean-text check always runs and reports.
+   Re-run on dev of that test under `gpt-transcribe` + `gpt-5.4-nano` (targeted apply, the four api Lambdas on the build of `3071b80`, then today's pair and develop's build restored): both fail on model quality.
+   The saved dictation reads raw "Hablé con Kelvaric sobre el contrato de mantenimiento." and clean text "Hablé con Kelvarix sobre el contrato de mantenimiento.", so users would not get "Quelvarix" either; the dictation before the term was added read "Kelbaric" in both (`.verify/api-e2e-gpt-transcribe-rare-term.out`).
+3. `deployment.json` refuses a `providers` entry for an environment outside `environments`, with a `config.test.ts` case; the JSON schema does not change.
+4. `infra/environments/dev/.terraform.lock.hcl` restored with `git checkout` after this round's dev plans.
+
+Decisions the plan did not record: none new.
+Pending: none.
+Deferred: none new; the desktop-against-older-server 400 goes to the desktop `ard.md` debt entry in `document-task`, as the om-reviewer asked.

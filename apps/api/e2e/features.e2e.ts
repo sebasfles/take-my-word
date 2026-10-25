@@ -241,7 +241,7 @@ describe("dictionary in a deployed environment", () => {
         (await call("POST", "/dictionary", { body: { term: rareTerm } })).json,
       );
       const withTerm = await dictate(rareSpeech);
-      if (configuredPair(url).prompted) expect(withTerm.raw).toContain(rareTerm);
+      if (configuredPair(url).prompted) expect.soft(withTerm.raw).toContain(rareTerm);
       expect(withTerm.text).toContain(rareTerm);
       expect(withTerm.styleId).toBe("plain");
 
