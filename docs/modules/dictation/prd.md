@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0021_provider_switch
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Dictation: product
@@ -67,6 +67,7 @@ Errors and empty states: with no dictations, the list is empty.
 - The style comes from the user's pick, else the active app's rule on desktop, else the user's default, else `plain`; a style that no longer exists never makes a dictation fail.
 - A new user's settings start with the `plain` style and English; users who existed before dictation languages keep the language they had.
 - With both languages chosen, a dictation recognized as neither is transcribed in the first one; the allowance is charged once.
+- A long recording the desktop sends in parts while the user speaks is still one dictation, cleaned and saved once, in one language; a part that fails or answers late goes again with the rest, so no words are lost, and only that part's seconds may count twice.
 - The language comes from the user's settings, never from the device; older clients that still send one are ignored.
 - Users have no provider choice: each environment runs one transcriber and one refiner, picked by the operator.
 - The result is the cleaned text and nothing else.

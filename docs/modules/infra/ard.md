@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0021_provider_switch
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Infra: architecture and debt
@@ -213,3 +213,13 @@ source: 0021_provider_switch
 - Debt created: none.
 - Revisit when: Terraform runs outside `pnpm tf`.
 - Source: 0021_provider_switch
+
+## 2026-10-25: The segment receipt key is a Terraform random value in `dictate`'s environment
+
+- Decision: `random_password.segment_receipt_key` is generated per environment and passed as `SEGMENT_RECEIPT_KEY`; rotating it is a `taint` and an apply, which only makes receipts in flight answer 400 and the desktop resend those takes whole.
+- Alternatives rejected: a manual value in Secrets Manager.
+- Reason: no secret to set by hand, a self-hosted deployment gets its own, and the key never leaves the account.
+- Debt created: none.
+- Revisit when: the key must be shared with something outside `dictate`.
+- Source: 0019_segmented_transcription
+

@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0021_provider_switch
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Infra: technical
@@ -25,7 +25,7 @@ The official deployment runs `core`, `dev` and `prd` from Sebastian's machine an
 |---|---|
 | API Gateway HTTP API | Fronts every route at `api.<web host>` (execute-api endpoint off, 10 requests per second, burst 20); the authorizer is attached; integrations time out at 30 s. |
 | Lambda `api` | Hono, every CRUD route (dictionary, styles, app rules, settings, history); 512 MB, 15 s; Node 24, ARM64, bundled with esbuild. |
-| Lambda `dictate` | `POST /dictations`; 60 s timeout and more memory than `api`. |
+| Lambda `dictate` | `POST /dictations` and `POST /dictations/segments`; 60 s timeout and more memory than `api`; its role may `GetItem` for the segment cap check. |
 | Lambda `dictionary-usage` | Consumer of the table's DynamoDB Stream through an event source mapping filtered to inserts of `DICTATION#`, batch 10, retry 2, bisect, batch item failures (dictionary module). |
 | DynamoDB `<deployment>-{env}` | The single table, with TTL and a stream enabled. |
 | Cognito user pool | Configured by the auth module, created here. |
@@ -65,6 +65,7 @@ Jobs, listeners or scheduled work: none.
 
 - `deployment.json`: see `deployment.example.json`; `pnpm tf` refuses a profile that resolves to another account than `aws.accountId`.
 - Lambda environment variables are wired by `stacks/app`; `DEBUG_BUCKET` only while the dev variable `debug_audio` is on.
+- `random_password.segment_receipt_key` (64 characters, provider `hashicorp/random`) becomes `dictate`'s `SEGMENT_RECEIPT_KEY`, per environment, in Terraform state and never in Secrets Manager; prd needs `pnpm tf prd apply` before a desktop release turns segmentation on anywhere, and until then prd answers 404 on the segment route and the desktop sends whole takes.
 - `providers.<env>` in `deployment.json` (`transcriber`, `refiner`, ids listed in its schema) becomes `dictate`'s `TRANSCRIBER` and `REFINER`; `pnpm tf` always passes both, today's pair when left out, and refuses an unknown id or an environment the deployment does not run.
 - `evalFunction` in `deployment.json` (off by default, refused without dev) makes `pnpm tf dev` pass `TF_VAR_eval_function`; prd and core never receive it, and the stack refuses it outside dev.
 - Repository Actions variables, set by hand: `DESKTOP_DEV_SERVER` and `DESKTOP_PRD_SERVER` (the discovery JSON each desktop build signs in to), `DESKTOP_UPDATER_PUBKEY` and `WEB_INDEXED_ORIGIN` (the prd origin search engines may index).
