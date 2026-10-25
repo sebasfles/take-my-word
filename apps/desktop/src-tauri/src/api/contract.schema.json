@@ -16,6 +16,13 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 256
+      },
+      "language": {
+        "type": "string",
+        "enum": [
+          "es",
+          "en"
+        ]
       }
     }
   },
@@ -97,6 +104,110 @@
       "latencyMs"
     ],
     "additionalProperties": false
+  },
+  "segmentMeta": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "language": {
+        "type": "string",
+        "enum": [
+          "es",
+          "en"
+        ]
+      }
+    }
+  },
+  "segmentResponse": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "raw": {
+        "type": "string"
+      },
+      "skipped": {
+        "type": "string",
+        "const": "silence"
+      },
+      "language": {
+        "type": "string",
+        "enum": [
+          "es",
+          "en"
+        ]
+      },
+      "receipt": {
+        "type": "string"
+      },
+      "providers": {
+        "type": "object",
+        "properties": {
+          "transcriber": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "latencyMs": {
+        "type": "object",
+        "properties": {
+          "quota": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "profile": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "transcribe": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "raw",
+      "providers",
+      "latencyMs"
+    ],
+    "additionalProperties": false
+  },
+  "earlierSegments": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "minItems": 1,
+    "maxItems": 24,
+    "type": "array",
+    "items": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "receipt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "text",
+        "receipt"
+      ],
+      "additionalProperties": false
+    }
   },
   "apiError": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -89,3 +89,15 @@ export function noise({
   }
   return withLevel(wavOf(samples), levelDbfs);
 }
+
+export function withNoise(wav: Buffer, levelDbfs: number, seed: number): Buffer {
+  const speech = samplesOf(wav);
+  const added = samplesOf(
+    noise({ seconds: speech.length / sampleRate, levelDbfs, color: "white", seed }),
+  );
+  return wavOf(
+    speech.map((sample, index) =>
+      Math.max(-fullScale, Math.min(fullScale, sample + (added[index] ?? 0))),
+    ),
+  );
+}

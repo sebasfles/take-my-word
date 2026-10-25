@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0021_provider_switch
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Dictation: database
@@ -32,7 +32,8 @@ Everything lives in the single DynamoDB table `take-my-word-{env}`, no ORM, no m
 - A user reads only items under their own key; the key comes from the authorizer, and a history cursor or id carries only the sort key.
 - History never shows an item past its `expiresAt`, even before TTL deletes it.
 - `SETTINGS` always names a style that existed when written; a later deletion resets it to `plain`, and `dictate` falls back to `plain` if that reset was missed.
-- The quota is charged with one atomic conditional update on `QUOTA#date` before any provider is called; the condition allows it while the day is under the cap.
+- A dictation is charged with one atomic conditional update on `QUOTA#date` before any provider is called; the condition allows it while the day is under the cap.
+- A segment reads `QUOTA#date` before transcribing and is charged with an unconditional `ADD` only after the provider answers; a final with segments charges only its own audio, without the condition, so a take started under the cap finishes; its `DICTATION#` carries the take's total seconds.
 - Dictations skipped as silence are not saved.
 - A `SETTINGS` item written before dictation languages reads as the language of its `locale`; `locale` is always derived from the first dictation language.
 - A `SETTINGS` item without a context reads as an empty one; a stored pick list or detail that no longer parses falls back to empty on its own, so a retired pick id empties the picks and keeps the detail.

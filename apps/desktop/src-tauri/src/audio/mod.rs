@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-pub use capture::{CaptureBuffer, Captured};
+pub use capture::{CaptureBuffer, Captured, LEVELS_PER_SECOND};
 pub use level::Level;
 pub use microphone::Microphone;
 pub use wav::encode_wav;
@@ -94,6 +94,8 @@ pub trait Capture {
     fn start(&mut self);
     fn monitor(&mut self, on: bool);
     fn stop(&mut self) -> Result<Captured, AudioError>;
+    fn levels(&mut self, from: usize) -> Vec<f32>;
+    fn between_levels(&mut self, from: usize, to: usize) -> Option<Captured>;
 }
 
 #[cfg(test)]

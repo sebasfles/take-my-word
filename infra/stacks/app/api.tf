@@ -47,6 +47,10 @@ module "api" {
         function_name = module.dictate.name
         invoke_arn    = module.dictate.invoke_arn
       }
+      "POST /dictations/segments" = {
+        function_name = module.dictate.name
+        invoke_arn    = module.dictate.invoke_arn
+      }
     },
     {
       for route in local.api_routes : route => {

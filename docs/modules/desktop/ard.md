@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0021_provider_switch
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Desktop: architecture and debt
@@ -466,3 +466,31 @@ source: 0021_provider_switch
 - Debt created: in that state every later launch becomes another instance with its own tray, hook and overlay.
 - Revisit when: a user sees two tray icons, or a second launch fails to bring the main window to the front.
 - Source: 0020_fix_overlay_after_reboot
+
+## 2026-10-25: Segments are cut by level against a floor that ignores digital zeros, and ship off
+
+- Decision: while a take records, the session reads the capture buffer's 10 ms levels every 100 ms; a level is quiet when it is at most 10 dB above an adaptive floor that rises 1 dB/s (and at most -30 dBFS), or at or below -60 dBFS, and exact zeros never move the floor; a segment closes after 600 ms of quiet once it has the minimum, cut at the pause's quietest level after its first 150 ms, or is forced at the maximum on the quietest level of its last second; a span with under 300 ms above the floor is marked covered and not sent; segmentation is off by default at 20/30, and the `segmentation` setting turns it on.
+- Alternatives rejected: a VAD model; letting the floor also skip everything under -60 dBFS, which in a quiet room settles on breath next to the quietest speech measured in dev (-47.9 dBFS, dictation "Silence on WAV is decided by measuring the audio") and could cut a quiet speaker mid-sentence.
+- Reason: no memory or package cost; exact zeros (a stream starting, synthetic gaps) had dragged the floor to -100 dBFS so pauses read as speech for tens of seconds; the gate (0019 `report.md`) fails every transcriber on both sample sets with invented words at forced cuts, since the long samples have no 600 ms pause clean and few with noise, so the desktop follows prd's transcriber and stays off.
+- Debt created: segmentation is off, so long takes still wait for the whole transcription; a forced cut mid-sentence makes the transcriber invent the sentence's end.
+- Revisit when: a VAD model or a shorter `pauseMs`, gated on noisy and real recordings, lets a policy pass for prd's transcriber.
+- Source: 0019_segmented_transcription
+
+## 2026-10-25: A segment never costs the take
+
+- Decision: one segment in flight at a time; after a failed segment (429 included) or one still in flight after a 1.5 s grace at release, the take sends no more segments and the final carries the earlier texts plus one WAV of everything after the last answered segment; a 404 on the segment route turns segments off for that server until it changes, which answers the revisit of "A self-hosted server older than the app may miss routes" for this route; a final refused with 400 is sent once more whole, without segments.
+- Alternatives rejected: retrying segments; failing the take.
+- Reason: every word of a take reaches the final at worst as audio, and a server without the route, or with a key it rotated, still dictates as before.
+- Debt created: none.
+- Revisit when: segments are sent more than one at a time.
+- Source: 0019_segmented_transcription
+
+## 2026-10-25: Release to paste is measured by a real-time replay in `cargo test`
+
+- Decision: an ignored test plays WAVs in real time through the capture buffer, session, detector, segment thread and worker against a deployed server with a token, faking only the device, overlay and paste, and measures release to the API's answer, the number the per-take log line reports.
+- Alternatives rejected: driving the app through its window, which needs a stored session and a person at the machine.
+- Reason: it runs unattended from WSL on the Windows host and exercises every part a user's take goes through but the paste.
+- Debt created: none.
+- Revisit when: the paste's own time needs measuring.
+- Source: 0019_segmented_transcription
+

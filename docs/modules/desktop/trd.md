@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0020_fix_overlay_after_reboot
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Desktop: technical
@@ -12,7 +12,8 @@ Built on Windows by 0002, signed in to the real API by 0007, released and self-u
 | Path | What |
 |---|---|
 | `apps/desktop/src-tauri/src/hotkey` | Native `WH_KEYBOARD_LL` hook behind `KeyHook`, the Esc hold-back, chord tracking fed by the hook and by page-forwarded keys (`Keys`, one count per event), the hold and hands-free gesture machine (`gesture.rs`), Start-menu guard, hotkey model |
-| `apps/desktop/src-tauri/src/audio` | `cpal` capture with a pre-armed stream, filtered resampling to 16 kHz mono 16-bit WAV, the input level meter |
+| `apps/desktop/src-tauri/src/audio` | `cpal` capture with a pre-armed stream and one RMS level per 10 ms, filtered resampling to 16 kHz mono 16-bit WAV, the input level meter |
+| `apps/desktop/src-tauri/src/segments` | The pause detector (a level against an adaptive floor) and a take's segments: one request in flight, texts, receipts, covered audio and the first language, a bounded grace at release; `replay.rs` is its debug-only real-time replay against a server |
 | `apps/desktop/src-tauri/src/session.rs`, `dictation.rs` | Gestures, cancel, the two-minute cap, the held-keys release check, the microphone check and the signed-out gate on the session thread; encode, send, paste and report on a worker |
 | `apps/desktop/src-tauri/src/own_window.rs` | Dictations into the main window sent to the page with an ack, kept in the clipboard otherwise |
 | `apps/desktop/src-tauri/src/paste.rs`, `clipboard`, `foreground` | Paste through a delayed-rendered clipboard counted only for the target's first read after the keystroke (Wait Chain Traversal for readers without a window, threads that ran since the keystroke first), one retry, restore after quiet, focus and integrity checks, `appId`, running apps |
@@ -39,11 +40,11 @@ Windows code sits behind the hook, foreground, clipboard and keychain modules; o
 
 None; desktop is a client.
 
-Calls, all from Rust with the access token: `POST /dictations` (audio and `appId`; the API picks the language), `GET /styles`, `GET /app-rules`, `GET` and `PUT /me/settings` (read first, since `PUT` replaces the item), and the editors' routes through the forwarder: dictionary, styles and app rules CRUD, settings, usage (`GET /me/usage`, read when General opens), history page and delete.
+Calls, all from Rust with the access token: `POST /dictations` (audio and `appId`; the API picks the language; with segments also the earlier texts, their receipts and the first language), `POST /dictations/segments` while a segmented take records, `GET /styles`, `GET /app-rules`, `GET` and `PUT /me/settings` (read first, since `PUT` replaces the item), and the editors' routes through the forwarder: dictionary, styles and app rules CRUD, settings, usage (`GET /me/usage`, read when General opens), history page and delete.
 Discovery: `GET https://<domain>/.well-known/take-my-word.json` when the user picks their own server.
 Cognito directly, as unsigned JSON calls: `InitiateAuth`, `RespondToAuthChallenge`, `ConfirmDevice`, `GetTokensFromRefreshToken`, `ForgetDevice`, `RevokeToken`.
 
-Jobs, listeners or scheduled work: the key hook, the microphone thread and the clipboard thread run for the app's lifetime; a paint check runs 1 s after each overlay show and a ready check 20 s after each overlay is created; a renewal, and a rule refresh when the rules are older than 5 min, start in the background at the first press; a level emitter runs only while listening or while the microphone step is shown in a visible window, and a 100 ms held-keys check only while the shortcut is down; prd release builds check `releases/latest/download/latest.json` at start and every 6 hours.
+Jobs, listeners or scheduled work: the key hook, the microphone thread and the clipboard thread run for the app's lifetime; a paint check runs 1 s after each overlay show and a ready check 20 s after each overlay is created; a renewal, and a rule refresh when the rules are older than 5 min, start in the background at the first press; the `segments` thread sends one segment at a time, and a 100 ms level poll runs only while a segmented take records; a level emitter runs only while listening or while the microphone step is shown in a visible window, and a 100 ms held-keys check only while the shortcut is down; prd release builds check `releases/latest/download/latest.json` at start and every 6 hours.
 
 ## Depends on
 
@@ -70,6 +71,9 @@ Jobs, listeners or scheduled work: the key hook, the microphone thread and the c
 - Window sizes live in `src/windows.json` (main window first size and minimum, update, overlay), read by Rust and the screenshots; the update window is fitted to its content at run time.
 - Every WebView window shares one browser argument string, `--force-prefers-no-reduced-motion` included.
 - Icons in `src-tauri/icons` (prd) and `icons/dev` (dev, the base config's) are written by `pnpm desktop-assets` in `packages/brand`, including the tray frames for 16 to 32 px.
+- `settings.json` `segmentation` (`enabled`, `minSeconds`, `maxSeconds`, `pauseMs`) is off by default at 20/30 and 600 ms: a segment closes at a pause once it has the minimum, only with nothing in flight, or is forced at the maximum on the quietest level of its last second.
+  A failed segment (429 included) or one still in flight after the grace sends the rest of the take whole in the final; a 404 turns segments off until the server changes; a final refused with 400 goes once more as one whole request.
+  One log line per take records audio length, segments sent and used, a late one, the outcome and the time from release to the answer, never text.
 - Debug builds only: `--dump-dir`, and `--dictate-wav` and `--stub-mode` sent to the running instance through single instance; the stub's tray submenu, off by default, with a two-line mode for multi-line pastes.
 
 ## Releases
@@ -84,6 +88,7 @@ Jobs, listeners or scheduled work: the key hook, the microphone thread and the c
 
 - Discovery parity: `discovery_vectors.json` (accepted and refused documents) runs against `discoverySchema` in vitest and against the Rust validator in cargo.
 - `cargo test`: the overlay's placement at each screen's scale and the rule that recreates it, hook model, gestures, twin key events, the held-keys release, session gate, the microphone check gate, inserts into the main window, paste with its retry, read order and reader rules (the real-clipboard ones ignored locally, run by `desktop-ci`), worker and error messages, route forwarding, rule cache ordering, level meter on a speech WAV and silence, dictionaries, stub routing, Cognito request shapes against a local fake, SRP against vectors from `packages/cognito`, the account (renewal, single renewal under concurrency, sign-in, new password, sign-out order), the bearer retry, the keychain on the real Credential Manager, the tray status and frames, window fitting, each environment's default hotkey, and the contract against `contract.schema.json`.
+- The detector runs on a 64 s Polly fixture with added noise, long silences and digital zeros; `replay::replays_takes_in_real_time_against_a_deployed_server` (ignored) plays a plan of WAVs in real time against a server with a token, faults included, and `writes_the_cut_points_a_session_makes_with_nothing_in_flight` (ignored) gives `pnpm eval:segmentation` its cuts.
 - `auth::dev_pool` tests are ignored: with `TMW_DEV_USERNAME` and `TMW_DEV_PASSWORD` they sign in to the dev pool, call the dev API and clean up after themselves.
 - Vitest covers the views with a mocked bridge, both dictionaries for missing keys, the brand token lint over every CSS and TSX file, and fails `ci` when `contract.schema.json` is stale; `pnpm screenshots <dir> [prefix,...]` renders every state in both languages and themes at each window's real size (the main window at 380x480, 1280x800, 1920x1080 and 2560x1440) and fails on sideways scroll or a fixed window that would scroll.
 - `scripts/terminal-smoke.sh`, run by hand from WSL on the Windows host and never in CI, dictates with a debug build (built with `--features tauri/custom-protocol`) into Windows Terminal with WSL, tmux and Claude Code, WSL with tmux, WSL bash, Windows PowerShell, conhost, a text box, WebView2 and Chrome, optionally racing a reader without a window, and records per paste the app's log lines, the text read back from the target, whether a line ran and the clipboard check.

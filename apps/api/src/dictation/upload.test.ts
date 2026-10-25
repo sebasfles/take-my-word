@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { wav } from "../testing/audio.ts";
 import { dictationBody, multipart, multipartContentType } from "../testing/multipart.ts";
 import { HttpError } from "../lib/http-error.ts";
-import { readDictationUpload } from "./upload.ts";
+import { readDictationUpload, readSegmentUpload } from "./upload.ts";
 
 async function codeOf(promise: Promise<unknown>): Promise<string> {
   try {
@@ -108,5 +108,79 @@ describe("readDictationUpload", () => {
     ],
   ])("answers bad_request for %s", async (_, contentType, body) => {
     expect(await codeOf(readDictationUpload(contentType, body))).toBe("bad_request");
+  });
+});
+
+describe("earlier segments and segment uploads", () => {
+  const audio = {
+    name: "audio",
+    body: wav({ seconds: 1 }),
+    filename: "a",
+    contentType: "audio/wav",
+  };
+
+  it("reads earlier segments from their own part, beyond the 4 KiB meta limit", async () => {
+    const segments = [{ text: "palabra ".repeat(1000), receipt: "r" }];
+    const body = multipart([
+      { name: "meta", body: "{}" },
+      { name: "segments", body: JSON.stringify(segments) },
+      audio,
+    ]);
+    const upload = await readDictationUpload(multipartContentType, body);
+    expect(upload.earlier).toEqual(segments);
+  });
+
+  it("leaves a request without segments exactly as before", async () => {
+    const upload = await readDictationUpload(
+      multipartContentType,
+      dictationBody({ audio: wav({ seconds: 1 }) }),
+    );
+    expect(upload.earlier).toBeUndefined();
+  });
+
+  it("reads a segment's meta and previous text, which defaults to empty", async () => {
+    const withPrevious = multipart([
+      { name: "meta", body: '{"language":"es"}' },
+      { name: "previous", body: "hola mundo" },
+      audio,
+    ]);
+    expect(await readSegmentUpload(multipartContentType, withPrevious)).toMatchObject({
+      meta: { language: "es" },
+      previous: "hola mundo",
+    });
+    const without = multipart([{ name: "meta", body: "{}" }, audio]);
+    expect((await readSegmentUpload(multipartContentType, without)).previous).toBe("");
+  });
+
+  it.each([
+    [
+      "meta over 4 KiB",
+      [{ name: "meta", body: JSON.stringify({ appId: "x".repeat(5000) }) }, audio],
+    ],
+    [
+      "segments that are not JSON",
+      [{ name: "meta", body: "{}" }, { name: "segments", body: "a" }, audio],
+    ],
+    [
+      "segments over 64 KiB",
+      [
+        { name: "meta", body: "{}" },
+        { name: "segments", body: JSON.stringify([{ text: "x".repeat(70_000), receipt: "r" }]) },
+        audio,
+      ],
+    ],
+    [
+      "two segments parts",
+      [
+        { name: "meta", body: "{}" },
+        { name: "segments", body: "[]" },
+        { name: "segments", body: "[]" },
+        audio,
+      ],
+    ],
+  ])("answers bad_request for %s", async (_, parts) => {
+    expect(await codeOf(readDictationUpload(multipartContentType, multipart(parts)))).toBe(
+      "bad_request",
+    );
   });
 });

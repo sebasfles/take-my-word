@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0021_provider_switch
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Dictation: architecture and debt
@@ -332,3 +332,31 @@ source: 0021_provider_switch
 - Debt created: rare terms depend on the refiner alone under Parakeet.
 - Revisit when: Parakeet is chosen for prd, or a user's terms go missing under it.
 - Source: 0021_provider_switch
+
+## 2026-10-25: Segments are transcribed by a stateless route and paid for with signed receipts
+
+- Decision: `POST /dictations/segments` transcribes one segment of a take without refining or saving and answers its raw text with an HMAC receipt over user, text hash, seconds, language and issue time; the final `POST /dictations` sends the earlier texts with their receipts, which are verified before any charge; a segment checks the cap before transcribing and is charged with an unconditional `ADD` only after the provider answers (a provider failure charges nothing, a hallucinated segment is charged); the final charges only its own audio and passes the cap when its receipts are valid; receipts live 180 s, a final may not repeat one, and the take may not pass 120 s plus 2.
+- Alternatives rejected: keeping segments server-side between requests; trusting the client's claimed seconds; charging the whole take in the final.
+- Reason: the API stays stateless per request and every second is still charged from its bytes ("The charge comes from the bytes"), once, while a take started under the cap finishes.
+- Debt created: inside 180 s a user can replay their own valid receipts in another final for one more refine without charge; a segment re-sent as audio after answering late is charged twice, at most one per take.
+- Revisit when: refines without charge show up in usage, or the desktop sends more than one segment in flight.
+- Source: 0019_segmented_transcription
+
+## 2026-10-25: A requested language is honoured only within the user's dictation languages
+
+- Decision: the final and segment meta may carry `language` (the first segment's detected language), and it is used only when it is one of the user's dictation languages; otherwise the request transcribes as if none was sent; this amends "Dictation languages live in settings and pick the transcription language", whose meta `locale` stays ignored.
+- Alternatives rejected: detecting each segment's language anew; trusting any language a client sends.
+- Reason: a take must not switch language mid-way, and a client may not widen the user's settings.
+- Debt created: none.
+- Revisit when: a third dictation language arrives.
+- Source: 0019_segmented_transcription
+
+## 2026-10-25: The segmentation gate cuts with the desktop's own detector
+
+- Decision: `pnpm eval:segmentation` runs the desktop's `Detector` over each clip through an ignored cargo test on the Windows host, as a session drives it with nothing in flight, and transcribes each segment through the eval Lambda with production's adapter, prompt and language rule; words within two of a cut are counted apart for the whole take and the segments alike, and the relative gate of 0017 applies to the rest.
+- Alternatives rejected: a port of the detector to TypeScript.
+- Reason: a port measured a detector that does not ship; the gate's verdict is only worth what its cuts are.
+- Debt created: none.
+- Revisit when: the detector runs anywhere but the desktop.
+- Source: 0019_segmented_transcription
+

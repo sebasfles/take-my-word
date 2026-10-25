@@ -3,8 +3,10 @@ use std::time::{Duration, Instant};
 
 use crate::audio::{AudioError, Capture, Captured, MAX_RECORDING, MIN_RECORDING};
 use crate::hotkey::{ChordEvent, Command, Gesture};
+use crate::segments::{Detector, Policy, TakeSegments};
 
 const RELEASE_CHECK: Duration = Duration::from_millis(100);
+const SEGMENT_POLL: Duration = Duration::from_millis(100);
 
 pub enum Input {
     Chord { event: ChordEvent, at: Instant },
@@ -14,7 +16,12 @@ pub enum Input {
 
 #[derive(Debug)]
 pub enum Take {
-    Recorded { captured: Captured, held: Duration },
+    Recorded {
+        captured: Captured,
+        held: Duration,
+        segments: Option<TakeSegments>,
+        released: Instant,
+    },
     TooShort,
     Cancelled,
     Failed(AudioError),
@@ -22,10 +29,19 @@ pub enum Take {
 
 pub trait Sink {
     fn may_record(&mut self) -> bool;
+    fn segments(&mut self) -> Option<(TakeSegments, Policy)>;
     fn listening(&mut self);
     fn hands_free(&mut self);
     fn chord_released(&mut self) -> bool;
     fn finished(&mut self, take: Take);
+}
+
+struct Segmenting {
+    take: TakeSegments,
+    detector: Detector,
+    read: usize,
+    start: usize,
+    poll_at: Instant,
 }
 
 pub struct Session<C, S> {
@@ -35,6 +51,7 @@ pub struct Session<C, S> {
     recording_since: Option<Instant>,
     release_check: Option<Instant>,
     checking: bool,
+    segmenting: Option<Segmenting>,
 }
 
 impl<C: Capture, S: Sink> Session<C, S> {
@@ -46,6 +63,7 @@ impl<C: Capture, S: Sink> Session<C, S> {
             recording_since: None,
             release_check: None,
             checking: false,
+            segmenting: None,
         }
     }
 
@@ -73,7 +91,11 @@ impl<C: Capture, S: Sink> Session<C, S> {
 
     fn deadline(&self) -> Option<Instant> {
         let cap = self.recording_since.map(|since| since + MAX_RECORDING);
-        [cap, self.gesture.deadline(), self.release_check]
+        let poll = self
+            .segmenting
+            .as_ref()
+            .map(|segmenting| segmenting.poll_at);
+        [cap, self.gesture.deadline(), self.release_check, poll]
             .into_iter()
             .flatten()
             .min()
@@ -129,6 +151,13 @@ impl<C: Capture, S: Sink> Session<C, S> {
                 self.release_check = Some(now + RELEASE_CHECK);
             }
         }
+        if self
+            .segmenting
+            .as_ref()
+            .is_some_and(|segmenting| now >= segmenting.poll_at)
+        {
+            self.poll_segments(now);
+        }
         let capped = self
             .recording_since
             .is_some_and(|since| now >= since + MAX_RECORDING);
@@ -147,6 +176,41 @@ impl<C: Capture, S: Sink> Session<C, S> {
         self.sink.listening();
         self.capture.start();
         self.recording_since = Some(at);
+        self.segmenting = self.sink.segments().map(|(take, policy)| Segmenting {
+            take,
+            detector: Detector::new(&policy),
+            read: 0,
+            start: 0,
+            poll_at: at + SEGMENT_POLL,
+        });
+    }
+
+    fn poll_segments(&mut self, now: Instant) {
+        let Some(segmenting) = self.segmenting.as_mut() else {
+            return;
+        };
+        segmenting.poll_at = now + SEGMENT_POLL;
+        let levels = self.capture.levels(segmenting.read);
+        segmenting.read += levels.len();
+        for level in levels {
+            segmenting.detector.push(level);
+        }
+        let Some(cut) = segmenting.detector.cut(segmenting.take.may_cut()) else {
+            return;
+        };
+        if !cut.spoken {
+            log::info!(
+                "segments: skipping {} ms without speech",
+                (cut.at - segmenting.start) * 10
+            );
+            segmenting.take.skip(cut.at);
+        } else if let Some(captured) = self.capture.between_levels(segmenting.start, cut.at) {
+            log::info!("segments: sending {} ms", captured.duration().as_millis());
+            segmenting.take.send(captured, cut.at);
+        } else {
+            segmenting.take.stop();
+        }
+        segmenting.start = cut.at;
     }
 
     fn end(&mut self, at: Instant) {
@@ -155,13 +219,17 @@ impl<C: Capture, S: Sink> Session<C, S> {
         };
         let held = at.saturating_duration_since(since).min(MAX_RECORDING);
         let captured = self.capture.stop();
+        let segments = self.segmenting.take().map(|segmenting| segmenting.take);
         self.resume_check();
-        self.sink.finished(take(held, captured));
+        self.sink.finished(take(held, captured, segments, at));
     }
 
     fn finish(&mut self, take: Take) {
         if self.recording_since.take().is_some() {
             let _ = self.capture.stop();
+            if let Some(segmenting) = self.segmenting.take() {
+                segmenting.take.cancel();
+            }
             self.resume_check();
             self.sink.finished(take);
         }
@@ -174,16 +242,30 @@ impl<C: Capture, S: Sink> Session<C, S> {
     }
 }
 
-fn take(held: Duration, captured: Result<Captured, AudioError>) -> Take {
-    if held < MIN_RECORDING {
-        return Take::TooShort;
-    }
-    match captured {
+fn take(
+    held: Duration,
+    captured: Result<Captured, AudioError>,
+    segments: Option<TakeSegments>,
+    released: Instant,
+) -> Take {
+    let take = match captured {
+        _ if held < MIN_RECORDING => Take::TooShort,
         Ok(captured) if captured.duration() < MIN_RECORDING => Take::TooShort,
         Ok(captured) if captured.is_digital_silence() => Take::Failed(AudioError::NoSignal),
-        Ok(captured) => Take::Recorded { captured, held },
+        Ok(captured) => {
+            return Take::Recorded {
+                captured,
+                held,
+                segments,
+                released,
+            };
+        }
         Err(error) => Take::Failed(error),
+    };
+    if let Some(segments) = segments {
+        segments.cancel();
     }
+    take
 }
 
 #[cfg(test)]
@@ -204,6 +286,9 @@ mod tests {
         zeros: bool,
         signed_out: bool,
         keys_up: bool,
+        levels: Vec<f32>,
+        heard: usize,
+        segmenting: Option<mpsc::Sender<crate::segments::Job>>,
     }
 
     struct FakeMic {
@@ -235,6 +320,24 @@ mod tests {
                 sample_rate: SAMPLE_RATE,
             })
         }
+
+        fn levels(&mut self, from: usize) -> Vec<f32> {
+            let log = self.log.borrow();
+            let heard = log.heard.min(log.levels.len());
+            log.levels[from.min(heard)..heard].to_vec()
+        }
+
+        fn between_levels(&mut self, from: usize, to: usize) -> Option<Captured> {
+            self.log
+                .borrow_mut()
+                .events
+                .push(format!("segment {from}..{to}"));
+            Some(Captured {
+                samples: vec![0.1; (to - from) * 480],
+                channels: 1,
+                sample_rate: SAMPLE_RATE,
+            })
+        }
     }
 
     struct FakeSink(Rc<RefCell<Log>>);
@@ -244,6 +347,14 @@ mod tests {
             let mut log = self.0.borrow_mut();
             log.events.push("may record".into());
             !log.signed_out
+        }
+
+        fn segments(&mut self) -> Option<(TakeSegments, Policy)> {
+            let jobs = self.0.borrow().segmenting.clone()?;
+            Some((
+                TakeSegments::new(jobs, crate::segments::Support::default()),
+                crate::segments::TEN_TWENTY,
+            ))
         }
 
         fn listening(&mut self) {
@@ -303,6 +414,7 @@ mod tests {
 
         fn tick(&mut self, at_ms: u64) {
             let at = self.t0 + Duration::from_millis(at_ms);
+            self.log.borrow_mut().heard = at_ms as usize / 10;
             self.session.on_deadline(at);
         }
 
@@ -325,7 +437,7 @@ mod tests {
             .takes
             .iter()
             .map(|take| match take {
-                Take::Recorded { held, captured } => format!(
+                Take::Recorded { held, captured, .. } => format!(
                     "recorded {}ms of {}ms",
                     held.as_millis(),
                     captured.duration().as_millis()
@@ -535,6 +647,85 @@ mod tests {
             harness.takes(),
             vec!["failed: the microphone sent only digital silence"]
         );
+    }
+
+    fn speech_with_a_pause_at(pause_ms: usize, total_ms: usize) -> Vec<f32> {
+        (0..total_ms / 10)
+            .map(|level| {
+                if (pause_ms / 10..pause_ms / 10 + 100).contains(&level) {
+                    0.000_5
+                } else {
+                    0.1 + 0.05 * ((level % 7) as f32 / 7.0)
+                }
+            })
+            .collect()
+    }
+
+    fn segmenting(harness: &Harness, levels: Vec<f32>) -> mpsc::Receiver<crate::segments::Job> {
+        let (jobs, inbox) = mpsc::channel();
+        let mut log = harness.log.borrow_mut();
+        log.levels = levels;
+        log.segmenting = Some(jobs);
+        inbox
+    }
+
+    fn run_until(harness: &mut Harness, until_ms: u64) {
+        while let Some(deadline) = harness.session.deadline() {
+            let at_ms = deadline.duration_since(harness.t0).as_millis() as u64;
+            if at_ms > until_ms {
+                break;
+            }
+            harness.tick(at_ms);
+        }
+    }
+
+    #[test]
+    fn a_long_hold_sends_a_segment_at_the_first_pause_after_the_minimum_while_recording() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(25)), Duration::ZERO);
+        let inbox = segmenting(&harness, speech_with_a_pause_at(12_000, 25_000));
+        harness.send(ChordEvent::Pressed, 0);
+        run_until(&mut harness, 12_700);
+        assert!(inbox.try_recv().is_ok());
+        assert!(
+            harness.events().contains(&"segment 0..1215".to_owned()),
+            "{:?}",
+            harness.events()
+        );
+        harness.send(ChordEvent::Released, 25_000);
+        let takes = harness.log.borrow();
+        let Some(Take::Recorded {
+            segments: Some(segments),
+            released,
+            ..
+        }) = takes.takes.first()
+        else {
+            panic!("no segmented take");
+        };
+        assert_eq!(*released, harness.t0 + Duration::from_secs(25));
+        assert!(!segments.may_cut());
+    }
+
+    #[test]
+    fn a_take_under_the_minimum_segment_sends_nothing_but_the_take() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(8)), Duration::ZERO);
+        let inbox = segmenting(&harness, speech_with_a_pause_at(5_000, 8_000));
+        harness.send(ChordEvent::Pressed, 0);
+        run_until(&mut harness, 8_000);
+        harness.send(ChordEvent::Released, 8_000);
+        assert!(inbox.try_recv().is_err());
+        assert_eq!(harness.takes(), vec!["recorded 8000ms of 8000ms"]);
+    }
+
+    #[test]
+    fn a_cancelled_take_closes_its_segments() {
+        let mut harness = Harness::new(Ok(Duration::from_secs(25)), Duration::ZERO);
+        let inbox = segmenting(&harness, speech_with_a_pause_at(12_000, 25_000));
+        harness.send(ChordEvent::Pressed, 0);
+        run_until(&mut harness, 13_000);
+        let job = inbox.try_recv().unwrap();
+        harness.send(ChordEvent::Cancelled, 13_100);
+        assert_eq!(harness.takes(), vec!["cancelled"]);
+        assert!(!job.take().may_cut());
     }
 
     #[test]

@@ -4,10 +4,12 @@ import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { s3DebugAudioSink } from "../dictation/audio-sink.ts";
 import { dynamoDictationStore, dynamoProfileStore, dynamoQuotaStore } from "../dictation/dynamo.ts";
+import { receiptMaxAgeSeconds } from "../dictation/receipt.ts";
 import { createSilenceGuard } from "../dictation/silence.ts";
 import { createLogger, stdout } from "../lib/log.ts";
 import { createMetrics } from "../lib/metrics.ts";
 import { cachedProviderKeys } from "../lib/secrets.ts";
+import { dynamoUsageStore } from "../usage/dynamo.ts";
 import { createDictateHandler } from "./app.ts";
 import { readConfig } from "./config.ts";
 import { selectProviders } from "./providers.ts";
@@ -26,6 +28,7 @@ const providers = await selectProviders(
 export const handler = createDictateHandler({
   providers,
   quota: dynamoQuotaStore(dynamo, config.TABLE_NAME),
+  usage: dynamoUsageStore({ client: dynamo, name: config.TABLE_NAME }),
   dailyQuotaMinutes: config.DAILY_QUOTA_MINUTES,
   dictations: dynamoDictationStore(dynamo, config.TABLE_NAME),
   profile: dynamoProfileStore({ client: dynamo, name: config.TABLE_NAME }),
@@ -38,6 +41,9 @@ export const handler = createDictateHandler({
     floorDbfs: config.SILENCE_FLOOR_DBFS,
     speechLevelDbfs: config.SPEECH_LEVEL_DBFS,
   },
+  ...(config.SEGMENT_RECEIPT_KEY && {
+    receipts: { secret: config.SEGMENT_RECEIPT_KEY, maxAgeSeconds: receiptMaxAgeSeconds },
+  }),
   ...(config.DEBUG_BUCKET && {
     audioSink: s3DebugAudioSink(new S3Client({}), config.DEBUG_BUCKET),
   }),

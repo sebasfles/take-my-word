@@ -192,6 +192,7 @@ function dictateInLambda(
     {
       providers: { transcriber, refiner },
       quota: { charge: () => Promise.resolve(true) },
+      usage: { usedSeconds: () => Promise.resolve(0) },
       dailyQuotaMinutes: 60,
       dictations: { save: () => Promise.resolve() },
       profile: {

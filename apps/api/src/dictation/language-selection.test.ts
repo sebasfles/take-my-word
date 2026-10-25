@@ -41,3 +41,20 @@ describe("transcribeIn", () => {
     expect(unknown.calls).toEqual([undefined, "en"]);
   });
 });
+
+describe("transcribeIn with a language already detected for the take", () => {
+  it("transcribes once in it when it is one of the user's languages", async () => {
+    const { calls, transcribe } = whisper("en");
+    expect(await transcribeIn(["en", "es"], transcribe, "es")).toEqual({
+      text: "in es",
+      language: "es",
+    });
+    expect(calls).toEqual(["es"]);
+  });
+
+  it("ignores it when it is not one of the user's languages", async () => {
+    const { calls, transcribe } = whisper("en");
+    expect(await transcribeIn(["en"], transcribe, "es")).toEqual({ text: "in en", language: "en" });
+    expect(calls).toEqual(["en"]);
+  });
+});

@@ -4,6 +4,9 @@ import {
   dictationMetaSchema,
   dictationResponseSchema,
   discoverySchema,
+  earlierSegmentsSchema,
+  segmentMetaSchema,
+  segmentResponseSchema,
   settingsSchema,
   styleListSchema,
 } from "@take-my-word/shared";
@@ -16,6 +19,9 @@ export function contractSchemas(): Record<string, unknown> {
   return {
     dictationMeta: z.toJSONSchema(dictationMetaSchema, { io: "input" }),
     dictationResponse: z.toJSONSchema(dictationResponseSchema),
+    segmentMeta: z.toJSONSchema(segmentMetaSchema, { io: "input" }),
+    segmentResponse: z.toJSONSchema(segmentResponseSchema),
+    earlierSegments: z.toJSONSchema(earlierSegmentsSchema),
     apiError: z.toJSONSchema(apiErrorSchema),
     settings: z.toJSONSchema(settingsSchema),
     styleList: z.toJSONSchema(styleListSchema),

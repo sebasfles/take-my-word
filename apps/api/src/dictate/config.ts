@@ -12,6 +12,7 @@ const configSchema = z
     DEBUG_BUCKET: z.string().min(1).optional(),
     TRANSCRIBER: z.string().default(defaultTranscriber),
     REFINER: z.string().default(defaultRefiner),
+    SEGMENT_RECEIPT_KEY: z.string().min(32).optional(),
     SILENCE_FLOOR_DBFS: z.coerce.number().max(0).default(defaultSilenceLevels.floorDbfs),
     SPEECH_LEVEL_DBFS: z.coerce.number().max(0).default(defaultSilenceLevels.speechLevelDbfs),
     DICTIONARY_HALF_LIFE_DAYS: z.coerce.number().positive().default(dictionaryHalfLifeDays),

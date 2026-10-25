@@ -1,6 +1,6 @@
 ---
-updated: 2026-10-24
-source: 0020_fix_overlay_after_reboot
+updated: 2026-10-25
+source: 0019_segmented_transcription
 ---
 
 # Desktop: product
@@ -90,6 +90,7 @@ Errors and empty states: a failed download or install says so and offers to try 
 - Terminals need no app rule: Windows Terminal (WSL, tmux, Claude Code, PowerShell) and the classic console take the dictation with Ctrl+V, and multi-line text keeps its line breaks and arrives as one block where the shell supports it.
 - In a Windows Terminal tab running Windows PowerShell 5.1, a multi-line dictation brings up the terminal's own warning, and confirming it runs every line but the last, because PSReadLine 2.0 has no bracketed paste; that is the terminal's behavior, not the app's, which never adds a line break or an Enter.
 - When the paste cannot land (an administrator window, a terminal run as administrator included, since Windows blocks typed input there; the window changed; the target never read it), the text stays in the clipboard and a notification says why; when the earlier clipboard cannot be put back, a notification says that too.
+- With `segmentation` turned on in `settings.json` (off by default), a long dictation is sent in parts while the user speaks, so on release only the last part is left to transcribe; a part that fails or is late never loses words, and a short dictation goes as one request either way.
 - Audio leaves the machine only to be transcribed and is never stored.
 - The dictated text stays out of Windows clipboard history and the cloud clipboard, and only the target app is given it.
 - The app speaks Spanish when Windows does, English otherwise, and follows Windows' light or dark theme; a choice of either in General applies to every open window at once and is kept, and the overlay looks the same in both themes.

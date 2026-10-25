@@ -26,6 +26,7 @@ use crate::overlay::{GatedOverlay, Overlay, OverlayState, Waveform, WindowOverla
 use crate::own_window::{ACK_TIMEOUT, Acks, Keeper, OwnWindowFirst, Page};
 use crate::paste::{EnigoKeystroke, Modifiers, Paster, Timing};
 use crate::rules::{RuleCache, RuleSource};
+use crate::segments::{self, Policy, Support, TakeSegments};
 use crate::server::{SelfHosted, Server};
 use crate::session::{Input, Session, Sink, Take};
 use crate::windows;
@@ -50,6 +51,7 @@ pub struct Shell {
     pub acks: Acks,
     #[cfg(debug_assertions)]
     pub jobs: mpsc::Sender<Job>,
+    segment_support: Support,
     keys: Arc<Mutex<Keys>>,
     keyboard: Arc<dyn KeyHook + Send + Sync>,
     session: mpsc::Sender<Input>,
@@ -108,10 +110,19 @@ impl Shell {
         let api = AuthedApi::new(HttpApi::new(server.api_url.clone())?, Arc::clone(&account));
         let rules = Arc::new(RuleCache::default());
         let dictation_api = api.clone();
+        let segment_api = api.clone();
         #[cfg(debug_assertions)]
         let stub = Stub::start(STUB_DELAY)?;
         #[cfg(debug_assertions)]
         let dictation_api = Stubbed::new(stub.clone(), dictation_api)?;
+        #[cfg(debug_assertions)]
+        let segment_api = Stubbed::new(stub.clone(), segment_api)?;
+        let (segment_jobs, segment_inbox) = mpsc::channel();
+        thread::Builder::new()
+            .name("segments".into())
+            .spawn(move || segments::serve(&segment_api, segment_inbox))?;
+        let segment_support = Support::default();
+        let policy = settings.segmentation.unwrap_or_default().checked();
         let keys = Arc::new(Mutex::new(Keys::new(settings.hotkey.clone())));
         let (session, session_inbox) = mpsc::channel();
         let (jobs, job_inbox) = mpsc::channel();
@@ -142,6 +153,7 @@ impl Shell {
             overlay: overlay.clone(),
             notifier: TrayNotifier(app.clone()),
             keystrokes: Arc::clone(&rules),
+            grace: segments::GRACE,
         };
         thread::Builder::new()
             .name("dictation".into())
@@ -160,6 +172,9 @@ impl Shell {
             busy: None,
             keys: Arc::clone(&keys),
             keyboard: keyboard.clone().unwrap_or_else(|| Arc::new(NoHook)),
+            segment_jobs,
+            segment_support: segment_support.clone(),
+            policy,
         };
         thread::Builder::new()
             .name("session".into())
@@ -178,6 +193,7 @@ impl Shell {
             acks,
             #[cfg(debug_assertions)]
             jobs,
+            segment_support,
             keys,
             keyboard: keyboard.unwrap_or_else(|| Arc::new(NoHook)),
             session,
@@ -204,6 +220,7 @@ impl Shell {
                 .connect(&server)
                 .map_err(|error| AccountError::Unavailable(error.to_string()))?;
             self.api.set_base_url(&server.api_url);
+            self.segment_support.reset();
             log::info!(
                 "server: {}",
                 chosen
@@ -413,9 +430,21 @@ struct ShellSink {
     busy: Option<Busy>,
     keys: Arc<Mutex<Keys>>,
     keyboard: Arc<dyn KeyHook + Send + Sync>,
+    segment_jobs: mpsc::Sender<segments::Job>,
+    segment_support: Support,
+    policy: Policy,
 }
 
 impl Sink for ShellSink {
+    fn segments(&mut self) -> Option<(TakeSegments, Policy)> {
+        (self.policy.enabled && self.segment_support.available()).then(|| {
+            (
+                TakeSegments::new(self.segment_jobs.clone(), self.segment_support.clone()),
+                self.policy,
+            )
+        })
+    }
+
     fn may_record(&mut self) -> bool {
         if self.account.is_signed_in() {
             self.account.renew_in_background();
